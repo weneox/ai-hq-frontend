@@ -1,0 +1,138 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =========================================================
+   Design Tokens (enterprise)
+   ========================================================= */
+:root {
+  color-scheme: light;
+
+  /* Typography */
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
+    "Apple Color Emoji", "Segoe UI Emoji";
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  /* Core tokens */
+  --bg: 210 40% 98%;
+  --fg: 222 47% 11%;
+  --muted: 215 20% 65%;
+  --border: 215 25% 90%;
+  --surface: 0 0% 100%;
+
+  --brand: 239 84% 63%;
+  --brand-foreground: 0 0% 100%;
+
+  --ring: 239 84% 63%;
+  --radius: 16px;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* =========================================================
+   Page background (subtle premium depth)
+   ========================================================= */
+body {
+  margin: 0;
+  color: hsl(var(--fg));
+  background:
+    radial-gradient(1200px circle at 18% -10%, rgba(99,102,241,0.10), transparent 45%),
+    radial-gradient(900px circle at 85% 10%, rgba(14,165,233,0.08), transparent 42%),
+    linear-gradient(to bottom, rgba(248,250,252,1), rgba(241,245,249,1));
+}
+
+/* Selection */
+::selection {
+  background: rgba(99, 102, 241, 0.20);
+}
+
+/* =========================================================
+   Scrollbar (clean + subtle)
+   ========================================================= */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100,116,139,.28) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(100,116,139,.22);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(100,116,139,.32);
+}
+
+/* Hide scrollbars for tab rows / small horizontal scrollers */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* =========================================================
+   Focus system (fallback)
+   - Components already use focus-visible:ring…; keep this light.
+   ========================================================= */
+:where(button, a, input, textarea, select):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.22);
+}
+
+/* Links */
+a {
+  color: inherit;
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: none;
+}
+
+/* =========================================================
+   Reduced motion
+   ========================================================= */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+    animation-duration: 0.001ms !important;
+  }
+}
+
+/* =========================================================
+   Dark mode via html.dark
+   ========================================================= */
+html.dark {
+  color-scheme: dark;
+}
+
+html.dark body {
+  color: hsl(210 40% 96%);
+  background:
+    radial-gradient(1200px circle at 18% -10%, rgba(99,102,241,0.14), transparent 46%),
+    radial-gradient(900px circle at 85% 10%, rgba(14,165,233,0.10), transparent 44%),
+    linear-gradient(to bottom, rgb(2 6 23), rgb(3 7 18));
+}
+
+html.dark ::selection {
+  background: rgba(99, 102, 241, 0.24);
+}
+
+html, body, #root {
+  height: 100%;
+}
