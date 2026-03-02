@@ -1,5 +1,6 @@
 const WS_TOKEN = String(import.meta.env.VITE_WS_TOKEN || "").trim();
-const API_BASE = (import.meta.env.VITE_API_BASE || "").replace(/\/+$/, "");
+const API_BASE = String(import.meta.env.VITE_API_BASE || "").replace(/\/+$/, "");
+const WS_URL = String(import.meta.env.VITE_WS_URL || "").trim();
 
 function safeJson(x) {
   try {
@@ -11,8 +12,15 @@ function safeJson(x) {
 }
 
 function buildWsUrl() {
+  // Prefer explicit WS URL if provided (Cloudflare Pages friendly)
+  if (WS_URL) {
+    if (!WS_TOKEN) return WS_URL;
+    const sep = WS_URL.includes("?") ? "&" : "?";
+    return `${WS_URL}${sep}token=${encodeURIComponent(WS_TOKEN)}`;
+  }
+
   if (!API_BASE || !WS_TOKEN) return "";
-  const wsBase = API_BASE.replace(/^http/i, "ws");
+  const wsBase = API_BASE.replace(/^https:/i, "wss:").replace(/^http:/i, "ws:");
   return `${wsBase}/ws?token=${encodeURIComponent(WS_TOKEN)}`;
 }
 
@@ -22,24 +30,22 @@ function buildWsUrl() {
  * - status events
  * - subscribe/unsubscribe
  */
-export function createWsClient({
-  onEvent,
-  onStatus,
-  maxDelayMs = 12000,
-} = {}) {
+export function createWsClient({ onEvent, onStatus, maxDelayMs = 12000 } = {}) {
   let ws = null;
   let stopped = false;
   let attempt = 0;
   let t = 0;
 
   const notifyStatus = (s) => {
-    try { onStatus && onStatus(s); } catch {}
+    try {
+      onStatus && onStatus(s);
+    } catch {}
   };
 
   const connect = () => {
     const url = buildWsUrl();
     if (!url) {
-      notifyStatus({ state: "off", detail: "missing VITE_WS_TOKEN or VITE_API_BASE" });
+      notifyStatus({ state: "off", detail: "missing VITE_WS_TOKEN or VITE_API_BASE/VITE_WS_URL" });
       return;
     }
 
@@ -61,7 +67,7 @@ export function createWsClient({
 
       ws.onerror = () => {
         notifyStatus({ state: "error" });
-        // onclose will handle reconnect
+        // reconnect handled by onclose
       };
 
       ws.onmessage = (ev) => {
@@ -69,6 +75,7 @@ export function createWsClient({
         if (!msg) return;
         const type = msg.type || msg.event;
         if (!type) return;
+
         try {
           onEvent && onEvent({ type, payload: msg });
         } catch {}
@@ -91,6 +98,7 @@ export function createWsClient({
       connect();
     }, delay);
 
+    // optional: keep UI updated
     notifyStatus({ state: "reconnecting", attempt, delayMs: delay });
   };
 
@@ -102,7 +110,9 @@ export function createWsClient({
     stop() {
       stopped = true;
       clearTimeout(t);
-      try { ws && ws.close(); } catch {}
+      try {
+        ws && ws.close();
+      } catch {}
       ws = null;
       notifyStatus({ state: "stopped" });
     },
@@ -112,7 +122,7 @@ export function createWsClient({
       } catch {}
     },
     canUseWs() {
-      return Boolean(API_BASE && WS_TOKEN);
+      return Boolean((WS_URL || API_BASE) && WS_TOKEN);
     },
   };
 }
