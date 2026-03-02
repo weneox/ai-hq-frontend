@@ -1,8 +1,9 @@
-// src/lib/pushClient.js — FINAL (stable)
-// ✅ Dev: VITE_API_BASE varsa onu istifadə edir
-// ✅ Dev fallback: env oxunmasa belə localhost-da Railway backend-ə vurur (404 fix)
+// src/lib/pushClient.js — FINAL (AI HQ)
+// ✅ Uses VITE_API_BASE when available
+// ✅ Dev fallback: if env not loaded and hostname=localhost => Railway backend
 // ✅ Prod: same-origin fallback
-// ✅ Safe: fetch JSON/non-JSON, service worker, logs
+// ✅ Stable SW registration + update + skipWaiting
+// ✅ Safe JSON reading + good error surfaces
 
 function urlBase64ToUint8Array(base64String) {
   const s = String(base64String || "").trim();
@@ -21,10 +22,17 @@ function trimSlashEnd(s) {
 // Import-meta env safe getter (avoid weird runtime contexts)
 function getViteEnv(key) {
   try {
-    // Vite runtime
     return String(import.meta?.env?.[key] || "").trim();
   } catch {
     return "";
+  }
+}
+
+function isLocalhost() {
+  try {
+    return typeof window !== "undefined" && window.location?.hostname === "localhost";
+  } catch {
+    return false;
   }
 }
 
@@ -33,12 +41,10 @@ export function getApiBase() {
   const v = trimSlashEnd(getViteEnv("VITE_API_BASE"));
   if (v) return v;
 
-  // 🔥 Fail-safe: env oxunmasa belə dev-də 404 olmasın
-  if (typeof window !== "undefined" && window.location?.hostname === "localhost") {
-    return "https://ai-hq-backend-production.up.railway.app";
-  }
+  // Fail-safe: env oxunmasa belə dev-də 404 olmasın
+  if (isLocalhost()) return "https://ai-hq-backend-production.up.railway.app";
 
-  return ""; // prod: same origin
+  return ""; // prod: same-origin
 }
 
 // Build endpoint URL safely (handles empty base)
@@ -68,20 +74,11 @@ export async function askPermission() {
   return p;
 }
 
-export async function registerServiceWorker() {
-  if (!("serviceWorker" in navigator)) return { ok: false, error: "serviceWorker not supported" };
-
+async function safeReadText(resp) {
   try {
-    // If already registered (common in dev), reuse it
-    const existing = await navigator.serviceWorker.getRegistration("/");
-    const reg = existing || (await navigator.serviceWorker.register("/sw.js"));
-
-    // Wait until active/ready
-    await navigator.serviceWorker.ready;
-
-    return { ok: true, reg };
-  } catch (e) {
-    return { ok: false, error: String(e?.message || e) };
+    return await resp.text();
+  } catch {
+    return "";
   }
 }
 
@@ -89,15 +86,60 @@ async function safeReadJson(resp) {
   try {
     const ct = String(resp.headers.get("content-type") || "");
     if (ct.includes("application/json")) return await resp.json();
-    // try anyway
+    // try anyway (backend might forget header)
     return await resp.json();
   } catch {
     return null;
   }
 }
 
+function normalizeErr(e) {
+  if (!e) return "unknown";
+  if (typeof e === "string") return e;
+  return String(e?.message || e);
+}
+
+/**
+ * Register and ensure latest service worker is active
+ * - register /sw.js (or reuse existing)
+ * - reg.update() to fetch latest sw.js (Cloudflare cache)
+ * - if waiting -> postMessage SKIP_WAITING
+ */
+export async function registerServiceWorker() {
+  if (!("serviceWorker" in navigator)) return { ok: false, error: "serviceWorker not supported" };
+
+  try {
+    // reuse existing registration if present
+    const existing = await navigator.serviceWorker.getRegistration("/");
+    const reg = existing || (await navigator.serviceWorker.register("/sw.js"));
+
+    // wait until ready
+    await navigator.serviceWorker.ready;
+
+    // force check for update
+    try {
+      await reg.update();
+    } catch {}
+
+    // if new worker is waiting, activate it
+    try {
+      if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
+    } catch {}
+
+    return { ok: true, reg };
+  } catch (e) {
+    return { ok: false, error: normalizeErr(e) };
+  }
+}
+
+/**
+ * Subscribe for push and send subscription to backend
+ * @param {string} vapidPublicKey - from backend /api/push/vapid or env VITE_VAPID_PUBLIC_KEY
+ * @param {string} recipient - e.g. "ceo"
+ */
 export async function subscribePush({ vapidPublicKey, recipient = "ceo" }) {
   if (!canPush()) return { ok: false, error: "push not supported in this browser" };
+
   const key = String(vapidPublicKey || "").trim();
   if (!key) return { ok: false, error: "missing VAPID public key" };
 
@@ -121,31 +163,97 @@ export async function subscribePush({ vapidPublicKey, recipient = "ceo" }) {
 
   const url = apiUrl("/api/push/subscribe");
 
-  // ✅ Debug (only logs in dev)
+  // optional debug logs
   try {
     const isDev = getViteEnv("DEV") === "true" || getViteEnv("MODE") === "development";
     if (isDev) {
-      console.log("[push] VITE_API_BASE =", getViteEnv("VITE_API_BASE"));
-      console.log("[push] resolved base =", getApiBase());
+      console.log("[push] VITE_API_BASE =", getViteEnv("VITE_API_BASE") || "(empty)");
+      console.log("[push] resolved base =", getApiBase() || "(same-origin)");
       console.log("[push] subscribe url =", url);
     }
   } catch {}
 
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json; charset=utf-8" },
-    body: JSON.stringify({
-      recipient,
-      subscription: sub.toJSON(),
-    }),
-  });
+  let resp;
+  try {
+    resp = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+      body: JSON.stringify({
+        recipient,
+        subscription: sub.toJSON(),
+      }),
+    });
+  } catch (e) {
+    return { ok: false, error: `network: ${normalizeErr(e)}` };
+  }
 
   const json = await safeReadJson(resp);
+  const text = json ? "" : await safeReadText(resp);
+
+  const ok = Boolean(resp.ok && (json?.ok ?? true));
+
+  return {
+    ok,
+    status: resp.status,
+    json,
+    text,
+    subscription: sub,
+  };
+}
+
+/**
+ * Unsubscribe locally (browser) + optionally tell backend to delete if you add endpoint later
+ */
+export async function unsubscribePush() {
+  if (!("serviceWorker" in navigator)) return { ok: false, error: "serviceWorker not supported" };
+
+  try {
+    const reg = await navigator.serviceWorker.getRegistration("/");
+    if (!reg) return { ok: true, unsubscribed: false };
+
+    const sub = await reg.pushManager.getSubscription();
+    if (!sub) return { ok: true, unsubscribed: false };
+
+    const done = await sub.unsubscribe();
+    return { ok: true, unsubscribed: Boolean(done) };
+  } catch (e) {
+    return { ok: false, error: normalizeErr(e) };
+  }
+}
+
+/**
+ * Debug helper: run a push test from the browser (needs backend /api/push/test POST)
+ * If backend requires DEBUG_API_TOKEN, pass debugToken and backend should read x-debug-token
+ */
+export async function sendPushTest({
+  title = "AI HQ Test ✅",
+  body = "Push from browser",
+  data = { type: "push.test", ts: new Date().toISOString() },
+  debugToken = "",
+} = {}) {
+  const url = apiUrl("/api/push/test");
+
+  const headers = { "Content-Type": "application/json; charset=utf-8" };
+  if (debugToken) headers["x-debug-token"] = String(debugToken);
+
+  let resp;
+  try {
+    resp = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ title, body, data }),
+    });
+  } catch (e) {
+    return { ok: false, error: `network: ${normalizeErr(e)}` };
+  }
+
+  const json = await safeReadJson(resp);
+  const text = json ? "" : await safeReadText(resp);
 
   return {
     ok: Boolean(resp.ok && (json?.ok ?? true)),
     status: resp.status,
     json,
-    subscription: sub,
+    text,
   };
 }
