@@ -1,4 +1,8 @@
-// src/lib/pushClient.js
+// src/lib/pushClient.js — FINAL
+// - Dev: uses VITE_API_BASE (e.g. https://ai-hq-backend-production.up.railway.app)
+// - Prod: same-origin fallback
+// - Fix: apiBase empty => DO NOT build `${apiBase}/...` (it becomes "/..." on localhost dev server)
+
 function urlBase64ToUint8Array(base64String) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -8,10 +12,21 @@ function urlBase64ToUint8Array(base64String) {
   return out;
 }
 
+function trimSlashEnd(s) {
+  return String(s || "").trim().replace(/\/+$/, "");
+}
+
 // Backend URL (prod: same-origin, dev: VITE_API_BASE)
 export function getApiBase() {
-  const v = (import.meta?.env?.VITE_API_BASE || "").trim();
-  return v || ""; // empty => same origin
+  const v = trimSlashEnd(import.meta?.env?.VITE_API_BASE || "");
+  return v; // "" => same origin
+}
+
+// Build endpoint URL safely (handles empty base)
+export function apiUrl(pathname) {
+  const base = getApiBase();
+  const p = String(pathname || "").startsWith("/") ? pathname : `/${pathname}`;
+  return base ? `${base}${p}` : p;
 }
 
 export async function registerServiceWorker() {
@@ -64,8 +79,7 @@ export async function subscribePush({ vapidPublicKey, recipient = "ceo" }) {
     });
   }
 
-  const apiBase = getApiBase();
-  const resp = await fetch(`${apiBase}/api/push/subscribe`, {
+  const resp = await fetch(apiUrl("/api/push/subscribe"), {
     method: "POST",
     headers: { "Content-Type": "application/json; charset=utf-8" },
     body: JSON.stringify({
