@@ -1,5 +1,7 @@
-// src/components/ProposalDetail.jsx (FIXED)
-// ✅ FIX: Hooks are ALWAYS called (no hooks after early return)
+// src/components/ProposalDetail.jsx (FINAL FIXED)
+// ✅ FIX: Decision panel shows ONLY when proposal.status === "pending"
+// ✅ Reject requires reason (button disabled if empty)
+// ✅ Adds badge tone for "in_progress"
 // Includes: Draft preview + Feedback + Approve Draft + Publish
 
 import { useMemo, useState } from "react";
@@ -20,6 +22,7 @@ import {
 function badgeTone(status) {
   const s = String(status || "").toLowerCase();
   if (s === "pending") return "warn";
+  if (s === "in_progress") return "neutral"; // ✅ added
   if (s === "approved") return "success";
   if (s === "rejected") return "danger";
   return "neutral";
@@ -144,7 +147,7 @@ export default function ProposalDetail({
   const [feedback, setFeedback] = useState("");
   const [showDraftFull, setShowDraftFull] = useState(false);
 
-  // ✅ HOOKS ALWAYS RUN (proposal may be null, that's fine)
+  // ✅ HOOKS ALWAYS RUN
   const payload = useMemo(() => parsePayload(proposal), [proposal]);
   const title = useMemo(() => (proposal ? titleOf(proposal) : "Proposal"), [proposal]);
   const summary = useMemo(() => (proposal ? summaryOf(proposal) : ""), [proposal]);
@@ -164,13 +167,10 @@ export default function ProposalDetail({
 
   const pack = resolvedDraft?.pack || null;
 
-  // ✅ AFTER hooks, it's safe to early-return
   if (!proposal) {
     return (
       <Card className="min-w-0 h-full flex flex-col justify-center items-center text-center">
-        <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-          Select a proposal
-        </div>
+        <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Select a proposal</div>
         <div className="mt-1 text-xs text-slate-500 dark:text-slate-400 max-w-[420px]">
           Soldakı queue-dan bir proposal seç — burada qərar paneli açılacaq.
         </div>
@@ -181,6 +181,7 @@ export default function ProposalDetail({
   const agent = proposal.agent_key || proposal.agentKey || proposal.agent || "—";
   const created = relTime(proposal.created_at || proposal.createdAt);
   const status = proposal.status || "pending";
+  const statusLc = String(status || "").toLowerCase();
 
   const st = String(resolvedDraft?.status || "").toLowerCase();
   const isDraftRegenerating = st.includes("regenerat") || st.includes("changes");
@@ -226,6 +227,8 @@ export default function ProposalDetail({
     await onPublishDraft(String(proposal.id), String(resolvedDraft.id));
   };
 
+  const rejectDisabled = Boolean(busy || !String(reason || "").trim()); // ✅
+
   return (
     <Card className="min-w-0 p-0 overflow-hidden flex flex-col h-full">
       {/* Header */}
@@ -256,9 +259,7 @@ export default function ProposalDetail({
             </div>
 
             {summary ? (
-              <div className="mt-2 text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
-                {summary}
-              </div>
+              <div className="mt-2 text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{summary}</div>
             ) : null}
 
             <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
@@ -297,9 +298,7 @@ export default function ProposalDetail({
           <div className="flex items-start justify-between gap-2 min-w-0">
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                  Generated Draft
-                </div>
+                <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">Generated Draft</div>
 
                 {resolvedDraft?.status ? (
                   <Badge tone={draftTone(resolvedDraft.status)}>{resolvedDraft.status}</Badge>
@@ -308,9 +307,7 @@ export default function ProposalDetail({
                 )}
 
                 {typeof resolvedDraft?.version === "number" ? (
-                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                    v{resolvedDraft.version}
-                  </span>
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">v{resolvedDraft.version}</span>
                 ) : null}
               </div>
 
@@ -359,9 +356,7 @@ export default function ProposalDetail({
 
                   {packTitle(pack) ? (
                     <>
-                      <div className="mt-3 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
-                        Topic
-                      </div>
+                      <div className="mt-3 text-[11px] font-semibold text-slate-600 dark:text-slate-300">Topic</div>
                       <div className="mt-1 text-sm text-slate-900 dark:text-slate-100 break-words">
                         {asDisplay(packTitle(pack))}
                       </div>
@@ -372,9 +367,7 @@ export default function ProposalDetail({
                 <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900/60 min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Hashtags</div>
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                      {packHashtags(pack).length || 0}
-                    </span>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400">{packHashtags(pack).length || 0}</span>
                   </div>
 
                   <div className="mt-2 flex flex-wrap gap-1">
@@ -471,7 +464,12 @@ export default function ProposalDetail({
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Button
                     variant="outline"
-                    disabled={effectiveDraftBusy || !canRequestChanges || isDraftRegenerating || !String(feedback || "").trim()}
+                    disabled={
+                      effectiveDraftBusy ||
+                      !canRequestChanges ||
+                      isDraftRegenerating ||
+                      !String(feedback || "").trim()
+                    }
                     onClick={doRequestChanges}
                     className="min-w-[180px]"
                     title={!resolvedDraft?.id ? "Draft ID yoxdur (backend-dən gəlməlidir)" : ""}
@@ -517,9 +515,7 @@ export default function ProposalDetail({
           <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">Overview</div>
 
           {rows.length === 0 ? (
-            <div className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-              Payload-da CEO üçün seçilən sahələr yoxdur.
-            </div>
+            <div className="mt-2 text-sm text-slate-500 dark:text-slate-400">Payload-da CEO üçün seçilən sahələr yoxdur.</div>
           ) : (
             <div className="mt-3 grid gap-2 md:grid-cols-2 min-w-0">
               {rows.map((r) => (
@@ -527,9 +523,7 @@ export default function ProposalDetail({
                   key={r.k}
                   className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900/60 min-w-0"
                 >
-                  <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
-                    {r.label}
-                  </div>
+                  <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">{r.label}</div>
                   <div className="mt-1 text-sm text-slate-900 dark:text-slate-100 whitespace-pre-wrap break-words">
                     {asDisplay(r.v)}
                   </div>
@@ -539,36 +533,50 @@ export default function ProposalDetail({
           )}
         </div>
 
-        {/* Decision */}
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30 min-w-0">
-          <div className="flex items-center justify-between gap-2">
+        {/* ✅ Decision — ONLY when pending */}
+        {statusLc === "pending" ? (
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30 min-w-0">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">Decision</div>
+              <div className="text-[11px] text-slate-500 dark:text-slate-400">Reject üçün reason məcburidir</div>
+            </div>
+
+            <textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              rows={6}
+              className="mt-2 w-full min-w-0 rounded-xl border border-slate-200 bg-white p-2 text-sm outline-none transition-all duration-200
+                         focus:border-indigo-300/80 focus:ring-2 focus:ring-indigo-500/25 focus:ring-offset-2 focus:ring-offset-white
+                         dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-indigo-500/50 dark:focus:ring-indigo-500/25 dark:focus:ring-offset-slate-950"
+              placeholder="Qısa səbəb / qeyd…"
+            />
+
+            <div className="mt-3 flex flex-wrap gap-2 min-w-0">
+              <Button variant="primary" disabled={busy} onClick={onApprove} className="flex-1 min-w-[160px]">
+                Approve
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={rejectDisabled}
+                onClick={onReject}
+                className="flex-1 min-w-[160px]"
+                title={!String(reason || "").trim() ? "Reject üçün reason yaz" : ""}
+              >
+                Reject
+              </Button>
+            </div>
+
+            <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">Approve → backend n8n workflow-a event atır.</div>
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30 min-w-0">
             <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">Decision</div>
-            <div className="text-[11px] text-slate-500 dark:text-slate-400">Reject üçün reason məcburidir</div>
+            <div className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+              Bu proposal artıq <span className="font-semibold">{statusLc}</span> mərhələsindədir — qərar paneli bağlanıb.
+              {statusLc === "in_progress" ? " Draft hazırlanır (n8n işləyir)." : ""}
+            </div>
           </div>
-
-          <textarea
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            rows={6}
-            className="mt-2 w-full min-w-0 rounded-xl border border-slate-200 bg-white p-2 text-sm outline-none transition-all duration-200
-                       focus:border-indigo-300/80 focus:ring-2 focus:ring-indigo-500/25 focus:ring-offset-2 focus:ring-offset-white
-                       dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-indigo-500/50 dark:focus:ring-indigo-500/25 dark:focus:ring-offset-slate-950"
-            placeholder="Qısa səbəb / qeyd…"
-          />
-
-          <div className="mt-3 flex flex-wrap gap-2 min-w-0">
-            <Button variant="primary" disabled={busy} onClick={onApprove} className="flex-1 min-w-[160px]">
-              Approve
-            </Button>
-            <Button variant="destructive" disabled={busy} onClick={onReject} className="flex-1 min-w-[160px]">
-              Reject
-            </Button>
-          </div>
-
-          <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
-            Approve → backend n8n workflow-a event atır.
-          </div>
-        </div>
+        )}
 
         {/* Advanced */}
         <details className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30 min-w-0">
