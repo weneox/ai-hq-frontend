@@ -1,5 +1,7 @@
-// src/components/ProposalList.jsx (FINAL)
+// src/components/ProposalList.jsx (FINAL — with in_progress tab + draft indicator)
 // Fixes: stable scroll, clean list, search + tabs
+// ✅ Adds "Drafting" (in_progress) tab so approved->in_progress proposals don't "disappear"
+// ✅ Shows small "Draft" badge when latestDraft exists (draft.ready etc.)
 
 import Card from "./ui/Card.jsx";
 import Input from "./ui/Input.jsx";
@@ -10,8 +12,19 @@ import { relTime, parsePayload, titleOf, summaryOf, safeText } from "../lib/uiFo
 function badgeTone(status) {
   const s = String(status || "").toLowerCase();
   if (s === "pending") return "warn";
+  if (s === "in_progress") return "neutral";
   if (s === "approved") return "success";
   if (s === "rejected") return "danger";
+  return "neutral";
+}
+
+function draftBadgeTone(draftStatus) {
+  const s = String(draftStatus || "").toLowerCase();
+  if (s.includes("ready")) return "success";
+  if (s.includes("approved")) return "success";
+  if (s.includes("published")) return "success";
+  if (s.includes("changes") || s.includes("regenerat")) return "warn";
+  if (s.includes("fail") || s.includes("error")) return "danger";
   return "neutral";
 }
 
@@ -28,6 +41,7 @@ export default function ProposalList({
 
   const tabs = [
     { value: "pending", label: "Pending" },
+    { value: "in_progress", label: "Drafting" }, // ✅ new
     { value: "approved", label: "Approved" },
     { value: "rejected", label: "Rejected" },
   ];
@@ -95,8 +109,15 @@ export default function ProposalList({
               const isSel = String(p.id) === String(selectedId);
               const agent = p.agent_key || p.agentKey || p.agent || "agent";
               const when = relTime(p.created_at || p.createdAt);
-              parsePayload(p); // keep parse call (side effects none, ok)
+
+              parsePayload(p);
               const summary = safeText(summaryOf(p), 96);
+
+              const draftStatus =
+                p?.latestDraft?.status ||
+                p?.draft?.status ||
+                p?.contentDraft?.status ||
+                "";
 
               return (
                 <button
@@ -135,13 +156,25 @@ export default function ProposalList({
                             </div>
                           ) : null}
 
-                          <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
-                            {agent} · {when}
+                          <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+                            <span>{agent} · {when}</span>
+
+                            {/* ✅ Draft indicator */}
+                            {draftStatus ? (
+                              <Badge tone={draftBadgeTone(draftStatus)} className="shrink-0">
+                                Draft
+                              </Badge>
+                            ) : null}
                           </div>
                         </div>
 
-                        <div className="shrink-0">
+                        <div className="shrink-0 flex flex-col items-end gap-2">
                           <Badge tone={badgeTone(p.status)}>{p.status || status}</Badge>
+                          {draftStatus ? (
+                            <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                              {String(draftStatus).toLowerCase().includes("ready") ? "ready" : "…" }
+                            </span>
+                          ) : null}
                         </div>
                       </div>
                     </div>
