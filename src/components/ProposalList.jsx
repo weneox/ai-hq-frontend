@@ -1,4 +1,6 @@
-// src/components/ProposalList.jsx
+// src/components/ProposalList.jsx (FINAL)
+// Fixes: stable scroll, clean list, search + tabs
+
 import Card from "./ui/Card.jsx";
 import Input from "./ui/Input.jsx";
 import Badge from "./ui/Badge.jsx";
@@ -34,7 +36,9 @@ export default function ProposalList({
   const filtered = (proposals || []).filter((p) => {
     const t = titleOf(p).toLowerCase();
     const s = summaryOf(p).toLowerCase();
-    return !q || t.includes(q) || s.includes(q);
+    const id = String(p?.id || "").toLowerCase();
+    const agent = String(p?.agent_key || p?.agentKey || p?.agent || "").toLowerCase();
+    return !q || t.includes(q) || s.includes(q) || id.includes(q) || agent.includes(q);
   });
 
   return (
@@ -60,31 +64,21 @@ export default function ProposalList({
               <Tabs value={status} onChange={setStatus} items={tabs} />
             </div>
             <div className="hidden md:block w-[240px]">
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search…"
-              />
+              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search…" />
             </div>
           </div>
 
           <div className="md:hidden">
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search…"
-            />
+            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search…" />
           </div>
         </div>
       </div>
 
-      {/* List */}
-      <div className="p-3 overflow-auto">
+      {/* List (min-h-0 is critical) */}
+      <div className="min-h-0 p-3 overflow-auto">
         {filtered.length === 0 ? (
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-300">
-            <div className="font-semibold text-slate-800 dark:text-slate-100">
-              No proposals yet
-            </div>
+            <div className="font-semibold text-slate-800 dark:text-slate-100">No proposals yet</div>
             <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
               Agentlər proposal yaradanda burada görünəcək.
             </div>
@@ -101,7 +95,7 @@ export default function ProposalList({
               const isSel = String(p.id) === String(selectedId);
               const agent = p.agent_key || p.agentKey || p.agent || "agent";
               const when = relTime(p.created_at || p.createdAt);
-              const payload = parsePayload(p);
+              parsePayload(p); // keep parse call (side effects none, ok)
               const summary = safeText(summaryOf(p), 96);
 
               return (

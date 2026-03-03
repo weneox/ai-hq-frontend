@@ -1,4 +1,8 @@
-// src/pages/Proposals.jsx
+// src/pages/Proposals.jsx (FINAL — A)
+// Fixes: right panel overflow/crop, better scroll behavior,
+//        WS refresh logic preserved.
+// NOTE: Search/filter is handled ONLY inside ProposalList.jsx
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import TopBar from "../components/TopBar.jsx";
 import ProposalList from "../components/ProposalList.jsx";
@@ -23,30 +27,19 @@ export default function ProposalsPage() {
   const [wsStatus, setWsStatus] = useState({ state: "disconnected" });
   const wsClientRef = useRef(null);
 
-  const selected = useMemo(
-    () => proposals.find((x) => String(x.id) === String(selectedId)) || null,
-    [proposals, selectedId]
-  );
-
-  const stats = useMemo(() => {
-    let pending = 0,
-      approved = 0,
-      rejected = 0;
-    for (const p of proposals) {
-      const s = String(p.status || "").toLowerCase();
-      if (s === "approved") approved++;
-      else if (s === "rejected") rejected++;
-      else pending++;
-    }
-    return { pending, approved, rejected };
-  }, [proposals]);
-
   const refreshProposals = async (why = "") => {
     setErr("");
     try {
       const list = await listProposals(status);
-      setProposals(list);
-      if (!selectedId && list.length) setSelectedId(String(list[0].id));
+      const next = Array.isArray(list) ? list : [];
+      setProposals(next);
+
+      // keep selection stable; if empty, pick first
+      const stillExists = next.some((p) => String(p.id) === String(selectedId));
+      if ((!selectedId || !stillExists) && next.length) {
+        setSelectedId(String(next[0].id));
+      }
+
       if (why) {
         setToast(why);
         window.setTimeout(() => setToast(""), 1200);
@@ -67,7 +60,7 @@ export default function ProposalsPage() {
     const ws = createWsClient({
       onStatus: (s) => setWsStatus(s),
       onEvent: ({ type }) => {
-        // UI-ya debug spam salmırıq — sadəcə refresh
+        // no UI spam — refresh only
         if (type === "proposal.created") refreshProposals("New proposal");
         else if (type === "proposal.updated") refreshProposals("Updated");
       },
@@ -87,12 +80,32 @@ export default function ProposalsPage() {
   }, []);
 
   useEffect(() => {
+    // fallback polling when ws not connected
     const s = wsStatus?.state;
     if (s === "connected") return;
     const id = setInterval(() => refreshProposals(), 9000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wsStatus?.state, status]);
+
+  // ✅ selected is ALWAYS from raw proposals (no filtering here)
+  const selected = useMemo(
+    () => proposals.find((x) => String(x.id) === String(selectedId)) || null,
+    [proposals, selectedId]
+  );
+
+  const stats = useMemo(() => {
+    let pending = 0,
+      approved = 0,
+      rejected = 0;
+    for (const p of proposals) {
+      const s = String(p.status || "").toLowerCase();
+      if (s === "approved") approved++;
+      else if (s === "rejected") rejected++;
+      else pending++;
+    }
+    return { pending, approved, rejected };
+  }, [proposals]);
 
   const onApprove = async () => {
     if (!selected) return;
@@ -129,7 +142,8 @@ export default function ProposalsPage() {
   };
 
   return (
-    <div className="min-w-0 flex flex-col gap-5">
+    // ✅ min-h-0 + min-w-0 => grid içi scroll problemlərini həll edir
+    <div className="min-w-0 min-h-0 flex flex-col gap-5">
       <TopBar
         wsStatus={wsStatus}
         onRefresh={() => refreshProposals("Refreshed")}
@@ -148,7 +162,8 @@ export default function ProposalsPage() {
           Loading…
         </div>
       ) : (
-        <div className="grid min-w-0 gap-5 items-stretch grid-cols-1 xl:grid-cols-[minmax(0,440px)_minmax(0,1fr)]">
+        <div className="grid min-w-0 min-h-0 gap-5 items-stretch grid-cols-1 xl:grid-cols-[minmax(0,440px)_minmax(0,1fr)]">
+          {/* LEFT */}
           <div className="min-w-0 min-h-0">
             <ProposalList
               proposals={proposals}
@@ -161,15 +176,21 @@ export default function ProposalsPage() {
             />
           </div>
 
+          {/* RIGHT */}
           <div className="min-w-0 min-h-0">
-            <ProposalDetail
-              proposal={selected}
-              busy={decisionBusy}
-              reason={reason}
-              setReason={setReason}
-              onApprove={onApprove}
-              onReject={onReject}
-            />
+            {/* ✅ right panel daxildən scroll üçün wrapper */}
+            <div className="min-w-0 min-h-0 h-full overflow-hidden rounded-2xl">
+              <div className="min-h-0 h-full overflow-auto">
+                <ProposalDetail
+                  proposal={selected}
+                  busy={decisionBusy}
+                  reason={reason}
+                  setReason={setReason}
+                  onApprove={onApprove}
+                  onReject={onReject}
+                />
+              </div>
+            </div>
           </div>
         </div>
       )}

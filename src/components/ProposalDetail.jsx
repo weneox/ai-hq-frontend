@@ -1,4 +1,7 @@
-// src/components/ProposalDetail.jsx
+// src/components/ProposalDetail.jsx (FINAL)
+// Includes: Draft preview + Feedback (request changes) + Approve Draft + Publish
+// Fixes: stable scrolling, safe draft normalize, clean disable logic
+
 import { useMemo, useState } from "react";
 import Card from "./ui/Card.jsx";
 import Badge from "./ui/Badge.jsx";
@@ -52,13 +55,8 @@ function safeJson(x) {
 }
 
 function normalizeDraft(rawDraft) {
-  // draft may come from:
-  // - draft object in API
-  // - proposal.latestDraft
-  // - execution result stored as string
   if (!rawDraft) return null;
 
-  // if draft is wrapped in { content_pack: ... } or { contentPack: ... }
   const d = typeof rawDraft === "string" ? safeJson(rawDraft) : rawDraft;
   if (!d) return null;
 
@@ -69,20 +67,17 @@ function normalizeDraft(rawDraft) {
     d.result?.content_pack ||
     d.output?.contentPack ||
     d.output?.content_pack ||
+    d.pack ||
+    d.payload ||
     null;
 
   const pack = typeof contentPack === "string" ? safeJson(contentPack) : contentPack;
 
-  const status =
-    d.status ||
-    d.draftStatus ||
-    (pack ? "draft.ready" : "") ||
-    "";
-
+  const status = d.status || d.draftStatus || (pack ? "draft.ready" : "") || "";
   const version = Number(d.version || pack?.version || 1) || 1;
 
   return {
-    id: d.id || d.contentItemId || d.content_item_id || null,
+    id: d.id || d.contentItemId || d.content_item_id || d.content_item?.id || null,
     status,
     version,
     updatedAt: d.updated_at || d.updatedAt || null,
@@ -93,14 +88,7 @@ function normalizeDraft(rawDraft) {
 
 function packTitle(pack) {
   if (!pack) return "";
-  return (
-    pack.title ||
-    pack.name ||
-    pack.summary ||
-    pack.goal ||
-    pack.topic ||
-    ""
-  );
+  return pack.title || pack.name || pack.summary || pack.goal || pack.topic || "";
 }
 
 function packCaption(pack) {
@@ -123,13 +111,7 @@ function packHashtags(pack) {
 
 function packType(pack) {
   if (!pack) return "";
-  return (
-    pack.type ||
-    pack.postType ||
-    pack.format ||
-    pack.assetType ||
-    ""
-  );
+  return pack.type || pack.postType || pack.format || pack.assetType || "";
 }
 
 function packReelScript(pack) {
@@ -151,18 +133,18 @@ export default function ProposalDetail({
   proposal,
   busy,
 
-  // existing decision UI
+  // decision UI
   reason,
   setReason,
   onApprove,
   onReject,
 
-  // ✅ NEW: draft + actions
-  draft,               // optional: draft object from parent
-  draftBusy,           // optional: boolean separate from busy
-  onRequestChanges,    // async (proposalId, draftId, feedbackText) => void
-  onApproveDraft,      // async (proposalId, draftId) => void
-  onPublishDraft,      // async (proposalId, draftId) => void
+  // draft UI/actions
+  draft,
+  draftBusy,
+  onRequestChanges, // (proposalId, draftId, feedbackText)
+  onApproveDraft, // (proposalId, draftId)
+  onPublishDraft, // (proposalId, draftId)
 }) {
   const [showFull, setShowFull] = useState(false);
 
@@ -171,14 +153,8 @@ export default function ProposalDetail({
   const [showDraftFull, setShowDraftFull] = useState(false);
 
   const payload = useMemo(() => parsePayload(proposal), [proposal]);
-  const title = useMemo(
-    () => (proposal ? titleOf(proposal) : "Proposal"),
-    [proposal]
-  );
-  const summary = useMemo(
-    () => (proposal ? summaryOf(proposal) : ""),
-    [proposal]
-  );
+  const title = useMemo(() => (proposal ? titleOf(proposal) : "Proposal"), [proposal]);
+  const summary = useMemo(() => (proposal ? summaryOf(proposal) : ""), [proposal]);
   const rows = useMemo(() => rowsForOverview(payload), [payload]);
 
   if (!proposal) {
@@ -204,51 +180,50 @@ export default function ProposalDetail({
     } catch {}
   };
 
-  // Draft resolve priority:
-  // 1) explicit prop "draft"
-  // 2) proposal.latestDraft / proposal.draft
-  // 3) proposal.lastExecution.result (if you pass it later)
   const resolvedDraft = useMemo(() => {
     const candidate =
       draft ||
       proposal.latestDraft ||
       proposal.draft ||
       proposal.contentDraft ||
+      proposal.latest_execution ||
+      proposal.lastExecution ||
       null;
     return normalizeDraft(candidate);
   }, [draft, proposal]);
 
   const pack = resolvedDraft?.pack || null;
 
-  const isDraftReady = String(resolvedDraft?.status || "").toLowerCase().includes("ready");
-  const isDraftRegenerating = String(resolvedDraft?.status || "").toLowerCase().includes("regenerat");
-  const isDraftApproved = String(resolvedDraft?.status || "").toLowerCase().includes("approved");
-  const isDraftPublished = String(resolvedDraft?.status || "").toLowerCase().includes("published");
+  const st = String(resolvedDraft?.status || "").toLowerCase();
+  const isDraftReady = st.includes("ready");
+  const isDraftRegenerating = st.includes("regenerat") || st.includes("changes");
+  const isDraftApproved = st.includes("approved");
+  const isDraftPublished = st.includes("published");
 
   const effectiveDraftBusy = Boolean(draftBusy || busy);
 
-  const canRequestChanges = Boolean(resolvedDraft?.id) && Boolean(onRequestChanges);
-  const canApproveDraft = Boolean(resolvedDraft?.id) && Boolean(onApproveDraft) && isDraftReady && !isDraftApproved && !isDraftPublished;
-  const canPublish = Boolean(resolvedDraft?.id) && Boolean(onPublishDraft) && isDraftApproved && !isDraftPublished;
+  const hasDraftId = Boolean(resolvedDraft?.id);
+  const canRequestChanges = hasDraftId && typeof onRequestChanges === "function";
+  const canApproveDraft =
+    hasDraftId && typeof onApproveDraft === "function" && isDraftReady && !isDraftApproved && !isDraftPublished;
+  const canPublish =
+    hasDraftId && typeof onPublishDraft === "function" && isDraftApproved && !isDraftPublished;
 
   const doRequestChanges = async () => {
     const text = String(feedback || "").trim();
     if (!text) return;
-    if (!onRequestChanges) return;
-    await onRequestChanges(String(proposal.id), String(resolvedDraft?.id || ""), text);
-    // UX: keep it, but also store last feedback for reference
-    // optional: clear
-    // setFeedback("");
+    if (!onRequestChanges || !resolvedDraft?.id) return;
+    await onRequestChanges(String(proposal.id), String(resolvedDraft.id), text);
   };
 
   const doApproveDraft = async () => {
-    if (!onApproveDraft) return;
-    await onApproveDraft(String(proposal.id), String(resolvedDraft?.id || ""));
+    if (!onApproveDraft || !resolvedDraft?.id) return;
+    await onApproveDraft(String(proposal.id), String(resolvedDraft.id));
   };
 
   const doPublishDraft = async () => {
-    if (!onPublishDraft) return;
-    await onPublishDraft(String(proposal.id), String(resolvedDraft?.id || ""));
+    if (!onPublishDraft || !resolvedDraft?.id) return;
+    await onPublishDraft(String(proposal.id), String(resolvedDraft.id));
   };
 
   const copyText = async (t) => {
@@ -321,23 +296,23 @@ export default function ProposalDetail({
         </div>
       </div>
 
-      {/* Body */}
-      <div className="px-4 py-4 space-y-4 min-w-0 overflow-auto">
-        {/* ✅ NEW: Draft section */}
+      {/* Body (min-h-0 is important for proper scrolling) */}
+      <div className="min-h-0 px-4 py-4 space-y-4 min-w-0 overflow-auto">
+        {/* Draft */}
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30 min-w-0">
-          <div className="flex items-center justify-between gap-2 min-w-0">
+          <div className="flex items-start justify-between gap-2 min-w-0">
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">
                   Generated Draft
                 </div>
+
                 {resolvedDraft?.status ? (
-                  <Badge tone={draftTone(resolvedDraft.status)}>
-                    {resolvedDraft.status}
-                  </Badge>
+                  <Badge tone={draftTone(resolvedDraft.status)}>{resolvedDraft.status}</Badge>
                 ) : (
                   <Badge tone="neutral">no draft</Badge>
                 )}
+
                 {typeof resolvedDraft?.version === "number" ? (
                   <span className="text-[11px] text-slate-500 dark:text-slate-400">
                     v{resolvedDraft.version}
@@ -351,7 +326,7 @@ export default function ProposalDetail({
             </div>
 
             <div className="shrink-0 flex items-center gap-2">
-              {pack?.caption ? (
+              {packCaption(pack) ? (
                 <Button
                   variant="outline"
                   size="sm"
@@ -370,12 +345,9 @@ export default function ProposalDetail({
             </div>
           ) : (
             <>
-              {/* Draft preview */}
               <div className="mt-3 grid gap-2 md:grid-cols-2 min-w-0">
                 <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900/60 min-w-0">
-                  <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
-                    Type
-                  </div>
+                  <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Type</div>
                   <div className="mt-1 text-sm text-slate-900 dark:text-slate-100 break-words">
                     {asDisplay(packType(pack) || "—")}
                   </div>
@@ -405,13 +377,12 @@ export default function ProposalDetail({
 
                 <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900/60 min-w-0">
                   <div className="flex items-center justify-between gap-2">
-                    <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
-                      Hashtags
-                    </div>
+                    <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Hashtags</div>
                     <span className="text-[11px] text-slate-500 dark:text-slate-400">
                       {packHashtags(pack).length || 0}
                     </span>
                   </div>
+
                   <div className="mt-2 flex flex-wrap gap-1">
                     {packHashtags(pack).slice(0, 18).map((h, i) => (
                       <span
@@ -430,19 +401,12 @@ export default function ProposalDetail({
                 </div>
               </div>
 
-              {/* Caption */}
               <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900/60 min-w-0">
                 <div className="flex items-center justify-between gap-2">
-                  <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
-                    Caption
-                  </div>
+                  <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Caption</div>
                   <div className="flex items-center gap-2">
                     {String(packCaption(pack)).length > 220 ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowDraftFull((v) => !v)}
-                      >
+                      <Button variant="outline" size="sm" onClick={() => setShowDraftFull((v) => !v)}>
                         {showDraftFull ? "Less" : "More"}
                       </Button>
                     ) : null}
@@ -467,7 +431,6 @@ export default function ProposalDetail({
                 </div>
               </div>
 
-              {/* Script + Image prompt */}
               <div className="mt-3 grid gap-2 md:grid-cols-2 min-w-0">
                 <details className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900/60 min-w-0">
                   <summary className="cursor-pointer select-none text-[11px] font-semibold text-slate-600 dark:text-slate-300">
@@ -488,7 +451,6 @@ export default function ProposalDetail({
                 </details>
               </div>
 
-              {/* Feedback */}
               <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900/60 min-w-0">
                 <div className="flex items-center justify-between gap-2">
                   <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
@@ -515,12 +477,7 @@ export default function ProposalDetail({
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Button
                     variant="outline"
-                    disabled={
-                      effectiveDraftBusy ||
-                      !canRequestChanges ||
-                      isDraftRegenerating ||
-                      !String(feedback || "").trim()
-                    }
+                    disabled={effectiveDraftBusy || !canRequestChanges || isDraftRegenerating || !String(feedback || "").trim()}
                     onClick={doRequestChanges}
                     className="min-w-[180px]"
                     title={!resolvedDraft?.id ? "Draft ID yoxdur (backend-dən gəlməlidir)" : ""}
@@ -563,9 +520,7 @@ export default function ProposalDetail({
 
         {/* Overview */}
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30 min-w-0">
-          <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-            Overview
-          </div>
+          <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">Overview</div>
 
           {rows.length === 0 ? (
             <div className="mt-2 text-sm text-slate-500 dark:text-slate-400">
@@ -593,12 +548,8 @@ export default function ProposalDetail({
         {/* Decision */}
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30 min-w-0">
           <div className="flex items-center justify-between gap-2">
-            <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-              Decision
-            </div>
-            <div className="text-[11px] text-slate-500 dark:text-slate-400">
-              Reject üçün reason məcburidir
-            </div>
+            <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">Decision</div>
+            <div className="text-[11px] text-slate-500 dark:text-slate-400">Reject üçün reason məcburidir</div>
           </div>
 
           <textarea
