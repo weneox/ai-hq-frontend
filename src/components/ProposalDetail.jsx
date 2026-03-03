@@ -2,9 +2,9 @@
 // ✅ FIX: Decision panel shows ONLY when proposal.status === "pending"
 // ✅ Reject requires reason (button disabled if empty)
 // ✅ Adds badge tone for "in_progress"
-// Includes: Draft preview + Feedback + Approve Draft + Publish
+// ✅ Reset local UI state when proposal changes (feedback, expanded states)
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Card from "./ui/Card.jsx";
 import Badge from "./ui/Badge.jsx";
 import Button from "./ui/Button.jsx";
@@ -22,7 +22,7 @@ import {
 function badgeTone(status) {
   const s = String(status || "").toLowerCase();
   if (s === "pending") return "warn";
-  if (s === "in_progress") return "neutral"; // ✅ added
+  if (s === "in_progress") return "neutral";
   if (s === "approved") return "success";
   if (s === "rejected") return "danger";
   return "neutral";
@@ -167,6 +167,13 @@ export default function ProposalDetail({
 
   const pack = resolvedDraft?.pack || null;
 
+  // ✅ reset local state when switching proposals
+  useEffect(() => {
+    setShowFull(false);
+    setShowDraftFull(false);
+    setFeedback("");
+  }, [proposal?.id]);
+
   if (!proposal) {
     return (
       <Card className="min-w-0 h-full flex flex-col justify-center items-center text-center">
@@ -227,7 +234,7 @@ export default function ProposalDetail({
     await onPublishDraft(String(proposal.id), String(resolvedDraft.id));
   };
 
-  const rejectDisabled = Boolean(busy || !String(reason || "").trim()); // ✅
+  const rejectDisabled = Boolean(busy || !String(reason || "").trim());
 
   return (
     <Card className="min-w-0 p-0 overflow-hidden flex flex-col h-full">
@@ -247,12 +254,7 @@ export default function ProposalDetail({
               </h2>
 
               {String(title).length > 80 ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowFull((v) => !v)}
-                  className="shrink-0"
-                >
+                <Button variant="outline" size="sm" onClick={() => setShowFull((v) => !v)} className="shrink-0">
                   {showFull ? "Less" : "More"}
                 </Button>
               ) : null}
@@ -318,12 +320,7 @@ export default function ProposalDetail({
 
             <div className="shrink-0 flex items-center gap-2">
               {packCaption(pack) ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => copyText(packCaption(pack))}
-                  disabled={!packCaption(pack)}
-                >
+                <Button variant="outline" size="sm" onClick={() => copyText(packCaption(pack))} disabled={!packCaption(pack)}>
                   Copy caption
                 </Button>
               ) : null}
@@ -345,21 +342,15 @@ export default function ProposalDetail({
 
                   {packPostTime(pack) ? (
                     <>
-                      <div className="mt-3 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
-                        Suggested time
-                      </div>
-                      <div className="mt-1 text-sm text-slate-900 dark:text-slate-100 break-words">
-                        {asDisplay(packPostTime(pack))}
-                      </div>
+                      <div className="mt-3 text-[11px] font-semibold text-slate-600 dark:text-slate-300">Suggested time</div>
+                      <div className="mt-1 text-sm text-slate-900 dark:text-slate-100 break-words">{asDisplay(packPostTime(pack))}</div>
                     </>
                   ) : null}
 
                   {packTitle(pack) ? (
                     <>
                       <div className="mt-3 text-[11px] font-semibold text-slate-600 dark:text-slate-300">Topic</div>
-                      <div className="mt-1 text-sm text-slate-900 dark:text-slate-100 break-words">
-                        {asDisplay(packTitle(pack))}
-                      </div>
+                      <div className="mt-1 text-sm text-slate-900 dark:text-slate-100 break-words">{asDisplay(packTitle(pack))}</div>
                     </>
                   ) : null}
                 </div>
@@ -464,12 +455,7 @@ export default function ProposalDetail({
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Button
                     variant="outline"
-                    disabled={
-                      effectiveDraftBusy ||
-                      !canRequestChanges ||
-                      isDraftRegenerating ||
-                      !String(feedback || "").trim()
-                    }
+                    disabled={effectiveDraftBusy || !canRequestChanges || isDraftRegenerating || !String(feedback || "").trim()}
                     onClick={doRequestChanges}
                     className="min-w-[180px]"
                     title={!resolvedDraft?.id ? "Draft ID yoxdur (backend-dən gəlməlidir)" : ""}
@@ -477,21 +463,11 @@ export default function ProposalDetail({
                     Request changes
                   </Button>
 
-                  <Button
-                    variant="primary"
-                    disabled={effectiveDraftBusy || !canApproveDraft}
-                    onClick={doApproveDraft}
-                    className="min-w-[160px]"
-                  >
+                  <Button variant="primary" disabled={effectiveDraftBusy || !canApproveDraft} onClick={doApproveDraft} className="min-w-[160px]">
                     Approve draft
                   </Button>
 
-                  <Button
-                    variant="primary"
-                    disabled={effectiveDraftBusy || !canPublish}
-                    onClick={doPublishDraft}
-                    className="min-w-[160px]"
-                  >
+                  <Button variant="primary" disabled={effectiveDraftBusy || !canPublish} onClick={doPublishDraft} className="min-w-[160px]">
                     Publish
                   </Button>
 
@@ -519,10 +495,7 @@ export default function ProposalDetail({
           ) : (
             <div className="mt-3 grid gap-2 md:grid-cols-2 min-w-0">
               {rows.map((r) => (
-                <div
-                  key={r.k}
-                  className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900/60 min-w-0"
-                >
+                <div key={r.k} className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900/60 min-w-0">
                   <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">{r.label}</div>
                   <div className="mt-1 text-sm text-slate-900 dark:text-slate-100 whitespace-pre-wrap break-words">
                     {asDisplay(r.v)}
@@ -533,7 +506,7 @@ export default function ProposalDetail({
           )}
         </div>
 
-        {/* ✅ Decision — ONLY when pending */}
+        {/* Decision — ONLY pending */}
         {statusLc === "pending" ? (
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30 min-w-0">
             <div className="flex items-center justify-between gap-2">
@@ -566,7 +539,9 @@ export default function ProposalDetail({
               </Button>
             </div>
 
-            <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">Approve → backend n8n workflow-a event atır.</div>
+            <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+              Approve → backend n8n workflow-a event atır.
+            </div>
           </div>
         ) : (
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30 min-w-0">

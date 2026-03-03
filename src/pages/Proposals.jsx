@@ -1,6 +1,7 @@
 // src/pages/Proposals.jsx (FINAL — A)
 // Fixes: right panel overflow/crop, better scroll behavior,
 //        WS refresh logic preserved.
+// ✅ NEW: reset "reason" when selected proposal changes
 // NOTE: Search/filter is handled ONLY inside ProposalList.jsx
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -34,7 +35,7 @@ export default function ProposalsPage() {
       const next = Array.isArray(list) ? list : [];
       setProposals(next);
 
-      // keep selection stable; if empty, pick first
+      // keep selection stable; if empty or missing, pick first
       const stillExists = next.some((p) => String(p.id) === String(selectedId));
       if ((!selectedId || !stillExists) && next.length) {
         setSelectedId(String(next[0].id));
@@ -60,7 +61,6 @@ export default function ProposalsPage() {
     const ws = createWsClient({
       onStatus: (s) => setWsStatus(s),
       onEvent: ({ type }) => {
-        // no UI spam — refresh only
         if (type === "proposal.created") refreshProposals("New proposal");
         else if (type === "proposal.updated") refreshProposals("Updated");
       },
@@ -93,6 +93,12 @@ export default function ProposalsPage() {
     () => proposals.find((x) => String(x.id) === String(selectedId)) || null,
     [proposals, selectedId]
   );
+
+  // ✅ reset reason when changing selected proposal
+  useEffect(() => {
+    setReason("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
 
   const stats = useMemo(() => {
     let pending = 0,
@@ -142,7 +148,6 @@ export default function ProposalsPage() {
   };
 
   return (
-    // ✅ min-h-0 + min-w-0 => grid içi scroll problemlərini həll edir
     <div className="min-w-0 min-h-0 flex flex-col gap-5">
       <TopBar
         wsStatus={wsStatus}
@@ -178,7 +183,6 @@ export default function ProposalsPage() {
 
           {/* RIGHT */}
           <div className="min-w-0 min-h-0">
-            {/* ✅ right panel daxildən scroll üçün wrapper */}
             <div className="min-w-0 min-h-0 h-full overflow-hidden rounded-2xl">
               <div className="min-h-0 h-full overflow-auto">
                 <ProposalDetail
