@@ -17,8 +17,15 @@ async function readJson(r) {
 
 function assertConfigured() {
   if (!API_BASE) {
-    throw new Error("VITE_API_BASE is not set. (Example: https://ai-hq-backend-production.up.railway.app)");
+    throw new Error(
+      "VITE_API_BASE is not set. (Example: https://ai-hq-backend-production.up.railway.app)"
+    );
   }
+}
+
+function pickErr(j, fallback) {
+  const m = j?.error || j?.message || j?.details?.message || j?.raw || fallback;
+  return String(m || fallback);
 }
 
 export async function apiGet(path) {
@@ -26,7 +33,7 @@ export async function apiGet(path) {
   const url = `${API_BASE}${path}`;
   const r = await fetch(url, { headers: { Accept: "application/json" } });
   const j = await readJson(r);
-  if (!r.ok || j?.ok === false) throw new Error(j?.error || `GET ${path} failed`);
+  if (!r.ok || j?.ok === false) throw new Error(pickErr(j, `GET ${path} failed`));
   return j;
 }
 
@@ -42,6 +49,6 @@ export async function apiPost(path, body) {
     body: JSON.stringify(body ?? {}),
   });
   const j = await readJson(r);
-  if (!r.ok || j?.ok === false) throw new Error(j?.error || `POST ${path} failed`);
+  if (!r.ok || j?.ok === false) throw new Error(pickErr(j, `POST ${path} failed`));
   return j;
 }

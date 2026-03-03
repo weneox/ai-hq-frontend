@@ -1,7 +1,6 @@
 // src/pages/Proposals.jsx (FINAL — A)
 // Fixes: right panel overflow/crop, better scroll behavior,
 //        WS refresh logic preserved.
-// ✅ NEW: reset "reason" when selected proposal changes
 // NOTE: Search/filter is handled ONLY inside ProposalList.jsx
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -35,7 +34,6 @@ export default function ProposalsPage() {
       const next = Array.isArray(list) ? list : [];
       setProposals(next);
 
-      // keep selection stable; if empty or missing, pick first
       const stillExists = next.some((p) => String(p.id) === String(selectedId));
       if ((!selectedId || !stillExists) && next.length) {
         setSelectedId(String(next[0].id));
@@ -80,7 +78,6 @@ export default function ProposalsPage() {
   }, []);
 
   useEffect(() => {
-    // fallback polling when ws not connected
     const s = wsStatus?.state;
     if (s === "connected") return;
     const id = setInterval(() => refreshProposals(), 9000);
@@ -88,17 +85,10 @@ export default function ProposalsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wsStatus?.state, status]);
 
-  // ✅ selected is ALWAYS from raw proposals (no filtering here)
   const selected = useMemo(
     () => proposals.find((x) => String(x.id) === String(selectedId)) || null,
     [proposals, selectedId]
   );
-
-  // ✅ reset reason when changing selected proposal
-  useEffect(() => {
-    setReason("");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId]);
 
   const stats = useMemo(() => {
     let pending = 0,
@@ -149,12 +139,7 @@ export default function ProposalsPage() {
 
   return (
     <div className="min-w-0 min-h-0 flex flex-col gap-5">
-      <TopBar
-        wsStatus={wsStatus}
-        onRefresh={() => refreshProposals("Refreshed")}
-        stats={stats}
-        toast={toast}
-      />
+      <TopBar wsStatus={wsStatus} onRefresh={() => refreshProposals("Refreshed")} stats={stats} toast={toast} />
 
       {err ? (
         <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900 shadow-sm dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
