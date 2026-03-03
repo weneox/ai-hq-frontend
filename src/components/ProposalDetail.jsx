@@ -1,6 +1,6 @@
-// src/components/ProposalDetail.jsx (FINAL)
-// Includes: Draft preview + Feedback (request changes) + Approve Draft + Publish
-// Fixes: stable scrolling, safe draft normalize, clean disable logic
+// src/components/ProposalDetail.jsx (FIXED)
+// ✅ FIX: Hooks are ALWAYS called (no hooks after early return)
+// Includes: Draft preview + Feedback + Approve Draft + Publish
 
 import { useMemo, useState } from "react";
 import Card from "./ui/Card.jsx";
@@ -90,12 +90,10 @@ function packTitle(pack) {
   if (!pack) return "";
   return pack.title || pack.name || pack.summary || pack.goal || pack.topic || "";
 }
-
 function packCaption(pack) {
   if (!pack) return "";
   return pack.caption || pack.postCaption || pack.text || "";
 }
-
 function packHashtags(pack) {
   if (!pack) return [];
   const h = pack.hashtags || pack.tags || pack.hashTags || [];
@@ -108,22 +106,18 @@ function packHashtags(pack) {
   }
   return [];
 }
-
 function packType(pack) {
   if (!pack) return "";
   return pack.type || pack.postType || pack.format || pack.assetType || "";
 }
-
 function packReelScript(pack) {
   if (!pack) return "";
   return pack.reel_script || pack.reelScript || pack.script || "";
 }
-
 function packImagePrompt(pack) {
   if (!pack) return "";
   return pack.image_prompt || pack.imagePrompt || pack.visual_prompt || "";
 }
-
 function packPostTime(pack) {
   if (!pack) return "";
   return pack.post_time || pack.postTime || pack.suggestedTime || "";
@@ -147,16 +141,30 @@ export default function ProposalDetail({
   onPublishDraft, // (proposalId, draftId)
 }) {
   const [showFull, setShowFull] = useState(false);
-
-  // feedback UX
   const [feedback, setFeedback] = useState("");
   const [showDraftFull, setShowDraftFull] = useState(false);
 
+  // ✅ HOOKS ALWAYS RUN (proposal may be null, that's fine)
   const payload = useMemo(() => parsePayload(proposal), [proposal]);
   const title = useMemo(() => (proposal ? titleOf(proposal) : "Proposal"), [proposal]);
   const summary = useMemo(() => (proposal ? summaryOf(proposal) : ""), [proposal]);
   const rows = useMemo(() => rowsForOverview(payload), [payload]);
 
+  const resolvedDraft = useMemo(() => {
+    const candidate =
+      draft ||
+      proposal?.latestDraft ||
+      proposal?.draft ||
+      proposal?.contentDraft ||
+      proposal?.latest_execution ||
+      proposal?.lastExecution ||
+      null;
+    return normalizeDraft(candidate);
+  }, [draft, proposal]);
+
+  const pack = resolvedDraft?.pack || null;
+
+  // ✅ AFTER hooks, it's safe to early-return
   if (!proposal) {
     return (
       <Card className="min-w-0 h-full flex flex-col justify-center items-center text-center">
@@ -174,31 +182,11 @@ export default function ProposalDetail({
   const created = relTime(proposal.created_at || proposal.createdAt);
   const status = proposal.status || "pending";
 
-  const copyId = async () => {
-    try {
-      await navigator.clipboard.writeText(String(proposal.id));
-    } catch {}
-  };
-
-  const resolvedDraft = useMemo(() => {
-    const candidate =
-      draft ||
-      proposal.latestDraft ||
-      proposal.draft ||
-      proposal.contentDraft ||
-      proposal.latest_execution ||
-      proposal.lastExecution ||
-      null;
-    return normalizeDraft(candidate);
-  }, [draft, proposal]);
-
-  const pack = resolvedDraft?.pack || null;
-
   const st = String(resolvedDraft?.status || "").toLowerCase();
-  const isDraftReady = st.includes("ready");
   const isDraftRegenerating = st.includes("regenerat") || st.includes("changes");
   const isDraftApproved = st.includes("approved");
   const isDraftPublished = st.includes("published");
+  const isDraftReady = st.includes("ready");
 
   const effectiveDraftBusy = Boolean(draftBusy || busy);
 
@@ -208,6 +196,18 @@ export default function ProposalDetail({
     hasDraftId && typeof onApproveDraft === "function" && isDraftReady && !isDraftApproved && !isDraftPublished;
   const canPublish =
     hasDraftId && typeof onPublishDraft === "function" && isDraftApproved && !isDraftPublished;
+
+  const copyId = async () => {
+    try {
+      await navigator.clipboard.writeText(String(proposal.id));
+    } catch {}
+  };
+
+  const copyText = async (t) => {
+    try {
+      await navigator.clipboard.writeText(String(t || ""));
+    } catch {}
+  };
 
   const doRequestChanges = async () => {
     const text = String(feedback || "").trim();
@@ -224,12 +224,6 @@ export default function ProposalDetail({
   const doPublishDraft = async () => {
     if (!onPublishDraft || !resolvedDraft?.id) return;
     await onPublishDraft(String(proposal.id), String(resolvedDraft.id));
-  };
-
-  const copyText = async (t) => {
-    try {
-      await navigator.clipboard.writeText(String(t || ""));
-    } catch {}
   };
 
   return (
@@ -296,7 +290,7 @@ export default function ProposalDetail({
         </div>
       </div>
 
-      {/* Body (min-h-0 is important for proper scrolling) */}
+      {/* Body */}
       <div className="min-h-0 px-4 py-4 space-y-4 min-w-0 overflow-auto">
         {/* Draft */}
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30 min-w-0">
@@ -321,7 +315,7 @@ export default function ProposalDetail({
               </div>
 
               <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-                Draft = n8n-in hazırladığı content pack. Buradan rəy yazıb yenidən hazırlatdırırsan.
+                Draft = n8n-in hazırladığı content pack.
               </div>
             </div>
 
@@ -511,7 +505,7 @@ export default function ProposalDetail({
                 </div>
 
                 <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
-                  “Request changes” → n8n bu feedback-i nəzərə alıb draft-ı yenidən qurur (v2, v3…).
+                  “Request changes” → n8n feedback-i nəzərə alıb draft-ı yenidən qurur (v2, v3…).
                 </div>
               </div>
             </>
