@@ -1,7 +1,8 @@
-// src/components/ProposalList.jsx (PREMIUM)
-// ✅ Segmented tabs (Pending/Drafting/Approved/Rejected)
+// src/components/ProposalList.jsx (FINAL — PREMIUM + NO-HIDDEN-TABS)
+// ✅ Tabs always visible (wrap, no hidden)
+// ✅ Search in its own row (clean UX)
 // ✅ Premium list item: hover lift + selected ring + press scale
-// ✅ Shows Draft badge + draft status chip (ready/approved/published/changes/failed)
+// ✅ Shows Draft badge + draft status label
 
 import Card from "./ui/Card.jsx";
 import Input from "./ui/Input.jsx";
@@ -40,15 +41,7 @@ function draftLabel(draftStatus) {
   return "draft";
 }
 
-export default function ProposalList({
-  proposals,
-  selectedId,
-  onSelect,
-  status,
-  setStatus,
-  search,
-  setSearch,
-}) {
+export default function ProposalList({ proposals, selectedId, onSelect, status, setStatus, search, setSearch }) {
   const DEV = import.meta.env.DEV;
 
   const tabs = [
@@ -74,7 +67,7 @@ export default function ProposalList({
         <div className="flex items-center justify-between gap-2 min-w-0">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <div className="text-sm font-semibold tracking-tight">Proposals</div>
+              <div className="text-sm font-semibold tracking-tight">Queue</div>
               <span
                 className="h-2 w-2 rounded-full bg-emerald-400/80 shadow-[0_0_0_4px_rgba(16,185,129,0.10)]"
                 aria-hidden="true"
@@ -90,22 +83,15 @@ export default function ProposalList({
           </Badge>
         </div>
 
+        {/* ✅ Tabs + Search (no hidden tabs) */}
         <div className="mt-3 flex flex-col gap-2 min-w-0">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="min-w-0 flex-1">
-              <Tabs value={status} onChange={setStatus} items={tabs} />
-            </div>
-            <div className="hidden md:block w-[260px]">
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search proposals…"
-              />
-            </div>
-          </div>
-
-          <div className="md:hidden">
-            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search…" />
+          <Tabs value={status} onChange={setStatus} items={tabs} />
+          <div className="w-full">
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search proposals…"
+            />
           </div>
         </div>
       </div>
@@ -207,14 +193,12 @@ export default function ProposalList({
                         <div className="shrink-0 flex flex-col items-end gap-2">
                           <Badge tone={badgeTone(p.status)}>{p.status || status}</Badge>
 
-                          {/* subtle hint on hover */}
                           <div className="text-[11px] text-slate-400 dark:text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity">
                             Click to open →
                           </div>
                         </div>
                       </div>
 
-                      {/* Selected glow */}
                       {isSel ? (
                         <div className="mt-3 h-px w-full bg-gradient-to-r from-indigo-500/0 via-indigo-500/25 to-indigo-500/0" />
                       ) : null}
