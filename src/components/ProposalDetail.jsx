@@ -22,6 +22,17 @@ function badgeTone(status) {
   return "neutral";
 }
 
+function draftTone(status) {
+  const s = String(status || "").toLowerCase();
+  if (s.includes("ready")) return "success";
+  if (s.includes("approved")) return "success";
+  if (s.includes("published")) return "success";
+  if (s.includes("regenerat")) return "warn";
+  if (s.includes("changes")) return "warn";
+  if (s.includes("fail")) return "danger";
+  return "neutral";
+}
+
 function asDisplay(v) {
   if (v == null) return "";
   if (typeof v === "string") return safeText(v, 180);
@@ -30,15 +41,134 @@ function asDisplay(v) {
   return String(v);
 }
 
+function safeJson(x) {
+  try {
+    if (!x) return null;
+    if (typeof x === "string") return JSON.parse(x);
+    return x;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeDraft(rawDraft) {
+  // draft may come from:
+  // - draft object in API
+  // - proposal.latestDraft
+  // - execution result stored as string
+  if (!rawDraft) return null;
+
+  // if draft is wrapped in { content_pack: ... } or { contentPack: ... }
+  const d = typeof rawDraft === "string" ? safeJson(rawDraft) : rawDraft;
+  if (!d) return null;
+
+  const contentPack =
+    d.content_pack ||
+    d.contentPack ||
+    d.result?.contentPack ||
+    d.result?.content_pack ||
+    d.output?.contentPack ||
+    d.output?.content_pack ||
+    null;
+
+  const pack = typeof contentPack === "string" ? safeJson(contentPack) : contentPack;
+
+  const status =
+    d.status ||
+    d.draftStatus ||
+    (pack ? "draft.ready" : "") ||
+    "";
+
+  const version = Number(d.version || pack?.version || 1) || 1;
+
+  return {
+    id: d.id || d.contentItemId || d.content_item_id || null,
+    status,
+    version,
+    updatedAt: d.updated_at || d.updatedAt || null,
+    lastFeedback: d.last_feedback || d.lastFeedback || "",
+    pack: pack || null,
+  };
+}
+
+function packTitle(pack) {
+  if (!pack) return "";
+  return (
+    pack.title ||
+    pack.name ||
+    pack.summary ||
+    pack.goal ||
+    pack.topic ||
+    ""
+  );
+}
+
+function packCaption(pack) {
+  if (!pack) return "";
+  return pack.caption || pack.postCaption || pack.text || "";
+}
+
+function packHashtags(pack) {
+  if (!pack) return [];
+  const h = pack.hashtags || pack.tags || pack.hashTags || [];
+  if (Array.isArray(h)) return h.filter(Boolean);
+  if (typeof h === "string") {
+    return h
+      .split(/[\s,]+/)
+      .map((x) => x.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+function packType(pack) {
+  if (!pack) return "";
+  return (
+    pack.type ||
+    pack.postType ||
+    pack.format ||
+    pack.assetType ||
+    ""
+  );
+}
+
+function packReelScript(pack) {
+  if (!pack) return "";
+  return pack.reel_script || pack.reelScript || pack.script || "";
+}
+
+function packImagePrompt(pack) {
+  if (!pack) return "";
+  return pack.image_prompt || pack.imagePrompt || pack.visual_prompt || "";
+}
+
+function packPostTime(pack) {
+  if (!pack) return "";
+  return pack.post_time || pack.postTime || pack.suggestedTime || "";
+}
+
 export default function ProposalDetail({
   proposal,
   busy,
+
+  // existing decision UI
   reason,
   setReason,
   onApprove,
   onReject,
+
+  // ✅ NEW: draft + actions
+  draft,               // optional: draft object from parent
+  draftBusy,           // optional: boolean separate from busy
+  onRequestChanges,    // async (proposalId, draftId, feedbackText) => void
+  onApproveDraft,      // async (proposalId, draftId) => void
+  onPublishDraft,      // async (proposalId, draftId) => void
 }) {
   const [showFull, setShowFull] = useState(false);
+
+  // feedback UX
+  const [feedback, setFeedback] = useState("");
+  const [showDraftFull, setShowDraftFull] = useState(false);
 
   const payload = useMemo(() => parsePayload(proposal), [proposal]);
   const title = useMemo(
@@ -71,6 +201,59 @@ export default function ProposalDetail({
   const copyId = async () => {
     try {
       await navigator.clipboard.writeText(String(proposal.id));
+    } catch {}
+  };
+
+  // Draft resolve priority:
+  // 1) explicit prop "draft"
+  // 2) proposal.latestDraft / proposal.draft
+  // 3) proposal.lastExecution.result (if you pass it later)
+  const resolvedDraft = useMemo(() => {
+    const candidate =
+      draft ||
+      proposal.latestDraft ||
+      proposal.draft ||
+      proposal.contentDraft ||
+      null;
+    return normalizeDraft(candidate);
+  }, [draft, proposal]);
+
+  const pack = resolvedDraft?.pack || null;
+
+  const isDraftReady = String(resolvedDraft?.status || "").toLowerCase().includes("ready");
+  const isDraftRegenerating = String(resolvedDraft?.status || "").toLowerCase().includes("regenerat");
+  const isDraftApproved = String(resolvedDraft?.status || "").toLowerCase().includes("approved");
+  const isDraftPublished = String(resolvedDraft?.status || "").toLowerCase().includes("published");
+
+  const effectiveDraftBusy = Boolean(draftBusy || busy);
+
+  const canRequestChanges = Boolean(resolvedDraft?.id) && Boolean(onRequestChanges);
+  const canApproveDraft = Boolean(resolvedDraft?.id) && Boolean(onApproveDraft) && isDraftReady && !isDraftApproved && !isDraftPublished;
+  const canPublish = Boolean(resolvedDraft?.id) && Boolean(onPublishDraft) && isDraftApproved && !isDraftPublished;
+
+  const doRequestChanges = async () => {
+    const text = String(feedback || "").trim();
+    if (!text) return;
+    if (!onRequestChanges) return;
+    await onRequestChanges(String(proposal.id), String(resolvedDraft?.id || ""), text);
+    // UX: keep it, but also store last feedback for reference
+    // optional: clear
+    // setFeedback("");
+  };
+
+  const doApproveDraft = async () => {
+    if (!onApproveDraft) return;
+    await onApproveDraft(String(proposal.id), String(resolvedDraft?.id || ""));
+  };
+
+  const doPublishDraft = async () => {
+    if (!onPublishDraft) return;
+    await onPublishDraft(String(proposal.id), String(resolvedDraft?.id || ""));
+  };
+
+  const copyText = async (t) => {
+    try {
+      await navigator.clipboard.writeText(String(t || ""));
     } catch {}
   };
 
@@ -140,6 +323,244 @@ export default function ProposalDetail({
 
       {/* Body */}
       <div className="px-4 py-4 space-y-4 min-w-0 overflow-auto">
+        {/* ✅ NEW: Draft section */}
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30 min-w-0">
+          <div className="flex items-center justify-between gap-2 min-w-0">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                  Generated Draft
+                </div>
+                {resolvedDraft?.status ? (
+                  <Badge tone={draftTone(resolvedDraft.status)}>
+                    {resolvedDraft.status}
+                  </Badge>
+                ) : (
+                  <Badge tone="neutral">no draft</Badge>
+                )}
+                {typeof resolvedDraft?.version === "number" ? (
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                    v{resolvedDraft.version}
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                Draft = n8n-in hazırladığı content pack. Buradan rəy yazıb yenidən hazırlatdırırsan.
+              </div>
+            </div>
+
+            <div className="shrink-0 flex items-center gap-2">
+              {pack?.caption ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => copyText(packCaption(pack))}
+                  disabled={!packCaption(pack)}
+                >
+                  Copy caption
+                </Button>
+              ) : null}
+            </div>
+          </div>
+
+          {!pack ? (
+            <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400">
+              Hələ draft yoxdur. (Approve etdikdən sonra n8n content pack yaradıb burada görünəcək.)
+            </div>
+          ) : (
+            <>
+              {/* Draft preview */}
+              <div className="mt-3 grid gap-2 md:grid-cols-2 min-w-0">
+                <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900/60 min-w-0">
+                  <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                    Type
+                  </div>
+                  <div className="mt-1 text-sm text-slate-900 dark:text-slate-100 break-words">
+                    {asDisplay(packType(pack) || "—")}
+                  </div>
+
+                  {packPostTime(pack) ? (
+                    <>
+                      <div className="mt-3 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                        Suggested time
+                      </div>
+                      <div className="mt-1 text-sm text-slate-900 dark:text-slate-100 break-words">
+                        {asDisplay(packPostTime(pack))}
+                      </div>
+                    </>
+                  ) : null}
+
+                  {packTitle(pack) ? (
+                    <>
+                      <div className="mt-3 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                        Topic
+                      </div>
+                      <div className="mt-1 text-sm text-slate-900 dark:text-slate-100 break-words">
+                        {asDisplay(packTitle(pack))}
+                      </div>
+                    </>
+                  ) : null}
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900/60 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                      Hashtags
+                    </div>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                      {packHashtags(pack).length || 0}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {packHashtags(pack).slice(0, 18).map((h, i) => (
+                      <span
+                        key={`${h}_${i}`}
+                        className="text-[11px] rounded-full border border-slate-200 bg-white px-2 py-0.5 dark:border-slate-800 dark:bg-slate-900/70 text-slate-700 dark:text-slate-200"
+                      >
+                        {h.startsWith("#") ? h : `#${h}`}
+                      </span>
+                    ))}
+                    {packHashtags(pack).length > 18 ? (
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                        +{packHashtags(pack).length - 18} more
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+
+              {/* Caption */}
+              <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900/60 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                    Caption
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {String(packCaption(pack)).length > 220 ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowDraftFull((v) => !v)}
+                      >
+                        {showDraftFull ? "Less" : "More"}
+                      </Button>
+                    ) : null}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => copyText(packCaption(pack))}
+                      disabled={!packCaption(pack)}
+                    >
+                      Copy
+                    </Button>
+                  </div>
+                </div>
+
+                <div
+                  className={[
+                    "mt-2 text-sm text-slate-900 dark:text-slate-100 whitespace-pre-wrap break-words",
+                    showDraftFull ? "" : "line-clamp-6",
+                  ].join(" ")}
+                >
+                  {packCaption(pack) ? packCaption(pack) : "—"}
+                </div>
+              </div>
+
+              {/* Script + Image prompt */}
+              <div className="mt-3 grid gap-2 md:grid-cols-2 min-w-0">
+                <details className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900/60 min-w-0">
+                  <summary className="cursor-pointer select-none text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                    Reel script
+                  </summary>
+                  <pre className="mt-2 text-xs whitespace-pre-wrap break-words text-slate-800 dark:text-slate-100">
+                    {packReelScript(pack) || "—"}
+                  </pre>
+                </details>
+
+                <details className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900/60 min-w-0">
+                  <summary className="cursor-pointer select-none text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                    Image prompt
+                  </summary>
+                  <pre className="mt-2 text-xs whitespace-pre-wrap break-words text-slate-800 dark:text-slate-100">
+                    {packImagePrompt(pack) || "—"}
+                  </pre>
+                </details>
+              </div>
+
+              {/* Feedback */}
+              <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900/60 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                    Feedback (changes request)
+                  </div>
+                  {resolvedDraft?.lastFeedback ? (
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Last: {safeText(resolvedDraft.lastFeedback, 60)}
+                    </div>
+                  ) : null}
+                </div>
+
+                <textarea
+                  value={feedback}
+                  onChange={(e) => setFeedback(e.target.value)}
+                  rows={4}
+                  className="mt-2 w-full min-w-0 rounded-xl border border-slate-200 bg-white p-2 text-sm outline-none transition-all duration-200
+                             focus:border-indigo-300/80 focus:ring-2 focus:ring-indigo-500/25 focus:ring-offset-2 focus:ring-offset-white
+                             dark:border-slate-800 dark:bg-slate-950/20 dark:text-slate-100 dark:focus:border-indigo-500/50 dark:focus:ring-indigo-500/25 dark:focus:ring-offset-slate-950"
+                  placeholder='Məs: "Caption daha qısa olsun. 8 hashtag. CTA WhatsApp. Ton premium. Reel script 15 saniyə."'
+                  disabled={effectiveDraftBusy || isDraftRegenerating}
+                />
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    disabled={
+                      effectiveDraftBusy ||
+                      !canRequestChanges ||
+                      isDraftRegenerating ||
+                      !String(feedback || "").trim()
+                    }
+                    onClick={doRequestChanges}
+                    className="min-w-[180px]"
+                    title={!resolvedDraft?.id ? "Draft ID yoxdur (backend-dən gəlməlidir)" : ""}
+                  >
+                    Request changes
+                  </Button>
+
+                  <Button
+                    variant="primary"
+                    disabled={effectiveDraftBusy || !canApproveDraft}
+                    onClick={doApproveDraft}
+                    className="min-w-[160px]"
+                  >
+                    Approve draft
+                  </Button>
+
+                  <Button
+                    variant="primary"
+                    disabled={effectiveDraftBusy || !canPublish}
+                    onClick={doPublishDraft}
+                    className="min-w-[160px]"
+                  >
+                    Publish
+                  </Button>
+
+                  {isDraftRegenerating ? (
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400 self-center">
+                      Regenerating… (n8n işləyir)
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+                  “Request changes” → n8n bu feedback-i nəzərə alıb draft-ı yenidən qurur (v2, v3…).
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
         {/* Overview */}
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30 min-w-0">
           <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">
@@ -204,7 +625,7 @@ export default function ProposalDetail({
           </div>
         </div>
 
-        {/* Advanced (Raw JSON hidden by default) */}
+        {/* Advanced */}
         <details className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30 min-w-0">
           <summary className="cursor-pointer select-none text-xs font-semibold text-slate-700 dark:text-slate-200">
             Advanced (Raw payload)
