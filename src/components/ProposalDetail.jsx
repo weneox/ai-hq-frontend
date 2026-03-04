@@ -1,6 +1,6 @@
-// src/components/ProposalDetail.jsx (FINAL — PREMIUM + ALWAYS SHOW DETAILS)
-// ✅ No dependency on uiFormat.js (fixes empty overview/details)
-// ✅ Draft Studio reads pack from many shapes (content_items/jobs/executions)
+// src/components/ProposalDetail.jsx (FINAL v2 — PREMIUM + NO CROP + SCROLLABLE PREVIEWS)
+// ✅ Overview "Caption (preview)" is scrollable (no truncation / no cut)
+// ✅ Keeps Draft Studio + multi-shape pack reader
 // ✅ Copy JSON uses JSON.stringify (no [object Object])
 // ✅ Sticky decision bar only when status=pending
 
@@ -214,9 +214,9 @@ function packTopic(pack) {
 
 function asDisplay(v) {
   if (v == null) return "";
-  if (typeof v === "string") return v.length > 220 ? v.slice(0, 219) + "…" : v;
+  if (typeof v === "string") return v; // ✅ no truncation here anymore
   if (Array.isArray(v)) return asDisplay(v.join(", "));
-  if (typeof v === "object") return asDisplay(pretty(v));
+  if (typeof v === "object") return pretty(v);
   return String(v);
 }
 
@@ -238,6 +238,13 @@ function Pill({ label, value, onCopy, title }) {
       ) : null}
     </span>
   );
+}
+
+function cxTitle(showFull) {
+  return [
+    "text-base sm:text-lg font-semibold leading-snug min-w-0",
+    showFull ? "break-words" : "line-clamp-2 break-words",
+  ].join(" ");
 }
 
 export default function ProposalDetail({
@@ -269,7 +276,6 @@ export default function ProposalDetail({
   const payloadObj = useMemo(() => pickPayloadObj(proposal), [proposal]);
   const pack = resolvedDraft?.pack || null;
 
-  // fallback overview from pack/payload
   const overviewRows = useMemo(() => {
     const rows = [];
 
@@ -279,20 +285,22 @@ export default function ProposalDetail({
       safeText(payloadObj?.lang) ||
       "";
     const platform = safeText(payloadObj?.platform) || safeText(pack?.platform) || "instagram";
-    const postType = safeText(payloadObj?.postType) || safeText(pack?.postType) || safeText(packType(pack)) || "";
+    const postType =
+      safeText(payloadObj?.postType) || safeText(pack?.postType) || safeText(packType(pack)) || "";
     const tags = packHashtags(pack);
     const cap = packCaption(pack) || safeText(payloadObj?.caption) || safeText(payloadObj?.text) || "";
 
-    if (lang) rows.push({ k: "lang", label: "Language", v: lang });
-    if (platform) rows.push({ k: "platform", label: "Platform", v: platform });
-    if (postType) rows.push({ k: "postType", label: "Post type", v: postType });
-    if (tags.length) rows.push({ k: "hashtags", label: "Hashtags", v: tags.slice(0, 16).join(" ") });
-    if (cap) rows.push({ k: "caption", label: "Caption (preview)", v: cap.slice(0, 220) });
+    if (lang) rows.push({ k: "lang", label: "Language", v: lang, kind: "text" });
+    if (platform) rows.push({ k: "platform", label: "Platform", v: platform, kind: "text" });
+    if (postType) rows.push({ k: "postType", label: "Post type", v: postType, kind: "text" });
+    if (tags.length) rows.push({ k: "hashtags", label: "Hashtags", v: tags.slice(0, 16).join(" "), kind: "text" });
 
-    // if still empty, show raw keys
+    // ✅ IMPORTANT: do NOT slice caption; show scroll instead
+    if (cap) rows.push({ k: "caption", label: "Caption (preview)", v: cap, kind: "longtext" });
+
     if (!rows.length && payloadObj && typeof payloadObj === "object") {
       const keys = Object.keys(payloadObj).slice(0, 12);
-      if (keys.length) rows.push({ k: "keys", label: "Payload keys", v: keys.join(", ") });
+      if (keys.length) rows.push({ k: "keys", label: "Payload keys", v: keys.join(", "), kind: "text" });
     }
 
     return rows;
@@ -377,20 +385,13 @@ export default function ProposalDetail({
               </h2>
 
               {String(title).length > 80 ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowFull((v) => !v)}
-                  className="shrink-0"
-                >
+                <Button variant="outline" size="sm" onClick={() => setShowFull((v) => !v)} className="shrink-0">
                   {showFull ? "Less" : "More"}
                 </Button>
               ) : null}
             </div>
 
-            {summary ? (
-              <div className="mt-2 text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{summary}</div>
-            ) : null}
+            {summary ? <div className="mt-2 text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{summary}</div> : null}
 
             <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
               <Pill
@@ -441,12 +442,7 @@ export default function ProposalDetail({
             </div>
 
             <div className="shrink-0 flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => copy(packCaption(pack))}
-                disabled={!packCaption(pack)}
-              >
+              <Button variant="outline" size="sm" onClick={() => copy(packCaption(pack))} disabled={!packCaption(pack)}>
                 Copy caption
               </Button>
               <Button variant="outline" size="sm" onClick={() => copyJson(pack)} disabled={!pack}>
@@ -494,9 +490,7 @@ export default function ProposalDetail({
                 <Card variant="panel" padded="sm">
                   <div className="flex items-center justify-between gap-2">
                     <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Hashtags</div>
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                      {packHashtags(pack).length || 0}
-                    </span>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400">{packHashtags(pack).length || 0}</span>
                   </div>
 
                   <div className="mt-2 flex flex-wrap gap-1">
@@ -527,12 +521,7 @@ export default function ProposalDetail({
                         {showDraftFull ? "Less" : "More"}
                       </Button>
                     ) : null}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => copy(packCaption(pack))}
-                      disabled={!packCaption(pack)}
-                    >
+                    <Button variant="outline" size="sm" onClick={() => copy(packCaption(pack))} disabled={!packCaption(pack)}>
                       Copy
                     </Button>
                   </div>
@@ -636,7 +625,7 @@ export default function ProposalDetail({
           )}
         </Card>
 
-        {/* Overview (never empty now) */}
+        {/* Overview */}
         <Card variant="soft" tone="neutral" padded="md">
           <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">Overview</div>
 
@@ -647,11 +636,20 @@ export default function ProposalDetail({
           ) : (
             <div className="mt-3 grid gap-2 md:grid-cols-2 min-w-0">
               {overviewRows.map((r) => (
-                <Card key={r.k} variant="panel" padded="sm">
+                <Card key={r.k} variant="panel" padded="sm" className="min-w-0">
                   <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">{r.label}</div>
-                  <div className="mt-1 text-sm text-slate-900 dark:text-slate-100 whitespace-pre-wrap break-words">
-                    {asDisplay(r.v)}
-                  </div>
+
+                  {r.kind === "longtext" ? (
+                    <div className="mt-2 text-sm text-slate-900 dark:text-slate-100 min-w-0">
+                      <div className="whitespace-pre-wrap break-words max-h-56 overflow-auto pr-2">
+                        {asDisplay(r.v) || "—"}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-1 text-sm text-slate-900 dark:text-slate-100 whitespace-pre-wrap break-words">
+                      {asDisplay(r.v) || "—"}
+                    </div>
+                  )}
                 </Card>
               ))}
             </div>
@@ -714,11 +712,4 @@ export default function ProposalDetail({
       ) : null}
     </Card>
   );
-}
-
-function cxTitle(showFull) {
-  return [
-    "text-base sm:text-lg font-semibold leading-snug min-w-0",
-    showFull ? "break-words" : "line-clamp-2 break-words",
-  ].join(" ");
 }
