@@ -3,7 +3,7 @@
 // ✅ TopBar stats across statuses
 // ✅ WS updates refresh list + stats (+ keeps selected refreshed)
 // ✅ Poll fallback when WS not connected
-// ✅ Draft actions wired: Request changes / Approve draft / Publish (auto-fallback routes)
+// ✅ Draft actions wired: Request changes / Approve draft / Publish
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import TopBar from "../components/TopBar.jsx";
@@ -22,7 +22,6 @@ import { createWsClient } from "../lib/ws.js";
 
 const STATUSES = ["pending", "in_progress", "approved", "rejected"];
 
-// listProposals returns [] (already) but keep safe
 function normalizeList(resp) {
   if (Array.isArray(resp)) return resp;
   if (resp && Array.isArray(resp.proposals)) return resp.proposals;
@@ -88,16 +87,16 @@ export default function ProposalsPage() {
     try {
       const list = await listProposals(desiredStatus);
       const next = normalizeList(list);
+
       setProposals(next);
 
-      // Keep selection if possible
-      const stillExists = next.some((p) => String(p.id) === String(keepSelectedId));
-      if (stillExists) {
-        setSelectedId(String(keepSelectedId));
-      } else if ((!keepSelectedId || !stillExists) && next.length) {
-        setSelectedId(String(next[0].id));
+      // selection handling (stable)
+      if (next.length === 0) {
+        // keep selectedId as-is (user may switch tab)
       } else {
-        // list empty: keep selectedId as-is (user may switch tab)
+        const stillExists = keepSelectedId && next.some((p) => String(p.id) === String(keepSelectedId));
+        if (stillExists) setSelectedId(String(keepSelectedId));
+        else setSelectedId(String(next[0].id));
       }
 
       if (why) showToast(why);
@@ -120,25 +119,21 @@ export default function ProposalsPage() {
     const ws = createWsClient({
       onStatus: (s) => setWsStatus(s),
       onEvent: ({ type, payload }) => {
-        // Always refresh stats — affects all tabs
+        // proposals changed
         if (type === "proposal.created" || type === "proposal.updated") {
           refreshStats();
-
-          // If current tab is the one likely affected, refresh list
           refreshProposals(type === "proposal.created" ? "New proposal" : "Updated", {
             status,
             keepSelectedId: selectedId,
           });
 
-          // If backend sends payload with id, and it's selected, keep it selected
           const pid = payload?.proposalId || payload?.id || payload?.proposal_id;
           if (pid && String(pid) === String(selectedId)) {
-            // make sure we pull newest data
             refreshProposals("", { status, keepSelectedId: selectedId });
           }
         }
 
-        // Optional job/execution events (draft becomes ready)
+        // draft/job/execution events
         if (type === "execution.updated" || type === "job.updated" || type === "content.updated") {
           refreshStats();
           refreshProposals("", { status, keepSelectedId: selectedId });

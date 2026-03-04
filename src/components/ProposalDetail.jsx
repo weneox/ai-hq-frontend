@@ -1,7 +1,7 @@
 // src/components/ProposalDetail.jsx (PREMIUM FINAL)
 // ✅ Sticky decision bar for pending
 // ✅ Draft studio layout (status + preview + feedback + actions)
-// ✅ Uses premium Button/Tabs/Card
+// ✅ Uses premium Button/Card
 // ✅ No crop/overflow issues
 
 import { useEffect, useMemo, useState } from "react";
@@ -258,10 +258,7 @@ export default function ProposalDetail({
         <div className="flex items-start justify-between gap-3 min-w-0">
           <div className="min-w-0">
             <div className="flex items-start gap-2 min-w-0">
-              <h2
-                className={cxTitle(showFull)}
-                title={title}
-              >
+              <h2 className={cxTitle(showFull)} title={title}>
                 {title}
               </h2>
 
@@ -273,9 +270,7 @@ export default function ProposalDetail({
             </div>
 
             {summary ? (
-              <div className="mt-2 text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
-                {summary}
-              </div>
+              <div className="mt-2 text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{summary}</div>
             ) : null}
 
             <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
@@ -327,20 +322,10 @@ export default function ProposalDetail({
             </div>
 
             <div className="shrink-0 flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => copy(packCaption(pack))}
-                disabled={!packCaption(pack)}
-              >
+              <Button variant="outline" size="sm" onClick={() => copy(packCaption(pack))} disabled={!packCaption(pack)}>
                 Copy caption
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => copy(pretty(pack))}
-                disabled={!pack}
-              >
+              <Button variant="outline" size="sm" onClick={() => copy(pretty(pack))} disabled={!pack}>
                 Copy JSON
               </Button>
             </div>
@@ -414,7 +399,12 @@ export default function ProposalDetail({
                         {showDraftFull ? "Less" : "More"}
                       </Button>
                     ) : null}
-                    <Button variant="outline" size="sm" onClick={() => copy(packCaption(pack))} disabled={!packCaption(pack)}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => copy(packCaption(pack))}
+                      disabled={!packCaption(pack)}
+                    >
                       Copy
                     </Button>
                   </div>
@@ -523,9 +513,7 @@ export default function ProposalDetail({
           <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">Overview</div>
 
           {rows.length === 0 ? (
-            <div className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-              Payload-da CEO üçün seçilən sahələr yoxdur.
-            </div>
+            <div className="mt-2 text-sm text-slate-500 dark:text-slate-400">Payload-da CEO üçün seçilən sahələr yoxdur.</div>
           ) : (
             <div className="mt-3 grid gap-2 md:grid-cols-2 min-w-0">
               {rows.map((r) => (
@@ -558,9 +546,7 @@ export default function ProposalDetail({
           <div className="px-4 py-3">
             <div className="flex items-center justify-between gap-2">
               <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">Decision</div>
-              <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                Reject üçün reason məcburidir
-              </div>
+              <div className="text-[11px] text-slate-500 dark:text-slate-400">Reject üçün reason məcburidir</div>
             </div>
 
             <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_auto_auto] items-start">
@@ -601,8 +587,7 @@ export default function ProposalDetail({
 }
 
 function cxTitle(showFull) {
-  return [
-    "text-base sm:text-lg font-semibold leading-snug min-w-0",
-    showFull ? "break-words" : "line-clamp-2 break-words",
-  ].join(" ");
+  return ["text-base sm:text-lg font-semibold leading-snug min-w-0", showFull ? "break-words" : "line-clamp-2 break-words"].join(
+    " "
+  );
 }
