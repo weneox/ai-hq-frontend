@@ -1,24 +1,60 @@
-// src/components/ProposalDetail.jsx (PREMIUM FINAL — Pending merged into Draft UI)
-// ✅ Decision bar shows when proposal.status === "pending" (even though no Pending tab)
-// ✅ Draft Studio shows best-effort draft pack preview (backend untouched)
-// ✅ No crop/overflow issues
+// src/components/ProposalDetail.jsx (FINAL — PREMIUM + ALWAYS SHOW DETAILS)
+// ✅ No dependency on uiFormat.js (fixes empty overview/details)
+// ✅ Draft Studio reads pack from many shapes (content_items/jobs/executions)
+// ✅ Copy JSON uses JSON.stringify (no [object Object])
+// ✅ Sticky decision bar only when status=pending
 
 import { useEffect, useMemo, useState } from "react";
 import Card from "./ui/Card.jsx";
 import Badge from "./ui/Badge.jsx";
 import Button from "./ui/Button.jsx";
-
 import { getApiBase } from "../api/client.js";
-import {
-  parsePayload,
-  titleOf,
-  summaryOf,
-  rowsForOverview,
-  pretty,
-  relTime,
-  shortId,
-  safeText,
-} from "../lib/uiFormat.js";
+
+function safeText(x) {
+  if (typeof x === "string") return x;
+  if (x && typeof x === "object") {
+    if (typeof x.text === "string") return x.text;
+    if (typeof x.value === "string") return x.value;
+  }
+  return "";
+}
+
+function safeJson(x) {
+  try {
+    if (!x) return null;
+    if (typeof x === "string") return JSON.parse(x);
+    if (typeof x === "object") return x;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function pretty(x) {
+  try {
+    return JSON.stringify(x ?? null, null, 2);
+  } catch {
+    return String(x ?? "");
+  }
+}
+
+function shortId(id) {
+  const s = String(id || "");
+  return s.length <= 8 ? s : s.slice(0, 8);
+}
+
+function relTime(iso) {
+  const ms = iso ? Date.parse(iso) : NaN;
+  if (!Number.isFinite(ms)) return "";
+  const d = Date.now() - ms;
+  const m = Math.round(d / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const days = Math.round(h / 24);
+  return `${days}d ago`;
+}
 
 function badgeTone(status) {
   const s = String(status || "").toLowerCase();
@@ -41,22 +77,61 @@ function draftTone(status) {
   return "neutral";
 }
 
-function safeJson(x) {
-  try {
-    if (!x) return null;
-    if (typeof x === "string") return JSON.parse(x);
-    return x;
-  } catch {
-    return null;
+function normalizeHashtags(h) {
+  if (!h) return [];
+  if (Array.isArray(h)) return h.map(String).map((x) => x.trim()).filter(Boolean);
+  if (typeof h === "string") {
+    return h
+      .split(/[\s,]+/)
+      .map((x) => x.trim())
+      .filter(Boolean)
+      .map((x) => (x.startsWith("#") ? x : `#${x}`));
   }
+  return [];
 }
 
-function asDisplay(v) {
-  if (v == null) return "";
-  if (typeof v === "string") return safeText(v, 220);
-  if (Array.isArray(v)) return safeText(v.join(", "), 220);
-  if (typeof v === "object") return safeText(pretty(v), 220);
-  return String(v);
+function pickPayloadObj(p) {
+  const raw =
+    p?.payload ??
+    p?.proposal ??
+    p?.data ??
+    p?.content ??
+    p?.draft ??
+    p?.latestDraft ??
+    p?.latest_draft ??
+    null;
+
+  const obj = safeJson(raw) || raw;
+  if (!obj || typeof obj !== "object") return null;
+  if (obj.payload && typeof obj.payload === "object") return obj.payload;
+  return obj;
+}
+
+function titleOf(p) {
+  const obj = pickPayloadObj(p);
+  if (obj) {
+    const t =
+      safeText(obj.title) ||
+      safeText(obj.name) ||
+      safeText(obj.topic) ||
+      safeText(obj.summary) ||
+      safeText(obj.goal);
+    if (t) return t;
+    const c = safeText(obj.caption) || safeText(obj.text) || "";
+    if (c) return c.slice(0, 80);
+  }
+  return `Proposal #${shortId(p?.id)}`;
+}
+
+function summaryOf(p) {
+  const obj = pickPayloadObj(p);
+  if (obj) {
+    const s = safeText(obj.summary) || safeText(obj.description) || safeText(obj.value) || "";
+    if (s) return s;
+    const c = safeText(obj.caption) || safeText(obj.text) || "";
+    if (c) return c.slice(0, 140);
+  }
+  return "";
 }
 
 function normalizeDraft(rawDraft) {
@@ -91,9 +166,26 @@ function normalizeDraft(rawDraft) {
   };
 }
 
-function packTitle(pack) {
+function pickDraftCandidate(proposal, draftProp) {
+  return (
+    draftProp ||
+    proposal?.latestDraft ||
+    proposal?.latest_draft ||
+    proposal?.draft ||
+    proposal?.contentDraft ||
+    proposal?.latest_execution ||
+    proposal?.lastExecution ||
+    proposal?.latestExecution ||
+    proposal?.execution ||
+    proposal?.job ||
+    (Array.isArray(proposal?.jobs) ? proposal.jobs[0] : null) ||
+    null
+  );
+}
+
+function packType(pack) {
   if (!pack) return "";
-  return pack.title || pack.name || pack.summary || pack.goal || pack.topic || "";
+  return pack.type || pack.postType || pack.format || pack.assetType || "";
 }
 function packCaption(pack) {
   if (!pack) return "";
@@ -101,19 +193,7 @@ function packCaption(pack) {
 }
 function packHashtags(pack) {
   if (!pack) return [];
-  const h = pack.hashtags || pack.tags || pack.hashTags || [];
-  if (Array.isArray(h)) return h.filter(Boolean);
-  if (typeof h === "string") {
-    return h
-      .split(/[\s,]+/)
-      .map((x) => x.trim())
-      .filter(Boolean);
-  }
-  return [];
-}
-function packType(pack) {
-  if (!pack) return "";
-  return pack.type || pack.postType || pack.format || pack.assetType || "";
+  return normalizeHashtags(pack.hashtags || pack.tags || pack.hashTags);
 }
 function packReelScript(pack) {
   if (!pack) return "";
@@ -126,6 +206,18 @@ function packImagePrompt(pack) {
 function packPostTime(pack) {
   if (!pack) return "";
   return pack.post_time || pack.postTime || pack.suggestedTime || "";
+}
+function packTopic(pack) {
+  if (!pack) return "";
+  return pack.title || pack.name || pack.summary || pack.goal || pack.topic || "";
+}
+
+function asDisplay(v) {
+  if (v == null) return "";
+  if (typeof v === "string") return v.length > 220 ? v.slice(0, 219) + "…" : v;
+  if (Array.isArray(v)) return asDisplay(v.join(", "));
+  if (typeof v === "object") return asDisplay(pretty(v));
+  return String(v);
 }
 
 function Pill({ label, value, onCopy, title }) {
@@ -166,24 +258,45 @@ export default function ProposalDetail({
   const [showDraftFull, setShowDraftFull] = useState(false);
 
   const apiBase = useMemo(() => getApiBase(), []);
-  const payload = useMemo(() => parsePayload(proposal), [proposal]);
   const title = useMemo(() => (proposal ? titleOf(proposal) : "Proposal"), [proposal]);
   const summary = useMemo(() => (proposal ? summaryOf(proposal) : ""), [proposal]);
-  const rows = useMemo(() => rowsForOverview(payload), [payload]);
 
   const resolvedDraft = useMemo(() => {
-    const candidate =
-      draft ||
-      proposal?.latestDraft ||
-      proposal?.draft ||
-      proposal?.contentDraft ||
-      proposal?.latest_execution ||
-      proposal?.lastExecution ||
-      null;
+    const candidate = pickDraftCandidate(proposal, draft);
     return normalizeDraft(candidate);
   }, [draft, proposal]);
 
+  const payloadObj = useMemo(() => pickPayloadObj(proposal), [proposal]);
   const pack = resolvedDraft?.pack || null;
+
+  // fallback overview from pack/payload
+  const overviewRows = useMemo(() => {
+    const rows = [];
+
+    const lang =
+      safeText(payloadObj?.language) ||
+      safeText(pack?.language) ||
+      safeText(payloadObj?.lang) ||
+      "";
+    const platform = safeText(payloadObj?.platform) || safeText(pack?.platform) || "instagram";
+    const postType = safeText(payloadObj?.postType) || safeText(pack?.postType) || safeText(packType(pack)) || "";
+    const tags = packHashtags(pack);
+    const cap = packCaption(pack) || safeText(payloadObj?.caption) || safeText(payloadObj?.text) || "";
+
+    if (lang) rows.push({ k: "lang", label: "Language", v: lang });
+    if (platform) rows.push({ k: "platform", label: "Platform", v: platform });
+    if (postType) rows.push({ k: "postType", label: "Post type", v: postType });
+    if (tags.length) rows.push({ k: "hashtags", label: "Hashtags", v: tags.slice(0, 16).join(" ") });
+    if (cap) rows.push({ k: "caption", label: "Caption (preview)", v: cap.slice(0, 220) });
+
+    // if still empty, show raw keys
+    if (!rows.length && payloadObj && typeof payloadObj === "object") {
+      const keys = Object.keys(payloadObj).slice(0, 12);
+      if (keys.length) rows.push({ k: "keys", label: "Payload keys", v: keys.join(", ") });
+    }
+
+    return rows;
+  }, [payloadObj, pack]);
 
   useEffect(() => {
     setShowFull(false);
@@ -229,6 +342,12 @@ export default function ProposalDetail({
     } catch {}
   };
 
+  const copyJson = async (obj) => {
+    try {
+      await navigator.clipboard.writeText(pretty(obj));
+    } catch {}
+  };
+
   const doRequestChanges = async () => {
     const text = String(feedback || "").trim();
     if (!text) return;
@@ -258,7 +377,12 @@ export default function ProposalDetail({
               </h2>
 
               {String(title).length > 80 ? (
-                <Button variant="outline" size="sm" onClick={() => setShowFull((v) => !v)} className="shrink-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowFull((v) => !v)}
+                  className="shrink-0"
+                >
                   {showFull ? "Less" : "More"}
                 </Button>
               ) : null}
@@ -276,7 +400,7 @@ export default function ProposalDetail({
                 onCopy={apiBase ? () => copy(apiBase) : null}
               />
               <span className="opacity-50">·</span>
-              <Pill label="Agent" value={`${agent} · ${created}`} />
+              <Pill label="Agent" value={`${agent}${created ? ` · ${created}` : ""}`} />
               <span className="opacity-50">·</span>
               <Pill
                 label="Ref"
@@ -312,15 +436,20 @@ export default function ProposalDetail({
               </div>
 
               <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-                Cron düşən item-lər **birbaşa Draft kimi** görünür. Pending olanlar üçün aşağıda “Approve” var.
+                Cron düşən item-lər birbaşa Draft kimi görünür. Pending olanlar üçün aşağıda “Approve” var.
               </div>
             </div>
 
             <div className="shrink-0 flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => copy(packCaption(pack))} disabled={!packCaption(pack)}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => copy(packCaption(pack))}
+                disabled={!packCaption(pack)}
+              >
                 Copy caption
               </Button>
-              <Button variant="outline" size="sm" onClick={() => copy(pretty(pack))} disabled={!pack}>
+              <Button variant="outline" size="sm" onClick={() => copyJson(pack)} disabled={!pack}>
                 Copy JSON
               </Button>
             </div>
@@ -352,11 +481,11 @@ export default function ProposalDetail({
                     </>
                   ) : null}
 
-                  {packTitle(pack) ? (
+                  {packTopic(pack) ? (
                     <>
                       <div className="mt-3 text-[11px] font-semibold text-slate-600 dark:text-slate-300">Topic</div>
                       <div className="mt-1 text-sm text-slate-900 dark:text-slate-100 break-words">
-                        {asDisplay(packTitle(pack))}
+                        {asDisplay(packTopic(pack))}
                       </div>
                     </>
                   ) : null}
@@ -365,7 +494,9 @@ export default function ProposalDetail({
                 <Card variant="panel" padded="sm">
                   <div className="flex items-center justify-between gap-2">
                     <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Hashtags</div>
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400">{packHashtags(pack).length || 0}</span>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                      {packHashtags(pack).length || 0}
+                    </span>
                   </div>
 
                   <div className="mt-2 flex flex-wrap gap-1">
@@ -375,7 +506,7 @@ export default function ProposalDetail({
                         className="text-[11px] rounded-full border border-slate-200 bg-white px-2 py-0.5
                                    dark:border-slate-800 dark:bg-slate-900/70 text-slate-700 dark:text-slate-200"
                       >
-                        {h.startsWith("#") ? h : `#${h}`}
+                        {h}
                       </span>
                     ))}
                     {packHashtags(pack).length > 20 ? (
@@ -396,7 +527,12 @@ export default function ProposalDetail({
                         {showDraftFull ? "Less" : "More"}
                       </Button>
                     ) : null}
-                    <Button variant="outline" size="sm" onClick={() => copy(packCaption(pack))} disabled={!packCaption(pack)}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => copy(packCaption(pack))}
+                      disabled={!packCaption(pack)}
+                    >
                       Copy
                     </Button>
                   </div>
@@ -438,7 +574,7 @@ export default function ProposalDetail({
                   <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Feedback</div>
                   {resolvedDraft?.lastFeedback ? (
                     <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                      Last: {safeText(resolvedDraft.lastFeedback, 70)}
+                      Last: {String(resolvedDraft.lastFeedback).slice(0, 70)}
                     </div>
                   ) : null}
                 </div>
@@ -500,15 +636,17 @@ export default function ProposalDetail({
           )}
         </Card>
 
-        {/* Overview */}
+        {/* Overview (never empty now) */}
         <Card variant="soft" tone="neutral" padded="md">
           <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">Overview</div>
 
-          {rows.length === 0 ? (
-            <div className="mt-2 text-sm text-slate-500 dark:text-slate-400">Payload-da CEO üçün seçilən sahələr yoxdur.</div>
+          {overviewRows.length === 0 ? (
+            <div className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+              Payload boşdur (və draft pack da yoxdur).
+            </div>
           ) : (
             <div className="mt-3 grid gap-2 md:grid-cols-2 min-w-0">
-              {rows.map((r) => (
+              {overviewRows.map((r) => (
                 <Card key={r.k} variant="panel" padded="sm">
                   <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">{r.label}</div>
                   <div className="mt-1 text-sm text-slate-900 dark:text-slate-100 whitespace-pre-wrap break-words">
@@ -527,12 +665,12 @@ export default function ProposalDetail({
           </summary>
 
           <pre className="mt-3 max-h-[520px] overflow-auto rounded-xl border border-slate-200 bg-white p-3 text-xs whitespace-pre-wrap break-words dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-100">
-            {pretty(payload)}
+            {pretty(pickPayloadObj(proposal) || proposal?.payload || null)}
           </pre>
         </details>
       </div>
 
-      {/* ✅ Sticky decision bar only when backend status is pending */}
+      {/* Sticky decision bar only when backend status is pending */}
       {statusLc === "pending" ? (
         <div className="absolute bottom-0 left-0 right-0 border-t border-slate-200/70 dark:border-slate-800/70 bg-white/75 dark:bg-slate-950/55 backdrop-blur-xl">
           <div className="px-4 py-3">
