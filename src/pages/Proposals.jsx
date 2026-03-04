@@ -1,9 +1,10 @@
-// src/pages/Proposals.jsx (FINAL — PREMIUM + DRAFT ACTIONS)
-// ✅ Approve -> switch to in_progress (drafting) and keep selection
-// ✅ TopBar stats across statuses
+// src/pages/Proposals.jsx (FINAL — PREMIUM + DRAFT MERGE)
+// ✅ UI Tabs: Draft (= pending + in_progress), Approved, Published, Rejected
+// ✅ Pending tab removed from UI (but backend status pending still exists)
+// ✅ Draft tab shows cron-created items immediately (pending) + drafting items (in_progress)
+// ✅ Approve (pending) -> move to in_progress and keep selection
 // ✅ WS updates refresh list + stats (+ keeps selected refreshed)
 // ✅ Poll fallback when WS not connected
-// ✅ Draft actions wired: Request changes / Approve draft / Publish
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import TopBar from "../components/TopBar.jsx";
@@ -20,7 +21,8 @@ import {
 
 import { createWsClient } from "../lib/ws.js";
 
-const STATUSES = ["pending", "in_progress", "approved", "rejected"];
+const BACKEND_STATUSES = ["pending", "in_progress", "approved", "published", "rejected"];
+const UI_TABS = ["draft", "approved", "published", "rejected"]; // ✅ no pending tab
 
 function normalizeList(resp) {
   if (Array.isArray(resp)) return resp;
@@ -28,11 +30,40 @@ function normalizeList(resp) {
   return [];
 }
 
+function parseDateMs(x) {
+  const v = x ? Date.parse(x) : NaN;
+  return Number.isFinite(v) ? v : 0;
+}
+
+function sortNewestFirst(a, b) {
+  const am = parseDateMs(a?.created_at || a?.createdAt);
+  const bm = parseDateMs(b?.created_at || b?.createdAt);
+  return bm - am;
+}
+
+function uniqById(items) {
+  const seen = new Set();
+  const out = [];
+  for (const it of items || []) {
+    const id = String(it?.id || "");
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(it);
+  }
+  return out;
+}
+
+function mergeDraftItems(pending, inProgress) {
+  return uniqById([...(pending || []), ...(inProgress || [])]).sort(sortNewestFirst);
+}
+
 export default function ProposalsPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
-  const [status, setStatus] = useState("pending");
+  // ✅ default UI tab is "draft" (merged)
+  const [status, setStatus] = useState("draft");
+
   const [search, setSearch] = useState("");
   const [proposals, setProposals] = useState([]);
   const [selectedId, setSelectedId] = useState("");
@@ -44,11 +75,15 @@ export default function ProposalsPage() {
   const [wsStatus, setWsStatus] = useState({ state: "disconnected" });
   const wsClientRef = useRef(null);
 
+  // keep legacy keys for TopBar compatibility (if it expects pending/in_progress)
   const [stats, setStats] = useState({
     pending: 0,
     in_progress: 0,
     approved: 0,
+    published: 0,
     rejected: 0,
+    // extra UI helper
+    draft: 0,
   });
 
   const showToast = (msg) => {
@@ -60,23 +95,50 @@ export default function ProposalsPage() {
   const refreshStats = async () => {
     try {
       const results = await Promise.allSettled(
-        STATUSES.map(async (s) => {
+        BACKEND_STATUSES.map(async (s) => {
           const items = await listProposals(s);
           return { status: s, items: normalizeList(items) };
         })
       );
 
-      const next = { pending: 0, in_progress: 0, approved: 0, rejected: 0 };
+      const next = {
+        pending: 0,
+        in_progress: 0,
+        approved: 0,
+        published: 0,
+        rejected: 0,
+        draft: 0,
+      };
+
       for (const x of results) {
         if (x.status !== "fulfilled") continue;
         const { status: s, items } = x.value || {};
         if (!s) continue;
         next[s] = Array.isArray(items) ? items.length : 0;
       }
+
+      // ✅ Draft tab count = pending + in_progress
+      next.draft = (next.pending || 0) + (next.in_progress || 0);
+
       setStats(next);
     } catch {
       // ignore
     }
+  };
+
+  const fetchByUiStatus = async (uiStatus) => {
+    const s = String(uiStatus || "draft").toLowerCase();
+
+    if (s === "draft") {
+      const [p1, p2] = await Promise.all([listProposals("pending"), listProposals("in_progress")]);
+      const pending = normalizeList(p1);
+      const inProgress = normalizeList(p2);
+      return mergeDraftItems(pending, inProgress);
+    }
+
+    // passthrough
+    const list = await listProposals(s);
+    return normalizeList(list).sort(sortNewestFirst);
   };
 
   const refreshProposals = async (why = "", opts = {}) => {
@@ -85,8 +147,7 @@ export default function ProposalsPage() {
 
     setErr("");
     try {
-      const list = await listProposals(desiredStatus);
-      const next = normalizeList(list);
+      const next = await fetchByUiStatus(desiredStatus);
 
       setProposals(next);
 
@@ -94,7 +155,8 @@ export default function ProposalsPage() {
       if (next.length === 0) {
         // keep selectedId as-is (user may switch tab)
       } else {
-        const stillExists = keepSelectedId && next.some((p) => String(p.id) === String(keepSelectedId));
+        const stillExists =
+          keepSelectedId && next.some((p) => String(p.id) === String(keepSelectedId));
         if (stillExists) setSelectedId(String(keepSelectedId));
         else setSelectedId(String(next[0].id));
       }
@@ -119,10 +181,13 @@ export default function ProposalsPage() {
     const ws = createWsClient({
       onStatus: (s) => setWsStatus(s),
       onEvent: ({ type, payload }) => {
-        // proposals changed
-        if (type === "proposal.created" || type === "proposal.updated") {
+        const isProposalEvent = type === "proposal.created" || type === "proposal.updated";
+        const isExecEvent =
+          type === "execution.updated" || type === "job.updated" || type === "content.updated";
+
+        if (isProposalEvent || isExecEvent) {
           refreshStats();
-          refreshProposals(type === "proposal.created" ? "New proposal" : "Updated", {
+          refreshProposals(isProposalEvent && type === "proposal.created" ? "New proposal" : "", {
             status,
             keepSelectedId: selectedId,
           });
@@ -131,12 +196,6 @@ export default function ProposalsPage() {
           if (pid && String(pid) === String(selectedId)) {
             refreshProposals("", { status, keepSelectedId: selectedId });
           }
-        }
-
-        // draft/job/execution events
-        if (type === "execution.updated" || type === "job.updated" || type === "content.updated") {
-          refreshStats();
-          refreshProposals("", { status, keepSelectedId: selectedId });
         }
       },
     });
@@ -176,16 +235,23 @@ export default function ProposalsPage() {
   // ---------- Decisions ----------
   const onApprove = async () => {
     if (!selected) return;
+
+    // only makes sense if pending
+    if (String(selected.status || "").toLowerCase() !== "pending") {
+      showToast("This item is not pending.");
+      return;
+    }
+
     setDecisionBusy(true);
     setErr("");
     try {
       await decideProposal(selected.id, "approve", reason?.trim() || "");
       setReason("");
 
-      // ✅ UX: go Drafting + keep same selected
-      setStatus("in_progress");
+      // ✅ UX: keep Draft tab selected; item becomes in_progress (drafting) and remains in Draft list
+      setStatus("draft");
       await refreshProposals("Approved ✅ → Drafting", {
-        status: "in_progress",
+        status: "draft",
         keepSelectedId: selected.id,
       });
       await refreshStats();
@@ -295,6 +361,8 @@ export default function ProposalsPage() {
               setStatus={setStatus}
               search={search}
               setSearch={setSearch}
+              // pass counts for tab badges (optional)
+              stats={stats}
             />
           </div>
 

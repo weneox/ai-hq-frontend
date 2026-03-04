@@ -1,7 +1,6 @@
-// src/components/ProposalDetail.jsx (PREMIUM FINAL)
-// ✅ Sticky decision bar for pending
-// ✅ Draft studio layout (status + preview + feedback + actions)
-// ✅ Uses premium Button/Card
+// src/components/ProposalDetail.jsx (PREMIUM FINAL — Pending merged into Draft UI)
+// ✅ Decision bar shows when proposal.status === "pending" (even though no Pending tab)
+// ✅ Draft Studio shows best-effort draft pack preview (backend untouched)
 // ✅ No crop/overflow issues
 
 import { useEffect, useMemo, useState } from "react";
@@ -26,6 +25,7 @@ function badgeTone(status) {
   if (s === "pending") return "warn";
   if (s === "in_progress") return "neutral";
   if (s === "approved") return "success";
+  if (s === "published") return "success";
   if (s === "rejected") return "danger";
   return "neutral";
 }
@@ -151,14 +151,10 @@ function Pill({ label, value, onCopy, title }) {
 export default function ProposalDetail({
   proposal,
   busy,
-
-  // decision UI
   reason,
   setReason,
   onApprove,
   onReject,
-
-  // draft UI/actions (optional)
   draft,
   draftBusy,
   onRequestChanges,
@@ -170,7 +166,6 @@ export default function ProposalDetail({
   const [showDraftFull, setShowDraftFull] = useState(false);
 
   const apiBase = useMemo(() => getApiBase(), []);
-
   const payload = useMemo(() => parsePayload(proposal), [proposal]);
   const title = useMemo(() => (proposal ? titleOf(proposal) : "Proposal"), [proposal]);
   const summary = useMemo(() => (proposal ? summaryOf(proposal) : ""), [proposal]);
@@ -201,7 +196,7 @@ export default function ProposalDetail({
       <Card className="min-w-0 h-full flex flex-col justify-center items-center text-center" variant="panel" padded="lg">
         <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Select a proposal</div>
         <div className="mt-1 text-xs text-slate-500 dark:text-slate-400 max-w-[460px]">
-          Soldakı queue-dan bir proposal seç — burada CEO Studio açılacaq.
+          Soldakı queue-dan bir item seç — burada CEO Studio açılacaq.
         </div>
       </Card>
     );
@@ -317,7 +312,7 @@ export default function ProposalDetail({
               </div>
 
               <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-                Draft = n8n-in yaratdığı content pack (caption, hashtags, script, image prompt…)
+                Cron düşən item-lər **birbaşa Draft kimi** görünür. Pending olanlar üçün aşağıda “Approve” var.
               </div>
             </div>
 
@@ -333,7 +328,9 @@ export default function ProposalDetail({
 
           {!pack ? (
             <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-white/70 p-3 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
-              Hələ draft yoxdur. Pending → Approve etdikdən sonra proposal “Drafting” olacaq və draft burada görünəcək.
+              {statusLc === "pending"
+                ? "Bu draft hələ approve olunmayıb. Aşağıdan Approve et → Drafting (in_progress) olacaq → n8n content pack hazırlayacaq."
+                : "Draft hələ hazır deyil. n8n işləyəndən sonra burada görünəcək."}
             </div>
           ) : (
             <>
@@ -399,12 +396,7 @@ export default function ProposalDetail({
                         {showDraftFull ? "Less" : "More"}
                       </Button>
                     ) : null}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => copy(packCaption(pack))}
-                      disabled={!packCaption(pack)}
-                    >
+                    <Button variant="outline" size="sm" onClick={() => copy(packCaption(pack))} disabled={!packCaption(pack)}>
                       Copy
                     </Button>
                   </div>
@@ -540,7 +532,7 @@ export default function ProposalDetail({
         </details>
       </div>
 
-      {/* Sticky pending decision bar */}
+      {/* ✅ Sticky decision bar only when backend status is pending */}
       {statusLc === "pending" ? (
         <div className="absolute bottom-0 left-0 right-0 border-t border-slate-200/70 dark:border-slate-800/70 bg-white/75 dark:bg-slate-950/55 backdrop-blur-xl">
           <div className="px-4 py-3">
@@ -577,7 +569,7 @@ export default function ProposalDetail({
             </div>
 
             <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
-              Approve → proposal Drafting olur → n8n content pack hazırlayır → burada görünür.
+              Approve → Drafting (in_progress) → n8n content pack hazırlayır → Draft Studio-da görünür.
             </div>
           </div>
         </div>
@@ -587,7 +579,8 @@ export default function ProposalDetail({
 }
 
 function cxTitle(showFull) {
-  return ["text-base sm:text-lg font-semibold leading-snug min-w-0", showFull ? "break-words" : "line-clamp-2 break-words"].join(
-    " "
-  );
+  return [
+    "text-base sm:text-lg font-semibold leading-snug min-w-0",
+    showFull ? "break-words" : "line-clamp-2 break-words",
+  ].join(" ");
 }

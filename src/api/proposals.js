@@ -23,18 +23,13 @@ export async function decideProposal(id, decision, reason) {
 
 function looksLikeRouteNotFound(err) {
   const msg = String(err?.message || err || "").toLowerCase();
-
-  // common signals from our api client / backend
   if (msg.includes("not found")) return true;
   if (msg.includes("404")) return true;
   if (msg.includes("cannot post")) return true;
   if (msg.includes("cannot get")) return true;
   if (msg.includes("no route")) return true;
   if (msg.includes("route")) return true;
-
-  // if api client embeds status code
   if (msg.includes("status 404")) return true;
-
   return false;
 }
 
@@ -46,8 +41,6 @@ async function postWithFallback(paths, body) {
       return await apiPost(p, body);
     } catch (e) {
       lastErr = e;
-
-      // if it's not a routing issue, don't keep trying
       if (!looksLikeRouteNotFound(e)) throw e;
     }
   }
@@ -62,16 +55,12 @@ async function postWithFallback(paths, body) {
 export async function requestDraftChanges(proposalId, draftId, feedback) {
   const pid = encodeURIComponent(String(proposalId));
   const did = encodeURIComponent(String(draftId));
-
   const fb = String(feedback || "").trim();
 
   return postWithFallback(
     [
-      // option A: content_items
       `/api/content/${did}/changes`,
-      // option B: drafts
       `/api/drafts/${did}/changes`,
-      // option C: under proposal
       `/api/proposals/${pid}/draft/${did}/changes`,
       `/api/proposals/${pid}/draft/changes`,
     ],
