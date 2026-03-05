@@ -1,8 +1,5 @@
-// src/components/ui/Input.jsx (FINAL v3.0 — ELITE)
-// ✅ Cleaner glass, better focus, sharper dark-mode, better clear button
-// ✅ InputGroup supports leftIcon / right / onClear
-// ✅ Default Input remains drop-in
-
+// src/components/ui/Input.jsx (ULTRA v4 — Enterprise Input)
+// ✅ Crisp surface, consistent radius, premium focus, better dark mode
 import { cx } from "../../lib/cx.js";
 
 function XIcon({ className }) {
@@ -23,18 +20,18 @@ function Surface({ children, className, disabled }) {
   return (
     <div
       className={cx(
-        "w-full min-w-0 rounded-2xl border",
-        "border-slate-200/80 bg-white/70 backdrop-blur",
-        "shadow-[0_1px_0_rgba(15,23,42,0.04)]",
-        "transition-[border-color,box-shadow,background-color] duration-200",
-        "focus-within:border-indigo-300/80 focus-within:ring-2 focus-within:ring-indigo-500/15",
-        "dark:border-slate-800/80 dark:bg-slate-950/25",
-        "dark:focus-within:border-indigo-500/45 dark:focus-within:ring-indigo-500/22",
+        "relative w-full min-w-0 rounded-2xl border",
+        "border-slate-200 bg-white",
+        "shadow-[0_1px_0_rgba(15,23,42,0.04),0_10px_26px_rgba(15,23,42,0.06)]",
+        "transition-[border-color,box-shadow] duration-200",
+        "focus-within:border-indigo-300 focus-within:ring-2 focus-within:ring-indigo-500/12",
+        "dark:border-slate-800 dark:bg-slate-950/55",
+        "dark:shadow-[0_1px_0_rgba(255,255,255,0.06),0_18px_44px_rgba(0,0,0,0.60)]",
+        "dark:focus-within:border-indigo-500/55 dark:focus-within:ring-indigo-500/18",
         disabled ? "opacity-60" : "",
         className
       )}
     >
-      {/* crisp hairline */}
       <div className="pointer-events-none absolute inset-0 rounded-2xl shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.10)]" />
       <div className="relative">{children}</div>
     </div>
@@ -75,8 +72,8 @@ export function InputGroup({
             readOnly={readOnly}
             placeholder={placeholder}
             className={cx(
-              "min-w-0 w-full bg-transparent text-sm text-slate-900",
-              "placeholder:text-slate-400 outline-none",
+              "min-w-0 w-full bg-transparent text-sm text-slate-900 outline-none",
+              "placeholder:text-slate-400",
               "dark:text-slate-100 dark:placeholder:text-slate-500",
               inputClassName
             )}
@@ -89,10 +86,9 @@ export function InputGroup({
               onClick={onClear}
               className={cx(
                 "shrink-0 inline-flex items-center justify-center rounded-xl p-2",
-                "border border-transparent",
-                "text-slate-500 hover:text-slate-700 hover:bg-slate-100",
-                "dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-900/60",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/25"
+                "text-slate-500 hover:text-slate-800 hover:bg-slate-100",
+                "dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-900/70",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/20"
               )}
               aria-label="Clear"
               title="Clear"

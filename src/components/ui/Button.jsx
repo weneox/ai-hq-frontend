@@ -1,139 +1,171 @@
-// src/components/ui/Button.jsx (ULTRA v1 — Enterprise Button System)
-// ✅ 0dan yazıldı (old v3 silin)
-// ✅ Serious SaaS buttons: no glow spam, no toy sheen
-// ✅ Variants: primary | secondary | outline | ghost | destructive
-// ✅ Sizes: sm | md | lg | icon
-// ✅ Loading: stable width, good UX
-// ✅ API: variant, size, isLoading, className
+import * as React from "react";
+import { motion } from "framer-motion";
+import { cva } from "class-variance-authority";
+import clsx from "clsx";
+import { twMerge } from "tailwind-merge";
 
-import { cx } from "../../lib/cx.js";
+function cn(...i) {
+  return twMerge(clsx(i));
+}
 
 function Spinner({ className }) {
   return (
-    <svg
-      className={cx("h-4 w-4 animate-spin", className)}
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-    >
-      <circle
-        className="opacity-25"
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        strokeWidth="3"
-        fill="none"
-      />
-      <path
-        className="opacity-75"
-        fill="currentColor"
-        d="M4 12a8 8 0 018-8v2.2A5.8 5.8 0 006.2 12H4z"
-      />
+    <svg className={cn("h-4 w-4 animate-spin", className)} viewBox="0 0 24 24" aria-hidden="true">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" fill="none" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v2.2A5.8 5.8 0 006.2 12H4z" />
     </svg>
   );
 }
 
-const sizes = {
-  sm: "h-9 px-3.5 text-[13px] rounded-xl",
-  md: "h-10 px-4 text-[13px] rounded-xl",
-  lg: "h-11 px-5 text-[14px] rounded-2xl",
-  icon: "h-10 w-10 p-0 rounded-xl",
-};
+const padMap = { sm: "px-3", md: "px-4", lg: "px-5", icon: "p-0" };
 
-const base = cx(
-  "relative inline-flex items-center justify-center gap-2",
-  "font-semibold whitespace-nowrap select-none",
-  "leading-none tracking-[-0.01em]",
-  "transition-[transform,background-color,border-color,box-shadow,color] duration-150",
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/18",
-  "focus-visible:ring-offset-2 ring-offset-white dark:ring-offset-slate-950",
-  "disabled:opacity-50 disabled:pointer-events-none",
-  "active:translate-y-[1px]"
-);
+// NOTE: remove transition-[transform] to avoid “double transform” with framer-motion
+const base = [
+  "group relative inline-flex items-center justify-center",
+  "select-none whitespace-nowrap",
+  "font-semibold tracking-[-0.01em]",
+  "outline-none",
+  "disabled:opacity-55 disabled:cursor-not-allowed",
+  "transition-[filter,box-shadow,border-color,background-color,color] duration-200",
+  // use your global focus system (index.css) — so don’t add extra rings here
+].join(" ");
 
-/**
- * Design rules:
- * - Primary is dark (serious). In dark mode it flips to light.
- * - Secondary/outline are neutral, no blur.
- * - No sheen overlays. No glow shadows.
- * - Shadows are small and real.
- */
-const variants = {
-  primary: cx(
-    "bg-slate-900 text-white border border-slate-900",
-    "hover:bg-slate-800 hover:border-slate-800",
-    "shadow-[0_1px_0_rgba(15,23,42,0.10),0_10px_24px_rgba(15,23,42,0.14)]",
-    "dark:bg-white dark:text-slate-950 dark:border-white",
-    "dark:hover:bg-slate-100 dark:hover:border-slate-100",
-    "dark:shadow-[0_1px_0_rgba(255,255,255,0.08),0_16px_44px_rgba(0,0,0,0.60)]"
-  ),
+const buttonCva = cva(base, {
+  variants: {
+    variant: {
+      primary: "text-white",
+      secondary: "text-slate-900 dark:text-slate-100",
+      outline: "text-slate-900 dark:text-slate-100",
+      ghost: "text-slate-900 dark:text-slate-100",
+      destructive: "text-white",
+    },
+    size: {
+      sm: "h-9 text-sm rounded-[12px]",
+      md: "h-10 text-sm rounded-[14px]",
+      lg: "h-11 text-[15px] rounded-[16px]",
+      icon: "h-10 w-10 rounded-[14px]",
+    },
+  },
+  defaultVariants: { variant: "primary", size: "md" },
+});
 
-  secondary: cx(
-    "bg-slate-100 text-slate-900 border border-slate-200",
-    "hover:bg-slate-200 hover:border-slate-300",
-    "shadow-[0_1px_0_rgba(15,23,42,0.04)]",
-    "dark:bg-white/5 dark:text-slate-100 dark:border-white/10",
-    "dark:hover:bg-white/7 dark:hover:border-white/15"
-  ),
+function frameClass(variant) {
+  if (variant === "primary") {
+    return "bg-[linear-gradient(135deg,rgba(99,102,241,.85),rgba(56,189,248,.55),rgba(167,139,250,.70))]";
+  }
+  if (variant === "destructive") {
+    return "bg-[linear-gradient(135deg,rgba(244,63,94,.85),rgba(251,113,133,.55),rgba(251,146,60,.55))]";
+  }
+  return "bg-transparent";
+}
 
-  outline: cx(
-    "bg-white text-slate-900 border border-slate-300",
-    "hover:bg-slate-50 hover:border-slate-400",
-    "shadow-[0_1px_0_rgba(15,23,42,0.04)]",
-    "dark:bg-transparent dark:text-slate-100 dark:border-white/18",
-    "dark:hover:bg-white/6 dark:hover:border-white/24"
-  ),
+function surfaceClass(variant) {
+  switch (variant) {
+    case "primary":
+      return "bg-[linear-gradient(180deg,rgba(30,41,59,.78),rgba(2,6,23,.94))] border border-white/10";
+    case "destructive":
+      return "bg-[linear-gradient(180deg,rgba(127,29,29,.74),rgba(69,10,10,.94))] border border-white/10";
+    case "secondary":
+      return [
+        "bg-white border border-slate-200",
+        "shadow-[0_10px_26px_rgba(2,6,23,.10)]",
+        "hover:shadow-[0_16px_40px_rgba(2,6,23,.14)]",
+        "dark:bg-slate-900 dark:border-white/10 dark:shadow-[0_16px_40px_rgba(0,0,0,.45)]",
+      ].join(" ");
+    case "outline":
+      return [
+        "bg-white/70 border border-slate-300 backdrop-blur-md",
+        "shadow-[0_10px_22px_rgba(2,6,23,.08)]",
+        "hover:border-slate-400 hover:bg-white/85",
+        "dark:bg-slate-950/35 dark:border-white/12 dark:hover:border-white/18 dark:hover:bg-slate-950/45",
+      ].join(" ");
+    case "ghost":
+      return "bg-transparent border border-transparent hover:bg-slate-900/[0.04] dark:hover:bg-white/[0.06]";
+    default:
+      return "bg-white border border-slate-200";
+  }
+}
 
-  ghost: cx(
-    "bg-transparent text-slate-700 border border-transparent",
-    "hover:bg-slate-100 hover:text-slate-900",
-    "dark:text-slate-200 dark:hover:bg-white/6 dark:hover:text-white",
-    "shadow-none"
-  ),
-
-  destructive: cx(
-    "bg-rose-600 text-white border border-rose-600",
-    "hover:bg-rose-700 hover:border-rose-700",
-    "shadow-[0_1px_0_rgba(15,23,42,0.10),0_10px_24px_rgba(225,29,72,0.18)]",
-    "focus-visible:ring-rose-500/22"
-  ),
-};
-
-export default function Button({
-  variant = "primary",
-  size = "md",
-  className,
-  isLoading = false,
-  disabled,
-  children,
-  ...props
-}) {
+export default React.forwardRef(function Button(
+  {
+    className,
+    variant = "primary",
+    size = "md",
+    isLoading = false,
+    leftIcon,
+    rightIcon,
+    disabled,
+    children,
+    ...props
+  },
+  ref
+) {
   const isDisabled = Boolean(disabled || isLoading);
-  const s = sizes[size] || sizes.md;
-  const v = variants[variant] || variants.primary;
+  const showFrame = variant === "primary" || variant === "destructive";
+
+  // smooth, not “donan”: lighter spring
+  const hover = isDisabled ? undefined : { y: -1 };
+  const tap = isDisabled ? undefined : { y: 0, scale: 0.985 };
 
   return (
-    <button
-      className={cx(base, s, v, isLoading ? "cursor-wait" : "", className)}
+    <motion.button
+      ref={ref}
+      type="button"
       disabled={isDisabled}
+      whileHover={hover}
+      whileTap={tap}
+      transition={{ type: "spring", stiffness: 260, damping: 22, mass: 0.9 }}
+      className={cn(buttonCva({ variant, size }), className)}
       {...props}
     >
-      {/* inner hairline for crispness (subtle) */}
+      {/* frame (only primary/destructive) */}
       <span
-        className="pointer-events-none absolute inset-0 rounded-[inherit] ring-1 ring-inset ring-black/5 dark:ring-white/10"
         aria-hidden="true"
+        className={cn(
+          "absolute inset-0 p-[1px] pointer-events-none",
+          // match rounding with button size (so corners are never square)
+          size === "sm" ? "rounded-[12px]" : size === "md" ? "rounded-[14px]" : size === "lg" ? "rounded-[16px]" : "rounded-[14px]",
+          frameClass(variant),
+          showFrame ? "opacity-100" : "opacity-0"
+        )}
       />
 
-      {/* content */}
-      <span className="relative z-10 inline-flex items-center justify-center gap-2">
-        {/* keep layout stable: spinner uses same space */}
-        {isLoading ? (
-          <span className="inline-flex items-center justify-center">
-            <Spinner />
+      {/* surface */}
+      <span
+        className={cn(
+          "relative z-[1] inline-flex h-full w-full items-center justify-center",
+          size === "sm" ? "rounded-[11px]" : size === "md" ? "rounded-[13px]" : size === "lg" ? "rounded-[15px]" : "rounded-[13px]",
+          padMap[size],
+          surfaceClass(variant)
+        )}
+      >
+        {/* subtle highlight sweep (primary/destructive only) */}
+        {showFrame && (
+          <span
+            aria-hidden="true"
+            className={cn(
+              "pointer-events-none absolute inset-0 overflow-hidden",
+              size === "sm" ? "rounded-[11px]" : size === "md" ? "rounded-[13px]" : size === "lg" ? "rounded-[15px]" : "rounded-[13px]",
+              "opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+            )}
+          >
+            <span
+              className={cn(
+                "absolute -left-1/2 top-0 h-full w-[140%]",
+                "bg-[linear-gradient(110deg,transparent,rgba(255,255,255,.18),transparent)]",
+                "translate-x-[-35%] group-hover:translate-x-[35%]",
+                "transition-transform duration-700 ease-out"
+              )}
+            />
           </span>
-        ) : null}
-        <span className={cx(isLoading ? "opacity-90" : "")}>{children}</span>
+        )}
+
+        <span className="relative z-[2] inline-flex items-center gap-2">
+          {isLoading ? <Spinner className="opacity-90" /> : leftIcon ? leftIcon : null}
+          <span className={cn(isLoading ? "opacity-95" : "")}>{children}</span>
+          {!isLoading && rightIcon ? rightIcon : null}
+        </span>
       </span>
-    </button>
+    </motion.button>
   );
-}
+});
