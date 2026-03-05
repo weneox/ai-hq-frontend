@@ -1,13 +1,6 @@
-// src/components/ProposalDetail.jsx (FINAL v4 — Draft → Approved → Published + Rejected)
-// ✅ No pending UI
-// ✅ Draft actions: Request changes / Approve draft / Reject
-// ✅ Publish only after approved
-// ✅ Reject reason input is ABOVE buttons (so Reject isn't "mysteriously disabled")
-// ✅ Props are compatible with BOTH styles:
-//    - onPublish OR onPublishDraft
-//    - onRejectDraft OR onReject
-// ✅ Reads draft from: draft prop OR proposal.latestContent/latestDraft/... (multi-shape)
-// ✅ Ultra-detailed draft viewer (format, caption, hashtags, design/layout, storyboard, script, prompts, specs)
+// src/components/ProposalDetail.jsx (FINAL v4.1 — adds auto-fetch /api/content?proposalId=...)
+// ✅ Fixes "no draft" when proposal list doesn't include latestDraft/latestContent
+// ✅ Draft actions stay same
 
 import { useEffect, useMemo, useState } from "react";
 import Card from "./ui/Card.jsx";
@@ -89,7 +82,8 @@ function normalizeHashtags(h) {
 }
 
 function pickPayloadObj(p) {
-  const raw = p?.payload ?? p?.proposal ?? p?.data ?? p?.content ?? p?.draft ?? p?.latestDraft ?? p?.latest_draft ?? null;
+  const raw =
+    p?.payload ?? p?.proposal ?? p?.data ?? p?.content ?? p?.draft ?? p?.latestDraft ?? p?.latest_draft ?? null;
   const obj = safeJson(raw) || raw;
   if (!obj || typeof obj !== "object") return null;
   if (obj.payload && typeof obj.payload === "object") return obj.payload;
@@ -278,6 +272,31 @@ function SmallPill({ label, value }) {
   );
 }
 
+async function fetchLatestDraft(apiBase, proposalId) {
+  if (!apiBase || !proposalId) return null;
+  const url = `${String(apiBase).replace(/\/+$/, "")}/api/content?proposalId=${encodeURIComponent(String(proposalId))}`;
+  const r = await fetch(url, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+  if (!r.ok) return null;
+  const j = await r.json().catch(() => null);
+
+  // Accept shapes:
+  // { ok:true, content: {...} }
+  // { ok:true, items:[...] }
+  // { item: {...} } / { draft: {...} }
+  const item =
+    j?.content ||
+    j?.item ||
+    j?.draft ||
+    (Array.isArray(j?.items) ? j.items[0] : null) ||
+    (Array.isArray(j?.contentItems) ? j.contentItems[0] : null) ||
+    null;
+
+  return item || null;
+}
+
 export default function ProposalDetail({
   proposal,
 
@@ -299,20 +318,58 @@ export default function ProposalDetail({
   draft,
 }) {
   const apiBase = useMemo(() => getApiBase(), []);
+
   const [feedback, setFeedback] = useState("");
   const [rejectReason, setRejectReason] = useState("");
 
+  // ✅ NEW: local fetched draft fallback
+  const [fetchedDraftRaw, setFetchedDraftRaw] = useState(null);
+  const [fetchingDraft, setFetchingDraft] = useState(false);
+
   const resolvedDraft = useMemo(() => {
-    const candidate = pickDraftCandidate(proposal, draft);
+    const candidate = pickDraftCandidate(proposal, draft) || fetchedDraftRaw;
     return normalizeDraft(candidate);
-  }, [proposal, draft]);
+  }, [proposal, draft, fetchedDraftRaw]);
 
   const pack = resolvedDraft?.pack || null;
 
   useEffect(() => {
     setFeedback("");
     setRejectReason("");
+    setFetchedDraftRaw(null);
   }, [proposal?.id]);
+
+  // ✅ NEW: auto-fetch when pack missing
+  useEffect(() => {
+    let alive = true;
+
+    async function run() {
+      if (!proposal?.id) return;
+
+      // if parent already passed draft or proposal already has candidate, skip
+      const candidate = pickDraftCandidate(proposal, draft);
+      const normalized = normalizeDraft(candidate);
+      if (normalized?.pack) return;
+
+      if (!apiBase) return;
+
+      setFetchingDraft(true);
+      try {
+        const item = await fetchLatestDraft(apiBase, proposal.id);
+        if (!alive) return;
+        setFetchedDraftRaw(item);
+      } catch {
+        // ignore
+      } finally {
+        if (alive) setFetchingDraft(false);
+      }
+    }
+
+    run();
+    return () => {
+      alive = false;
+    };
+  }, [apiBase, proposal?.id, draft]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!proposal) {
     return (
@@ -346,7 +403,7 @@ export default function ProposalDetail({
   const isDraftApproved = draftStatusLc.includes("approved") || isApproved;
   const canPublish = Boolean(pack) && isDraftApproved && !isPublished;
 
-  const effectiveBusy = Boolean(busy || draftBusy);
+  const effectiveBusy = Boolean(busy || draftBusy || fetchingDraft);
 
   const agent = proposal.agent_key || proposal.agentKey || proposal.agent || "—";
   const created = relTime(proposal.created_at || proposal.createdAt);
@@ -382,7 +439,6 @@ export default function ProposalDetail({
     if (!handler) return;
     const r = String(rejectReason || "").trim();
     if (!r) return;
-    // pass (proposalId, draftId, reason) — parent can ignore draftId if it wants
     await handler(String(proposal.id), String(resolvedDraft?.id || ""), r);
     setRejectReason("");
   };
@@ -452,7 +508,7 @@ export default function ProposalDetail({
               <div className="flex items-center gap-2 flex-wrap">
                 <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">Draft Studio</div>
                 <Badge tone={draftTone(resolvedDraft?.status || (pack ? "draft.ready" : "no draft"))}>
-                  {resolvedDraft?.status || (pack ? "draft.ready" : "no draft")}
+                  {resolvedDraft?.status || (pack ? "draft.ready" : fetchingDraft ? "loading…" : "no draft")}
                 </Badge>
                 {typeof resolvedDraft?.version === "number" ? (
                   <span className="text-[11px] text-slate-500 dark:text-slate-400">v{resolvedDraft.version}</span>
@@ -476,8 +532,14 @@ export default function ProposalDetail({
 
           {!pack ? (
             <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-white/70 p-3 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
-              Draft hələ görünmür. Backend draft-ı `content_items`-ə yazmalıdır və UI ya list-lə birlikdə gətirməlidir,
-              ya da parent ayrıca `/api/content?proposalId=...` fetch etməlidir.
+              {fetchingDraft ? (
+                <>Draft axtarıram… `/api/content?proposalId=...` çağırılır.</>
+              ) : (
+                <>
+                  Draft hələ görünmür. Ya backend draft-ı `content_items`-ə yazmır, ya da `GET /api/content?proposalId=...`
+                  boş qayıdır.
+                </>
+              )}
             </div>
           ) : (
             <>
@@ -620,7 +682,6 @@ export default function ProposalDetail({
                   ) : null}
                 </div>
 
-                {/* Feedback */}
                 <textarea
                   value={feedback}
                   onChange={(e) => setFeedback(e.target.value)}
@@ -632,7 +693,6 @@ export default function ProposalDetail({
                   disabled={effectiveBusy || isRegenerating || isRejected || isPublished}
                 />
 
-                {/* Reject reason (MOVED ABOVE BUTTONS) */}
                 {isDraftStage ? (
                   <div className="mt-3">
                     <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Reject reason</div>
@@ -727,13 +787,12 @@ export default function ProposalDetail({
           )}
         </Card>
 
-        {/* Advanced raw */}
         <details className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30 min-w-0">
           <summary className="cursor-pointer select-none text-xs font-semibold text-slate-700 dark:text-slate-200">
             Advanced (Raw)
           </summary>
           <pre className="mt-3 max-h-[520px] overflow-auto rounded-xl border border-slate-200 bg-white p-3 text-xs whitespace-pre-wrap break-words dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-100">
-            {pretty({ proposal, draft: resolvedDraft })}
+            {pretty({ proposal, draft: resolvedDraft, fetchedDraftRaw })}
           </pre>
         </details>
       </div>
