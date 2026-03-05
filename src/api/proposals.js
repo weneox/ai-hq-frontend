@@ -1,9 +1,9 @@
-// src/api/proposals.js (FINAL — robust + auto-fallback draft routes)
+// src/api/proposals.js (FINAL v3.2 — robust + auto-fallback draft routes + rejectDraft)
 
 import { apiGet, apiPost } from "./client.js";
 
-export async function listProposals(status = "pending") {
-  const s = encodeURIComponent(status || "pending");
+export async function listProposals(status = "draft") {
+  const s = encodeURIComponent(status || "draft");
   const j = await apiGet(`/api/proposals?status=${s}`);
 
   // supports both {proposals: []} and direct []
@@ -11,6 +11,7 @@ export async function listProposals(status = "pending") {
   return j?.proposals || [];
 }
 
+// NOTE: legacy decideProposal still here if you ever need it (not used by UI v3)
 export async function decideProposal(id, decision, reason) {
   const pid = encodeURIComponent(String(id));
   return apiPost(`/api/proposals/${pid}/decision`, {
@@ -60,11 +61,13 @@ export async function requestDraftChanges(proposalId, draftId, feedback) {
   return postWithFallback(
     [
       `/api/content/${did}/changes`,
+      `/api/content/${did}/feedback`, // some backends use /feedback
       `/api/drafts/${did}/changes`,
       `/api/proposals/${pid}/draft/${did}/changes`,
       `/api/proposals/${pid}/draft/changes`,
+      `/api/proposals/${pid}/request-changes`, // your convenience route returns contentId sometimes
     ],
-    { proposalId: String(proposalId), draftId: String(draftId), feedback: fb }
+    { proposalId: String(proposalId), draftId: String(draftId), feedback: fb, feedbackText: fb }
   );
 }
 
@@ -87,6 +90,27 @@ export async function approveDraft(proposalId, draftId) {
 }
 
 /**
+ * Reject draft (moves proposal to rejected)
+ * body: { proposalId, draftId, reason }
+ */
+export async function rejectDraft(proposalId, draftId, reason) {
+  const pid = encodeURIComponent(String(proposalId));
+  const did = encodeURIComponent(String(draftId));
+  const r = String(reason || "").trim();
+
+  return postWithFallback(
+    [
+      `/api/content/${did}/reject`,
+      `/api/drafts/${did}/reject`,
+      `/api/proposals/${pid}/draft/${did}/reject`,
+      `/api/proposals/${pid}/draft/reject`,
+      `/api/proposals/${pid}/reject`, // optional convenience if you add it later
+    ],
+    { proposalId: String(proposalId), draftId: String(draftId), reason: r, rejectReason: r }
+  );
+}
+
+/**
  * Publish draft
  */
 export async function publishDraft(proposalId, draftId) {
@@ -99,6 +123,7 @@ export async function publishDraft(proposalId, draftId) {
       `/api/drafts/${did}/publish`,
       `/api/proposals/${pid}/draft/${did}/publish`,
       `/api/proposals/${pid}/draft/publish`,
+      `/api/proposals/${pid}/publish`, // your convenience route returns contentId
     ],
     { proposalId: String(proposalId), draftId: String(draftId) }
   );

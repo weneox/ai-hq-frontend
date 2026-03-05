@@ -1,10 +1,12 @@
-// src/pages/Proposals.jsx (FINAL — PREMIUM + DRAFT MERGE)
-// ✅ UI Tabs: Draft (= pending + in_progress), Approved, Published, Rejected
-// ✅ Pending tab removed from UI (but backend status pending still exists)
-// ✅ Draft tab shows cron-created items immediately (pending) + drafting items (in_progress)
-// ✅ Approve (pending) -> move to in_progress and keep selection
-// ✅ WS updates refresh list + stats (+ keeps selected refreshed)
-// ✅ Poll fallback when WS not connected
+// src/pages/Proposals.jsx (FINAL v3.1 — DRAFT→APPROVED→PUBLISHED + REJECTED)
+// ✅ UI Tabs: Draft, Approved, Published, Rejected
+// ✅ No Pending tab + no decideProposal approve/reject
+// ✅ Draft actions live inside ProposalDetail: Request changes / Approve draft / Reject
+// ✅ Publish only after approved
+// ✅ WS refresh + polling fallback, keeps selection stable
+// ✅ Draft tab merges: draft + in_progress + pending(legacy)
+// ✅ Safe stats: keeps backend counts + UI draft count merged
+// ✅ Approve Draft UX: if current tab is Draft, auto-switch to Approved (optional) and keep selection
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import TopBar from "../components/TopBar.jsx";
@@ -13,16 +15,16 @@ import ProposalDetail from "../components/ProposalDetail.jsx";
 
 import {
   listProposals,
-  decideProposal,
   requestDraftChanges,
   approveDraft,
+  rejectDraft,
   publishDraft,
 } from "../api/proposals.js";
 
 import { createWsClient } from "../lib/ws.js";
 
-const BACKEND_STATUSES = ["pending", "in_progress", "approved", "published", "rejected"];
-const UI_TABS = ["draft", "approved", "published", "rejected"]; // ✅ no pending tab
+const BACKEND_STATUSES = ["draft", "in_progress", "approved", "published", "rejected", "pending"]; // pending = legacy safety
+const UI_TABS = ["draft", "approved", "published", "rejected"];
 
 function normalizeList(resp) {
   if (Array.isArray(resp)) return resp;
@@ -53,37 +55,35 @@ function uniqById(items) {
   return out;
 }
 
-function mergeDraftItems(pending, inProgress) {
-  return uniqById([...(pending || []), ...(inProgress || [])]).sort(sortNewestFirst);
+function mergeDraftItems(draft, inProgress, pendingMaybe) {
+  return uniqById([...(draft || []), ...(inProgress || []), ...(pendingMaybe || [])]).sort(sortNewestFirst);
 }
 
 export default function ProposalsPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
-  // ✅ default UI tab is "draft" (merged)
+  // ✅ default UI tab
   const [status, setStatus] = useState("draft");
 
   const [search, setSearch] = useState("");
   const [proposals, setProposals] = useState([]);
   const [selectedId, setSelectedId] = useState("");
 
-  const [decisionBusy, setDecisionBusy] = useState(false);
-  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState("");
 
   const [wsStatus, setWsStatus] = useState({ state: "disconnected" });
   const wsClientRef = useRef(null);
 
-  // keep legacy keys for TopBar compatibility (if it expects pending/in_progress)
+  // keep backend counts + UI helper
   const [stats, setStats] = useState({
-    pending: 0,
+    draft: 0, // UI merged draft count
     in_progress: 0,
     approved: 0,
     published: 0,
     rejected: 0,
-    // extra UI helper
-    draft: 0,
+    pending: 0, // legacy backend count
   });
 
   const showToast = (msg) => {
@@ -102,12 +102,12 @@ export default function ProposalsPage() {
       );
 
       const next = {
-        pending: 0,
+        draft: 0,
         in_progress: 0,
         approved: 0,
         published: 0,
         rejected: 0,
-        draft: 0,
+        pending: 0,
       };
 
       for (const x of results) {
@@ -117,8 +117,8 @@ export default function ProposalsPage() {
         next[s] = Array.isArray(items) ? items.length : 0;
       }
 
-      // ✅ Draft tab count = pending + in_progress
-      next.draft = (next.pending || 0) + (next.in_progress || 0);
+      // ✅ UI Draft count = backend draft + in_progress + pending
+      next.draft = (next.draft || 0) + (next.in_progress || 0) + (next.pending || 0);
 
       setStats(next);
     } catch {
@@ -130,13 +130,14 @@ export default function ProposalsPage() {
     const s = String(uiStatus || "draft").toLowerCase();
 
     if (s === "draft") {
-      const [p1, p2] = await Promise.all([listProposals("pending"), listProposals("in_progress")]);
-      const pending = normalizeList(p1);
-      const inProgress = normalizeList(p2);
-      return mergeDraftItems(pending, inProgress);
+      const [a, b, c] = await Promise.all([
+        listProposals("draft"),
+        listProposals("in_progress"),
+        listProposals("pending"), // legacy safety
+      ]);
+      return mergeDraftItems(normalizeList(a), normalizeList(b), normalizeList(c));
     }
 
-    // passthrough
     const list = await listProposals(s);
     return normalizeList(list).sort(sortNewestFirst);
   };
@@ -148,17 +149,14 @@ export default function ProposalsPage() {
     setErr("");
     try {
       const next = await fetchByUiStatus(desiredStatus);
-
       setProposals(next);
 
-      // selection handling (stable)
+      // stable selection
       if (next.length === 0) {
         // keep selectedId as-is (user may switch tab)
       } else {
-        const stillExists =
-          keepSelectedId && next.some((p) => String(p.id) === String(keepSelectedId));
-        if (stillExists) setSelectedId(String(keepSelectedId));
-        else setSelectedId(String(next[0].id));
+        const stillExists = keepSelectedId && next.some((p) => String(p.id) === String(keepSelectedId));
+        setSelectedId(stillExists ? String(keepSelectedId) : String(next[0].id));
       }
 
       if (why) showToast(why);
@@ -169,7 +167,7 @@ export default function ProposalsPage() {
     }
   };
 
-  // Initial + status change
+  // initial + tab change
   useEffect(() => {
     refreshProposals();
     refreshStats();
@@ -182,17 +180,17 @@ export default function ProposalsPage() {
       onStatus: (s) => setWsStatus(s),
       onEvent: ({ type, payload }) => {
         const isProposalEvent = type === "proposal.created" || type === "proposal.updated";
-        const isExecEvent =
-          type === "execution.updated" || type === "job.updated" || type === "content.updated";
+        const isContentEvent = type === "content.updated";
+        const isExecEvent = type === "execution.updated" || type === "job.updated";
 
-        if (isProposalEvent || isExecEvent) {
+        if (isProposalEvent || isContentEvent || isExecEvent) {
           refreshStats();
-          refreshProposals(isProposalEvent && type === "proposal.created" ? "New proposal" : "", {
+          refreshProposals(isProposalEvent && type === "proposal.created" ? "New item" : "", {
             status,
             keepSelectedId: selectedId,
           });
 
-          const pid = payload?.proposalId || payload?.id || payload?.proposal_id;
+          const pid = payload?.proposalId || payload?.proposal_id || payload?.id;
           if (pid && String(pid) === String(selectedId)) {
             refreshProposals("", { status, keepSelectedId: selectedId });
           }
@@ -213,7 +211,7 @@ export default function ProposalsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Poll fallback when WS not connected
+  // Poll fallback
   useEffect(() => {
     const s = wsStatus?.state;
     if (s === "connected") return;
@@ -232,101 +230,75 @@ export default function ProposalsPage() {
     [proposals, selectedId]
   );
 
-  // ---------- Decisions ----------
-  const onApprove = async () => {
-    if (!selected) return;
-
-    // only makes sense if pending
-    if (String(selected.status || "").toLowerCase() !== "pending") {
-      showToast("This item is not pending.");
-      return;
-    }
-
-    setDecisionBusy(true);
+  // ---------- Draft actions (UI -> backend) ----------
+  const onRequestChanges = async (proposalId, contentId, feedbackText) => {
+    setBusy(true);
     setErr("");
     try {
-      await decideProposal(selected.id, "approve", reason?.trim() || "");
-      setReason("");
-
-      // ✅ UX: keep Draft tab selected; item becomes in_progress (drafting) and remains in Draft list
-      setStatus("draft");
-      await refreshProposals("Approved ✅ → Drafting", {
-        status: "draft",
-        keepSelectedId: selected.id,
-      });
-      await refreshStats();
-    } catch (e) {
-      setErr(String(e?.message || e));
-    } finally {
-      setDecisionBusy(false);
-    }
-  };
-
-  const onReject = async () => {
-    if (!selected) return;
-    if (!reason.trim()) {
-      setErr("Reject üçün qısa reason yaz.");
-      return;
-    }
-    setDecisionBusy(true);
-    setErr("");
-    try {
-      await decideProposal(selected.id, "reject", reason.trim());
-      setReason("");
-
-      setStatus("rejected");
-      await refreshProposals("Rejected ❌", {
-        status: "rejected",
-        keepSelectedId: selected.id,
-      });
-      await refreshStats();
-    } catch (e) {
-      setErr(String(e?.message || e));
-    } finally {
-      setDecisionBusy(false);
-    }
-  };
-
-  // ---------- Draft actions ----------
-  const onRequestChanges = async (proposalId, draftId, feedbackText) => {
-    setDecisionBusy(true);
-    setErr("");
-    try {
-      await requestDraftChanges(proposalId, draftId, feedbackText);
+      await requestDraftChanges(proposalId, contentId, feedbackText);
       await refreshProposals("Changes requested ✅", { status, keepSelectedId: proposalId });
       await refreshStats();
     } catch (e) {
       setErr(String(e?.message || e));
     } finally {
-      setDecisionBusy(false);
+      setBusy(false);
     }
   };
 
-  const onApproveDraft = async (proposalId, draftId) => {
-    setDecisionBusy(true);
+  const onApproveDraft = async (proposalId, contentId) => {
+    setBusy(true);
     setErr("");
     try {
-      await approveDraft(proposalId, draftId);
-      await refreshProposals("Draft approved ✅", { status, keepSelectedId: proposalId });
+      await approveDraft(proposalId, contentId);
+
+      // refresh counts first
       await refreshStats();
+
+      // UX: if you're on Draft tab, item will likely move to Approved -> switch there
+      if (status === "draft") {
+        setStatus("approved");
+        await refreshProposals("Draft approved ✅", { status: "approved", keepSelectedId: proposalId });
+      } else {
+        await refreshProposals("Draft approved ✅", { status, keepSelectedId: proposalId });
+      }
     } catch (e) {
       setErr(String(e?.message || e));
     } finally {
-      setDecisionBusy(false);
+      setBusy(false);
     }
   };
 
-  const onPublishDraft = async (proposalId, draftId) => {
-    setDecisionBusy(true);
+  const onRejectDraft = async (proposalId, contentId, reasonText) => {
+    setBusy(true);
     setErr("");
     try {
-      await publishDraft(proposalId, draftId);
+      await rejectDraft(proposalId, contentId, reasonText);
+
+      await refreshStats();
+
+      setStatus("rejected");
+      await refreshProposals("Rejected ❌", { status: "rejected", keepSelectedId: proposalId });
+    } catch (e) {
+      setErr(String(e?.message || e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onPublish = async (proposalId, contentId) => {
+    setBusy(true);
+    setErr("");
+    try {
+      await publishDraft(proposalId, contentId);
+
+      await refreshStats();
+
+      // publish usually completes after callback -> keep tab but refresh
       await refreshProposals("Publish requested ✅", { status, keepSelectedId: proposalId });
-      await refreshStats();
     } catch (e) {
       setErr(String(e?.message || e));
     } finally {
-      setDecisionBusy(false);
+      setBusy(false);
     }
   };
 
@@ -358,10 +330,12 @@ export default function ProposalsPage() {
               selectedId={selectedId}
               onSelect={(id) => setSelectedId(id)}
               status={status}
-              setStatus={setStatus}
+              setStatus={(s) => {
+                const next = UI_TABS.includes(String(s)) ? String(s) : "draft";
+                setStatus(next);
+              }}
               search={search}
               setSearch={setSearch}
-              // pass counts for tab badges (optional)
               stats={stats}
             />
           </div>
@@ -372,15 +346,12 @@ export default function ProposalsPage() {
               <div className="min-h-0 h-full overflow-auto">
                 <ProposalDetail
                   proposal={selected}
-                  busy={decisionBusy}
-                  reason={reason}
-                  setReason={setReason}
-                  onApprove={onApprove}
-                  onReject={onReject}
-                  draftBusy={decisionBusy}
+                  busy={busy}
+                  draftBusy={busy}
                   onRequestChanges={onRequestChanges}
                   onApproveDraft={onApproveDraft}
-                  onPublishDraft={onPublishDraft}
+                  onRejectDraft={onRejectDraft}
+                  onPublish={onPublish}
                 />
               </div>
             </div>

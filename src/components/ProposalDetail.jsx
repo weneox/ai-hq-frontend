@@ -1,8 +1,13 @@
-// src/components/ProposalDetail.jsx (FINAL v2 — PREMIUM + NO CROP + SCROLLABLE PREVIEWS)
-// ✅ Overview "Caption (preview)" is scrollable (no truncation / no cut)
-// ✅ Keeps Draft Studio + multi-shape pack reader
-// ✅ Copy JSON uses JSON.stringify (no [object Object])
-// ✅ Sticky decision bar only when status=pending
+// src/components/ProposalDetail.jsx (FINAL v4 — Draft → Approved → Published + Rejected)
+// ✅ No pending UI
+// ✅ Draft actions: Request changes / Approve draft / Reject
+// ✅ Publish only after approved
+// ✅ Reject reason input is ABOVE buttons (so Reject isn't "mysteriously disabled")
+// ✅ Props are compatible with BOTH styles:
+//    - onPublish OR onPublishDraft
+//    - onRejectDraft OR onReject
+// ✅ Reads draft from: draft prop OR proposal.latestContent/latestDraft/... (multi-shape)
+// ✅ Ultra-detailed draft viewer (format, caption, hashtags, design/layout, storyboard, script, prompts, specs)
 
 import { useEffect, useMemo, useState } from "react";
 import Card from "./ui/Card.jsx";
@@ -18,7 +23,6 @@ function safeText(x) {
   }
   return "";
 }
-
 function safeJson(x) {
   try {
     if (!x) return null;
@@ -29,7 +33,6 @@ function safeJson(x) {
     return null;
   }
 }
-
 function pretty(x) {
   try {
     return JSON.stringify(x ?? null, null, 2);
@@ -37,12 +40,10 @@ function pretty(x) {
     return String(x ?? "");
   }
 }
-
 function shortId(id) {
   const s = String(id || "");
   return s.length <= 8 ? s : s.slice(0, 8);
 }
-
 function relTime(iso) {
   const ms = iso ? Date.parse(iso) : NaN;
   if (!Number.isFinite(ms)) return "";
@@ -58,21 +59,18 @@ function relTime(iso) {
 
 function badgeTone(status) {
   const s = String(status || "").toLowerCase();
-  if (s === "pending") return "warn";
-  if (s === "in_progress") return "neutral";
+  if (s === "draft" || s === "in_progress" || s === "drafting") return "neutral";
   if (s === "approved") return "success";
   if (s === "published") return "success";
   if (s === "rejected") return "danger";
   return "neutral";
 }
-
 function draftTone(status) {
   const s = String(status || "").toLowerCase();
   if (s.includes("ready")) return "success";
   if (s.includes("approved")) return "success";
   if (s.includes("published")) return "success";
-  if (s.includes("regenerat")) return "warn";
-  if (s.includes("changes")) return "warn";
+  if (s.includes("regenerat") || s.includes("changes") || s.includes("revise")) return "warn";
   if (s.includes("fail") || s.includes("error")) return "danger";
   return "neutral";
 }
@@ -91,16 +89,7 @@ function normalizeHashtags(h) {
 }
 
 function pickPayloadObj(p) {
-  const raw =
-    p?.payload ??
-    p?.proposal ??
-    p?.data ??
-    p?.content ??
-    p?.draft ??
-    p?.latestDraft ??
-    p?.latest_draft ??
-    null;
-
+  const raw = p?.payload ?? p?.proposal ?? p?.data ?? p?.content ?? p?.draft ?? p?.latestDraft ?? p?.latest_draft ?? null;
   const obj = safeJson(raw) || raw;
   if (!obj || typeof obj !== "object") return null;
   if (obj.payload && typeof obj.payload === "object") return obj.payload;
@@ -110,19 +99,13 @@ function pickPayloadObj(p) {
 function titleOf(p) {
   const obj = pickPayloadObj(p);
   if (obj) {
-    const t =
-      safeText(obj.title) ||
-      safeText(obj.name) ||
-      safeText(obj.topic) ||
-      safeText(obj.summary) ||
-      safeText(obj.goal);
+    const t = safeText(obj.title) || safeText(obj.name) || safeText(obj.topic) || safeText(obj.summary) || safeText(obj.goal);
     if (t) return t;
     const c = safeText(obj.caption) || safeText(obj.text) || "";
     if (c) return c.slice(0, 80);
   }
-  return `Proposal #${shortId(p?.id)}`;
+  return `Item #${shortId(p?.id)}`;
 }
-
 function summaryOf(p) {
   const obj = pickPayloadObj(p);
   if (obj) {
@@ -134,9 +117,29 @@ function summaryOf(p) {
   return "";
 }
 
+function pickDraftCandidate(proposal, draftProp) {
+  return (
+    draftProp ||
+    proposal?.latestContent ||
+    proposal?.latestDraft ||
+    proposal?.latest_draft ||
+    proposal?.draft ||
+    proposal?.contentDraft ||
+    proposal?.latest_execution ||
+    proposal?.lastExecution ||
+    proposal?.latestExecution ||
+    proposal?.execution ||
+    proposal?.job ||
+    (Array.isArray(proposal?.jobs) ? proposal.jobs[0] : null) ||
+    null
+  );
+}
+
+// Accepts shapes like:
+// - content_items row: {id,status,content_pack,last_feedback,updated_at,version?}
+// - job callback: {output:{contentPack}} etc
 function normalizeDraft(rawDraft) {
   if (!rawDraft) return null;
-
   const d = typeof rawDraft === "string" ? safeJson(rawDraft) : rawDraft;
   if (!d) return null;
 
@@ -166,26 +169,10 @@ function normalizeDraft(rawDraft) {
   };
 }
 
-function pickDraftCandidate(proposal, draftProp) {
-  return (
-    draftProp ||
-    proposal?.latestDraft ||
-    proposal?.latest_draft ||
-    proposal?.draft ||
-    proposal?.contentDraft ||
-    proposal?.latest_execution ||
-    proposal?.lastExecution ||
-    proposal?.latestExecution ||
-    proposal?.execution ||
-    proposal?.job ||
-    (Array.isArray(proposal?.jobs) ? proposal.jobs[0] : null) ||
-    null
-  );
-}
-
+/** ---------- pack readers (flexible keys) ---------- */
 function packType(pack) {
   if (!pack) return "";
-  return pack.type || pack.postType || pack.format || pack.assetType || "";
+  return pack.post_type || pack.postType || pack.format || pack.type || pack.assetType || "";
 }
 function packCaption(pack) {
   if (!pack) return "";
@@ -195,161 +182,180 @@ function packHashtags(pack) {
   if (!pack) return [];
   return normalizeHashtags(pack.hashtags || pack.tags || pack.hashTags);
 }
+function packPostTime(pack) {
+  if (!pack) return "";
+  return pack.post_time || pack.postTime || pack.suggestedTime || pack.time || "";
+}
+function packLanguage(pack) {
+  if (!pack) return "";
+  return pack.language || pack.lang || "";
+}
+function packPlatform(pack) {
+  if (!pack) return "instagram";
+  return pack.platform || "instagram";
+}
+function packCta(pack) {
+  if (!pack) return "";
+  return pack.cta || pack.call_to_action || pack.callToAction || "";
+}
 function packReelScript(pack) {
   if (!pack) return "";
-  return pack.reel_script || pack.reelScript || pack.script || "";
+  return pack.reel_script || pack.reelScript || pack.script || pack.voiceover || "";
 }
 function packImagePrompt(pack) {
   if (!pack) return "";
-  return pack.image_prompt || pack.imagePrompt || pack.visual_prompt || "";
+  return pack.image_prompt || pack.imagePrompt || pack.visual_prompt || pack.visualPrompt || "";
 }
-function packPostTime(pack) {
+function packDesign(pack) {
   if (!pack) return "";
-  return pack.post_time || pack.postTime || pack.suggestedTime || "";
+  return (
+    pack.design_instructions ||
+    pack.designInstructions ||
+    pack.layout_instructions ||
+    pack.layoutInstructions ||
+    pack.visual_direction ||
+    pack.visualDirection ||
+    ""
+  );
 }
-function packTopic(pack) {
+function packStoryboard(pack) {
+  if (!pack) return null;
+  return pack.storyboard || pack.shot_list || pack.shotList || pack.scenes || null;
+}
+function packAssetSpecs(pack) {
+  if (!pack) return null;
+  return pack.asset_specs || pack.assetSpecs || pack.specs || pack.output_specs || null;
+}
+function packHook(pack) {
   if (!pack) return "";
-  return pack.title || pack.name || pack.summary || pack.goal || pack.topic || "";
+  return pack.hook || pack.opening_line || pack.openingLine || "";
+}
+function packKeyPoints(pack) {
+  if (!pack) return null;
+  return pack.key_points || pack.keyPoints || pack.bullets || null;
+}
+function packMusic(pack) {
+  if (!pack) return "";
+  return pack.music || pack.audio || pack.sound || "";
+}
+function packCompliance(pack) {
+  if (!pack) return "";
+  return pack.compliance_notes || pack.complianceNotes || pack.rules || "";
+}
+function packShotDuration(pack) {
+  if (!pack) return "";
+  return pack.duration || pack.video_duration || pack.videoDuration || "";
 }
 
 function asDisplay(v) {
   if (v == null) return "";
-  if (typeof v === "string") return v; // ✅ no truncation here anymore
-  if (Array.isArray(v)) return asDisplay(v.join(", "));
+  if (typeof v === "string") return v;
+  if (Array.isArray(v)) return v.map(asDisplay).filter(Boolean).join("\n");
   if (typeof v === "object") return pretty(v);
   return String(v);
 }
 
-function Pill({ label, value, onCopy, title }) {
+function Section({ title, children, right }) {
   return (
-    <span className="inline-flex items-center gap-2 min-w-0">
-      <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-200">{label}</span>
-      <span
-        className="min-w-0 max-w-[520px] truncate rounded-lg border border-slate-200 bg-white px-2 py-0.5 text-[11px]
-                   dark:border-slate-800 dark:bg-slate-900/60 text-slate-700 dark:text-slate-200"
-        title={title || String(value || "")}
-      >
-        {value || "—"}
-      </span>
-      {onCopy ? (
-        <Button variant="outline" size="sm" onClick={onCopy}>
-          Copy
-        </Button>
-      ) : null}
-    </span>
+    <Card variant="panel" padded="sm" className="min-w-0">
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">{title}</div>
+        {right ? <div className="shrink-0">{right}</div> : null}
+      </div>
+      <div className="mt-2 min-w-0">{children}</div>
+    </Card>
   );
 }
 
-function cxTitle(showFull) {
-  return [
-    "text-base sm:text-lg font-semibold leading-snug min-w-0",
-    showFull ? "break-words" : "line-clamp-2 break-words",
-  ].join(" ");
+function SmallPill({ label, value }) {
+  return (
+    <div className="flex items-center gap-2 min-w-0">
+      <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">{label}</div>
+      <div className="text-[11px] text-slate-800 dark:text-slate-100 truncate" title={String(value || "")}>
+        {value || "—"}
+      </div>
+    </div>
+  );
 }
 
 export default function ProposalDetail({
   proposal,
+
+  // flags
   busy,
-  reason,
-  setReason,
-  onApprove,
-  onReject,
-  draft,
   draftBusy,
+
+  // handlers (support both naming styles)
   onRequestChanges,
   onApproveDraft,
-  onPublishDraft,
-}) {
-  const [showFull, setShowFull] = useState(false);
-  const [feedback, setFeedback] = useState("");
-  const [showDraftFull, setShowDraftFull] = useState(false);
 
+  onRejectDraft,
+  onReject, // fallback
+
+  onPublish,
+  onPublishDraft, // fallback
+
+  // optional injected draft (if parent fetches /content separately)
+  draft,
+}) {
   const apiBase = useMemo(() => getApiBase(), []);
-  const title = useMemo(() => (proposal ? titleOf(proposal) : "Proposal"), [proposal]);
-  const summary = useMemo(() => (proposal ? summaryOf(proposal) : ""), [proposal]);
+  const [feedback, setFeedback] = useState("");
+  const [rejectReason, setRejectReason] = useState("");
 
   const resolvedDraft = useMemo(() => {
     const candidate = pickDraftCandidate(proposal, draft);
     return normalizeDraft(candidate);
-  }, [draft, proposal]);
+  }, [proposal, draft]);
 
-  const payloadObj = useMemo(() => pickPayloadObj(proposal), [proposal]);
   const pack = resolvedDraft?.pack || null;
 
-  const overviewRows = useMemo(() => {
-    const rows = [];
-
-    const lang =
-      safeText(payloadObj?.language) ||
-      safeText(pack?.language) ||
-      safeText(payloadObj?.lang) ||
-      "";
-    const platform = safeText(payloadObj?.platform) || safeText(pack?.platform) || "instagram";
-    const postType =
-      safeText(payloadObj?.postType) || safeText(pack?.postType) || safeText(packType(pack)) || "";
-    const tags = packHashtags(pack);
-    const cap = packCaption(pack) || safeText(payloadObj?.caption) || safeText(payloadObj?.text) || "";
-
-    if (lang) rows.push({ k: "lang", label: "Language", v: lang, kind: "text" });
-    if (platform) rows.push({ k: "platform", label: "Platform", v: platform, kind: "text" });
-    if (postType) rows.push({ k: "postType", label: "Post type", v: postType, kind: "text" });
-    if (tags.length) rows.push({ k: "hashtags", label: "Hashtags", v: tags.slice(0, 16).join(" "), kind: "text" });
-
-    // ✅ IMPORTANT: do NOT slice caption; show scroll instead
-    if (cap) rows.push({ k: "caption", label: "Caption (preview)", v: cap, kind: "longtext" });
-
-    if (!rows.length && payloadObj && typeof payloadObj === "object") {
-      const keys = Object.keys(payloadObj).slice(0, 12);
-      if (keys.length) rows.push({ k: "keys", label: "Payload keys", v: keys.join(", "), kind: "text" });
-    }
-
-    return rows;
-  }, [payloadObj, pack]);
-
   useEffect(() => {
-    setShowFull(false);
-    setShowDraftFull(false);
     setFeedback("");
+    setRejectReason("");
   }, [proposal?.id]);
 
   if (!proposal) {
     return (
       <Card className="min-w-0 h-full flex flex-col justify-center items-center text-center" variant="panel" padded="lg">
-        <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Select a proposal</div>
+        <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Select an item</div>
         <div className="mt-1 text-xs text-slate-500 dark:text-slate-400 max-w-[460px]">
-          Soldakı queue-dan bir item seç — burada CEO Studio açılacaq.
+          Soldakı list-dən bir item seç — burada Draft Studio açılacaq.
         </div>
       </Card>
     );
   }
 
+  const title = titleOf(proposal);
+  const summary = summaryOf(proposal);
+
+  // statuses: draft / in_progress / approved / published / rejected
+  const status = String(proposal.status || "draft").toLowerCase();
+  const isRejected = status === "rejected";
+  const isPublished = status === "published";
+  const isApproved = status === "approved";
+
+  // draft stage includes: draft + in_progress
+  const isDraftStage = !isRejected && !isPublished && !isApproved;
+
+  const draftStatusLc = String(resolvedDraft?.status || "").toLowerCase();
+  const isRegenerating =
+    draftStatusLc.includes("regenerat") || draftStatusLc.includes("changes") || draftStatusLc.includes("revise");
+
+  const isDraftReady = Boolean(pack) && (draftStatusLc.includes("ready") || draftStatusLc === "" || draftStatusLc.includes("draft"));
+
+  const isDraftApproved = draftStatusLc.includes("approved") || isApproved;
+  const canPublish = Boolean(pack) && isDraftApproved && !isPublished;
+
+  const effectiveBusy = Boolean(busy || draftBusy);
+
   const agent = proposal.agent_key || proposal.agentKey || proposal.agent || "—";
   const created = relTime(proposal.created_at || proposal.createdAt);
-  const status = proposal.status || "pending";
-  const statusLc = String(status || "").toLowerCase();
-
-  const st = String(resolvedDraft?.status || "").toLowerCase();
-  const isDraftRegenerating = st.includes("regenerat") || st.includes("changes");
-  const isDraftApproved = st.includes("approved");
-  const isDraftPublished = st.includes("published");
-  const isDraftReady = st.includes("ready");
-
-  const effectiveDraftBusy = Boolean(draftBusy || busy);
-  const hasDraftId = Boolean(resolvedDraft?.id);
-
-  const canRequestChanges = hasDraftId && typeof onRequestChanges === "function";
-  const canApproveDraft =
-    hasDraftId && typeof onApproveDraft === "function" && isDraftReady && !isDraftApproved && !isDraftPublished;
-  const canPublish = hasDraftId && typeof onPublishDraft === "function" && isDraftApproved && !isDraftPublished;
-
-  const rejectDisabled = Boolean(busy || !String(reason || "").trim());
 
   const copy = async (t) => {
     try {
       await navigator.clipboard.writeText(String(t || ""));
     } catch {}
   };
-
   const copyJson = async (obj) => {
     try {
       await navigator.clipboard.writeText(pretty(obj));
@@ -357,21 +363,55 @@ export default function ProposalDetail({
   };
 
   const doRequestChanges = async () => {
-    const text = String(feedback || "").trim();
-    if (!text) return;
-    if (!onRequestChanges || !resolvedDraft?.id) return;
-    await onRequestChanges(String(proposal.id), String(resolvedDraft.id), text);
+    if (!onRequestChanges) return;
+    const fb = String(feedback || "").trim();
+    if (!fb) return;
+    if (!resolvedDraft?.id) return;
+    await onRequestChanges(String(proposal.id), String(resolvedDraft.id), fb);
+    setFeedback("");
   };
 
   const doApproveDraft = async () => {
-    if (!onApproveDraft || !resolvedDraft?.id) return;
+    if (!onApproveDraft) return;
+    if (!resolvedDraft?.id) return;
     await onApproveDraft(String(proposal.id), String(resolvedDraft.id));
   };
 
-  const doPublishDraft = async () => {
-    if (!onPublishDraft || !resolvedDraft?.id) return;
-    await onPublishDraft(String(proposal.id), String(resolvedDraft.id));
+  const doRejectDraft = async () => {
+    const handler = onRejectDraft || onReject;
+    if (!handler) return;
+    const r = String(rejectReason || "").trim();
+    if (!r) return;
+    // pass (proposalId, draftId, reason) — parent can ignore draftId if it wants
+    await handler(String(proposal.id), String(resolvedDraft?.id || ""), r);
+    setRejectReason("");
   };
+
+  const doPublish = async () => {
+    const handler = onPublish || onPublishDraft;
+    if (!handler) return;
+    if (!resolvedDraft?.id) return;
+    await handler(String(proposal.id), String(resolvedDraft.id));
+  };
+
+  // --- build detailed view fields ---
+  const payloadObj = pickPayloadObj(proposal);
+  const lang = packLanguage(pack) || safeText(payloadObj?.language) || safeText(payloadObj?.lang) || "";
+  const platform = packPlatform(pack);
+  const postType = packType(pack);
+  const postTime = packPostTime(pack);
+  const cta = packCta(pack);
+  const hook = packHook(pack);
+  const hashtags = packHashtags(pack);
+  const design = packDesign(pack);
+  const script = packReelScript(pack);
+  const imgPrompt = packImagePrompt(pack);
+  const storyboard = packStoryboard(pack);
+  const specs = packAssetSpecs(pack);
+  const keyPoints = packKeyPoints(pack);
+  const music = packMusic(pack);
+  const compliance = packCompliance(pack);
+  const duration = packShotDuration(pack);
 
   return (
     <Card className="min-w-0 p-0 overflow-hidden flex flex-col h-full" variant="elevated" padded={false} clip>
@@ -379,36 +419,21 @@ export default function ProposalDetail({
       <div className="px-4 pt-4 pb-3 border-b border-slate-200/70 dark:border-slate-800/70">
         <div className="flex items-start justify-between gap-3 min-w-0">
           <div className="min-w-0">
-            <div className="flex items-start gap-2 min-w-0">
-              <h2 className={cxTitle(showFull)} title={title}>
-                {title}
-              </h2>
-
-              {String(title).length > 80 ? (
-                <Button variant="outline" size="sm" onClick={() => setShowFull((v) => !v)} className="shrink-0">
-                  {showFull ? "Less" : "More"}
-                </Button>
-              ) : null}
-            </div>
+            <h2 className="text-base sm:text-lg font-semibold leading-snug min-w-0 break-words" title={title}>
+              {title}
+            </h2>
 
             {summary ? <div className="mt-2 text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{summary}</div> : null}
 
             <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
-              <Pill
-                label="Backend"
-                value={apiBase || "VITE_API_BASE missing"}
-                title={apiBase || ""}
-                onCopy={apiBase ? () => copy(apiBase) : null}
-              />
+              <SmallPill label="Backend" value={apiBase || "VITE_API_BASE missing"} />
               <span className="opacity-50">·</span>
-              <Pill label="Agent" value={`${agent}${created ? ` · ${created}` : ""}`} />
+              <SmallPill label="Agent" value={`${agent}${created ? ` · ${created}` : ""}`} />
               <span className="opacity-50">·</span>
-              <Pill
-                label="Ref"
-                value={`PR-${shortId(proposal.id).toUpperCase()}`}
-                onCopy={() => copy(String(proposal.id))}
-                title={String(proposal.id)}
-              />
+              <SmallPill label="Ref" value={`PR-${shortId(proposal.id).toUpperCase()}`} />
+              <Button variant="outline" size="sm" onClick={() => copy(String(proposal.id))}>
+                Copy ID
+              </Button>
             </div>
           </div>
 
@@ -418,26 +443,24 @@ export default function ProposalDetail({
         </div>
       </div>
 
-      {/* Body scroll */}
-      <div className="min-h-0 px-4 py-4 space-y-4 min-w-0 overflow-auto pb-24">
+      {/* Body */}
+      <div className="min-h-0 px-4 py-4 space-y-4 min-w-0 overflow-auto pb-10">
         {/* Draft Studio */}
-        <Card variant="soft" tone={resolvedDraft?.status ? "info" : "neutral"} padded="md">
+        <Card variant="soft" tone={pack ? "info" : "neutral"} padded="md">
           <div className="flex items-start justify-between gap-2 min-w-0">
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">Draft Studio</div>
-                {resolvedDraft?.status ? (
-                  <Badge tone={draftTone(resolvedDraft.status)}>{resolvedDraft.status}</Badge>
-                ) : (
-                  <Badge tone="neutral">no draft</Badge>
-                )}
+                <Badge tone={draftTone(resolvedDraft?.status || (pack ? "draft.ready" : "no draft"))}>
+                  {resolvedDraft?.status || (pack ? "draft.ready" : "no draft")}
+                </Badge>
                 {typeof resolvedDraft?.version === "number" ? (
                   <span className="text-[11px] text-slate-500 dark:text-slate-400">v{resolvedDraft.version}</span>
                 ) : null}
               </div>
 
               <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-                Cron düşən item-lər birbaşa Draft kimi görünür. Pending olanlar üçün aşağıda “Approve” var.
+                Axın: <b>draft</b> → <b>approved</b> → <b>published</b>. “Request changes” yaz — loop edib yeni draft gəlir.
               </div>
             </div>
 
@@ -453,48 +476,46 @@ export default function ProposalDetail({
 
           {!pack ? (
             <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-white/70 p-3 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
-              {statusLc === "pending"
-                ? "Bu draft hələ approve olunmayıb. Aşağıdan Approve et → Drafting (in_progress) olacaq → n8n content pack hazırlayacaq."
-                : "Draft hələ hazır deyil. n8n işləyəndən sonra burada görünəcək."}
+              Draft hələ görünmür. Backend draft-ı `content_items`-ə yazmalıdır və UI ya list-lə birlikdə gətirməlidir,
+              ya da parent ayrıca `/api/content?proposalId=...` fetch etməlidir.
             </div>
           ) : (
             <>
-              <div className="mt-3 grid gap-2 md:grid-cols-2 min-w-0">
-                <Card variant="panel" padded="sm">
-                  <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Type</div>
-                  <div className="mt-1 text-sm text-slate-900 dark:text-slate-100 break-words">
-                    {asDisplay(packType(pack) || "—")}
+              {/* Top summary grid */}
+              <div className="mt-3 grid gap-2 lg:grid-cols-3 min-w-0">
+                <Section title="Basics">
+                  <div className="space-y-1">
+                    <SmallPill label="Platform" value={platform} />
+                    <SmallPill label="Language" value={lang || "—"} />
+                    <SmallPill label="Format" value={postType || "—"} />
+                    <SmallPill label="Post time" value={postTime || "—"} />
+                    <SmallPill label="CTA" value={cta || "—"} />
+                    {duration ? <SmallPill label="Duration" value={duration} /> : null}
                   </div>
+                </Section>
 
-                  {packPostTime(pack) ? (
-                    <>
-                      <div className="mt-3 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
-                        Suggested time
-                      </div>
-                      <div className="mt-1 text-sm text-slate-900 dark:text-slate-100 break-words">
-                        {asDisplay(packPostTime(pack))}
-                      </div>
-                    </>
-                  ) : null}
-
-                  {packTopic(pack) ? (
-                    <>
-                      <div className="mt-3 text-[11px] font-semibold text-slate-600 dark:text-slate-300">Topic</div>
-                      <div className="mt-1 text-sm text-slate-900 dark:text-slate-100 break-words">
-                        {asDisplay(packTopic(pack))}
-                      </div>
-                    </>
-                  ) : null}
-                </Card>
-
-                <Card variant="panel" padded="sm">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Hashtags</div>
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400">{packHashtags(pack).length || 0}</span>
+                <Section title="Hook / Angle">
+                  <div className="text-sm text-slate-900 dark:text-slate-100 whitespace-pre-wrap break-words">
+                    {hook ? hook : "—"}
                   </div>
+                  {keyPoints ? (
+                    <details className="mt-3">
+                      <summary className="cursor-pointer text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                        Key points
+                      </summary>
+                      <pre className="mt-2 text-xs whitespace-pre-wrap break-words text-slate-800 dark:text-slate-100">
+                        {asDisplay(keyPoints) || "—"}
+                      </pre>
+                    </details>
+                  ) : null}
+                </Section>
 
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {packHashtags(pack).slice(0, 20).map((h, i) => (
+                <Section
+                  title="Hashtags"
+                  right={<span className="text-[11px] text-slate-500 dark:text-slate-400">{hashtags.length}</span>}
+                >
+                  <div className="flex flex-wrap gap-1">
+                    {hashtags.slice(0, 28).map((h, i) => (
                       <span
                         key={`${h}_${i}`}
                         className="text-[11px] rounded-full border border-slate-200 bg-white px-2 py-0.5
@@ -503,71 +524,103 @@ export default function ProposalDetail({
                         {h}
                       </span>
                     ))}
-                    {packHashtags(pack).length > 20 ? (
-                      <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                        +{packHashtags(pack).length - 20} more
-                      </span>
+                    {hashtags.length > 28 ? (
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400">+{hashtags.length - 28} more</span>
                     ) : null}
                   </div>
-                </Card>
+                </Section>
               </div>
 
-              <Card variant="panel" padded="sm" className="mt-3">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Caption</div>
+              {/* Caption */}
+              <Section
+                title="Caption (full)"
+                right={
                   <div className="flex items-center gap-2">
-                    {String(packCaption(pack)).length > 240 ? (
-                      <Button variant="outline" size="sm" onClick={() => setShowDraftFull((v) => !v)}>
-                        {showDraftFull ? "Less" : "More"}
-                      </Button>
-                    ) : null}
                     <Button variant="outline" size="sm" onClick={() => copy(packCaption(pack))} disabled={!packCaption(pack)}>
                       Copy
                     </Button>
                   </div>
+                }
+              >
+                <div className="text-sm text-slate-900 dark:text-slate-100 whitespace-pre-wrap break-words max-h-[320px] overflow-auto pr-2">
+                  {packCaption(pack) || "—"}
                 </div>
+              </Section>
 
-                <div
-                  className={[
-                    "mt-2 text-sm text-slate-900 dark:text-slate-100 whitespace-pre-wrap break-words",
-                    showDraftFull ? "" : "line-clamp-7",
-                  ].join(" ")}
-                >
-                  {packCaption(pack) ? packCaption(pack) : "—"}
-                </div>
-              </Card>
+              {/* Design / Layout instructions */}
+              <div className="grid gap-2 lg:grid-cols-2 min-w-0">
+                <Section title="Design / Layout instructions (VERY IMPORTANT)">
+                  <div className="text-sm text-slate-900 dark:text-slate-100 whitespace-pre-wrap break-words max-h-[380px] overflow-auto pr-2">
+                    {design || "—"}
+                  </div>
+                  <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+                    Burada: rəng palitrası, font, grid, elementlərin yerləşimi, cover frame, logo placement, CTA button,
+                    overlay text, ikonlar, spacing və s. olmalıdır.
+                  </div>
+                </Section>
 
-              <div className="mt-3 grid gap-2 md:grid-cols-2 min-w-0">
-                <details className="rounded-2xl border border-slate-200/70 bg-white/80 p-3 dark:border-slate-800/70 dark:bg-slate-900/40">
-                  <summary className="cursor-pointer select-none text-[11px] font-semibold text-slate-600 dark:text-slate-300">
-                    Reel script
-                  </summary>
-                  <pre className="mt-2 text-xs whitespace-pre-wrap break-words text-slate-800 dark:text-slate-100">
-                    {packReelScript(pack) || "—"}
+                <Section title="Asset specs / Output">
+                  <pre className="text-xs whitespace-pre-wrap break-words text-slate-800 dark:text-slate-100 max-h-[380px] overflow-auto pr-2">
+                    {asDisplay(specs) || "—"}
                   </pre>
-                </details>
 
-                <details className="rounded-2xl border border-slate-200/70 bg-white/80 p-3 dark:border-slate-800/70 dark:bg-slate-900/40">
-                  <summary className="cursor-pointer select-none text-[11px] font-semibold text-slate-600 dark:text-slate-300">
-                    Image prompt
-                  </summary>
-                  <pre className="mt-2 text-xs whitespace-pre-wrap break-words text-slate-800 dark:text-slate-100">
-                    {packImagePrompt(pack) || "—"}
-                  </pre>
-                </details>
+                  {imgPrompt ? (
+                    <details className="mt-3">
+                      <summary className="cursor-pointer text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                        Image prompt (generator üçün)
+                      </summary>
+                      <pre className="mt-2 text-xs whitespace-pre-wrap break-words text-slate-800 dark:text-slate-100">
+                        {imgPrompt}
+                      </pre>
+                    </details>
+                  ) : null}
+
+                  {compliance ? (
+                    <details className="mt-3">
+                      <summary className="cursor-pointer text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                        Compliance / Notes
+                      </summary>
+                      <pre className="mt-2 text-xs whitespace-pre-wrap break-words text-slate-800 dark:text-slate-100">
+                        {compliance}
+                      </pre>
+                    </details>
+                  ) : null}
+                </Section>
               </div>
 
-              {/* Feedback + draft actions */}
+              {/* Storyboard / Script */}
+              <div className="grid gap-2 lg:grid-cols-2 min-w-0">
+                <Section title="Storyboard / Shotlist">
+                  <pre className="text-xs whitespace-pre-wrap break-words text-slate-800 dark:text-slate-100 max-h-[420px] overflow-auto pr-2">
+                    {asDisplay(storyboard) || "—"}
+                  </pre>
+                </Section>
+
+                <Section title="Reel script / Voiceover">
+                  <pre className="text-xs whitespace-pre-wrap break-words text-slate-800 dark:text-slate-100 max-h-[420px] overflow-auto pr-2">
+                    {script || "—"}
+                  </pre>
+
+                  {music ? (
+                    <div className="mt-3 text-[11px] text-slate-500 dark:text-slate-400">
+                      <b>Music/SFX:</b> {music}
+                    </div>
+                  ) : null}
+                </Section>
+              </div>
+
+              {/* Actions */}
               <Card variant="panel" padded="sm" className="mt-3">
                 <div className="flex items-center justify-between gap-2">
-                  <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Feedback</div>
+                  <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Actions</div>
                   {resolvedDraft?.lastFeedback ? (
                     <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                      Last: {String(resolvedDraft.lastFeedback).slice(0, 70)}
+                      Last feedback: {String(resolvedDraft.lastFeedback).slice(0, 90)}
                     </div>
                   ) : null}
                 </div>
 
+                {/* Feedback */}
                 <textarea
                   value={feedback}
                   onChange={(e) => setFeedback(e.target.value)}
@@ -575,25 +628,56 @@ export default function ProposalDetail({
                   className="mt-2 w-full min-w-0 rounded-xl border border-slate-200 bg-white p-2 text-sm outline-none transition-all duration-200
                              focus:border-indigo-300/80 focus:ring-2 focus:ring-indigo-500/25 focus:ring-offset-2 focus:ring-offset-white
                              dark:border-slate-800 dark:bg-slate-950/20 dark:text-slate-100 dark:focus:border-indigo-500/50 dark:focus:ring-indigo-500/25 dark:focus:ring-offset-slate-950"
-                  placeholder='Məs: "Caption daha qısa olsun. 8 hashtag. CTA WhatsApp. Ton premium. Reel script 15 saniyə."'
-                  disabled={effectiveDraftBusy || isDraftRegenerating}
+                  placeholder='Dəyişiklik: "Caption daha qısa. 8 hashtag. CTA WhatsApp. Dizaynda 3 kadr: 1) hook 2) benefit 3) CTA. Rəng: neon-blue + dark."'
+                  disabled={effectiveBusy || isRegenerating || isRejected || isPublished}
                 />
+
+                {/* Reject reason (MOVED ABOVE BUTTONS) */}
+                {isDraftStage ? (
+                  <div className="mt-3">
+                    <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Reject reason</div>
+                    <input
+                      value={rejectReason}
+                      onChange={(e) => setRejectReason(e.target.value)}
+                      className="mt-2 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none
+                                 dark:border-slate-800 dark:bg-slate-950/20 dark:text-slate-100"
+                      placeholder='Məs: "Brand uyğun deyil" / "Bu gün video yox, carousel olsun" / "Mövzu dəyişsin"...'
+                      disabled={effectiveBusy || isRegenerating}
+                    />
+                  </div>
+                ) : null}
 
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Button
                     variant="outline"
-                    isLoading={effectiveDraftBusy && isDraftRegenerating}
-                    disabled={effectiveDraftBusy || !canRequestChanges || !String(feedback || "").trim()}
+                    isLoading={effectiveBusy && isRegenerating}
+                    disabled={
+                      effectiveBusy ||
+                      !onRequestChanges ||
+                      !resolvedDraft?.id ||
+                      !String(feedback || "").trim() ||
+                      isRejected ||
+                      isPublished
+                    }
                     onClick={doRequestChanges}
                     className="min-w-[180px]"
+                    title={!resolvedDraft?.id ? "contentId yoxdur" : ""}
                   >
                     Request changes
                   </Button>
 
                   <Button
                     variant="primary"
-                    isLoading={effectiveDraftBusy && !isDraftRegenerating}
-                    disabled={effectiveDraftBusy || !canApproveDraft}
+                    isLoading={effectiveBusy && !isRegenerating}
+                    disabled={
+                      effectiveBusy ||
+                      !onApproveDraft ||
+                      !resolvedDraft?.id ||
+                      !isDraftStage ||
+                      !isDraftReady ||
+                      isRejected ||
+                      isPublished
+                    }
                     onClick={doApproveDraft}
                     className="min-w-[160px]"
                   >
@@ -601,16 +685,34 @@ export default function ProposalDetail({
                   </Button>
 
                   <Button
+                    variant="destructive"
+                    isLoading={effectiveBusy && !isRegenerating}
+                    disabled={
+                      effectiveBusy ||
+                      !(onRejectDraft || onReject) ||
+                      !isDraftStage ||
+                      isRejected ||
+                      isPublished ||
+                      !String(rejectReason || "").trim()
+                    }
+                    onClick={doRejectDraft}
+                    className="min-w-[140px]"
+                    title={!String(rejectReason || "").trim() ? "Reject reason yaz" : ""}
+                  >
+                    Reject
+                  </Button>
+
+                  <Button
                     variant="primary"
-                    isLoading={effectiveDraftBusy && !isDraftRegenerating}
-                    disabled={effectiveDraftBusy || !canPublish}
-                    onClick={doPublishDraft}
-                    className="min-w-[160px]"
+                    isLoading={effectiveBusy && !isRegenerating}
+                    disabled={effectiveBusy || !(onPublish || onPublishDraft) || !resolvedDraft?.id || !canPublish || isRejected}
+                    onClick={doPublish}
+                    className="min-w-[140px]"
                   >
                     Publish
                   </Button>
 
-                  {isDraftRegenerating ? (
+                  {isRegenerating ? (
                     <span className="text-[11px] text-slate-500 dark:text-slate-400 self-center">
                       Regenerating… (n8n işləyir)
                     </span>
@@ -618,98 +720,23 @@ export default function ProposalDetail({
                 </div>
 
                 <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
-                  Request changes → n8n draft-ı yenidən qurur (v2, v3…).
+                  Loop: Request changes → n8n revise → yeni draft (v2,v3…) → yenə approve/reject/publish.
                 </div>
               </Card>
             </>
           )}
         </Card>
 
-        {/* Overview */}
-        <Card variant="soft" tone="neutral" padded="md">
-          <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">Overview</div>
-
-          {overviewRows.length === 0 ? (
-            <div className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-              Payload boşdur (və draft pack da yoxdur).
-            </div>
-          ) : (
-            <div className="mt-3 grid gap-2 md:grid-cols-2 min-w-0">
-              {overviewRows.map((r) => (
-                <Card key={r.k} variant="panel" padded="sm" className="min-w-0">
-                  <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">{r.label}</div>
-
-                  {r.kind === "longtext" ? (
-                    <div className="mt-2 text-sm text-slate-900 dark:text-slate-100 min-w-0">
-                      <div className="whitespace-pre-wrap break-words max-h-56 overflow-auto pr-2">
-                        {asDisplay(r.v) || "—"}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="mt-1 text-sm text-slate-900 dark:text-slate-100 whitespace-pre-wrap break-words">
-                      {asDisplay(r.v) || "—"}
-                    </div>
-                  )}
-                </Card>
-              ))}
-            </div>
-          )}
-        </Card>
-
-        {/* Advanced */}
+        {/* Advanced raw */}
         <details className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30 min-w-0">
           <summary className="cursor-pointer select-none text-xs font-semibold text-slate-700 dark:text-slate-200">
-            Advanced (Raw payload)
+            Advanced (Raw)
           </summary>
-
           <pre className="mt-3 max-h-[520px] overflow-auto rounded-xl border border-slate-200 bg-white p-3 text-xs whitespace-pre-wrap break-words dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-100">
-            {pretty(pickPayloadObj(proposal) || proposal?.payload || null)}
+            {pretty({ proposal, draft: resolvedDraft })}
           </pre>
         </details>
       </div>
-
-      {/* Sticky decision bar only when backend status is pending */}
-      {statusLc === "pending" ? (
-        <div className="absolute bottom-0 left-0 right-0 border-t border-slate-200/70 dark:border-slate-800/70 bg-white/75 dark:bg-slate-950/55 backdrop-blur-xl">
-          <div className="px-4 py-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">Decision</div>
-              <div className="text-[11px] text-slate-500 dark:text-slate-400">Reject üçün reason məcburidir</div>
-            </div>
-
-            <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_auto_auto] items-start">
-              <textarea
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                rows={3}
-                className="w-full min-w-0 rounded-xl border border-slate-200 bg-white p-2 text-sm outline-none transition-all duration-200
-                           focus:border-indigo-300/80 focus:ring-2 focus:ring-indigo-500/25 focus:ring-offset-2 focus:ring-offset-white
-                           dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-indigo-500/50 dark:focus:ring-indigo-500/25 dark:focus:ring-offset-slate-950"
-                placeholder="Qısa reason / qeyd…"
-              />
-
-              <Button variant="primary" isLoading={busy} disabled={busy} onClick={onApprove} className="min-w-[140px]">
-                Approve
-              </Button>
-
-              <Button
-                variant="destructive"
-                isLoading={busy && !rejectDisabled}
-                disabled={rejectDisabled}
-                onClick={onReject}
-                className="min-w-[140px]"
-                title={!String(reason || "").trim() ? "Reject üçün reason yaz" : ""}
-              >
-                Reject
-              </Button>
-            </div>
-
-            <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
-              Approve → Drafting (in_progress) → n8n content pack hazırlayır → Draft Studio-da görünür.
-            </div>
-          </div>
-        </div>
-      ) : null}
     </Card>
   );
 }
