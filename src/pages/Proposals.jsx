@@ -1,8 +1,8 @@
-// src/pages/Proposals.jsx (FINAL v3.3.1 — PAGE SCROLL ON Proposals)
-// ✅ Proposals səhifəsinin ÖZÜ scroll olur (wheel hər yerdə işləyir)
-// ✅ TopBar sticky qalır (istəsən söndürmək olar)
-// ✅ RIGHT panel sticky + öz iç scroll (sənin əvvəlki height fix ideyası saxlanıb)
-// ✅ Bütün logic saxlanılıb: WS + poll + stats + actions + selection
+// src/pages/Proposals.jsx (FINAL v3.3.2 — FIXED draft approve flow)
+// ✅ Draft tab-dakı Approve artıq Approved tab-a keçirmir
+// ✅ Draft Approve = /api/content/:id/approve -> asset generation request
+// ✅ UI draft mərhələsində qalır və n8n nəticəsini gözləyir
+// ✅ Bütün qalan logic saxlanılıb
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import TopBar from "../components/TopBar.jsx";
@@ -152,6 +152,8 @@ export default function ProposalsPage() {
         const stillExists =
           keepSelectedId && next.some((p) => String(p.id) === String(keepSelectedId));
         setSelectedId(stillExists ? String(keepSelectedId) : String(next[0].id));
+      } else {
+        setSelectedId("");
       }
 
       if (why) showToast(why);
@@ -243,11 +245,17 @@ export default function ProposalsPage() {
       await approveDraft(proposalId, contentId);
       await refreshStats();
 
-      if (status === "draft") {
-        setStatus("approved");
-        await refreshProposals("Draft approved ✅", { status: "approved", keepSelectedId: proposalId });
-      } else {
-        await refreshProposals("Draft approved ✅", { status, keepSelectedId: proposalId });
+      // ✅ FIX:
+      // Draft approve = asset generation request.
+      // User draft mərhələsindən çıxmamalıdır.
+      // Approved tab-a keçirmək SƏHV idi.
+      await refreshProposals("Asset generation started ✅", {
+        status: "draft",
+        keepSelectedId: proposalId,
+      });
+
+      if (status !== "draft") {
+        setStatus("draft");
       }
     } catch (e) {
       setErr(String(e?.message || e));
@@ -291,10 +299,8 @@ export default function ProposalsPage() {
   };
 
   return (
-    // ✅ BURDA əsas dəyişiklik: overflow-y-auto (page scroll)
     <div className="min-w-0 min-h-0 h-full overflow-y-auto overscroll-contain pr-1">
       <div className="min-w-0 flex flex-col gap-5 pb-10">
-        {/* TopBar sticky istəmirsənsə, bu wrapper-i sil */}
         <div className="sticky top-0 z-30">
           <div className="rounded-2xl bg-white/55 backdrop-blur-xl dark:bg-slate-950/30">
             <TopBar wsStatus={wsStatus} onRefresh={handleManualRefresh} stats={stats} toast={toast} />
@@ -325,7 +331,6 @@ export default function ProposalsPage() {
               "grid-cols-1 xl:grid-cols-[minmax(0,460px)_minmax(0,1fr)]"
             )}
           >
-            {/* LEFT (normal flow, page scroll drives it) */}
             <div className="min-w-0">
               <ProposalList
                 proposals={proposals}
@@ -342,7 +347,6 @@ export default function ProposalsPage() {
               />
             </div>
 
-            {/* RIGHT (sticky + own inner scroll) */}
             <div className="min-w-0">
               <div className="xl:sticky xl:top-[84px]">
                 <div
