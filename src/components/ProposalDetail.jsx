@@ -1,8 +1,8 @@
-// src/components/ProposalDetail.jsx (FINAL v5.2 — CEO Draft Studio ULTRA)
-// ✅ Premium layout: sticky header actions + 2-col content/meta
-// ✅ Tabs for long content (Design / Script / Storyboard / Specs / Raw)
-// ✅ Keeps ALL existing logic: normalizeDraft + auto-fetch /api/content?proposalId=...
-// ✅ Draft actions unchanged (Request changes / Approve draft / Reject / Publish)
+// src/components/ProposalDetail.jsx (FINAL v5.2.3 — FIX: NO double scroll, no bottom cut)
+// ✅ Logic preserved
+// ✅ FIX: ProposalDetail no longer creates its own scroll container
+// ✅ Sticky header works with parent scroll (right panel)
+// ✅ Prevents bottom text cut
 
 import { useEffect, useMemo, useState } from "react";
 import Card from "./ui/Card.jsx";
@@ -96,6 +96,7 @@ function pickPayloadObj(p) {
     p?.latestDraft ??
     p?.latest_draft ??
     null;
+
   const obj = safeJson(raw) || raw;
   if (!obj || typeof obj !== "object") return null;
   if (obj.payload && typeof obj.payload === "object") return obj.payload;
@@ -146,9 +147,6 @@ function pickDraftCandidate(proposal, draftProp) {
   );
 }
 
-// Accepts shapes like:
-// - content_items row: {id,status,content_pack,last_feedback,updated_at,version?}
-// - job callback: {output:{contentPack}} etc
 function normalizeDraft(rawDraft) {
   if (!rawDraft) return null;
   const d = typeof rawDraft === "string" ? safeJson(rawDraft) : rawDraft;
@@ -180,7 +178,7 @@ function normalizeDraft(rawDraft) {
   };
 }
 
-/** ---------- pack readers (flexible keys) ---------- */
+/** ---------- pack readers ---------- */
 function packType(pack) {
   if (!pack) return "";
   return pack.post_type || pack.postType || pack.format || pack.type || pack.assetType || "";
@@ -301,9 +299,7 @@ function Pill({ children, tone = "neutral" }) {
       : "border-slate-200 bg-white text-slate-700 dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-200";
 
   return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${cls}`}
-    >
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${cls}`}>
       {children}
     </span>
   );
@@ -313,10 +309,7 @@ function KV({ k, v }) {
   return (
     <div className="flex items-center justify-between gap-3">
       <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">{k}</div>
-      <div
-        className="text-[11px] text-slate-900 dark:text-slate-100 truncate max-w-[210px]"
-        title={String(v || "")}
-      >
+      <div className="text-[11px] text-slate-900 dark:text-slate-100 truncate max-w-[210px]" title={String(v || "")}>
         {v || "—"}
       </div>
     </div>
@@ -370,11 +363,10 @@ export default function ProposalDetail({
   const [feedback, setFeedback] = useState("");
   const [rejectReason, setRejectReason] = useState("");
 
-  // local fetched draft fallback
   const [fetchedDraftRaw, setFetchedDraftRaw] = useState(null);
   const [fetchingDraft, setFetchingDraft] = useState(false);
 
-  const [tab, setTab] = useState("design"); // design | script | storyboard | specs | raw
+  const [tab, setTab] = useState("design");
   const [showInputs, setShowInputs] = useState(true);
 
   const resolvedDraft = useMemo(() => {
@@ -392,7 +384,6 @@ export default function ProposalDetail({
     setShowInputs(true);
   }, [proposal?.id]);
 
-  // auto-fetch when pack missing
   useEffect(() => {
     let alive = true;
 
@@ -425,7 +416,7 @@ export default function ProposalDetail({
 
   if (!proposal) {
     return (
-      <Card className="min-w-0 h-full flex flex-col justify-center items-center text-center" variant="panel" padded="lg">
+      <Card className="min-w-0 min-h-0 h-full flex flex-col justify-center items-center text-center" variant="panel" padded="lg">
         <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Select an item</div>
         <div className="mt-1 text-xs text-slate-500 dark:text-slate-400 max-w-[460px]">
           Soldakı list-dən bir item seç — burada Draft Studio açılacaq.
@@ -437,7 +428,6 @@ export default function ProposalDetail({
   const title = titleOf(proposal);
   const summary = summaryOf(proposal);
 
-  // statuses
   const status = String(proposal.status || "draft").toLowerCase();
   const isRejected = status === "rejected";
   const isPublished = status === "published";
@@ -446,7 +436,9 @@ export default function ProposalDetail({
 
   const draftStatusLc = String(resolvedDraft?.status || "").toLowerCase();
   const isRegenerating =
-    draftStatusLc.includes("regenerat") || draftStatusLc.includes("changes") || draftStatusLc.includes("revise");
+    draftStatusLc.includes("regenerat") ||
+    draftStatusLc.includes("changes") ||
+    draftStatusLc.includes("revise");
 
   const isDraftReady =
     Boolean(pack) && (draftStatusLc.includes("ready") || draftStatusLc === "" || draftStatusLc.includes("draft"));
@@ -521,8 +513,10 @@ export default function ProposalDetail({
   const requestDisabledReason = !showInputs ? "Inputs hidden" : !String(feedback || "").trim() ? "Write feedback" : "";
 
   return (
-    <Card className="min-w-0 p-0 overflow-hidden flex flex-col h-full" variant="elevated" padded={false} clip>
-      {/* Sticky header (premium) */}
+    // ✅ IMPORTANT: ProposalDetail does NOT create its own scroll container.
+    // Parent (Proposals.jsx right panel) owns the scroll.
+    <Card className="min-w-0 min-h-0 w-full flex flex-col" variant="elevated" padded={false} clip>
+      {/* Sticky header */}
       <div className="sticky top-0 z-10">
         <div className="h-[3px] bg-gradient-to-r from-indigo-500/70 via-cyan-400/55 to-emerald-400/55 dark:from-indigo-400/55 dark:via-cyan-300/45 dark:to-emerald-300/45" />
         <div className="bg-white/82 backdrop-blur border-b border-slate-200/70 dark:bg-slate-950/72 dark:border-slate-800/70">
@@ -530,10 +524,7 @@ export default function ProposalDetail({
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h2
-                    className="text-[15px] sm:text-[17px] font-semibold leading-snug min-w-0 break-words text-slate-900 dark:text-slate-100"
-                    title={title}
-                  >
+                  <h2 className="text-[15px] sm:text-[17px] font-semibold leading-snug min-w-0 break-words text-slate-900 dark:text-slate-100" title={title}>
                     {title}
                   </h2>
 
@@ -554,8 +545,7 @@ export default function ProposalDetail({
                 ) : null}
 
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
-                  <span className="font-semibold text-slate-600 dark:text-slate-300">Ref</span> PR-
-                  {shortId(proposal.id).toUpperCase()}
+                  <span className="font-semibold text-slate-600 dark:text-slate-300">Ref</span> PR-{shortId(proposal.id).toUpperCase()}
                   <span className="opacity-50">·</span>
                   <span className="font-semibold text-slate-600 dark:text-slate-300">Agent</span> {agent}
                   {created ? (
@@ -576,12 +566,7 @@ export default function ProposalDetail({
                   <Button variant="outline" size="sm" onClick={() => copy(String(proposal.id))}>
                     Copy ID
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => copy(packCaption(pack))}
-                    disabled={!packCaption(pack)}
-                  >
+                  <Button variant="outline" size="sm" onClick={() => copy(packCaption(pack))} disabled={!packCaption(pack)}>
                     Copy caption
                   </Button>
                   <Button variant="outline" size="sm" onClick={() => copyJson(pack)} disabled={!pack}>
@@ -650,9 +635,7 @@ export default function ProposalDetail({
                     variant="primary"
                     size="sm"
                     isLoading={effectiveBusy && !isRegenerating}
-                    disabled={
-                      effectiveBusy || !(onPublish || onPublishDraft) || !resolvedDraft?.id || !canPublish || isRejected
-                    }
+                    disabled={effectiveBusy || !(onPublish || onPublishDraft) || !resolvedDraft?.id || !canPublish || isRejected}
                     onClick={doPublish}
                   >
                     Publish
@@ -672,8 +655,8 @@ export default function ProposalDetail({
         </div>
       </div>
 
-      {/* Body */}
-      <div className="min-h-0 px-5 py-5 min-w-0 overflow-auto pb-10">
+      {/* ✅ BODY: NO overflow here (parent owns scroll) */}
+      <div className="min-w-0 min-h-0 px-5 py-5 pb-10">
         {!pack ? (
           <Card variant="panel" padded="lg" className="border border-dashed border-slate-300 dark:border-slate-700">
             <SectionTitle right={fetchingDraft ? "Loading…" : ""}>Draft Studio</SectionTitle>
@@ -692,9 +675,7 @@ export default function ProposalDetail({
                     {packCaption(pack) || "—"}
                   </div>
                 </div>
-                <div className="shrink-0 flex items-start gap-2">
-                  {hook ? <Pill tone="neutral">Hook: {hook}</Pill> : null}
-                </div>
+                <div className="shrink-0 flex items-start gap-2">{hook ? <Pill tone="neutral">Hook: {hook}</Pill> : null}</div>
               </div>
 
               <div className="mt-4 flex flex-wrap gap-2">
@@ -716,11 +697,9 @@ export default function ProposalDetail({
               ) : null}
             </div>
 
-            {/* 2-col: Content + Meta */}
             <div className="mt-5 grid gap-5 grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] items-start">
               {/* LEFT */}
               <div className="min-w-0 space-y-4">
-                {/* Tabs */}
                 <div className="flex items-center gap-2 flex-wrap">
                   <TabBtn active={tab === "design"} onClick={() => setTab("design")}>
                     Design
@@ -739,9 +718,7 @@ export default function ProposalDetail({
                   </TabBtn>
 
                   {isRegenerating ? (
-                    <span className="ml-2 text-[11px] text-slate-500 dark:text-slate-400">
-                      Regenerating… (n8n işləyir)
-                    </span>
+                    <span className="ml-2 text-[11px] text-slate-500 dark:text-slate-400">Regenerating… (n8n işləyir)</span>
                   ) : null}
                 </div>
 
@@ -811,7 +788,6 @@ export default function ProposalDetail({
                   )}
                 </Card>
 
-                {/* Inputs */}
                 {showInputs ? (
                   <Card variant="panel" padded="lg" className="min-w-0">
                     <SectionTitle right="Loop">Feedback loop</SectionTitle>
@@ -821,9 +797,7 @@ export default function ProposalDetail({
 
                     <div className="mt-3 grid gap-4 grid-cols-1 lg:grid-cols-2">
                       <div className="min-w-0">
-                        <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                          Change request
-                        </div>
+                        <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Change request</div>
                         <textarea
                           value={feedback}
                           onChange={(e) => setFeedback(e.target.value)}
@@ -837,9 +811,7 @@ export default function ProposalDetail({
                       </div>
 
                       <div className="min-w-0">
-                        <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                          Reject reason
-                        </div>
+                        <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Reject reason</div>
                         <input
                           value={rejectReason}
                           onChange={(e) => setRejectReason(e.target.value)}
@@ -888,9 +860,7 @@ export default function ProposalDetail({
                       </span>
                     ))}
                     {hashtags.length > 36 ? (
-                      <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                        +{hashtags.length - 36} more
-                      </span>
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400">+{hashtags.length - 36} more</span>
                     ) : null}
                   </div>
                 </Card>

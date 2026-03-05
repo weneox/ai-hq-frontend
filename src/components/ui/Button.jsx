@@ -1,7 +1,10 @@
-// src/components/ui/Button.jsx (FINAL v3.0 — ELITE)
-// ✅ Cleaner depth, premium highlight, better outline/ghost, safer disabled
-// ✅ Press physics + subtle sheen (not glow spam)
-// ✅ Keeps API: variant, size(sm/md/lg), isLoading
+// src/components/ui/Button.jsx (ULTRA v1 — Enterprise Button System)
+// ✅ 0dan yazıldı (old v3 silin)
+// ✅ Serious SaaS buttons: no glow spam, no toy sheen
+// ✅ Variants: primary | secondary | outline | ghost | destructive
+// ✅ Sizes: sm | md | lg | icon
+// ✅ Loading: stable width, good UX
+// ✅ API: variant, size, isLoading, className
 
 import { cx } from "../../lib/cx.js";
 
@@ -30,71 +33,69 @@ function Spinner({ className }) {
   );
 }
 
-const sizeMap = {
+const sizes = {
   sm: "h-9 px-3.5 text-[13px] rounded-xl",
-  md: "h-10 px-4 text-[13px] rounded-2xl",
-  lg: "h-11 px-5 text-[15px] rounded-2xl",
+  md: "h-10 px-4 text-[13px] rounded-xl",
+  lg: "h-11 px-5 text-[14px] rounded-2xl",
+  icon: "h-10 w-10 p-0 rounded-xl",
 };
 
 const base = cx(
   "relative inline-flex items-center justify-center gap-2",
-  "font-semibold select-none whitespace-nowrap",
-  "transition-[transform,box-shadow,background-color,border-color,color,filter] duration-200",
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/25",
+  "font-semibold whitespace-nowrap select-none",
+  "leading-none tracking-[-0.01em]",
+  "transition-[transform,background-color,border-color,box-shadow,color] duration-150",
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/18",
   "focus-visible:ring-offset-2 ring-offset-white dark:ring-offset-slate-950",
-  "disabled:opacity-50 disabled:pointer-events-none disabled:shadow-none",
-  "active:translate-y-[1px] active:scale-[0.99]"
+  "disabled:opacity-50 disabled:pointer-events-none",
+  "active:translate-y-[1px]"
 );
 
-// sheen overlay (premium)
-const sheen =
-  "before:content-[''] before:absolute before:inset-0 before:rounded-[inherit] " +
-  "before:bg-gradient-to-b before:from-white/50 before:to-transparent " +
-  "before:[mask-image:radial-gradient(900px_circle_at_50%_0%,black,transparent_55%)] " +
-  "before:pointer-events-none dark:before:from-white/12";
-
+/**
+ * Design rules:
+ * - Primary is dark (serious). In dark mode it flips to light.
+ * - Secondary/outline are neutral, no blur.
+ * - No sheen overlays. No glow shadows.
+ * - Shadows are small and real.
+ */
 const variants = {
   primary: cx(
-    "text-white",
-    "bg-slate-900 hover:bg-slate-800",
-    "shadow-[0_1px_0_rgba(15,23,42,0.10),0_22px_70px_-54px_rgba(2,6,23,0.55)]",
-    "dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200",
-    "dark:shadow-[0_1px_0_rgba(255,255,255,0.07),0_26px_86px_-62px_rgba(0,0,0,0.95)]",
-    sheen
+    "bg-slate-900 text-white border border-slate-900",
+    "hover:bg-slate-800 hover:border-slate-800",
+    "shadow-[0_1px_0_rgba(15,23,42,0.10),0_10px_24px_rgba(15,23,42,0.14)]",
+    "dark:bg-white dark:text-slate-950 dark:border-white",
+    "dark:hover:bg-slate-100 dark:hover:border-slate-100",
+    "dark:shadow-[0_1px_0_rgba(255,255,255,0.08),0_16px_44px_rgba(0,0,0,0.60)]"
   ),
 
   secondary: cx(
-    "border border-slate-200/80 bg-white text-slate-900",
-    "hover:bg-slate-50 hover:border-slate-300/80",
-    "shadow-[0_1px_0_rgba(15,23,42,0.06),0_16px_44px_-48px_rgba(2,6,23,0.20)]",
-    "dark:border-slate-800/80 dark:bg-slate-950/35 dark:text-slate-100",
-    "dark:hover:bg-slate-950/55 dark:hover:border-slate-700/80",
-    "dark:shadow-[0_1px_0_rgba(255,255,255,0.05),0_20px_62px_-54px_rgba(0,0,0,0.85)]",
-    sheen
+    "bg-slate-100 text-slate-900 border border-slate-200",
+    "hover:bg-slate-200 hover:border-slate-300",
+    "shadow-[0_1px_0_rgba(15,23,42,0.04)]",
+    "dark:bg-white/5 dark:text-slate-100 dark:border-white/10",
+    "dark:hover:bg-white/7 dark:hover:border-white/15"
   ),
 
   outline: cx(
-    "border border-slate-200/80 bg-white/60 text-slate-900 backdrop-blur",
-    "hover:bg-white hover:border-slate-300/90",
-    "shadow-[0_1px_0_rgba(15,23,42,0.05)]",
-    "dark:border-slate-800/80 dark:bg-slate-950/25 dark:text-slate-100",
-    "dark:hover:bg-slate-950/50 dark:hover:border-slate-700/90",
-    sheen
+    "bg-white text-slate-900 border border-slate-300",
+    "hover:bg-slate-50 hover:border-slate-400",
+    "shadow-[0_1px_0_rgba(15,23,42,0.04)]",
+    "dark:bg-transparent dark:text-slate-100 dark:border-white/18",
+    "dark:hover:bg-white/6 dark:hover:border-white/24"
   ),
 
   ghost: cx(
-    "bg-transparent text-slate-700",
-    "hover:bg-slate-100/85",
-    "dark:text-slate-200 dark:hover:bg-slate-800/55",
+    "bg-transparent text-slate-700 border border-transparent",
+    "hover:bg-slate-100 hover:text-slate-900",
+    "dark:text-slate-200 dark:hover:bg-white/6 dark:hover:text-white",
     "shadow-none"
   ),
 
   destructive: cx(
-    "text-white",
-    "bg-rose-600 hover:bg-rose-700",
-    "shadow-[0_1px_0_rgba(15,23,42,0.10),0_22px_70px_-54px_rgba(225,29,72,0.30)]",
-    "focus-visible:ring-rose-500/25",
-    sheen
+    "bg-rose-600 text-white border border-rose-600",
+    "hover:bg-rose-700 hover:border-rose-700",
+    "shadow-[0_1px_0_rgba(15,23,42,0.10),0_10px_24px_rgba(225,29,72,0.18)]",
+    "focus-visible:ring-rose-500/22"
   ),
 };
 
@@ -108,31 +109,31 @@ export default function Button({
   ...props
 }) {
   const isDisabled = Boolean(disabled || isLoading);
-  const s = sizeMap[size] || sizeMap.md;
+  const s = sizes[size] || sizes.md;
+  const v = variants[variant] || variants.primary;
 
   return (
     <button
-      className={cx(
-        base,
-        s,
-        variants[variant] || variants.primary,
-        isLoading ? "cursor-wait" : "",
-        className
-      )}
+      className={cx(base, s, v, isLoading ? "cursor-wait" : "", className)}
       disabled={isDisabled}
       {...props}
     >
-      {/* loading dim */}
-      <span className={cx("relative z-10 inline-flex items-center gap-2", isLoading ? "opacity-90" : "")}>
-        {isLoading ? <Spinner /> : null}
-        {children}
-      </span>
-
-      {/* subtle inner border for crispness */}
+      {/* inner hairline for crispness (subtle) */}
       <span
         className="pointer-events-none absolute inset-0 rounded-[inherit] ring-1 ring-inset ring-black/5 dark:ring-white/10"
         aria-hidden="true"
       />
+
+      {/* content */}
+      <span className="relative z-10 inline-flex items-center justify-center gap-2">
+        {/* keep layout stable: spinner uses same space */}
+        {isLoading ? (
+          <span className="inline-flex items-center justify-center">
+            <Spinner />
+          </span>
+        ) : null}
+        <span className={cx(isLoading ? "opacity-90" : "")}>{children}</span>
+      </span>
     </button>
   );
 }

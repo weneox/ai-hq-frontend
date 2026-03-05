@@ -1,8 +1,8 @@
-// src/pages/Proposals.jsx (FINAL v3.2.1 — FIXED: cx import + stable layout)
-// ✅ FIX: cx was missing -> white screen (ReferenceError: cx is not defined)
-// ✅ Same logic preserved
-// ✅ Sticky right panel + internal scroll, no crop
-// ✅ WS + poll unchanged
+// src/pages/Proposals.jsx (FINAL v3.3.1 — PAGE SCROLL ON Proposals)
+// ✅ Proposals səhifəsinin ÖZÜ scroll olur (wheel hər yerdə işləyir)
+// ✅ TopBar sticky qalır (istəsən söndürmək olar)
+// ✅ RIGHT panel sticky + öz iç scroll (sənin əvvəlki height fix ideyası saxlanıb)
+// ✅ Bütün logic saxlanılıb: WS + poll + stats + actions + selection
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import TopBar from "../components/TopBar.jsx";
@@ -18,9 +18,9 @@ import {
 } from "../api/proposals.js";
 
 import { createWsClient } from "../lib/ws.js";
-import { cx } from "../lib/cx.js"; // ✅ REQUIRED
+import { cx } from "../lib/cx.js";
 
-const BACKEND_STATUSES = ["draft", "in_progress", "approved", "published", "rejected", "pending"]; // pending = legacy safety
+const BACKEND_STATUSES = ["draft", "in_progress", "approved", "published", "rejected", "pending"];
 const UI_TABS = ["draft", "approved", "published", "rejected"];
 
 function normalizeList(resp) {
@@ -67,9 +67,7 @@ export default function ProposalsPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
-  // ✅ default UI tab
   const [status, setStatus] = useState("draft");
-
   const [search, setSearch] = useState("");
   const [proposals, setProposals] = useState([]);
   const [selectedId, setSelectedId] = useState("");
@@ -80,14 +78,13 @@ export default function ProposalsPage() {
   const [wsStatus, setWsStatus] = useState({ state: "disconnected" });
   const wsClientRef = useRef(null);
 
-  // keep backend counts + UI helper
   const [stats, setStats] = useState({
-    draft: 0, // UI merged draft count
+    draft: 0,
     in_progress: 0,
     approved: 0,
     published: 0,
     rejected: 0,
-    pending: 0, // legacy backend count
+    pending: 0,
   });
 
   const showToast = (msg) => {
@@ -121,13 +118,9 @@ export default function ProposalsPage() {
         next[s] = Array.isArray(items) ? items.length : 0;
       }
 
-      // ✅ UI Draft count = backend draft + in_progress + pending
       next.draft = (next.draft || 0) + (next.in_progress || 0) + (next.pending || 0);
-
       setStats(next);
-    } catch {
-      // ignore
-    }
+    } catch {}
   };
 
   const fetchByUiStatus = async (uiStatus) => {
@@ -137,7 +130,7 @@ export default function ProposalsPage() {
       const [a, b, c] = await Promise.all([
         listProposals("draft"),
         listProposals("in_progress"),
-        listProposals("pending"), // legacy safety
+        listProposals("pending"),
       ]);
       return mergeDraftItems(normalizeList(a), normalizeList(b), normalizeList(c));
     }
@@ -155,10 +148,7 @@ export default function ProposalsPage() {
       const next = await fetchByUiStatus(desiredStatus);
       setProposals(next);
 
-      // stable selection
-      if (next.length === 0) {
-        // keep selectedId as-is (user may switch tab)
-      } else {
+      if (next.length > 0) {
         const stillExists =
           keepSelectedId && next.some((p) => String(p.id) === String(keepSelectedId));
         setSelectedId(stillExists ? String(keepSelectedId) : String(next[0].id));
@@ -172,14 +162,12 @@ export default function ProposalsPage() {
     }
   };
 
-  // initial + tab change
   useEffect(() => {
     refreshProposals();
     refreshStats();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
-  // WS
   useEffect(() => {
     const ws = createWsClient({
       onStatus: (s) => setWsStatus(s),
@@ -216,7 +204,6 @@ export default function ProposalsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Poll fallback
   useEffect(() => {
     const s = wsStatus?.state;
     if (s === "connected") return;
@@ -235,7 +222,6 @@ export default function ProposalsPage() {
     [proposals, selectedId]
   );
 
-  // ---------- Draft actions (UI -> backend) ----------
   const onRequestChanges = async (proposalId, contentId, feedbackText) => {
     setBusy(true);
     setErr("");
@@ -255,15 +241,11 @@ export default function ProposalsPage() {
     setErr("");
     try {
       await approveDraft(proposalId, contentId);
-
       await refreshStats();
 
       if (status === "draft") {
         setStatus("approved");
-        await refreshProposals("Draft approved ✅", {
-          status: "approved",
-          keepSelectedId: proposalId,
-        });
+        await refreshProposals("Draft approved ✅", { status: "approved", keepSelectedId: proposalId });
       } else {
         await refreshProposals("Draft approved ✅", { status, keepSelectedId: proposalId });
       }
@@ -279,9 +261,7 @@ export default function ProposalsPage() {
     setErr("");
     try {
       await rejectDraft(proposalId, contentId, reasonText);
-
       await refreshStats();
-
       setStatus("rejected");
       await refreshProposals("Rejected ❌", { status: "rejected", keepSelectedId: proposalId });
     } catch (e) {
@@ -296,7 +276,6 @@ export default function ProposalsPage() {
     setErr("");
     try {
       await publishDraft(proposalId, contentId);
-
       await refreshStats();
       await refreshProposals("Publish requested ✅", { status, keepSelectedId: proposalId });
     } catch (e) {
@@ -312,73 +291,86 @@ export default function ProposalsPage() {
   };
 
   return (
-    <div className="min-w-0 min-h-0 flex flex-col gap-5">
-      <TopBar wsStatus={wsStatus} onRefresh={handleManualRefresh} stats={stats} toast={toast} />
-
-      {err ? (
-        <div className="rounded-2xl border border-rose-200/70 bg-rose-50/80 p-4 text-sm text-rose-900 shadow-sm dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
-          {err}
-        </div>
-      ) : null}
-
-      {loading ? (
-        <EmptyBox title="Loading…" desc="Fetching proposals and drafts from backend." />
-      ) : proposals.length === 0 ? (
-        <EmptyBox
-          title="No items yet"
-          desc={
-            status === "draft"
-              ? "Drafts will appear here (including in_progress). Trigger a daily cron or create a new proposal."
-              : "Nothing in this tab yet."
-          }
-        />
-      ) : (
-        <div className="grid min-w-0 min-h-0 gap-5 items-stretch grid-cols-1 xl:grid-cols-[minmax(0,460px)_minmax(0,1fr)]">
-          {/* LEFT */}
-          <div className="min-w-0 min-h-0">
-            <ProposalList
-              proposals={proposals}
-              selectedId={selectedId}
-              onSelect={(id) => setSelectedId(id)}
-              status={status}
-              setStatus={(s) => {
-                const next = UI_TABS.includes(String(s)) ? String(s) : "draft";
-                setStatus(next);
-              }}
-              search={search}
-              setSearch={setSearch}
-              stats={stats}
-            />
+    // ✅ BURDA əsas dəyişiklik: overflow-y-auto (page scroll)
+    <div className="min-w-0 min-h-0 h-full overflow-y-auto overscroll-contain pr-1">
+      <div className="min-w-0 flex flex-col gap-5 pb-10">
+        {/* TopBar sticky istəmirsənsə, bu wrapper-i sil */}
+        <div className="sticky top-0 z-30">
+          <div className="rounded-2xl bg-white/55 backdrop-blur-xl dark:bg-slate-950/30">
+            <TopBar wsStatus={wsStatus} onRefresh={handleManualRefresh} stats={stats} toast={toast} />
           </div>
+        </div>
 
-          {/* RIGHT */}
-          <div className="min-w-0 min-h-0">
-            <div className="xl:sticky xl:top-[calc(20px+84px)]">
-              <div
-                className={cx(
-                  "min-w-0 min-h-0 overflow-hidden rounded-2xl",
-                  "border border-slate-200/70 bg-white/70 backdrop-blur-xl",
-                  "shadow-[0_12px_44px_-28px_rgba(2,6,23,0.35)]",
-                  "dark:border-slate-800 dark:bg-slate-950/35"
-                )}
-                style={{ maxHeight: "calc(100dvh - 160px)" }}
-              >
-                <div className="min-h-0 h-full overflow-auto">
-                  <ProposalDetail
-                    proposal={selected}
-                    busy={busy}
-                    draftBusy={busy}
-                    onRequestChanges={onRequestChanges}
-                    onApproveDraft={onApproveDraft}
-                    onRejectDraft={onRejectDraft}
-                    onPublish={onPublish}
-                  />
+        {err ? (
+          <div className="rounded-2xl border border-rose-200/70 bg-rose-50/80 p-4 text-sm text-rose-900 shadow-sm dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+            {err}
+          </div>
+        ) : null}
+
+        {loading ? (
+          <EmptyBox title="Loading…" desc="Fetching proposals and drafts from backend." />
+        ) : proposals.length === 0 ? (
+          <EmptyBox
+            title="No items yet"
+            desc={
+              status === "draft"
+                ? "Drafts will appear here (including in_progress). Trigger a daily cron or create a new proposal."
+                : "Nothing in this tab yet."
+            }
+          />
+        ) : (
+          <div
+            className={cx(
+              "grid min-w-0 gap-5 items-start",
+              "grid-cols-1 xl:grid-cols-[minmax(0,460px)_minmax(0,1fr)]"
+            )}
+          >
+            {/* LEFT (normal flow, page scroll drives it) */}
+            <div className="min-w-0">
+              <ProposalList
+                proposals={proposals}
+                selectedId={selectedId}
+                onSelect={(id) => setSelectedId(id)}
+                status={status}
+                setStatus={(s) => {
+                  const next = UI_TABS.includes(String(s)) ? String(s) : "draft";
+                  setStatus(next);
+                }}
+                search={search}
+                setSearch={setSearch}
+                stats={stats}
+              />
+            </div>
+
+            {/* RIGHT (sticky + own inner scroll) */}
+            <div className="min-w-0">
+              <div className="xl:sticky xl:top-[84px]">
+                <div
+                  className={cx(
+                    "min-w-0 overflow-hidden rounded-2xl",
+                    "border border-slate-200/70 bg-white/70 backdrop-blur-xl",
+                    "shadow-[0_12px_44px_-28px_rgba(2,6,23,0.35)]",
+                    "dark:border-slate-800 dark:bg-slate-950/35"
+                  )}
+                  style={{ height: "calc(100dvh - 220px)" }}
+                >
+                  <div className="h-full overflow-y-auto overscroll-contain">
+                    <ProposalDetail
+                      proposal={selected}
+                      busy={busy}
+                      draftBusy={busy}
+                      onRequestChanges={onRequestChanges}
+                      onApproveDraft={onApproveDraft}
+                      onRejectDraft={onRejectDraft}
+                      onPublish={onPublish}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

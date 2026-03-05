@@ -1,9 +1,8 @@
-// src/components/ProposalList.jsx (FINAL v1.2 — ULTRA PREMIUM + ALWAYS SHOW DETAILS)
+// src/components/ProposalList.jsx (FINAL v1.2.1 — FIX: layout/scroll never breaks)
 // ✅ Tabs: Draft (= pending + in_progress), Approved, Published, Rejected
-// ✅ DOES NOT depend on uiFormat.js
 // ✅ Best-effort details extraction from payload/proposal/drafts/executions
-// ✅ Cleaner hierarchy: header -> pipeline stats -> tabs/search -> list
-// ✅ Draft cards show: title + caption preview + format + tags preview + agent/time + stage badge
+// ✅ FIX: Card.jsx wrapper issue -> use inner flex wrapper so scroll works 100%
+// ✅ Cleaner hierarchy: header -> chips -> tabs/search -> scroll list
 
 import Card from "./ui/Card.jsx";
 import Input from "./ui/Input.jsx";
@@ -288,212 +287,212 @@ export default function ProposalList({
       : stageFiltered.length;
 
   return (
-    <Card className="min-w-0 p-0 overflow-hidden flex flex-col h-full">
-      {/* Header */}
-      <div className="px-4 pt-4 pb-3 border-b border-slate-200/70 dark:border-slate-800">
-        <div className="flex items-start justify-between gap-3 min-w-0">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <div className="text-sm font-semibold tracking-tight">Draft Pipeline</div>
-              <span
-                className="h-2 w-2 rounded-full bg-emerald-400/80 shadow-[0_0_0_5px_rgba(16,185,129,0.12)]"
-                aria-hidden="true"
-              />
-              <span className="text-[11px] text-slate-500 dark:text-slate-400">Live</span>
-            </div>
-
-            <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              Draft → Approve draft → Publish
-            </div>
-
-            {/* quick meta */}
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <MiniChip>
-                Showing <span className="mx-1 font-semibold text-slate-800 dark:text-slate-100">{shownCount}</span>
-                {q ? <span className="opacity-70">/ {totalInTab}</span> : null}
-              </MiniChip>
-
-              {status === "draft" ? <MiniChip>Auto-merge: draft + in_progress</MiniChip> : null}
-              <MiniChip>AI HQ</MiniChip>
-            </div>
-          </div>
-
-          <div className="shrink-0">
-            <Badge tone="neutral">{shownCount}</Badge>
-          </div>
-        </div>
-
-        {/* Tabs + Search */}
-        <div className="mt-3 flex flex-col gap-2 min-w-0">
-          <Tabs value={status} onChange={setStatus} items={tabs} />
-          <div className="w-full">
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search drafts, captions, agent…"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* List */}
-      <div className="min-h-0 p-3 overflow-auto">
-        {filtered.length === 0 ? (
-          <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4 text-sm text-slate-600 shadow-sm dark:border-slate-800 dark:bg-slate-950/25 dark:text-slate-300">
-            <div className="font-semibold text-slate-900 dark:text-slate-100">No items</div>
-            <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              Cron/agent draft yaradanda burada görünəcək.
-            </div>
-
-            {DEV ? (
-              <div className="mt-3 rounded-xl border border-slate-200/70 bg-white/70 p-3 font-mono text-xs text-slate-700 dark:border-slate-800 dark:bg-slate-950/25 dark:text-slate-200 overflow-auto">
-                POST /api/debate {"{ \"mode\": \"proposal\" }"}
+    <Card className="min-w-0 p-0 overflow-hidden h-full">
+      {/* ✅ IMPORTANT: real flex layout must live INSIDE Card (Card has its own wrapper) */}
+      <div className="min-w-0 min-h-0 h-full flex flex-col">
+        {/* Header */}
+        <div className="px-4 pt-4 pb-3 border-b border-slate-200/70 dark:border-slate-800">
+          <div className="flex items-start justify-between gap-3 min-w-0">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <div className="text-sm font-semibold tracking-tight">Draft Pipeline</div>
+                <span
+                  className="h-2 w-2 rounded-full bg-emerald-400/80 shadow-[0_0_0_5px_rgba(16,185,129,0.12)]"
+                  aria-hidden="true"
+                />
+                <span className="text-[11px] text-slate-500 dark:text-slate-400">Live</span>
               </div>
-            ) : null}
+
+              <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Draft → Approve draft → Publish
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <MiniChip>
+                  Showing{" "}
+                  <span className="mx-1 font-semibold text-slate-800 dark:text-slate-100">
+                    {shownCount}
+                  </span>
+                  {q ? <span className="opacity-70">/ {totalInTab}</span> : null}
+                </MiniChip>
+
+                {status === "draft" ? <MiniChip>Auto-merge: draft + in_progress</MiniChip> : null}
+                <MiniChip>AI HQ</MiniChip>
+              </div>
+            </div>
+
+            <div className="shrink-0">
+              <Badge tone="neutral">{shownCount}</Badge>
+            </div>
           </div>
-        ) : (
-          <div className="space-y-2">
-            {filtered.map((p) => {
-              const isSel = String(p?.id) === String(selectedId);
 
-              const agent = p?.agent_key || p?.agentKey || p?.agent || "agent";
-              const when = relTime(p?.created_at || p?.createdAt);
+          {/* Tabs + Search */}
+          <div className="mt-3 flex flex-col gap-2 min-w-0">
+            <Tabs value={status} onChange={setStatus} items={tabs} />
+            <div className="w-full">
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search drafts, captions, agent…"
+              />
+            </div>
+          </div>
+        </div>
 
-              const stage = stageOf(p);
-              const stageTxt = stageLabel(p);
+        {/* List */}
+        <div className="min-h-0 p-3 overflow-y-auto overscroll-contain">
+          {filtered.length === 0 ? (
+            <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4 text-sm text-slate-600 shadow-sm dark:border-slate-800 dark:bg-slate-950/25 dark:text-slate-300">
+              <div className="font-semibold text-slate-900 dark:text-slate-100">No items</div>
+              <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Cron/agent draft yaradanda burada görünəcək.
+              </div>
 
-              const t = titleFrom(p);
-              const cap = captionFrom(p);
-              const tags = tagsFrom(p);
-              const fmt = formatFrom(p);
-              const cta = ctaFrom(p);
+              {DEV ? (
+                <div className="mt-3 rounded-xl border border-slate-200/70 bg-white/70 p-3 font-mono text-xs text-slate-700 dark:border-slate-800 dark:bg-slate-950/25 dark:text-slate-200 overflow-auto">
+                  POST /api/debate {"{ \"mode\": \"proposal\" }"}
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {filtered.map((p) => {
+                const isSel = String(p?.id) === String(selectedId);
 
-              const capPreview = clip(cap, 140);
-              const tagPreview = tags.slice(0, 3);
+                const agent = p?.agent_key || p?.agentKey || p?.agent || "agent";
+                const when = relTime(p?.created_at || p?.createdAt);
 
-              const itemCls = [
-                "group w-full text-left min-w-0",
-                "rounded-2xl border transition-all duration-200",
-                "bg-white/70 border-slate-200/70",
-                "hover:bg-white/85 hover:shadow-[0_18px_40px_-30px_rgba(2,6,23,0.35)]",
-                "active:scale-[0.995]",
-                "dark:bg-slate-950/25 dark:border-slate-800",
-                "dark:hover:bg-slate-950/35",
-                "focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30 focus-visible:ring-offset-2",
-                "focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950",
-                isSel
-                  ? "border-indigo-200/70 bg-indigo-50/60 shadow-[0_16px_40px_-34px_rgba(79,70,229,0.55)] dark:border-indigo-500/25 dark:bg-indigo-500/10"
-                  : "",
-              ].join(" ");
+                const stage = stageOf(p);
+                const stageTxt = stageLabel(p);
 
-              return (
-                <button
-                  key={p?.id}
-                  onClick={() => (onSelect ? onSelect(String(p?.id)) : null)}
-                  className={itemCls}
-                  type="button"
-                >
-                  <div className="p-3">
-                    <div className="flex items-start gap-3 min-w-0">
-                      {/* Accent */}
-                      <div
-                        className={[
-                          "mt-1 h-10 w-1 rounded-full shrink-0 transition-opacity",
-                          isSel
-                            ? "bg-gradient-to-b from-indigo-500/75 via-cyan-400/65 to-emerald-400/65"
-                            : "bg-slate-200/70 dark:bg-slate-800/70 group-hover:opacity-90",
-                        ].join(" ")}
-                        aria-hidden="true"
-                      />
+                const t = titleFrom(p);
+                const cap = captionFrom(p);
+                const tags = tagsFrom(p);
+                const fmt = formatFrom(p);
+                const cta = ctaFrom(p);
 
-                      <div className="min-w-0 flex-1">
-                        {/* Title + Stage */}
-                        <div className="flex items-start justify-between gap-3 min-w-0">
-                          <div className="min-w-0">
-                            <div className="text-sm font-semibold leading-snug text-slate-900 dark:text-slate-100">
-                              <span className="line-clamp-2 break-words">{t}</span>
+                const capPreview = clip(cap, 140);
+                const tagPreview = tags.slice(0, 3);
+
+                const itemCls = [
+                  "group w-full text-left min-w-0",
+                  "rounded-2xl border transition-all duration-200",
+                  "bg-white/70 border-slate-200/70",
+                  "hover:bg-white/85 hover:shadow-[0_18px_40px_-30px_rgba(2,6,23,0.35)]",
+                  "active:scale-[0.995]",
+                  "dark:bg-slate-950/25 dark:border-slate-800",
+                  "dark:hover:bg-slate-950/35",
+                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30 focus-visible:ring-offset-2",
+                  "focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950",
+                  isSel
+                    ? "border-indigo-200/70 bg-indigo-50/60 shadow-[0_16px_40px_-34px_rgba(79,70,229,0.55)] dark:border-indigo-500/25 dark:bg-indigo-500/10"
+                    : "",
+                ].join(" ");
+
+                return (
+                  <button
+                    key={p?.id}
+                    onClick={() => (onSelect ? onSelect(String(p?.id)) : null)}
+                    className={itemCls}
+                    type="button"
+                  >
+                    <div className="p-3">
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div
+                          className={[
+                            "mt-1 h-10 w-1 rounded-full shrink-0 transition-opacity",
+                            isSel
+                              ? "bg-gradient-to-b from-indigo-500/75 via-cyan-400/65 to-emerald-400/65"
+                              : "bg-slate-200/70 dark:bg-slate-800/70 group-hover:opacity-90",
+                          ].join(" ")}
+                          aria-hidden="true"
+                        />
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-3 min-w-0">
+                            <div className="min-w-0">
+                              <div className="text-sm font-semibold leading-snug text-slate-900 dark:text-slate-100">
+                                <span className="line-clamp-2 break-words">{t}</span>
+                              </div>
+
+                              {capPreview ? (
+                                <div className="mt-1 text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
+                                  {capPreview}
+                                </div>
+                              ) : (
+                                <div className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+                                  Draft (caption yoxdur)
+                                </div>
+                              )}
                             </div>
 
-                            {/* caption preview */}
-                            {capPreview ? (
-                              <div className="mt-1 text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
-                                {capPreview}
+                            <div className="shrink-0 flex flex-col items-end gap-2">
+                              <Badge tone={stageTone(stage, p?.status)} className="shrink-0">
+                                {stage === "draft" ? "Draft" : stage}
+                              </Badge>
+
+                              <div className="text-[11px] text-slate-400 dark:text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                                Open →
                               </div>
+                            </div>
+                          </div>
+
+                          <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+                            <span className="font-medium text-slate-600 dark:text-slate-300">
+                              {agent}
+                            </span>
+                            {when ? <span>· {when}</span> : null}
+                            {stageTxt ? <span>· {stageTxt}</span> : null}
+
+                            {fmt ? (
+                              <span className="ml-1 inline-flex items-center rounded-full border border-slate-200/70 bg-white/60 px-2 py-0.5 text-[11px] text-slate-600 dark:border-slate-800 dark:bg-slate-950/25 dark:text-slate-300">
+                                {fmt}
+                              </span>
+                            ) : null}
+
+                            {cta ? (
+                              <span className="inline-flex items-center rounded-full border border-slate-200/70 bg-white/60 px-2 py-0.5 text-[11px] text-slate-600 dark:border-slate-800 dark:bg-slate-950/25 dark:text-slate-300">
+                                CTA: {clip(cta, 26)}
+                              </span>
+                            ) : null}
+                          </div>
+
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            {tagPreview.length ? (
+                              <>
+                                {tagPreview.map((h) => (
+                                  <span
+                                    key={h}
+                                    className="inline-flex items-center rounded-full border border-slate-200/70 bg-slate-50/70 px-2 py-0.5 text-[11px] text-slate-600 dark:border-slate-800 dark:bg-slate-950/25 dark:text-slate-300"
+                                  >
+                                    {h}
+                                  </span>
+                                ))}
+                                {tags.length > tagPreview.length ? (
+                                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                                    +{tags.length - tagPreview.length} more
+                                  </span>
+                                ) : null}
+                              </>
                             ) : (
-                              <div className="mt-1 text-xs text-slate-400 dark:text-slate-500">
-                                Draft (caption yoxdur)
-                              </div>
+                              <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                                #{tags.length} tags
+                              </span>
                             )}
                           </div>
 
-                          <div className="shrink-0 flex flex-col items-end gap-2">
-                            <Badge tone={stageTone(stage, p?.status)} className="shrink-0">
-                              {stage === "draft" ? "Draft" : stage}
-                            </Badge>
-
-                            <div className="text-[11px] text-slate-400 dark:text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                              Open →
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Meta row */}
-                        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
-                          <span className="font-medium text-slate-600 dark:text-slate-300">
-                            {agent}
-                          </span>
-                          {when ? <span>· {when}</span> : null}
-                          {stageTxt ? <span>· {stageTxt}</span> : null}
-
-                          {fmt ? (
-                            <span className="ml-1 inline-flex items-center rounded-full border border-slate-200/70 bg-white/60 px-2 py-0.5 text-[11px] text-slate-600 dark:border-slate-800 dark:bg-slate-950/25 dark:text-slate-300">
-                              {fmt}
-                            </span>
-                          ) : null}
-
-                          {cta ? (
-                            <span className="inline-flex items-center rounded-full border border-slate-200/70 bg-white/60 px-2 py-0.5 text-[11px] text-slate-600 dark:border-slate-800 dark:bg-slate-950/25 dark:text-slate-300">
-                              CTA: {clip(cta, 26)}
-                            </span>
+                          {isSel ? (
+                            <div className="mt-3 h-px w-full bg-gradient-to-r from-indigo-500/0 via-indigo-500/25 to-indigo-500/0" />
                           ) : null}
                         </div>
-
-                        {/* Tags preview */}
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          {tagPreview.length ? (
-                            <>
-                              {tagPreview.map((h) => (
-                                <span
-                                  key={h}
-                                  className="inline-flex items-center rounded-full border border-slate-200/70 bg-slate-50/70 px-2 py-0.5 text-[11px] text-slate-600 dark:border-slate-800 dark:bg-slate-950/25 dark:text-slate-300"
-                                >
-                                  {h}
-                                </span>
-                              ))}
-                              {tags.length > tagPreview.length ? (
-                                <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                                  +{tags.length - tagPreview.length} more
-                                </span>
-                              ) : null}
-                            </>
-                          ) : (
-                            <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                              #{tags.length} tags
-                            </span>
-                          )}
-                        </div>
-
-                        {isSel ? (
-                          <div className="mt-3 h-px w-full bg-gradient-to-r from-indigo-500/0 via-indigo-500/25 to-indigo-500/0" />
-                        ) : null}
                       </div>
                     </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
     </Card>
   );

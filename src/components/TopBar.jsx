@@ -1,71 +1,33 @@
-// src/components/TopBar.jsx (FINAL v1.1 — aligned with UI tabs)
-
-import { RefreshCw, Radio, Copy } from "lucide-react";
+// src/components/TopBar.jsx (ELITE v5.1 — FLAT HEADER STRIP, NO CARD LOOK)
+import { Copy, Link2, RefreshCw, Wifi, WifiOff } from "lucide-react";
 import { getApiBase } from "../api/client.js";
-import Badge from "./ui/Badge.jsx";
 import Button from "./ui/Button.jsx";
-import Card from "./ui/Card.jsx";
 
-function wsTone(state) {
-  switch (state) {
-    case "connected":
-      return "success";
-    case "reconnecting":
-    case "connecting":
-      return "warn";
-    case "disconnected":
-    case "error":
-      return "danger";
-    case "off":
-      return "neutral";
-    default:
-      return "neutral";
+function hostOf(url) {
+  try {
+    return new URL(url).host;
+  } catch {
+    return "";
   }
 }
 
-function pulseColor(state) {
-  switch (state) {
-    case "connected":
-      return "bg-emerald-400";
-    case "connecting":
-    case "reconnecting":
-      return "bg-amber-400";
-    case "error":
-    case "disconnected":
-      return "bg-rose-400";
-    default:
-      return "bg-slate-400";
-  }
-}
-function pingColor(state) {
-  switch (state) {
-    case "connected":
-      return "bg-emerald-400/35";
-    case "connecting":
-    case "reconnecting":
-      return "bg-amber-400/35";
-    case "error":
-    case "disconnected":
-      return "bg-rose-400/35";
-    default:
-      return "bg-slate-400/25";
-  }
-}
-
-function StatPill({ label, value, tone }) {
-  return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/70 px-3 py-1 text-[11px] font-semibold text-slate-700 shadow-[0_1px_0_rgba(15,23,42,0.04)] dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-200">
-      <span className="opacity-75">{label}</span>
-      <Badge tone={tone || "neutral"} className="px-2 py-0.5">
-        {value ?? 0}
-      </Badge>
-    </span>
-  );
+function wsDot(state) {
+  if (state === "connected") return "bg-emerald-500";
+  if (state === "connecting" || state === "reconnecting") return "bg-amber-500";
+  if (state === "disconnected" || state === "error") return "bg-rose-500";
+  return "bg-slate-400";
 }
 
 export default function TopBar({ wsStatus, onRefresh, stats, toast, title = "Proposals" }) {
   const api = getApiBase() || "";
+  const host = hostOf(api);
   const state = wsStatus?.state || "disconnected";
+  const WsIcon = state === "connected" ? Wifi : WifiOff;
+
+  const draft = stats?.draft ?? 0;
+  const approved = stats?.approved ?? 0;
+  const published = stats?.published ?? 0;
+  const rejected = stats?.rejected ?? 0;
 
   const copyApi = async () => {
     try {
@@ -73,81 +35,103 @@ export default function TopBar({ wsStatus, onRefresh, stats, toast, title = "Pro
     } catch {}
   };
 
-  // ✅ align with UI tabs
-  const draftCount = stats?.draft ?? 0; // already merged in Proposals.jsx (draft+in_progress+pending)
-  const approvedCount = stats?.approved ?? 0;
-  const publishedCount = stats?.published ?? 0;
-  const rejectedCount = stats?.rejected ?? 0;
-
   return (
-    <Card variant="glass" padded={false} className="overflow-hidden min-w-0">
-      <div className="h-1 bg-gradient-to-r from-indigo-500/60 via-cyan-400/45 to-emerald-400/45 dark:from-indigo-400/45 dark:via-cyan-300/35 dark:to-emerald-300/35" />
-
-      <div className="p-4 md:p-5 min-w-0">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between min-w-0">
+    <div className="min-w-0">
+      {/* flat strip */}
+      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-[0_1px_0_rgba(15,23,42,0.04)] dark:border-slate-800 dark:bg-slate-950/40">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          {/* left */}
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-3 min-w-0">
-              <div className="text-lg font-semibold tracking-tight">{title}</div>
+            <div className="flex items-center gap-3">
+              <div className="text-[18px] font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+                {title}
+              </div>
 
-              <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/70 px-2.5 py-1 text-[11px] font-semibold text-slate-700 shadow-[0_1px_0_rgba(15,23,42,0.04)] dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-200">
-                <span className="relative flex h-2 w-2">
-                  <span className={`absolute inline-flex h-full w-full animate-ping rounded-full ${pingColor(state)}`} />
-                  <span className={`relative inline-flex h-2 w-2 rounded-full ${pulseColor(state)}`} />
-                </span>
-                <Radio className="h-3.5 w-3.5 opacity-80" />
-                live
-              </span>
+              <div className="inline-flex items-center gap-2 text-[12px] font-semibold text-slate-600 dark:text-slate-300">
+                <span className={`h-2 w-2 rounded-full ${wsDot(state)}`} />
+                <WsIcon className="h-4 w-4 opacity-80" />
+                {state}
+              </div>
 
               {toast ? (
-                <Badge tone="info" className="shrink-0">
+                <div className="hidden md:block rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-200">
                   {toast}
-                </Badge>
-              ) : null}
-            </div>
-
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400 min-w-0">
-              {api ? (
-                <span className="inline-flex items-center gap-2 min-w-0 rounded-full border border-slate-200 bg-white/70 px-3 py-1 text-[11px] font-semibold text-slate-700 shadow-[0_1px_0_rgba(15,23,42,0.04)] dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-200">
-                  <span className="inline-block min-w-0 max-w-[72vw] sm:max-w-[520px] truncate" title={api}>
-                    API: {api}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={copyApi}
-                    className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white/80 p-1 text-slate-700 transition-all hover:bg-white hover:shadow-sm active:translate-y-[1px]
-                               dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200 dark:hover:bg-slate-900/60"
-                    aria-label="Copy API base"
-                    title="Copy API base"
-                  >
-                    <Copy className="h-3.5 w-3.5" />
-                  </button>
-                </span>
-              ) : null}
-
-              <Badge tone={wsTone(state)} className="shrink-0">
-                WS: {state}
-                {wsStatus?.delayMs ? ` · retry ${Math.round(wsStatus.delayMs)}ms` : ""}
-              </Badge>
-
-              {stats ? (
-                <div className="flex flex-wrap items-center gap-2">
-                  <StatPill label="Draft" value={draftCount} tone="neutral" />
-                  <StatPill label="Approved" value={approvedCount} tone="success" />
-                  <StatPill label="Published" value={publishedCount} tone="success" />
-                  <StatPill label="Rejected" value={rejectedCount} tone="danger" />
                 </div>
               ) : null}
             </div>
+
+            <div className="mt-1 text-[12px] font-medium text-slate-500 dark:text-slate-400">
+              Draft → Approve → Publish
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 lg:justify-end">
-            <Button variant="outline" size="md" onClick={onRefresh} className="whitespace-nowrap">
+          {/* right */}
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 lg:justify-end">
+            <div className="flex items-baseline gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Draft
+              </span>
+              <span className="text-[13px] font-semibold tabular-nums text-slate-900 dark:text-slate-100">
+                {draft}
+              </span>
+            </div>
+
+            <div className="flex items-baseline gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Approved
+              </span>
+              <span className="text-[13px] font-semibold tabular-nums text-emerald-700 dark:text-emerald-300">
+                {approved}
+              </span>
+            </div>
+
+            <div className="flex items-baseline gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Published
+              </span>
+              <span className="text-[13px] font-semibold tabular-nums text-slate-900 dark:text-slate-100">
+                {published}
+              </span>
+            </div>
+
+            <div className="flex items-baseline gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Rejected
+              </span>
+              <span className="text-[13px] font-semibold tabular-nums text-rose-700 dark:text-rose-300">
+                {rejected}
+              </span>
+            </div>
+
+            <Button variant="outline" size="md" onClick={onRefresh} className="h-9 rounded-xl">
               <RefreshCw className="h-4 w-4" />
               Refresh
             </Button>
           </div>
         </div>
+
+        {/* api line */}
+        {api ? (
+          <div className="flex min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] dark:border-slate-800 dark:bg-slate-900/30">
+            <Link2 className="h-4 w-4 opacity-80" />
+            <div className="min-w-0 truncate font-semibold text-slate-900 dark:text-slate-100">
+              {host ? `${host}` : "API"}
+              <span className="mx-2 opacity-40">—</span>
+              <span className="font-medium opacity-80">{api}</span>
+            </div>
+            <button
+              type="button"
+              onClick={copyApi}
+              className="ml-auto inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-100 active:translate-y-[1px]
+                         dark:border-slate-800 dark:bg-slate-950/40 dark:hover:bg-slate-900/60"
+              aria-label="Copy API"
+              title="Copy API"
+            >
+              <Copy className="h-4 w-4" />
+            </button>
+          </div>
+        ) : null}
       </div>
-    </Card>
+    </div>
   );
 }
