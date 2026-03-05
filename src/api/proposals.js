@@ -1,23 +1,44 @@
-// src/api/proposals.js (FINAL v3.3 — includes includeContent/includePack + auto-fallback + rejectDraft)
+// src/api/proposals.js (FINAL — matches backend v2.10+ content/proposals routes)
 
 import { apiGet, apiPost } from "./client.js";
 
 /**
- * List proposals by status.
- * ✅ Always requests latestContent + content_pack so ProposalDetail can render Draft Studio without extra fetch.
+ * UI tabs -> Backend statuses
+ * UI: draft | approved | published | rejected
+ * DB: in_progress | approved | published | rejected
+ */
+function mapUiStatusToBackend(status) {
+  const s = String(status || "").toLowerCase();
+
+  // Draft tab should show "drafting" items
+  if (s === "draft" || s === "drafting") return "in_progress";
+
+  if (s === "approved") return "approved";
+  if (s === "published") return "published";
+  if (s === "rejected") return "rejected";
+
+  // safety
+  return "in_progress";
+}
+
+/**
+ * List proposals by UI tab status.
+ * ✅ Always include latestContent + pack for Draft Studio.
  */
 export async function listProposals(status = "draft") {
-  const s = encodeURIComponent(status || "draft");
+  const backendStatus = mapUiStatusToBackend(status);
+  const s = encodeURIComponent(backendStatus);
 
-  // ✅ IMPORTANT: include latest content + pack in list response
   const j = await apiGet(`/api/proposals?status=${s}&includeContent=1&includePack=1`);
 
-  // supports both {proposals: []} and direct []
   if (Array.isArray(j)) return j;
   return j?.proposals || [];
 }
 
-// NOTE: legacy decideProposal still here if you ever need it (not used by UI v3)
+/**
+ * Decision endpoint (used for reject in UI)
+ * POST /api/proposals/:id/decision  { decision:"approved"|"rejected", reason? }
+ */
 export async function decideProposal(id, decision, reason) {
   const pid = encodeURIComponent(String(id));
   return apiPost(`/api/proposals/${pid}/decision`, {
@@ -26,121 +47,62 @@ export async function decideProposal(id, decision, reason) {
   });
 }
 
-// ---------- Draft actions (auto-fallback routes) ----------
-
-function looksLikeRouteNotFound(err) {
-  const msg = String(err?.message || err || "").toLowerCase();
-  if (msg.includes("not found")) return true;
-  if (msg.includes("404")) return true;
-  if (msg.includes("cannot post")) return true;
-  if (msg.includes("cannot get")) return true;
-  if (msg.includes("no route")) return true;
-  if (msg.includes("route")) return true;
-  if (msg.includes("status 404")) return true;
-  return false;
-}
-
-async function postWithFallback(paths, body) {
-  let lastErr = null;
-
-  for (const p of paths) {
-    try {
-      return await apiPost(p, body);
-    } catch (e) {
-      lastErr = e;
-      if (!looksLikeRouteNotFound(e)) throw e;
-    }
-  }
-
-  throw lastErr || new Error("Draft action failed");
-}
+// ==========================
+// Draft actions (content_items)
+// ==========================
 
 /**
  * Request changes (regenerate draft)
- * body: { proposalId, draftId, feedback }
+ * POST /api/content/:contentId/feedback  { feedbackText, tenantId? }
  */
-export async function requestDraftChanges(proposalId, draftId, feedback) {
-  const pid = encodeURIComponent(String(proposalId));
-  const did = encodeURIComponent(String(draftId));
+export async function requestDraftChanges(proposalId, contentId, feedback) {
+  const did = encodeURIComponent(String(contentId));
   const fb = String(feedback || "").trim();
 
-  return postWithFallback(
-    [
-      `/api/content/${did}/changes`,
-      `/api/content/${did}/feedback`, // some backends use /feedback
-      `/api/drafts/${did}/changes`,
-      `/api/proposals/${pid}/draft/${did}/changes`,
-      `/api/proposals/${pid}/draft/changes`,
-      `/api/proposals/${pid}/request-changes`, // convenience route may return contentId
-    ],
-    {
-      proposalId: String(proposalId),
-      draftId: String(draftId),
-      feedback: fb,
-      feedbackText: fb,
-    }
-  );
+  return apiPost(`/api/content/${did}/feedback`, {
+    proposalId: String(proposalId || ""),
+    draftId: String(contentId || ""),
+    feedbackText: fb,
+    feedback: fb,
+  });
 }
 
 /**
  * Approve draft
+ * POST /api/content/:contentId/approve
  */
-export async function approveDraft(proposalId, draftId) {
-  const pid = encodeURIComponent(String(proposalId));
-  const did = encodeURIComponent(String(draftId));
+export async function approveDraft(proposalId, contentId) {
+  const did = encodeURIComponent(String(contentId));
 
-  return postWithFallback(
-    [
-      `/api/content/${did}/approve`,
-      `/api/drafts/${did}/approve`,
-      `/api/proposals/${pid}/draft/${did}/approve`,
-      `/api/proposals/${pid}/draft/approve`,
-    ],
-    { proposalId: String(proposalId), draftId: String(draftId) }
-  );
+  return apiPost(`/api/content/${did}/approve`, {
+    proposalId: String(proposalId || ""),
+    draftId: String(contentId || ""),
+  });
 }
 
 /**
- * Reject draft (moves proposal to rejected)
- * body: { proposalId, draftId, reason }
+ * Reject (THIS IS PROPOSAL DECISION, not content route)
+ * POST /api/proposals/:proposalId/decision { decision:"rejected", reason }
  */
-export async function rejectDraft(proposalId, draftId, reason) {
+export async function rejectDraft(proposalId, _contentId, reason) {
   const pid = encodeURIComponent(String(proposalId));
-  const did = encodeURIComponent(String(draftId));
   const r = String(reason || "").trim();
 
-  return postWithFallback(
-    [
-      `/api/content/${did}/reject`,
-      `/api/drafts/${did}/reject`,
-      `/api/proposals/${pid}/draft/${did}/reject`,
-      `/api/proposals/${pid}/draft/reject`,
-      `/api/proposals/${pid}/reject`, // optional convenience if you add later
-    ],
-    {
-      proposalId: String(proposalId),
-      draftId: String(draftId),
-      reason: r,
-      rejectReason: r,
-    }
-  );
+  return apiPost(`/api/proposals/${pid}/decision`, {
+    decision: "rejected",
+    reason: r,
+  });
 }
 
 /**
- * Publish draft
+ * Publish
+ * POST /api/content/:contentId/publish
  */
-export async function publishDraft(proposalId, draftId) {
-  const pid = encodeURIComponent(String(proposalId));
-  const did = encodeURIComponent(String(draftId));
+export async function publishDraft(proposalId, contentId) {
+  const did = encodeURIComponent(String(contentId));
 
-  return postWithFallback(
-    [
-      `/api/content/${did}/publish`,
-      `/api/drafts/${did}/publish`,
-      `/api/proposals/${pid}/draft/${did}/publish`,
-      `/api/proposals/${pid}/draft/publish`,
-      `/api/proposals/${pid}/publish`, // convenience route may return contentId
-    ],
-    { proposalId: String(proposalId), draftId: String(draftId) }
-  );
+  return apiPost(`/api/content/${did}/publish`, {
+    proposalId: String(proposalId || ""),
+    draftId: String(contentId || ""),
+  });
 }
