@@ -1,9 +1,8 @@
-// src/pages/Proposals.jsx (FINAL v3.2 — PREMIUM layout framing + stable scroll)
-// ✅ Same logic as v3.1 (kept)
-// ✅ Premium page container + subtle separators
-// ✅ Right panel: sticky on desktop, internal scroll only, no crop/glitch
-// ✅ Better empty states placeholders
-// ✅ Keeps selection stable + WS/poll unchanged
+// src/pages/Proposals.jsx (FINAL v3.2.1 — FIXED: cx import + stable layout)
+// ✅ FIX: cx was missing -> white screen (ReferenceError: cx is not defined)
+// ✅ Same logic preserved
+// ✅ Sticky right panel + internal scroll, no crop
+// ✅ WS + poll unchanged
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import TopBar from "../components/TopBar.jsx";
@@ -19,6 +18,7 @@ import {
 } from "../api/proposals.js";
 
 import { createWsClient } from "../lib/ws.js";
+import { cx } from "../lib/cx.js"; // ✅ REQUIRED
 
 const BACKEND_STATUSES = ["draft", "in_progress", "approved", "published", "rejected", "pending"]; // pending = legacy safety
 const UI_TABS = ["draft", "approved", "published", "rejected"];
@@ -353,7 +353,6 @@ export default function ProposalsPage() {
 
           {/* RIGHT */}
           <div className="min-w-0 min-h-0">
-            {/* Desktop: sticky panel; Mobile: normal flow */}
             <div className="xl:sticky xl:top-[calc(20px+84px)]">
               <div
                 className={cx(
@@ -362,10 +361,7 @@ export default function ProposalsPage() {
                   "shadow-[0_12px_44px_-28px_rgba(2,6,23,0.35)]",
                   "dark:border-slate-800 dark:bg-slate-950/35"
                 )}
-                style={{
-                  // on desktop keep it within viewport; header+gaps are already in Shell
-                  maxHeight: "calc(100dvh - 160px)",
-                }}
+                style={{ maxHeight: "calc(100dvh - 160px)" }}
               >
                 <div className="min-h-0 h-full overflow-auto">
                   <ProposalDetail
