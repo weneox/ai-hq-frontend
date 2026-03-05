@@ -1,8 +1,14 @@
+// src/api/client.js (FIXED — do NOT throw on {ok:false} when HTTP is 200)
+
 const RAW = (import.meta.env.VITE_API_BASE || "").trim();
 const API_BASE = RAW ? RAW.replace(/\/+$/, "") : "";
 
 export function getApiBase() {
   return API_BASE;
+}
+
+export function apiUrl(path) {
+  return `${API_BASE}${path}`;
 }
 
 async function readJson(r) {
@@ -11,7 +17,7 @@ async function readJson(r) {
   try {
     return JSON.parse(text);
   } catch {
-    return { raw: text };
+    return { ok: false, raw: text };
   }
 }
 
@@ -28,27 +34,55 @@ function pickErr(j, fallback) {
   return String(m || fallback);
 }
 
+/**
+ * IMPORTANT:
+ * - Throws ONLY when HTTP status is not ok (4xx/5xx) or network error.
+ * - If backend returns HTTP 200 with {ok:false}, we return the JSON (no throw).
+ *   Upper layers (api/proposals.js etc.) will handle j.ok.
+ */
 export async function apiGet(path) {
   assertConfigured();
   const url = `${API_BASE}${path}`;
-  const r = await fetch(url, { headers: { Accept: "application/json" } });
+
+  let r;
+  try {
+    r = await fetch(url, { headers: { Accept: "application/json" } });
+  } catch (e) {
+    throw new Error(`Network error (GET ${path}): ${String(e?.message || e)}`);
+  }
+
   const j = await readJson(r);
-  if (!r.ok || j?.ok === false) throw new Error(pickErr(j, `GET ${path} failed`));
+
+  if (!r.ok) {
+    throw new Error(pickErr(j, `GET ${path} failed (${r.status})`));
+  }
+
   return j;
 }
 
 export async function apiPost(path, body) {
   assertConfigured();
   const url = `${API_BASE}${path}`;
-  const r = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json; charset=utf-8",
-      Accept: "application/json",
-    },
-    body: JSON.stringify(body ?? {}),
-  });
+
+  let r;
+  try {
+    r = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(body ?? {}),
+    });
+  } catch (e) {
+    throw new Error(`Network error (POST ${path}): ${String(e?.message || e)}`);
+  }
+
   const j = await readJson(r);
-  if (!r.ok || j?.ok === false) throw new Error(pickErr(j, `POST ${path} failed`));
+
+  if (!r.ok) {
+    throw new Error(pickErr(j, `POST ${path} failed (${r.status})`));
+  }
+
   return j;
 }

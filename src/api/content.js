@@ -6,10 +6,10 @@ export async function getContentByProposalId(proposalId) {
 
   const r = await fetch(apiUrl(`/api/content?proposalId=${encodeURIComponent(proposalId)}`), {
     method: "GET",
-    headers: { Accept: "application/json" },
+    headers: { Accept: "application/json; charset=utf-8" },
   });
 
   const j = await r.json().catch(() => ({}));
   if (!r.ok || !j?.ok) throw new Error(j?.error || `content fetch failed (${r.status})`);
-  return j?.content || null; // content_items row
+  return j?.content || null;
 }

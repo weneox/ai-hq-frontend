@@ -1,4 +1,4 @@
-// src/api/proposals.js (FINAL — matches backend v2.10+ content/proposals routes)
+// src/api/proposals.js (FIXED — tolerant approve/publish responses)
 
 import { apiGet, apiPost } from "./client.js";
 
@@ -10,21 +10,16 @@ import { apiGet, apiPost } from "./client.js";
 function mapUiStatusToBackend(status) {
   const s = String(status || "").toLowerCase();
 
-  // Draft tab should show "drafting" items
+  // Draft tab should show drafting items
   if (s === "draft" || s === "drafting") return "in_progress";
 
   if (s === "approved") return "approved";
   if (s === "published") return "published";
   if (s === "rejected") return "rejected";
 
-  // safety
   return "in_progress";
 }
 
-/**
- * List proposals by UI tab status.
- * ✅ Always include latestContent + pack for Draft Studio.
- */
 export async function listProposals(status = "draft") {
   const backendStatus = mapUiStatusToBackend(status);
   const s = encodeURIComponent(backendStatus);
@@ -35,10 +30,6 @@ export async function listProposals(status = "draft") {
   return j?.proposals || [];
 }
 
-/**
- * Decision endpoint (used for reject in UI)
- * POST /api/proposals/:id/decision  { decision:"approved"|"rejected", reason? }
- */
 export async function decideProposal(id, decision, reason) {
   const pid = encodeURIComponent(String(id));
   return apiPost(`/api/proposals/${pid}/decision`, {
@@ -51,39 +42,42 @@ export async function decideProposal(id, decision, reason) {
 // Draft actions (content_items)
 // ==========================
 
-/**
- * Request changes (regenerate draft)
- * POST /api/content/:contentId/feedback  { feedbackText, tenantId? }
- */
-export async function requestDraftChanges(proposalId, contentId, feedback) {
+export async function requestDraftChanges(_proposalId, contentId, feedback) {
   const did = encodeURIComponent(String(contentId));
   const fb = String(feedback || "").trim();
 
-  return apiPost(`/api/content/${did}/feedback`, {
-    proposalId: String(proposalId || ""),
-    draftId: String(contentId || ""),
+  // backend only needs feedbackText (proposalId/draftId artıq şərt deyil)
+  const j = await apiPost(`/api/content/${did}/feedback`, {
     feedbackText: fb,
-    feedback: fb,
   });
+
+  // normalize return (UI-safe)
+  return {
+    ok: !!j?.ok,
+    content: j?.content || null,
+    jobId: j?.jobId || j?.job_id || null,
+    error: j?.ok ? null : (j?.error || "feedback failed"),
+  };
 }
 
 /**
- * Approve draft
- * POST /api/content/:contentId/approve
+ * Approve draft:
+ * NEW FLOW: approve => asset generation request (no proposal object required)
  */
-export async function approveDraft(proposalId, contentId) {
+export async function approveDraft(_proposalId, contentId) {
   const did = encodeURIComponent(String(contentId));
 
-  return apiPost(`/api/content/${did}/approve`, {
-    proposalId: String(proposalId || ""),
-    draftId: String(contentId || ""),
-  });
+  const j = await apiPost(`/api/content/${did}/approve`, {});
+
+  return {
+    ok: !!j?.ok,
+    content: j?.content || null,
+    jobId: j?.jobId || j?.job_id || null,
+    note: j?.note || null,
+    error: j?.ok ? null : (j?.error || "approve failed"),
+  };
 }
 
-/**
- * Reject (THIS IS PROPOSAL DECISION, not content route)
- * POST /api/proposals/:proposalId/decision { decision:"rejected", reason }
- */
 export async function rejectDraft(proposalId, _contentId, reason) {
   const pid = encodeURIComponent(String(proposalId));
   const r = String(reason || "").trim();
@@ -95,14 +89,18 @@ export async function rejectDraft(proposalId, _contentId, reason) {
 }
 
 /**
- * Publish
- * POST /api/content/:contentId/publish
+ * Publish:
+ * backend may require asset.ready depending on your new content.js
  */
-export async function publishDraft(proposalId, contentId) {
+export async function publishDraft(_proposalId, contentId) {
   const did = encodeURIComponent(String(contentId));
 
-  return apiPost(`/api/content/${did}/publish`, {
-    proposalId: String(proposalId || ""),
-    draftId: String(contentId || ""),
-  });
+  const j = await apiPost(`/api/content/${did}/publish`, {});
+
+  return {
+    ok: !!j?.ok,
+    content: j?.content || null,
+    jobId: j?.jobId || j?.job_id || null,
+    error: j?.ok ? null : (j?.error || "publish failed"),
+  };
 }
