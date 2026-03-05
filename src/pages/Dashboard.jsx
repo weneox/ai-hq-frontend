@@ -1,553 +1,752 @@
-// src/pages/Dashboard.jsx (ULTRA PREMIUM v1 — AI HQ Command Center)
-// ✅ Full redesign: premium hero, KPI grid, AI Team (robots), Ops feed, Quick actions
-// ✅ No extra deps required (only your existing ui components + lucide-react)
-// ✅ Easy to connect real API later
+// src/pages/Dashboard.jsx (MISSION CONTROL — ELITE v3.0)
+// ✅ Same layout: Map (ReactFlow) + Right Queue + Bottom Signals + Drawer
+// ✅ Premium admin feel: hover lift, sheen, stronger depth, active states
+// ✅ Mobile optimized: stacked layout, drawer full width on mobile
+// ✅ Keeps: reactflow, framer-motion, recharts, dayjs, lucide-react
 
-import { useMemo, useState } from "react";
-import Card from "../components/ui/Card.jsx";
-import Badge from "../components/ui/Badge.jsx";
-import Button from "../components/ui/Button.jsx";
-import Input from "../components/ui/Input.jsx";
+import { useMemo, useState, useEffect, useCallback } from "react";
+import dayjs from "dayjs";
+import { motion, AnimatePresence } from "framer-motion";
+import ReactFlow, {
+  Background,
+  Controls,
+  MiniMap,
+  useNodesState,
+  useEdgesState,
+} from "reactflow";
+import "reactflow/dist/style.css";
 
 import {
-  Sparkles,
+  Command,
+  Search,
+  Bell,
   Shield,
-  Activity,
-  Zap,
-  ChevronRight,
-  Rocket,
-  RefreshCw,
-  Crown,
-  Bot,
-  Cpu,
-  Radar,
+  Sparkles,
+  ArrowRight,
+  X,
+  CheckCircle2,
   Timer,
+  Flame,
+  TrendingUp,
+  Play,
+  Pause,
+  RefreshCw,
+  Eye,
+  Activity,
+  ArrowUpRight,
 } from "lucide-react";
 
-/** --------------------------------
- *  Mini helpers
- * -------------------------------- */
-function clamp01(x) {
-  const n = Number(x);
-  if (!Number.isFinite(n)) return 0;
-  return Math.max(0, Math.min(1, n));
-}
-function pct(n) {
-  const v = Math.round(clamp01(n) * 100);
-  return `${v}%`;
-}
-function nowIso() {
-  return new Date().toISOString();
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+} from "recharts";
+
+function cx(...a) {
+  return a.filter(Boolean).join(" ");
 }
 
-/** --------------------------------
- *  Robot avatar (NO humans)
- *  - purely SVG, premium, subtle
- * -------------------------------- */
-function RobotAvatar({ tone = "indigo", size = 44 }) {
-  const s = Number(size) || 44;
+function fmtPct(n) {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return "—";
+  return `${Math.round(v * 100)}%`;
+}
 
+function shortId(id) {
+  const s = String(id || "");
+  if (s.length <= 10) return s || "—";
+  return `${s.slice(0, 6)}…${s.slice(-4)}`;
+}
+
+function toneCls(tone) {
+  if (tone === "success") return "from-emerald-400/18 via-emerald-400/6";
+  if (tone === "warn") return "from-amber-400/18 via-amber-400/6";
+  if (tone === "danger") return "from-rose-400/18 via-rose-400/6";
+  if (tone === "info") return "from-cyan-400/18 via-cyan-400/6";
+  return "from-white/10 via-white/5";
+}
+
+function Pill({ tone = "neutral", children, className }) {
+  const cls =
+    tone === "success"
+      ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-200"
+      : tone === "warn"
+      ? "border-amber-400/20 bg-amber-400/10 text-amber-200"
+      : tone === "danger"
+      ? "border-rose-400/20 bg-rose-400/10 text-rose-200"
+      : tone === "info"
+      ? "border-cyan-400/20 bg-cyan-400/10 text-cyan-200"
+      : "border-white/10 bg-white/5 text-slate-200";
+
+  return (
+    <span
+      className={cx(
+        "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold tracking-wide",
+        "shadow-[0_1px_0_rgba(255,255,255,0.06)]",
+        cls,
+        className
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+/** Premium button (no external deps) */
+function ActionButton({ variant = "ghost", children, className, ...props }) {
+  const v =
+    variant === "primary"
+      ? "bg-white text-[#050712] hover:opacity-95"
+      : variant === "soft"
+      ? "border border-white/12 bg-white/[0.06] text-white hover:bg-white/[0.10]"
+      : "border border-white/10 bg-white/[0.04] text-white hover:bg-white/[0.08]";
+
+  return (
+    <button
+      className={cx(
+        "relative inline-flex items-center justify-center gap-2",
+        "rounded-2xl px-4 py-3 text-sm font-semibold",
+        "transition-[transform,box-shadow,background-color,border-color] duration-200",
+        "active:translate-y-[1px]",
+        "hover:-translate-y-[1px]",
+        "shadow-[0_18px_60px_rgba(0,0,0,0.45)] hover:shadow-[0_30px_90px_rgba(0,0,0,0.62)]",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20",
+        v,
+        className
+      )}
+      {...props}
+    >
+      {/* sheen */}
+      <span
+        className={cx(
+          "pointer-events-none absolute inset-0 rounded-2xl opacity-0",
+          "transition-opacity duration-200",
+          "group-hover:opacity-100"
+        )}
+      />
+      <span className="relative z-10">{children}</span>
+      <span
+        className={cx(
+          "pointer-events-none absolute inset-0 rounded-2xl",
+          "[mask-image:radial-gradient(900px_circle_at_30%_-20%,black,transparent_55%)]"
+        )}
+      >
+        <span className="absolute inset-0 bg-gradient-to-b from-white/14 to-transparent opacity-70" />
+      </span>
+    </button>
+  );
+}
+
+function MetricChip({ icon, label, value, tone = "neutral" }) {
+  return (
+    <div
+      className={cx(
+        "group relative rounded-2xl border px-4 py-3",
+        "border-white/10 bg-white/[0.035] backdrop-blur",
+        "shadow-[0_22px_90px_rgba(0,0,0,0.40)]",
+        "transition-[transform,box-shadow,background-color,border-color] duration-200",
+        "hover:-translate-y-[2px] hover:bg-white/[0.05] hover:border-white/14",
+        "hover:shadow-[0_36px_130px_rgba(0,0,0,0.62)]"
+      )}
+    >
+      <div
+        className={cx(
+          "pointer-events-none absolute -inset-px rounded-2xl opacity-0 blur-[18px]",
+          "bg-gradient-to-br",
+          toneCls(tone),
+          "to-transparent",
+          "group-hover:opacity-90"
+        )}
+        aria-hidden="true"
+      />
+
+      <div className="relative z-10 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-300/80">
+            <span className="opacity-80">{icon}</span>
+            <span className="uppercase tracking-wider">{label}</span>
+          </div>
+          <div className="mt-1 text-[26px] font-semibold tracking-tight text-white">{value}</div>
+        </div>
+        <Pill tone={tone}>{tone === "neutral" ? "LIVE" : tone}</Pill>
+      </div>
+    </div>
+  );
+}
+
+function Drawer({ open, onClose, title, children }) {
+  return (
+    <AnimatePresence>
+      {open ? (
+        <>
+          <motion.div
+            className="fixed inset-0 z-40 bg-black/60"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+          />
+          <motion.aside
+            className={cx(
+              "fixed right-0 top-0 z-50 h-full w-[460px] max-w-[96vw]",
+              "border-l border-white/10 bg-[#070A12]/92 backdrop-blur-xl",
+              "shadow-[-50px_0_140px_rgba(0,0,0,0.72)]"
+            )}
+            initial={{ x: 36, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: 36, opacity: 0 }}
+            transition={{ duration: 0.22 }}
+          >
+            <div className="flex items-start justify-between gap-3 p-5">
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-white">{title}</div>
+                <div className="mt-1 text-xs text-slate-300/70">CEO decisions / details</div>
+              </div>
+              <button
+                onClick={onClose}
+                className="rounded-2xl border border-white/10 bg-white/5 p-2 text-slate-200 hover:bg-white/10 transition"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="h-[1px] bg-white/10" />
+            <div className="p-5 overflow-auto h-[calc(100%-72px)]">{children}</div>
+          </motion.aside>
+        </>
+      ) : null}
+    </AnimatePresence>
+  );
+}
+
+function NodeBox({ title, subtitle, tone = "neutral", status }) {
   const ring =
-    tone === "emerald"
-      ? "from-emerald-400/55 via-cyan-400/40 to-indigo-500/40"
-      : tone === "cyan"
-      ? "from-cyan-400/55 via-indigo-400/35 to-emerald-400/35"
-      : tone === "amber"
-      ? "from-amber-400/55 via-rose-400/25 to-indigo-500/35"
-      : "from-indigo-400/55 via-cyan-400/35 to-emerald-400/35";
+    tone === "success"
+      ? "ring-emerald-400/25"
+      : tone === "warn"
+      ? "ring-amber-400/25"
+      : tone === "info"
+      ? "ring-cyan-400/25"
+      : tone === "danger"
+      ? "ring-rose-400/25"
+      : "ring-white/15";
+
+  const dot =
+    tone === "success"
+      ? "bg-emerald-400"
+      : tone === "warn"
+      ? "bg-amber-400"
+      : tone === "info"
+      ? "bg-cyan-400"
+      : tone === "danger"
+      ? "bg-rose-400"
+      : "bg-slate-400";
 
   return (
     <div
-      className={[
-        "relative shrink-0 rounded-2xl",
-        "border border-slate-200/70 bg-white/70 backdrop-blur",
-        "dark:border-slate-800/70 dark:bg-slate-950/35",
-        "shadow-[0_1px_0_rgba(15,23,42,0.05)]",
-      ].join(" ")}
-      style={{ width: s, height: s }}
+      className={cx(
+        "group min-w-[240px] rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-4",
+        "shadow-[0_34px_160px_rgba(0,0,0,0.58)]",
+        "ring-1",
+        ring,
+        "transition-[transform,box-shadow,background-color,border-color] duration-200",
+        "hover:-translate-y-[2px] hover:bg-white/[0.055] hover:border-white/14",
+        "hover:shadow-[0_44px_190px_rgba(0,0,0,0.72)]"
+      )}
     >
       <div
-        className={[
-          "absolute -inset-px rounded-2xl opacity-70 blur-[10px]",
+        className={cx(
+          "pointer-events-none absolute -inset-px rounded-2xl opacity-0 blur-[18px]",
           "bg-gradient-to-br",
-          ring,
+          toneCls(tone),
           "to-transparent",
-        ].join(" ")}
+          "group-hover:opacity-85"
+        )}
         aria-hidden="true"
       />
-      <div className="relative z-10 h-full w-full grid place-items-center">
-        <svg width={Math.floor(s * 0.72)} height={Math.floor(s * 0.72)} viewBox="0 0 64 64" aria-hidden="true">
-          <defs>
-            <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stopColor="currentColor" stopOpacity="0.85" />
-              <stop offset="1" stopColor="currentColor" stopOpacity="0.35" />
-            </linearGradient>
-          </defs>
 
-          {/* antenna */}
-          <path d="M32 6v8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" opacity="0.55" />
-          <circle cx="32" cy="6" r="3" fill="currentColor" opacity="0.6" />
-
-          {/* head */}
-          <rect
-            x="14"
-            y="16"
-            width="36"
-            height="28"
-            rx="10"
-            fill="url(#g1)"
-            opacity="0.9"
-            stroke="currentColor"
-            strokeOpacity="0.22"
-          />
-
-          {/* eyes */}
-          <circle cx="26" cy="30" r="3.2" fill="currentColor" opacity="0.78" />
-          <circle cx="38" cy="30" r="3.2" fill="currentColor" opacity="0.78" />
-          <rect x="24" y="36" width="16" height="3.6" rx="2" fill="currentColor" opacity="0.45" />
-
-          {/* body */}
-          <rect
-            x="18"
-            y="44"
-            width="28"
-            height="12"
-            rx="6"
-            fill="currentColor"
-            opacity="0.18"
-            stroke="currentColor"
-            strokeOpacity="0.16"
-          />
-          <circle cx="32" cy="50" r="2.6" fill="currentColor" opacity="0.35" />
-        </svg>
+      <div className="relative z-10 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold text-white">{title}</div>
+          <div className="mt-1 text-xs text-slate-300/70">{subtitle}</div>
+        </div>
+        <div className="shrink-0 flex items-center gap-2">
+          <span className={cx("h-2 w-2 rounded-full", dot)} />
+          <span className="text-[11px] font-semibold text-slate-200/80 uppercase tracking-wider">
+            {status}
+          </span>
+        </div>
       </div>
     </div>
   );
 }
 
-/** --------------------------------
- *  KPI Card (premium)
- * -------------------------------- */
-function Kpi({ title, value, sub, tone = "neutral", icon }) {
-  const topGlow =
-    tone === "success"
-      ? "from-emerald-400/35 via-cyan-400/18"
-      : tone === "warn"
-      ? "from-amber-400/35 via-rose-400/12"
-      : tone === "info"
-      ? "from-indigo-400/35 via-cyan-400/18"
-      : tone === "danger"
-      ? "from-rose-400/35 via-amber-400/10"
-      : "from-slate-300/35 via-slate-200/10";
-
-  return (
-    <Card variant="elevated" padded={false} className="min-w-0 overflow-hidden">
-      <div className="relative">
-        <div className={`h-1 w-full bg-gradient-to-r ${topGlow} to-transparent`} />
-        <div className="p-4 md:p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">{title}</div>
-              <div className="mt-1 text-[28px] leading-none font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-                {value}
-              </div>
-              {sub ? <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">{sub}</div> : null}
-              <div className="mt-3">
-                <Badge tone={tone}>{tone === "neutral" ? "Live" : tone}</Badge>
-              </div>
-            </div>
-
-            <div
-              className={[
-                "shrink-0 rounded-2xl p-3",
-                "border border-slate-200/70 bg-white/70 backdrop-blur",
-                "dark:border-slate-800/70 dark:bg-slate-950/30",
-              ].join(" ")}
-            >
-              {icon}
-            </div>
-          </div>
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-/** --------------------------------
- *  Agent Card
- * -------------------------------- */
-function AgentCard({ name, role, status = "online", tone = "indigo", meta }) {
-  const online = status === "online";
-  return (
-    <Card variant="panel" padded="lg" className="min-w-0">
-      <div className="flex items-start gap-4 min-w-0">
-        <div className="text-slate-900 dark:text-white">
-          <RobotAvatar tone={tone} />
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{name}</div>
-              <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{role}</div>
-            </div>
-
-            <Badge tone={online ? "success" : "neutral"}>{online ? "online" : "idle"}</Badge>
-          </div>
-
-          {meta ? (
-            <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-slate-600 dark:text-slate-300">
-              <div className="rounded-xl border border-slate-200 bg-white/60 px-2.5 py-2 dark:border-slate-800 dark:bg-slate-950/25">
-                <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Focus</div>
-                <div className="mt-0.5">{meta.focus}</div>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-white/60 px-2.5 py-2 dark:border-slate-800 dark:bg-slate-950/25">
-                <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Queue</div>
-                <div className="mt-0.5">{meta.queue}</div>
-              </div>
-            </div>
-          ) : null}
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-/** --------------------------------
- *  Ops feed item
- * -------------------------------- */
-function FeedItem({ title, desc, tag, tone = "info", time }) {
-  return (
-    <div className="flex items-start gap-3">
-      <div
-        className={[
-          "mt-1 h-9 w-1 rounded-full shrink-0",
-          tone === "success"
-            ? "bg-gradient-to-b from-emerald-400/80 via-cyan-400/50 to-transparent"
-            : tone === "warn"
-            ? "bg-gradient-to-b from-amber-400/80 via-rose-400/35 to-transparent"
-            : tone === "danger"
-            ? "bg-gradient-to-b from-rose-400/85 via-amber-400/25 to-transparent"
-            : "bg-gradient-to-b from-indigo-400/80 via-cyan-400/45 to-transparent",
-        ].join(" ")}
-        aria-hidden="true"
-      />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</div>
-            {desc ? <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{desc}</div> : null}
-          </div>
-          <div className="shrink-0 flex items-center gap-2">
-            {tag ? <Badge tone={tone}>{tag}</Badge> : null}
-            {time ? <span className="text-[11px] text-slate-400 dark:text-slate-500">{time}</span> : null}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+const nodeTypes = {
+  box: ({ data }) => (
+    <NodeBox title={data.title} subtitle={data.subtitle} tone={data.tone} status={data.status} />
+  ),
+};
 
 export default function Dashboard() {
-  // Later you will replace these with real API data
-  const kpis = useMemo(
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selectedDecision, setSelectedDecision] = useState(null);
+  const [search, setSearch] = useState("");
+  const [paused, setPaused] = useState(false);
+
+  const now = useMemo(() => dayjs(), []);
+
+  const metrics = useMemo(
     () => ({
-      todayDrafts: 7,
-      queue: 2,
-      execSuccess: 0.94,
-      health: "OK",
+      draftsToday: 1,
+      approvals: 2,
+      publishReady: 0,
+      success7d: 0.94,
     }),
     []
   );
 
-  const [search, setSearch] = useState("");
-
-  // Dynamic agents (later: fetch /api/agents)
-  const agents = useMemo(
-    () => [
-      { name: "Orion", role: "Strategy & Growth", tone: "indigo", meta: { focus: "Daily IG Draft", queue: "2 tasks" } },
-      { name: "Nova", role: "Creative Director", tone: "cyan", meta: { focus: "Visual layout", queue: "1 task" } },
-      { name: "Atlas", role: "Ops & Execution", tone: "emerald", meta: { focus: "Publish pipeline", queue: "0 tasks" } },
-      { name: "Echo", role: "Analytics & QA", tone: "amber", meta: { focus: "Performance review", queue: "3 tasks" } },
-    ],
-    []
-  );
-
-  const feed = useMemo(
+  const decisions = useMemo(
     () => [
       {
-        title: "Daily draft created",
-        desc: "Format: IG carousel · Draft Studio is ready for review.",
-        tag: "proposal",
-        tone: "info",
-        time: "just now",
-      },
-      {
-        title: "n8n: Content Pack Builder",
-        desc: "Execution completed · assets plan prepared.",
-        tag: "execution",
-        tone: "success",
-        time: "12m ago",
-      },
-      {
-        title: "Publish workflow idle",
-        desc: "Waiting for CEO approval to publish.",
-        tag: "publish",
+        id: "8aa468ab-9c64-44bc-ab94-7919e4974dc6",
+        type: "Draft",
         tone: "warn",
-        time: "1h ago",
+        title: "Approve today’s draft",
+        subtitle: "Caption + hashtags + layout instructions ready.",
+        age: "now",
+      },
+      {
+        id: "5fcb64c7-f241-4bb9-a1ae-f8fbc9aae7fe",
+        type: "Execution",
+        tone: "info",
+        title: "Review content pack",
+        subtitle: "Validate structure, tone, and compliance.",
+        age: "12m",
+      },
+      {
+        id: "job-0003",
+        type: "Publish",
+        tone: "neutral",
+        title: "Publish gate locked",
+        subtitle: "Waiting for CEO approval — no auto-publish.",
+        age: "1h",
       },
     ],
     []
   );
 
-  const filteredAgents = agents.filter((a) => {
+  const filteredDecisions = useMemo(() => {
     const q = String(search || "").trim().toLowerCase();
-    if (!q) return true;
-    return (
-      a.name.toLowerCase().includes(q) ||
-      a.role.toLowerCase().includes(q) ||
-      String(a.meta?.focus || "").toLowerCase().includes(q)
-    );
-  });
+    if (!q) return decisions;
+    return decisions.filter((d) => {
+      return (
+        d.title.toLowerCase().includes(q) ||
+        d.subtitle.toLowerCase().includes(q) ||
+        String(d.type).toLowerCase().includes(q) ||
+        String(d.id).toLowerCase().includes(q)
+      );
+    });
+  }, [decisions, search]);
+
+  const chart = useMemo(
+    () => [
+      { d: "Mon", v: 68 },
+      { d: "Tue", v: 74 },
+      { d: "Wed", v: 71 },
+      { d: "Thu", v: 78 },
+      { d: "Fri", v: 82 },
+      { d: "Sat", v: 76 },
+      { d: "Sun", v: 84 },
+    ],
+    []
+  );
+
+  const initialNodes = useMemo(
+    () => [
+      {
+        id: "n1",
+        type: "box",
+        position: { x: 0, y: 70 },
+        data: { title: "DRAFT", subtitle: "Create daily draft (10:00 Asia/Baku)", tone: "success", status: "READY" },
+      },
+      {
+        id: "n2",
+        type: "box",
+        position: { x: 320, y: 0 },
+        data: { title: "ASSETS PLAN", subtitle: "Image/Video/Voice prompts + layout blueprint", tone: "info", status: "RUNNING" },
+      },
+      {
+        id: "n3",
+        type: "box",
+        position: { x: 320, y: 160 },
+        data: { title: "CEO REVIEW", subtitle: "Approve draft or request changes", tone: "warn", status: "WAITING" },
+      },
+      {
+        id: "n4",
+        type: "box",
+        position: { x: 680, y: 70 },
+        data: { title: "PUBLISH", subtitle: "Meta publish workflow (locked until approval)", tone: "neutral", status: "LOCKED" },
+      },
+    ],
+    []
+  );
+
+  const initialEdges = useMemo(
+    () => [
+      { id: "e1-2", source: "n1", target: "n2", animated: true, style: { stroke: "rgba(255,255,255,0.22)" } },
+      { id: "e1-3", source: "n1", target: "n3", animated: true, style: { stroke: "rgba(255,255,255,0.22)" } },
+      { id: "e2-4", source: "n2", target: "n4", style: { stroke: "rgba(255,255,255,0.18)" } },
+      { id: "e3-4", source: "n3", target: "n4", style: { stroke: "rgba(255,255,255,0.18)" } },
+    ],
+    []
+  );
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+  useEffect(() => {
+    if (paused) return;
+    const t = setInterval(() => {
+      setNodes((ns) =>
+        ns.map((n) => {
+          if (n.id !== "n2") return n;
+          return {
+            ...n,
+            data: {
+              ...n.data,
+              subtitle:
+                Math.random() > 0.5
+                  ? "Image/Video/Voice prompts + layout blueprint"
+                  : "Packaging assets plan for CEO preview",
+            },
+          };
+        })
+      );
+    }, 3200);
+    return () => clearInterval(t);
+  }, [paused, setNodes]);
+
+  const openDecision = useCallback((d) => {
+    setSelectedDecision(d);
+    setDrawerOpen(true);
+  }, []);
 
   return (
-    <div className="min-w-0 space-y-5">
-      {/* HERO — Command Center */}
-      <Card variant="glass" padded={false} className="overflow-hidden">
-        <div className="h-1 bg-gradient-to-r from-indigo-500/60 via-cyan-400/40 to-emerald-400/40" />
+    <div className="min-w-0">
+      <div className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#050712]">
+        {/* ambient glows */}
+        <div className="pointer-events-none absolute -left-40 -top-40 h-[520px] w-[520px] rounded-full bg-cyan-500/10 blur-[90px]" />
+        <div className="pointer-events-none absolute -right-40 -top-48 h-[520px] w-[520px] rounded-full bg-indigo-500/10 blur-[90px]" />
+        <div className="pointer-events-none absolute left-1/3 -bottom-72 h-[620px] w-[620px] rounded-full bg-emerald-500/8 blur-[110px]" />
+        {/* soft vignette */}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/0 via-black/0 to-black/35" />
 
-        <div className="p-5 md:p-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between min-w-0">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <div className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white/70 px-3 py-2 text-sm font-semibold text-slate-900 shadow-[0_1px_0_rgba(15,23,42,0.04)] dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-100">
-                  <Crown className="h-4 w-4 opacity-80" />
-                  AI HQ · Command Center
-                </div>
-
-                <Badge tone="info">Founder: Emil Bagirov</Badge>
-                <Badge tone="success">Realtime: Ready</Badge>
-                <Badge tone="neutral">Pipeline: Draft → Approve → Publish</Badge>
-              </div>
-
-              <div className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-                Control your AI workforce: daily drafts, approvals, executions, publish — all in one place.
-              </div>
+        {/* TOP BAR */}
+        <div className="relative z-10 flex items-center justify-between gap-4 px-4 sm:px-6 py-5">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="grid h-11 w-11 place-items-center rounded-2xl border border-white/10 bg-white/5">
+              <Command className="h-5 w-5 text-white/90" />
             </div>
-
-            <div className="flex items-center gap-2 justify-end">
-              <div className="w-[320px] max-w-[70vw] hidden md:block">
-                <Input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search agents / focus…"
-                />
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-white">AI HQ — Mission Control</div>
+              <div className="mt-0.5 text-xs text-slate-300/70">
+                {now.format("dddd, D MMM")} · Asia/Baku · CEO-first governance
               </div>
-              <Button variant="outline" size="md" onClick={() => setSearch("")}>
-                <RefreshCw className="h-4 w-4" />
-                Reset
-              </Button>
-              <Button variant="primary" size="md" onClick={() => alert("Later: trigger daily draft")}>
-                <Rocket className="h-4 w-4" />
-                Run daily draft
-                <ChevronRight className="h-4 w-4 opacity-80" />
-              </Button>
             </div>
           </div>
+
+          <div className="flex items-center gap-2">
+            <div className="hidden lg:flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
+              <Search className="h-4 w-4 text-slate-200/70" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search decisions…"
+                className="w-[320px] bg-transparent text-sm text-white placeholder:text-slate-300/50 outline-none"
+              />
+              {search ? (
+                <button
+                  onClick={() => setSearch("")}
+                  className="rounded-xl border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-semibold text-slate-200 hover:bg-white/10"
+                >
+                  Clear
+                </button>
+              ) : null}
+            </div>
+
+            <ActionButton variant="soft" onClick={() => alert("Later: notifications")} title="Notifications">
+              <Bell className="h-4 w-4" />
+            </ActionButton>
+
+            <ActionButton variant="soft" onClick={() => setPaused((v) => !v)} title="Pause live">
+              {paused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+            </ActionButton>
+          </div>
         </div>
-      </Card>
 
-      {/* KPIs */}
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Kpi
-          title="Today drafts"
-          value={kpis.todayDrafts}
-          sub="Auto created at 10:00 (Asia/Baku)"
-          tone="info"
-          icon={<Sparkles className="h-5 w-5 text-slate-900 dark:text-white opacity-80" />}
-        />
-        <Kpi
-          title="Queue"
-          value={kpis.queue}
-          sub="Waiting for your approval"
-          tone="warn"
-          icon={<Timer className="h-5 w-5 text-slate-900 dark:text-white opacity-80" />}
-        />
-        <Kpi
-          title="Execution success"
-          value={pct(kpis.execSuccess)}
-          sub="Last 7 days avg"
-          tone="success"
-          icon={<Zap className="h-5 w-5 text-slate-900 dark:text-white opacity-80" />}
-        />
-        <Kpi
-          title="System health"
-          value={kpis.health}
-          sub="WS + DB stable"
-          tone="success"
-          icon={<Shield className="h-5 w-5 text-slate-900 dark:text-white opacity-80" />}
-        />
-      </div>
-
-      {/* Main grid */}
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px] items-start">
-        {/* LEFT */}
-        <div className="min-w-0 space-y-4">
-          {/* AI TEAM */}
-          <Card variant="panel" padded={false} className="overflow-hidden">
-            <div className="p-5 border-b border-slate-200/70 dark:border-slate-800/70">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <Bot className="h-4 w-4 opacity-70" />
-                    <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">AI Team (Robots)</div>
-                  </div>
-                  <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    New agents will appear here automatically.
-                  </div>
-                </div>
-                <Badge tone="info">{filteredAgents.length} active</Badge>
+        {/* HERO */}
+        <div className="relative z-10 px-4 sm:px-6 pb-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="min-w-0">
+              <div className="text-[34px] sm:text-[40px] leading-[1.05] font-semibold tracking-tight text-white">
+                Control the day. Approve fast. Publish clean.
               </div>
-            </div>
-
-            <div className="p-4 grid gap-3 md:grid-cols-2">
-              {filteredAgents.map((a) => (
-                <AgentCard key={a.name} name={a.name} role={a.role} tone={a.tone} meta={a.meta} status="online" />
-              ))}
-            </div>
-          </Card>
-
-          {/* QUICK CONTROL */}
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card variant="soft" padded="lg">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Workflow controls</div>
-                  <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    Manual approvals + publish gate (CEO-first governance).
-                  </div>
-                </div>
-                <Cpu className="h-5 w-5 opacity-70" />
+              <div className="mt-2 text-sm text-slate-300/75 max-w-[72ch]">
+                A calm executive surface. The map is the product: Draft → Assets → Review → Publish.
               </div>
 
               <div className="mt-4 flex flex-wrap gap-2">
-                <Button variant="outline" size="md" onClick={() => alert("Later: open Proposals tab")}>
-                  Open Proposals
-                </Button>
-                <Button variant="outline" size="md" onClick={() => alert("Later: open Executions tab")}>
-                  Open Executions
-                </Button>
-                <Button variant="primary" size="md" onClick={() => alert("Later: publish pipeline")}>
-                  Publish Center
-                  <ChevronRight className="h-4 w-4 opacity-80" />
-                </Button>
+                <Pill tone="success">
+                  <Shield className="h-4 w-4 opacity-80" />
+                  WS Online
+                </Pill>
+                <Pill tone="info">
+                  <Sparkles className="h-4 w-4 opacity-80" />
+                  Daily draft 10:00
+                </Pill>
+                <Pill tone="neutral">
+                  <Timer className="h-4 w-4 opacity-80" />
+                  Manual mode
+                </Pill>
               </div>
+            </div>
 
-              <div className="mt-4 rounded-2xl border border-slate-200 bg-white/60 p-4 dark:border-slate-800 dark:bg-slate-950/25">
-                <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Status</div>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <Badge tone="info">Mode: Manual</Badge>
-                  <Badge tone="success">WS: Online</Badge>
-                  <Badge tone="neutral">Last sync: {new Date().toLocaleTimeString()}</Badge>
-                </div>
-              </div>
-            </Card>
+            <div className="flex flex-wrap gap-2">
+              <ActionButton variant="primary" onClick={() => alert("Later: trigger daily draft")}>
+                Run daily draft <ArrowRight className="h-4 w-4" />
+              </ActionButton>
 
-            <Card variant="soft" padded="lg">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Insight</div>
-                  <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    What matters today: keep cadence, approve drafts fast, publish on time.
-                  </div>
-                </div>
-                <Radar className="h-5 w-5 opacity-70" />
-              </div>
+              <ActionButton variant="soft" onClick={() => alert("Later: open drafts")}>
+                Review drafts <Eye className="h-4 w-4" />
+              </ActionButton>
 
-              <div className="mt-4 space-y-2">
-                <div className="rounded-2xl border border-slate-200 bg-white/60 p-4 dark:border-slate-800 dark:bg-slate-950/25">
-                  <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Priority</div>
-                  <div className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
-                    Approve today’s draft
-                  </div>
-                  <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    So that assets can be generated & prepared for publish.
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Badge tone="warn">2 approvals pending</Badge>
-                <Badge tone="success">94% success</Badge>
-              </div>
-            </Card>
+              <ActionButton variant="soft" onClick={() => setSearch("")}>
+                Reset <RefreshCw className="h-4 w-4" />
+              </ActionButton>
+            </div>
           </div>
         </div>
 
-        {/* RIGHT */}
-        <div className="min-w-0 space-y-4">
-          {/* OPS FEED */}
-          <Card variant="panel" padded={false} className="overflow-hidden">
-            <div className="p-5 border-b border-slate-200/70 dark:border-slate-800/70">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <Activity className="h-4 w-4 opacity-70" />
-                    <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Ops feed</div>
-                  </div>
-                  <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    Realtime events (WS) will stream here.
-                  </div>
-                </div>
-                <Badge tone="success">Live</Badge>
-              </div>
-            </div>
+        {/* METRICS */}
+        <div className="relative z-10 px-4 sm:px-6 pb-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <MetricChip icon={<Sparkles className="h-4 w-4" />} label="Drafts today" value={metrics.draftsToday} tone="info" />
+          <MetricChip icon={<Flame className="h-4 w-4" />} label="Approvals" value={metrics.approvals} tone="warn" />
+          <MetricChip icon={<Shield className="h-4 w-4" />} label="Publish ready" value={metrics.publishReady} tone="neutral" />
+          <MetricChip icon={<TrendingUp className="h-4 w-4" />} label="Success (7d)" value={fmtPct(metrics.success7d)} tone="success" />
+        </div>
 
-            <div className="p-4 space-y-4">
-              {feed.map((x, i) => (
-                <FeedItem key={i} title={x.title} desc={x.desc} tag={x.tag} tone={x.tone} time={x.time} />
-              ))}
-            </div>
-          </Card>
-
-          {/* MINI AUDIT */}
-          <Card variant="soft" padded="lg">
-            <div className="flex items-start justify-between gap-3">
+        {/* MAIN */}
+        <div className="relative z-10 grid gap-4 px-4 sm:px-6 pb-6 xl:grid-cols-[minmax(0,1fr)_400px]">
+          {/* Map */}
+          <div className="min-w-0 rounded-[26px] border border-white/10 bg-white/[0.03] backdrop-blur">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-5 py-4">
               <div className="min-w-0">
-                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Audit snapshot</div>
-                <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">Last security & system check.</div>
+                <div className="text-sm font-semibold text-white">Pipeline Map</div>
+                <div className="mt-1 text-xs text-slate-300/70">
+                  The center is the system. Live map, no “card dashboard” feel.
+                </div>
               </div>
-              <Shield className="h-5 w-5 opacity-70" />
-            </div>
 
-            <div className="mt-4 rounded-2xl border border-slate-200 bg-white/60 p-4 dark:border-slate-800 dark:bg-slate-950/25">
-              <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Last event</div>
-              <div className="mt-1 text-xs text-slate-600 dark:text-slate-300">
-                {nowIso()}
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Badge tone="success">Integrity OK</Badge>
-                <Badge tone="neutral">No alerts</Badge>
+              <div className="flex items-center gap-2">
+                <Pill tone={paused ? "neutral" : "success"}>{paused ? "PAUSED" : "LIVE"}</Pill>
+                <Pill tone="info">
+                  <Activity className="h-4 w-4 opacity-80" />
+                  WS stream
+                </Pill>
               </div>
             </div>
 
-            <div className="mt-4 flex gap-2">
-              <Button variant="outline" size="md" onClick={() => alert("Later: open Alerts")}>
-                Alerts
-              </Button>
-              <Button variant="primary" size="md" onClick={() => alert("Later: open Activity log")}>
-                Activity log
-                <ChevronRight className="h-4 w-4 opacity-80" />
-              </Button>
+            <div className="h-[420px] sm:h-[520px] w-full overflow-hidden rounded-[26px]">
+              <ReactFlow
+                nodes={nodes}
+                edges={edges}
+                onNodesChange={onNodesChange}
+                onEdgesChange={onEdgesChange}
+                nodeTypes={nodeTypes}
+                fitView
+                fitViewOptions={{ padding: 0.22 }}
+                proOptions={{ hideAttribution: true }}
+                nodesDraggable={false}
+                nodesConnectable={false}
+                elementsSelectable={false}
+                panOnDrag
+              >
+                <Background gap={18} size={1} color="rgba(255,255,255,0.06)" />
+                <Controls showInteractive={false} />
+                <MiniMap pannable zoomable />
+              </ReactFlow>
             </div>
-          </Card>
+          </div>
+
+          {/* Queue */}
+          <div className="min-w-0 rounded-[26px] border border-white/10 bg-white/[0.03] backdrop-blur">
+            <div className="flex items-center justify-between gap-3 px-5 py-4">
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-white">CEO Queue</div>
+                <div className="mt-1 text-xs text-slate-300/70">Only what needs your action.</div>
+              </div>
+              <Pill tone="warn">{filteredDecisions.length}</Pill>
+            </div>
+
+            <div className="px-4 pb-4">
+              <div className="lg:hidden mb-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 flex items-center gap-2">
+                <Search className="h-4 w-4 text-slate-200/70" />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search decisions…"
+                  className="w-full bg-transparent text-sm text-white placeholder:text-slate-300/50 outline-none"
+                />
+              </div>
+
+              <div className="space-y-2">
+                {filteredDecisions.map((d) => {
+                  const active = selectedDecision?.id === d.id && drawerOpen;
+
+                  return (
+                    <button
+                      key={d.id}
+                      onClick={() => openDecision(d)}
+                      className={cx(
+                        "group relative w-full rounded-2xl border px-4 py-3 text-left",
+                        "transition-[transform,box-shadow,background-color,border-color] duration-200",
+                        "hover:-translate-y-[2px] active:translate-y-[1px]",
+                        "shadow-[0_20px_80px_rgba(0,0,0,0.42)] hover:shadow-[0_34px_120px_rgba(0,0,0,0.62)]",
+                        active ? "border-white/18 bg-white/[0.10]" : "border-white/10 bg-white/5 hover:bg-white/10"
+                      )}
+                    >
+                      {/* glow */}
+                      <div
+                        className={cx(
+                          "pointer-events-none absolute -inset-px rounded-2xl opacity-0 blur-[18px]",
+                          "bg-gradient-to-br",
+                          toneCls(d.tone),
+                          "to-transparent",
+                          active ? "opacity-100" : "group-hover:opacity-85"
+                        )}
+                        aria-hidden="true"
+                      />
+
+                      <div className="relative z-10 flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-white truncate">{d.title}</div>
+                          <div className="mt-1 text-xs text-slate-300/70 line-clamp-2">{d.subtitle}</div>
+
+                          <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-slate-300/70">
+                            <span className="inline-flex items-center gap-1.5">
+                              <Timer className="h-3.5 w-3.5 opacity-80" />
+                              {d.age}
+                            </span>
+                            <span className="inline-flex items-center gap-1.5">
+                              <span className="h-1.5 w-1.5 rounded-full bg-white/40" />
+                              {shortId(d.id)}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="shrink-0 flex flex-col items-end gap-2">
+                          <Pill tone={d.tone}>{d.type}</Pill>
+                          <span className="text-[11px] text-slate-200/60 inline-flex items-center gap-1">
+                            Open <ArrowUpRight className="h-3.5 w-3.5" />
+                          </span>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+
+                {filteredDecisions.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-white/15 bg-white/3 px-4 py-6 text-sm text-slate-300/70">
+                    No results.
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Signals */}
+        <div className="relative z-10 px-4 sm:px-6 pb-6">
+          <div className="rounded-[26px] border border-white/10 bg-white/[0.03] backdrop-blur">
+            <div className="flex items-center justify-between gap-3 px-5 py-4">
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-white">Signals</div>
+                <div className="mt-1 text-xs text-slate-300/70">Weekly performance signal (demo).</div>
+              </div>
+              <Pill tone="success">OK</Pill>
+            </div>
+
+            <div className="px-5 pb-5 h-[240px] sm:h-[280px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chart} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                  <XAxis dataKey="d" tickLine={false} axisLine={false} tick={{ fill: "rgba(226,232,240,0.70)", fontSize: 12 }} />
+                  <YAxis tickLine={false} axisLine={false} width={30} tick={{ fill: "rgba(226,232,240,0.55)", fontSize: 12 }} />
+                  <Tooltip
+                    contentStyle={{
+                      background: "rgba(7,10,18,0.92)",
+                      border: "1px solid rgba(255,255,255,0.12)",
+                      borderRadius: 14,
+                      color: "white",
+                      boxShadow: "0 30px 100px rgba(0,0,0,0.65)",
+                    }}
+                    labelStyle={{ color: "rgba(226,232,240,0.8)" }}
+                    cursor={{ stroke: "rgba(255,255,255,0.08)" }}
+                  />
+                  <Line type="monotone" dataKey="v" stroke="rgba(56,189,248,0.9)" strokeWidth={2.4} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Footer note */}
-      <div className="text-[11px] text-slate-400 dark:text-slate-500">
-        AI HQ · CEO Command Center · Premium UI build (robots only)
-      </div>
+      {/* Drawer */}
+      <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title={selectedDecision ? selectedDecision.title : "Decision"}>
+        {!selectedDecision ? (
+          <div className="text-sm text-slate-200/80">Select an item from the queue.</div>
+        ) : (
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-white">{selectedDecision.title}</div>
+                  <div className="mt-1 text-xs text-slate-300/70">{selectedDecision.subtitle}</div>
+                </div>
+                <Pill tone={selectedDecision.tone}>{selectedDecision.type}</Pill>
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                  <div className="text-[11px] font-semibold text-slate-300/70 uppercase tracking-wider">ID</div>
+                  <div className="mt-1 text-sm font-semibold text-white">{shortId(selectedDecision.id)}</div>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                  <div className="text-[11px] font-semibold text-slate-300/70 uppercase tracking-wider">Age</div>
+                  <div className="mt-1 text-sm font-semibold text-white">{selectedDecision.age}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <ActionButton variant="soft" onClick={() => alert("Later: open full detail")}>
+                Open detail <Eye className="h-4 w-4" />
+              </ActionButton>
+              <ActionButton variant="primary" onClick={() => alert("Later: approve/action")}>
+                Approve / Action <CheckCircle2 className="h-4 w-4" />
+              </ActionButton>
+            </div>
+
+            <div className="text-[11px] text-slate-300/55">
+              Demo drawer. Later we’ll wire it to proposals/executions endpoints.
+            </div>
+          </div>
+        )}
+      </Drawer>
     </div>
   );
 }
