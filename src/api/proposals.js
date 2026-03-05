@@ -1,10 +1,16 @@
-// src/api/proposals.js (FINAL v3.2 — robust + auto-fallback draft routes + rejectDraft)
+// src/api/proposals.js (FINAL v3.3 — includes includeContent/includePack + auto-fallback + rejectDraft)
 
 import { apiGet, apiPost } from "./client.js";
 
+/**
+ * List proposals by status.
+ * ✅ Always requests latestContent + content_pack so ProposalDetail can render Draft Studio without extra fetch.
+ */
 export async function listProposals(status = "draft") {
   const s = encodeURIComponent(status || "draft");
-  const j = await apiGet(`/api/proposals?status=${s}`);
+
+  // ✅ IMPORTANT: include latest content + pack in list response
+  const j = await apiGet(`/api/proposals?status=${s}&includeContent=1&includePack=1`);
 
   // supports both {proposals: []} and direct []
   if (Array.isArray(j)) return j;
@@ -65,9 +71,14 @@ export async function requestDraftChanges(proposalId, draftId, feedback) {
       `/api/drafts/${did}/changes`,
       `/api/proposals/${pid}/draft/${did}/changes`,
       `/api/proposals/${pid}/draft/changes`,
-      `/api/proposals/${pid}/request-changes`, // your convenience route returns contentId sometimes
+      `/api/proposals/${pid}/request-changes`, // convenience route may return contentId
     ],
-    { proposalId: String(proposalId), draftId: String(draftId), feedback: fb, feedbackText: fb }
+    {
+      proposalId: String(proposalId),
+      draftId: String(draftId),
+      feedback: fb,
+      feedbackText: fb,
+    }
   );
 }
 
@@ -104,9 +115,14 @@ export async function rejectDraft(proposalId, draftId, reason) {
       `/api/drafts/${did}/reject`,
       `/api/proposals/${pid}/draft/${did}/reject`,
       `/api/proposals/${pid}/draft/reject`,
-      `/api/proposals/${pid}/reject`, // optional convenience if you add it later
+      `/api/proposals/${pid}/reject`, // optional convenience if you add later
     ],
-    { proposalId: String(proposalId), draftId: String(draftId), reason: r, rejectReason: r }
+    {
+      proposalId: String(proposalId),
+      draftId: String(draftId),
+      reason: r,
+      rejectReason: r,
+    }
   );
 }
 
@@ -123,7 +139,7 @@ export async function publishDraft(proposalId, draftId) {
       `/api/drafts/${did}/publish`,
       `/api/proposals/${pid}/draft/${did}/publish`,
       `/api/proposals/${pid}/draft/publish`,
-      `/api/proposals/${pid}/publish`, // your convenience route returns contentId
+      `/api/proposals/${pid}/publish`, // convenience route may return contentId
     ],
     { proposalId: String(proposalId), draftId: String(draftId) }
   );
