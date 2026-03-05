@@ -1,4 +1,5 @@
-// src/components/TopBar.jsx (PREMIUM FINAL)
+// src/components/TopBar.jsx (FINAL v1.1 — aligned with UI tabs)
+
 import { RefreshCw, Radio, Copy } from "lucide-react";
 import { getApiBase } from "../api/client.js";
 import Badge from "./ui/Badge.jsx";
@@ -62,7 +63,7 @@ function StatPill({ label, value, tone }) {
   );
 }
 
-export default function TopBar({ wsStatus, onRefresh, stats, toast }) {
+export default function TopBar({ wsStatus, onRefresh, stats, toast, title = "Proposals" }) {
   const api = getApiBase() || "";
   const state = wsStatus?.state || "disconnected";
 
@@ -72,6 +73,12 @@ export default function TopBar({ wsStatus, onRefresh, stats, toast }) {
     } catch {}
   };
 
+  // ✅ align with UI tabs
+  const draftCount = stats?.draft ?? 0; // already merged in Proposals.jsx (draft+in_progress+pending)
+  const approvedCount = stats?.approved ?? 0;
+  const publishedCount = stats?.published ?? 0;
+  const rejectedCount = stats?.rejected ?? 0;
+
   return (
     <Card variant="glass" padded={false} className="overflow-hidden min-w-0">
       <div className="h-1 bg-gradient-to-r from-indigo-500/60 via-cyan-400/45 to-emerald-400/45 dark:from-indigo-400/45 dark:via-cyan-300/35 dark:to-emerald-300/35" />
@@ -79,9 +86,8 @@ export default function TopBar({ wsStatus, onRefresh, stats, toast }) {
       <div className="p-4 md:p-5 min-w-0">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between min-w-0">
           <div className="min-w-0">
-            {/* Title row */}
             <div className="flex flex-wrap items-center gap-3 min-w-0">
-              <div className="text-lg font-semibold tracking-tight">Proposals</div>
+              <div className="text-lg font-semibold tracking-tight">{title}</div>
 
               <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/70 px-2.5 py-1 text-[11px] font-semibold text-slate-700 shadow-[0_1px_0_rgba(15,23,42,0.04)] dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-200">
                 <span className="relative flex h-2 w-2">
@@ -99,7 +105,6 @@ export default function TopBar({ wsStatus, onRefresh, stats, toast }) {
               ) : null}
             </div>
 
-            {/* Meta row */}
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400 min-w-0">
               {api ? (
                 <span className="inline-flex items-center gap-2 min-w-0 rounded-full border border-slate-200 bg-white/70 px-3 py-1 text-[11px] font-semibold text-slate-700 shadow-[0_1px_0_rgba(15,23,42,0.04)] dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-200">
@@ -124,19 +129,17 @@ export default function TopBar({ wsStatus, onRefresh, stats, toast }) {
                 {wsStatus?.delayMs ? ` · retry ${Math.round(wsStatus.delayMs)}ms` : ""}
               </Badge>
 
-              {/* Stats as premium pills */}
               {stats ? (
                 <div className="flex flex-wrap items-center gap-2">
-                  <StatPill label="Pending" value={stats.pending} tone="warn" />
-                  <StatPill label="Drafting" value={stats.in_progress ?? 0} tone="neutral" />
-                  <StatPill label="Approved" value={stats.approved} tone="success" />
-                  <StatPill label="Rejected" value={stats.rejected} tone="danger" />
+                  <StatPill label="Draft" value={draftCount} tone="neutral" />
+                  <StatPill label="Approved" value={approvedCount} tone="success" />
+                  <StatPill label="Published" value={publishedCount} tone="success" />
+                  <StatPill label="Rejected" value={rejectedCount} tone="danger" />
                 </div>
               ) : null}
             </div>
           </div>
 
-          {/* Actions */}
           <div className="flex items-center gap-2 lg:justify-end">
             <Button variant="outline" size="md" onClick={onRefresh} className="whitespace-nowrap">
               <RefreshCw className="h-4 w-4" />

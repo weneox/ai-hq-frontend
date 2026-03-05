@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { Moon, Sun, Search } from "lucide-react";
+import { Moon, Sun, Search, Menu } from "lucide-react";
 import { applyTheme, getInitialTheme } from "../../lib/theme.js";
 import { cx } from "../../lib/cx.js";
 
@@ -14,7 +14,7 @@ const titles = {
   "/settings": "Settings",
 };
 
-export default function Header() {
+export default function Header({ onOpenSidebar }) {
   const loc = useLocation();
   const title = useMemo(() => titles[loc.pathname] || "AI HQ", [loc.pathname]);
 
@@ -33,7 +33,7 @@ export default function Header() {
   return (
     <header
       className={cx(
-        "rounded-xl border",
+        "rounded-xl border overflow-hidden",
         "border-slate-200 bg-white/85 backdrop-blur-xl",
         "shadow-[0_1px_0_rgba(15,23,42,0.06),0_16px_40px_-34px_rgba(2,6,23,0.22)]",
         "dark:border-slate-800 dark:bg-slate-950/40",
@@ -45,17 +45,29 @@ export default function Header() {
 
       <div className="px-5 py-4">
         <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-[17px] font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-              {title}
-            </div>
-            <div className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
-              CEO Command Center
+          <div className="flex items-center gap-3 min-w-0">
+            {/* Mobile hamburger */}
+            <button
+              onClick={onOpenSidebar}
+              className="lg:hidden inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white/80 hover:bg-slate-50 transition dark:border-slate-800 dark:bg-slate-900/40 dark:hover:bg-slate-800/50"
+              title="Menu"
+              aria-label="Open menu"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+
+            <div className="min-w-0">
+              <div className="text-[17px] font-semibold tracking-tight text-slate-900 dark:text-slate-100 truncate">
+                {title}
+              </div>
+              <div className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                CEO Command Center
+              </div>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Search */}
+            {/* Search (desktop) */}
             <div className="hidden md:flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/70 px-3 h-10 dark:border-slate-800 dark:bg-slate-950/30">
               <Search className="h-4 w-4 text-slate-500" />
               <input

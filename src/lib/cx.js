@@ -1,3 +1,6 @@
-export function cx(...a) {
-  return a.filter(Boolean).join(" ");
+import { clsx } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+export function cx(...inputs) {
+  return twMerge(clsx(inputs));
 }

@@ -1,12 +1,9 @@
-// src/pages/Proposals.jsx (FINAL v3.1 — DRAFT→APPROVED→PUBLISHED + REJECTED)
-// ✅ UI Tabs: Draft, Approved, Published, Rejected
-// ✅ No Pending tab + no decideProposal approve/reject
-// ✅ Draft actions live inside ProposalDetail: Request changes / Approve draft / Reject
-// ✅ Publish only after approved
-// ✅ WS refresh + polling fallback, keeps selection stable
-// ✅ Draft tab merges: draft + in_progress + pending(legacy)
-// ✅ Safe stats: keeps backend counts + UI draft count merged
-// ✅ Approve Draft UX: if current tab is Draft, auto-switch to Approved (optional) and keep selection
+// src/pages/Proposals.jsx (FINAL v3.2 — PREMIUM layout framing + stable scroll)
+// ✅ Same logic as v3.1 (kept)
+// ✅ Premium page container + subtle separators
+// ✅ Right panel: sticky on desktop, internal scroll only, no crop/glitch
+// ✅ Better empty states placeholders
+// ✅ Keeps selection stable + WS/poll unchanged
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import TopBar from "../components/TopBar.jsx";
@@ -31,18 +28,15 @@ function normalizeList(resp) {
   if (resp && Array.isArray(resp.proposals)) return resp.proposals;
   return [];
 }
-
 function parseDateMs(x) {
   const v = x ? Date.parse(x) : NaN;
   return Number.isFinite(v) ? v : 0;
 }
-
 function sortNewestFirst(a, b) {
   const am = parseDateMs(a?.created_at || a?.createdAt);
   const bm = parseDateMs(b?.created_at || b?.createdAt);
   return bm - am;
 }
-
 function uniqById(items) {
   const seen = new Set();
   const out = [];
@@ -54,9 +48,19 @@ function uniqById(items) {
   }
   return out;
 }
-
 function mergeDraftItems(draft, inProgress, pendingMaybe) {
-  return uniqById([...(draft || []), ...(inProgress || []), ...(pendingMaybe || [])]).sort(sortNewestFirst);
+  return uniqById([...(draft || []), ...(inProgress || []), ...(pendingMaybe || [])]).sort(
+    sortNewestFirst
+  );
+}
+
+function EmptyBox({ title, desc }) {
+  return (
+    <div className="rounded-2xl border border-slate-200/70 bg-white/70 p-5 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-950/35">
+      <div className="text-[13px] font-semibold text-slate-900 dark:text-slate-100">{title}</div>
+      <div className="mt-1 text-[12px] text-slate-500 dark:text-slate-400">{desc}</div>
+    </div>
+  );
 }
 
 export default function ProposalsPage() {
@@ -155,7 +159,8 @@ export default function ProposalsPage() {
       if (next.length === 0) {
         // keep selectedId as-is (user may switch tab)
       } else {
-        const stillExists = keepSelectedId && next.some((p) => String(p.id) === String(keepSelectedId));
+        const stillExists =
+          keepSelectedId && next.some((p) => String(p.id) === String(keepSelectedId));
         setSelectedId(stillExists ? String(keepSelectedId) : String(next[0].id));
       }
 
@@ -251,13 +256,14 @@ export default function ProposalsPage() {
     try {
       await approveDraft(proposalId, contentId);
 
-      // refresh counts first
       await refreshStats();
 
-      // UX: if you're on Draft tab, item will likely move to Approved -> switch there
       if (status === "draft") {
         setStatus("approved");
-        await refreshProposals("Draft approved ✅", { status: "approved", keepSelectedId: proposalId });
+        await refreshProposals("Draft approved ✅", {
+          status: "approved",
+          keepSelectedId: proposalId,
+        });
       } else {
         await refreshProposals("Draft approved ✅", { status, keepSelectedId: proposalId });
       }
@@ -292,8 +298,6 @@ export default function ProposalsPage() {
       await publishDraft(proposalId, contentId);
 
       await refreshStats();
-
-      // publish usually completes after callback -> keep tab but refresh
       await refreshProposals("Publish requested ✅", { status, keepSelectedId: proposalId });
     } catch (e) {
       setErr(String(e?.message || e));
@@ -312,17 +316,24 @@ export default function ProposalsPage() {
       <TopBar wsStatus={wsStatus} onRefresh={handleManualRefresh} stats={stats} toast={toast} />
 
       {err ? (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900 shadow-sm dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+        <div className="rounded-2xl border border-rose-200/70 bg-rose-50/80 p-4 text-sm text-rose-900 shadow-sm dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
           {err}
         </div>
       ) : null}
 
       {loading ? (
-        <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300">
-          Loading…
-        </div>
+        <EmptyBox title="Loading…" desc="Fetching proposals and drafts from backend." />
+      ) : proposals.length === 0 ? (
+        <EmptyBox
+          title="No items yet"
+          desc={
+            status === "draft"
+              ? "Drafts will appear here (including in_progress). Trigger a daily cron or create a new proposal."
+              : "Nothing in this tab yet."
+          }
+        />
       ) : (
-        <div className="grid min-w-0 min-h-0 gap-5 items-stretch grid-cols-1 xl:grid-cols-[minmax(0,440px)_minmax(0,1fr)]">
+        <div className="grid min-w-0 min-h-0 gap-5 items-stretch grid-cols-1 xl:grid-cols-[minmax(0,460px)_minmax(0,1fr)]">
           {/* LEFT */}
           <div className="min-w-0 min-h-0">
             <ProposalList
@@ -342,17 +353,31 @@ export default function ProposalsPage() {
 
           {/* RIGHT */}
           <div className="min-w-0 min-h-0">
-            <div className="min-w-0 min-h-0 h-full overflow-hidden rounded-2xl">
-              <div className="min-h-0 h-full overflow-auto">
-                <ProposalDetail
-                  proposal={selected}
-                  busy={busy}
-                  draftBusy={busy}
-                  onRequestChanges={onRequestChanges}
-                  onApproveDraft={onApproveDraft}
-                  onRejectDraft={onRejectDraft}
-                  onPublish={onPublish}
-                />
+            {/* Desktop: sticky panel; Mobile: normal flow */}
+            <div className="xl:sticky xl:top-[calc(20px+84px)]">
+              <div
+                className={cx(
+                  "min-w-0 min-h-0 overflow-hidden rounded-2xl",
+                  "border border-slate-200/70 bg-white/70 backdrop-blur-xl",
+                  "shadow-[0_12px_44px_-28px_rgba(2,6,23,0.35)]",
+                  "dark:border-slate-800 dark:bg-slate-950/35"
+                )}
+                style={{
+                  // on desktop keep it within viewport; header+gaps are already in Shell
+                  maxHeight: "calc(100dvh - 160px)",
+                }}
+              >
+                <div className="min-h-0 h-full overflow-auto">
+                  <ProposalDetail
+                    proposal={selected}
+                    busy={busy}
+                    draftBusy={busy}
+                    onRequestChanges={onRequestChanges}
+                    onApproveDraft={onApproveDraft}
+                    onRejectDraft={onRejectDraft}
+                    onPublish={onPublish}
+                  />
+                </div>
               </div>
             </div>
           </div>
