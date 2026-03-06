@@ -1,8 +1,10 @@
-// src/pages/Proposals.jsx (FINAL v3.3.2 — FIXED draft approve flow)
-// ✅ Draft tab-dakı Approve artıq Approved tab-a keçirmir
-// ✅ Draft Approve = /api/content/:id/approve -> asset generation request
-// ✅ UI draft mərhələsində qalır və n8n nəticəsini gözləyir
-// ✅ Bütün qalan logic saxlanılıb
+// src/pages/Proposals.jsx (FINAL v3.3.5 — FIXED async publish flow)
+// ✅ Draft Approve draft mərhələsində qalır
+// ✅ Publish request async-dir, dərhal Published tab-a atmır
+// ✅ Publish sonrası boş ekran problemi həll olundu
+// ✅ selectedId qorunur
+// ✅ WebSocket / polling ilə stabil işləyir
+// ✅ draft tab = draft + in_progress + pending
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import TopBar from "../components/TopBar.jsx";
@@ -28,15 +30,18 @@ function normalizeList(resp) {
   if (resp && Array.isArray(resp.proposals)) return resp.proposals;
   return [];
 }
+
 function parseDateMs(x) {
   const v = x ? Date.parse(x) : NaN;
   return Number.isFinite(v) ? v : 0;
 }
+
 function sortNewestFirst(a, b) {
-  const am = parseDateMs(a?.created_at || a?.createdAt);
-  const bm = parseDateMs(b?.created_at || b?.createdAt);
+  const am = parseDateMs(a?.updated_at || a?.updatedAt || a?.created_at || a?.createdAt);
+  const bm = parseDateMs(b?.updated_at || b?.updatedAt || b?.created_at || b?.createdAt);
   return bm - am;
 }
+
 function uniqById(items) {
   const seen = new Set();
   const out = [];
@@ -48,6 +53,7 @@ function uniqById(items) {
   }
   return out;
 }
+
 function mergeDraftItems(draft, inProgress, pendingMaybe) {
   return uniqById([...(draft || []), ...(inProgress || []), ...(pendingMaybe || [])]).sort(
     sortNewestFirst
@@ -77,6 +83,8 @@ export default function ProposalsPage() {
 
   const [wsStatus, setWsStatus] = useState({ state: "disconnected" });
   const wsClientRef = useRef(null);
+  const selectedIdRef = useRef("");
+  const statusRef = useRef("draft");
 
   const [stats, setStats] = useState({
     draft: 0,
@@ -86,6 +94,14 @@ export default function ProposalsPage() {
     rejected: 0,
     pending: 0,
   });
+
+  useEffect(() => {
+    selectedIdRef.current = selectedId;
+  }, [selectedId]);
+
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
 
   const showToast = (msg) => {
     if (!msg) return;
@@ -140,8 +156,8 @@ export default function ProposalsPage() {
   };
 
   const refreshProposals = async (why = "", opts = {}) => {
-    const desiredStatus = opts.status ?? status;
-    const keepSelectedId = opts.keepSelectedId ?? selectedId;
+    const desiredStatus = opts.status ?? statusRef.current;
+    const keepSelectedId = opts.keepSelectedId ?? selectedIdRef.current;
 
     setErr("");
     try {
@@ -151,6 +167,7 @@ export default function ProposalsPage() {
       if (next.length > 0) {
         const stillExists =
           keepSelectedId && next.some((p) => String(p.id) === String(keepSelectedId));
+
         setSelectedId(stillExists ? String(keepSelectedId) : String(next[0].id));
       } else {
         setSelectedId("");
@@ -180,14 +197,21 @@ export default function ProposalsPage() {
 
         if (isProposalEvent || isContentEvent || isExecEvent) {
           refreshStats();
+
+          const currentStatus = statusRef.current;
+          const currentSelectedId = selectedIdRef.current;
+
           refreshProposals(isProposalEvent && type === "proposal.created" ? "New item" : "", {
-            status,
-            keepSelectedId: selectedId,
+            status: currentStatus,
+            keepSelectedId: currentSelectedId,
           });
 
           const pid = payload?.proposalId || payload?.proposal_id || payload?.id;
-          if (pid && String(pid) === String(selectedId)) {
-            refreshProposals("", { status, keepSelectedId: selectedId });
+          if (pid && String(pid) === String(currentSelectedId)) {
+            refreshProposals("", {
+              status: currentStatus,
+              keepSelectedId: currentSelectedId,
+            });
           }
         }
       },
@@ -203,7 +227,6 @@ export default function ProposalsPage() {
       } catch {}
       wsClientRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -224,12 +247,29 @@ export default function ProposalsPage() {
     [proposals, selectedId]
   );
 
+  useEffect(() => {
+    if (loading) return;
+
+    if (proposals.length === 0) {
+      if (selectedId) setSelectedId("");
+      return;
+    }
+
+    const exists = proposals.some((x) => String(x.id) === String(selectedId));
+    if (!exists) {
+      setSelectedId(String(proposals[0].id));
+    }
+  }, [loading, proposals, selectedId]);
+
   const onRequestChanges = async (proposalId, contentId, feedbackText) => {
     setBusy(true);
     setErr("");
     try {
       await requestDraftChanges(proposalId, contentId, feedbackText);
-      await refreshProposals("Changes requested ✅", { status, keepSelectedId: proposalId });
+      await refreshProposals("Changes requested ✅", {
+        status: statusRef.current,
+        keepSelectedId: proposalId,
+      });
       await refreshStats();
     } catch (e) {
       setErr(String(e?.message || e));
@@ -245,18 +285,14 @@ export default function ProposalsPage() {
       await approveDraft(proposalId, contentId);
       await refreshStats();
 
-      // ✅ FIX:
-      // Draft approve = asset generation request.
-      // User draft mərhələsindən çıxmamalıdır.
-      // Approved tab-a keçirmək SƏHV idi.
+      if (statusRef.current !== "draft") {
+        setStatus("draft");
+      }
+
       await refreshProposals("Asset generation started ✅", {
         status: "draft",
         keepSelectedId: proposalId,
       });
-
-      if (status !== "draft") {
-        setStatus("draft");
-      }
     } catch (e) {
       setErr(String(e?.message || e));
     } finally {
@@ -270,8 +306,15 @@ export default function ProposalsPage() {
     try {
       await rejectDraft(proposalId, contentId, reasonText);
       await refreshStats();
-      setStatus("rejected");
-      await refreshProposals("Rejected ❌", { status: "rejected", keepSelectedId: proposalId });
+
+      if (statusRef.current !== "rejected") {
+        setStatus("rejected");
+      }
+
+      await refreshProposals("Rejected ❌", {
+        status: "rejected",
+        keepSelectedId: proposalId,
+      });
     } catch (e) {
       setErr(String(e?.message || e));
     } finally {
@@ -282,10 +325,45 @@ export default function ProposalsPage() {
   const onPublish = async (proposalId, contentId) => {
     setBusy(true);
     setErr("");
+
     try {
-      await publishDraft(proposalId, contentId);
+      const res = await publishDraft(proposalId, contentId);
+
+      if (res?.ok === false) {
+        throw new Error(res?.error || "publish failed");
+      }
+
       await refreshStats();
-      await refreshProposals("Publish requested ✅", { status, keepSelectedId: proposalId });
+
+      // Publish async request-dir.
+      // Dərhal Published tab-a keçmək olmaz.
+      // Əvvəl cari tabda qalırıq və həmin item-i saxlamağa çalışırıq.
+      const currentStatus = statusRef.current;
+      const currentList = await fetchByUiStatus(currentStatus);
+
+      setProposals(currentList);
+
+      if (currentList.length > 0) {
+        const stillExists = currentList.some((p) => String(p?.id) === String(proposalId));
+        setSelectedId(stillExists ? String(proposalId) : String(currentList[0]?.id || ""));
+      } else {
+        setSelectedId("");
+      }
+
+      showToast("Publish requested ✅");
+
+      // Əgər backend artıq həqiqətən published edibsə, onda tab-ı dəyiş.
+      try {
+        const publishedItems = await fetchByUiStatus("published");
+        const nowPublished = publishedItems.some((p) => String(p?.id) === String(proposalId));
+
+        if (nowPublished) {
+          setStatus("published");
+          setProposals(publishedItems);
+          setSelectedId(String(proposalId));
+          showToast("Published ✅");
+        }
+      } catch {}
     } catch (e) {
       setErr(String(e?.message || e));
     } finally {
@@ -303,7 +381,12 @@ export default function ProposalsPage() {
       <div className="min-w-0 flex flex-col gap-5 pb-10">
         <div className="sticky top-0 z-30">
           <div className="rounded-2xl bg-white/55 backdrop-blur-xl dark:bg-slate-950/30">
-            <TopBar wsStatus={wsStatus} onRefresh={handleManualRefresh} stats={stats} toast={toast} />
+            <TopBar
+              wsStatus={wsStatus}
+              onRefresh={handleManualRefresh}
+              stats={stats}
+              toast={toast}
+            />
           </div>
         </div>
 

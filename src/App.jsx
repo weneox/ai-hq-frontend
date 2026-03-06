@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import Shell from "./components/layout/Shell.jsx";
 
 import Dashboard from "./pages/Dashboard.jsx";
@@ -15,11 +15,11 @@ export default function App() {
       <Routes>
         <Route element={<Shell />}>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/analytics" element={<Analytics />} />
           <Route path="/proposals" element={<Proposals />} />
           <Route path="/executions" element={<Executions />} />
           <Route path="/agents" element={<Agents />} />
           <Route path="/threads" element={<Threads />} />
-          <Route path="/analytics" element={<Analytics />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

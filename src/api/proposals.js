@@ -1,23 +1,29 @@
-// src/api/proposals.js (FIXED — tolerant approve/publish responses)
+// src/api/proposals.js (FINAL v2 — FIXED status mapping + tolerant actions)
 
 import { apiGet, apiPost } from "./client.js";
 
 /**
- * UI tabs -> Backend statuses
- * UI: draft | approved | published | rejected
- * DB: in_progress | approved | published | rejected
+ * UI / page can request:
+ * - draft
+ * - pending
+ * - in_progress
+ * - approved
+ * - published
+ * - rejected
+ *
+ * We should pass these through correctly.
  */
 function mapUiStatusToBackend(status) {
-  const s = String(status || "").toLowerCase();
+  const s = String(status || "").trim().toLowerCase();
 
-  // Draft tab should show drafting items
-  if (s === "draft" || s === "drafting") return "in_progress";
-
+  if (s === "draft") return "draft";
+  if (s === "pending") return "pending";
+  if (s === "in_progress") return "in_progress";
   if (s === "approved") return "approved";
   if (s === "published") return "published";
   if (s === "rejected") return "rejected";
 
-  return "in_progress";
+  return "draft";
 }
 
 export async function listProposals(status = "draft") {
@@ -27,7 +33,8 @@ export async function listProposals(status = "draft") {
   const j = await apiGet(`/api/proposals?status=${s}&includeContent=1&includePack=1`);
 
   if (Array.isArray(j)) return j;
-  return j?.proposals || [];
+  if (Array.isArray(j?.proposals)) return j.proposals;
+  return [];
 }
 
 export async function decideProposal(id, decision, reason) {
@@ -46,23 +53,21 @@ export async function requestDraftChanges(_proposalId, contentId, feedback) {
   const did = encodeURIComponent(String(contentId));
   const fb = String(feedback || "").trim();
 
-  // backend only needs feedbackText (proposalId/draftId artıq şərt deyil)
   const j = await apiPost(`/api/content/${did}/feedback`, {
     feedbackText: fb,
   });
 
-  // normalize return (UI-safe)
   return {
     ok: !!j?.ok,
     content: j?.content || null,
     jobId: j?.jobId || j?.job_id || null,
-    error: j?.ok ? null : (j?.error || "feedback failed"),
+    error: j?.ok ? null : j?.error || "feedback failed",
   };
 }
 
 /**
  * Approve draft:
- * NEW FLOW: approve => asset generation request (no proposal object required)
+ * content approve => asset generation request
  */
 export async function approveDraft(_proposalId, contentId) {
   const did = encodeURIComponent(String(contentId));
@@ -74,7 +79,7 @@ export async function approveDraft(_proposalId, contentId) {
     content: j?.content || null,
     jobId: j?.jobId || j?.job_id || null,
     note: j?.note || null,
-    error: j?.ok ? null : (j?.error || "approve failed"),
+    error: j?.ok ? null : j?.error || "approve failed",
   };
 }
 
@@ -89,8 +94,7 @@ export async function rejectDraft(proposalId, _contentId, reason) {
 }
 
 /**
- * Publish:
- * backend may require asset.ready depending on your new content.js
+ * Publish
  */
 export async function publishDraft(_proposalId, contentId) {
   const did = encodeURIComponent(String(contentId));
@@ -100,7 +104,9 @@ export async function publishDraft(_proposalId, contentId) {
   return {
     ok: !!j?.ok,
     content: j?.content || null,
+    proposal: j?.proposal || null,
     jobId: j?.jobId || j?.job_id || null,
-    error: j?.ok ? null : (j?.error || "publish failed"),
+    note: j?.note || null,
+    error: j?.ok ? null : j?.error || "publish failed",
   };
 }

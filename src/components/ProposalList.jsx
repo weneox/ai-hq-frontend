@@ -1,8 +1,9 @@
-// src/components/ProposalList.jsx (FINAL v1.2.1 — FIX: layout/scroll never breaks)
-// ✅ Tabs: Draft (= pending + in_progress), Approved, Published, Rejected
-// ✅ Best-effort details extraction from payload/proposal/drafts/executions
-// ✅ FIX: Card.jsx wrapper issue -> use inner flex wrapper so scroll works 100%
-// ✅ Cleaner hierarchy: header -> chips -> tabs/search -> scroll list
+// src/components/ProposalList.jsx (FINAL v1.3.0 — FIXED double filtering / parent-owned tab data)
+// ✅ Parent artıq status-a görə data verir, burada ikinci dəfə stage filter YOXDUR
+// ✅ Search yalnız görünən list üzərində işləyir
+// ✅ Tabs qalır
+// ✅ Scroll/layout qorunur
+// ✅ Empty state stabil işləyir
 
 import Card from "./ui/Card.jsx";
 import Input from "./ui/Input.jsx";
@@ -59,6 +60,7 @@ function pickDraftPackFromAnything(p) {
     p?.execution,
     p?.job,
     p?.jobs?.[0],
+    p?.latestContent,
   ].filter(Boolean);
 
   for (const src of sources) {
@@ -155,6 +157,7 @@ function tagsFrom(p) {
 function formatFrom(p) {
   const obj = pickPayloadObj(p);
   const pack = pickDraftPackFromAnything(p);
+
   const v =
     safeText(obj?.format) ||
     safeText(obj?.post_type) ||
@@ -163,6 +166,7 @@ function formatFrom(p) {
     safeText(pack?.post_type) ||
     safeText(pack?.postType) ||
     "";
+
   const s = String(v || "").toLowerCase();
   if (!s) return "";
   if (s.includes("reel") || s.includes("video")) return "Reel";
@@ -187,7 +191,7 @@ function ctaFrom(p) {
 function clip(s, n) {
   const t = String(s || "").trim();
   if (!t) return "";
-  return t.length <= n ? t : t.slice(0, n - 1).trimEnd() + "…";
+  return t.length <= n ? t : `${t.slice(0, n - 1).trimEnd()}…`;
 }
 
 function relTime(iso) {
@@ -203,8 +207,18 @@ function relTime(iso) {
   return `${days}d ago`;
 }
 
+function rawStatusOf(p) {
+  return String(
+    p?.status ||
+      p?.latestContent?.status ||
+      p?.latestDraft?.status ||
+      p?.latest_draft?.status ||
+      ""
+  ).toLowerCase();
+}
+
 function stageOf(p) {
-  const s = String(p?.status || "").toLowerCase();
+  const s = rawStatusOf(p);
   if (s === "pending" || s === "in_progress" || s === "drafting" || s === "draft") return "draft";
   if (s === "approved") return "approved";
   if (s === "published") return "published";
@@ -223,13 +237,15 @@ function stageTone(stage, rawStatus) {
 }
 
 function stageLabel(p) {
-  const s = String(p?.status || "").toLowerCase();
+  const s = rawStatusOf(p);
   if (s === "pending") return "needs approval";
   if (s === "in_progress") return "drafting";
   if (s === "approved") return "approved";
   if (s === "published") return "published";
   if (s === "rejected") return "rejected";
-  return "";
+  if (s.startsWith("asset.")) return s;
+  if (s.startsWith("publish.")) return s;
+  return s || "";
 }
 
 function MiniChip({ children }) {
@@ -259,13 +275,14 @@ export default function ProposalList({
     { value: "rejected", label: "Rejected" },
   ];
 
-  const q = (search || "").trim().toLowerCase();
+  const q = String(search || "").trim().toLowerCase();
 
-  // 1) Tab stage filter first
-  const stageFiltered = (proposals || []).filter((p) => stageOf(p) === String(status || "draft"));
+  // ✅ IMPORTANT:
+  // parent artıq düzgün tab üçün proposals verir.
+  // burada ikinci dəfə status filter etmirik.
+  const baseItems = Array.isArray(proposals) ? proposals : [];
 
-  // 2) Search filter
-  const filtered = stageFiltered.filter((p) => {
+  const filtered = baseItems.filter((p) => {
     const t = String(titleFrom(p) || "").toLowerCase();
     const c = String(captionFrom(p) || "").toLowerCase();
     const id = String(p?.id || "").toLowerCase();
@@ -277,22 +294,20 @@ export default function ProposalList({
 
   const totalInTab =
     status === "draft"
-      ? stats?.draft ?? stageFiltered.length
+      ? stats?.draft ?? baseItems.length
       : status === "approved"
-      ? stats?.approved ?? stageFiltered.length
+      ? stats?.approved ?? baseItems.length
       : status === "published"
-      ? stats?.published ?? stageFiltered.length
+      ? stats?.published ?? baseItems.length
       : status === "rejected"
-      ? stats?.rejected ?? stageFiltered.length
-      : stageFiltered.length;
+      ? stats?.rejected ?? baseItems.length
+      : baseItems.length;
 
   return (
-    <Card className="min-w-0 p-0 overflow-hidden h-full">
-      {/* ✅ IMPORTANT: real flex layout must live INSIDE Card (Card has its own wrapper) */}
-      <div className="min-w-0 min-h-0 h-full flex flex-col">
-        {/* Header */}
-        <div className="px-4 pt-4 pb-3 border-b border-slate-200/70 dark:border-slate-800">
-          <div className="flex items-start justify-between gap-3 min-w-0">
+    <Card className="min-w-0 h-full overflow-hidden p-0">
+      <div className="flex h-full min-h-0 min-w-0 flex-col">
+        <div className="border-b border-slate-200/70 px-4 pb-3 pt-4 dark:border-slate-800">
+          <div className="flex min-w-0 items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <div className="text-sm font-semibold tracking-tight">Draft Pipeline</div>
@@ -316,7 +331,7 @@ export default function ProposalList({
                   {q ? <span className="opacity-70">/ {totalInTab}</span> : null}
                 </MiniChip>
 
-                {status === "draft" ? <MiniChip>Auto-merge: draft + in_progress</MiniChip> : null}
+                {status === "draft" ? <MiniChip>Auto-merge: draft + in_progress + pending</MiniChip> : null}
                 <MiniChip>AI HQ</MiniChip>
               </div>
             </div>
@@ -326,8 +341,7 @@ export default function ProposalList({
             </div>
           </div>
 
-          {/* Tabs + Search */}
-          <div className="mt-3 flex flex-col gap-2 min-w-0">
+          <div className="mt-3 flex min-w-0 flex-col gap-2">
             <Tabs value={status} onChange={setStatus} items={tabs} />
             <div className="w-full">
               <Input
@@ -339,17 +353,18 @@ export default function ProposalList({
           </div>
         </div>
 
-        {/* List */}
-        <div className="min-h-0 p-3 overflow-y-auto overscroll-contain">
+        <div className="min-h-0 overflow-y-auto overscroll-contain p-3">
           {filtered.length === 0 ? (
             <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4 text-sm text-slate-600 shadow-sm dark:border-slate-800 dark:bg-slate-950/25 dark:text-slate-300">
               <div className="font-semibold text-slate-900 dark:text-slate-100">No items</div>
               <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                Cron/agent draft yaradanda burada görünəcək.
+                {q
+                  ? "Search nəticəsi tapılmadı."
+                  : "Bu tab üçün item yoxdur. Başqa tab seçə bilərsən."}
               </div>
 
               {DEV ? (
-                <div className="mt-3 rounded-xl border border-slate-200/70 bg-white/70 p-3 font-mono text-xs text-slate-700 dark:border-slate-800 dark:bg-slate-950/25 dark:text-slate-200 overflow-auto">
+                <div className="mt-3 overflow-auto rounded-xl border border-slate-200/70 bg-white/70 p-3 font-mono text-xs text-slate-700 dark:border-slate-800 dark:bg-slate-950/25 dark:text-slate-200">
                   POST /api/debate {"{ \"mode\": \"proposal\" }"}
                 </div>
               ) : null}
@@ -360,9 +375,10 @@ export default function ProposalList({
                 const isSel = String(p?.id) === String(selectedId);
 
                 const agent = p?.agent_key || p?.agentKey || p?.agent || "agent";
-                const when = relTime(p?.created_at || p?.createdAt);
+                const when = relTime(p?.updated_at || p?.updatedAt || p?.created_at || p?.createdAt);
 
                 const stage = stageOf(p);
+                const rawStatus = rawStatusOf(p);
                 const stageTxt = stageLabel(p);
 
                 const t = titleFrom(p);
@@ -375,12 +391,11 @@ export default function ProposalList({
                 const tagPreview = tags.slice(0, 3);
 
                 const itemCls = [
-                  "group w-full text-left min-w-0",
-                  "rounded-2xl border transition-all duration-200",
-                  "bg-white/70 border-slate-200/70",
+                  "group w-full min-w-0 rounded-2xl border text-left transition-all duration-200",
+                  "border-slate-200/70 bg-white/70",
                   "hover:bg-white/85 hover:shadow-[0_18px_40px_-30px_rgba(2,6,23,0.35)]",
                   "active:scale-[0.995]",
-                  "dark:bg-slate-950/25 dark:border-slate-800",
+                  "dark:border-slate-800 dark:bg-slate-950/25",
                   "dark:hover:bg-slate-950/35",
                   "focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30 focus-visible:ring-offset-2",
                   "focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950",
@@ -392,31 +407,31 @@ export default function ProposalList({
                 return (
                   <button
                     key={p?.id}
+                    type="button"
                     onClick={() => (onSelect ? onSelect(String(p?.id)) : null)}
                     className={itemCls}
-                    type="button"
                   >
                     <div className="p-3">
-                      <div className="flex items-start gap-3 min-w-0">
+                      <div className="flex min-w-0 items-start gap-3">
                         <div
                           className={[
-                            "mt-1 h-10 w-1 rounded-full shrink-0 transition-opacity",
+                            "mt-1 h-10 w-1 shrink-0 rounded-full transition-opacity",
                             isSel
                               ? "bg-gradient-to-b from-indigo-500/75 via-cyan-400/65 to-emerald-400/65"
-                              : "bg-slate-200/70 dark:bg-slate-800/70 group-hover:opacity-90",
+                              : "bg-slate-200/70 group-hover:opacity-90 dark:bg-slate-800/70",
                           ].join(" ")}
                           aria-hidden="true"
                         />
 
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-start justify-between gap-3 min-w-0">
+                          <div className="flex min-w-0 items-start justify-between gap-3">
                             <div className="min-w-0">
                               <div className="text-sm font-semibold leading-snug text-slate-900 dark:text-slate-100">
                                 <span className="line-clamp-2 break-words">{t}</span>
                               </div>
 
                               {capPreview ? (
-                                <div className="mt-1 text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
+                                <div className="mt-1 line-clamp-2 text-xs text-slate-500 dark:text-slate-400">
                                   {capPreview}
                                 </div>
                               ) : (
@@ -426,12 +441,12 @@ export default function ProposalList({
                               )}
                             </div>
 
-                            <div className="shrink-0 flex flex-col items-end gap-2">
-                              <Badge tone={stageTone(stage, p?.status)} className="shrink-0">
+                            <div className="flex shrink-0 flex-col items-end gap-2">
+                              <Badge tone={stageTone(stage, rawStatus)} className="shrink-0">
                                 {stage === "draft" ? "Draft" : stage}
                               </Badge>
 
-                              <div className="text-[11px] text-slate-400 dark:text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <div className="text-[11px] text-slate-400 opacity-0 transition-opacity group-hover:opacity-100 dark:text-slate-500">
                                 Open →
                               </div>
                             </div>

@@ -1,7 +1,8 @@
-// src/components/ProposalDetail.jsx (FINAL v5.2.4 — FIXED publish gating by asset.ready)
-// ✅ Publish button now follows backend rule: content must be asset.ready / assets.ready / publish.ready
-// ✅ Approve / Reject / Request logic preserved
-// ✅ No double scroll, no bottom cut preserved
+// src/components/ProposalDetail.jsx (FINAL v5.2.5 — FIXED publish safety + stable gating)
+// ✅ Publish yalnız asset.ready / assets.ready / publish.ready olanda aktivdir
+// ✅ Asset hazır deyilsə publish işləmir
+// ✅ Request / Approve / Reject logic saxlanılıb
+// ✅ No double scroll / no cut saxlanılıb
 
 import { useEffect, useMemo, useState } from "react";
 import Card from "./ui/Card.jsx";
@@ -20,6 +21,7 @@ function safeText(x) {
   }
   return "";
 }
+
 function safeJson(x) {
   try {
     if (!x) return null;
@@ -30,6 +32,7 @@ function safeJson(x) {
     return null;
   }
 }
+
 function pretty(x) {
   try {
     return JSON.stringify(x ?? null, null, 2);
@@ -37,10 +40,12 @@ function pretty(x) {
     return String(x ?? "");
   }
 }
+
 function shortId(id) {
   const s = String(id || "");
   return s.length <= 8 ? s : s.slice(0, 8);
 }
+
 function relTime(iso) {
   const ms = iso ? Date.parse(iso) : NaN;
   if (!Number.isFinite(ms)) return "";
@@ -56,12 +61,13 @@ function relTime(iso) {
 
 function badgeTone(status) {
   const s = String(status || "").toLowerCase();
-  if (s === "draft" || s === "in_progress" || s === "drafting") return "neutral";
+  if (s === "draft" || s === "in_progress" || s === "drafting" || s === "pending") return "neutral";
   if (s === "approved") return "success";
   if (s === "published") return "success";
   if (s === "rejected") return "danger";
   return "neutral";
 }
+
 function draftTone(status) {
   const s = String(status || "").toLowerCase();
   if (s.includes("ready")) return "success";
@@ -117,6 +123,7 @@ function titleOf(p) {
   }
   return `Item #${shortId(p?.id)}`;
 }
+
 function summaryOf(p) {
   const obj = pickPayloadObj(p);
   if (obj) {
@@ -177,7 +184,6 @@ function normalizeDraft(rawDraft) {
   };
 }
 
-/** ---------- pack readers ---------- */
 function packType(pack) {
   if (!pack) return "";
   return pack.post_type || pack.postType || pack.format || pack.type || pack.assetType || "";
@@ -283,9 +289,6 @@ async function fetchLatestDraft(apiBase, proposalId) {
   return item || null;
 }
 
-/** =========================
- *  Premium UI atoms
- *  ========================= */
 function Pill({ children, tone = "neutral" }) {
   const t = String(tone);
   const cls =
@@ -308,7 +311,10 @@ function KV({ k, v }) {
   return (
     <div className="flex items-center justify-between gap-3">
       <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">{k}</div>
-      <div className="text-[11px] text-slate-900 dark:text-slate-100 truncate max-w-[210px]" title={String(v || "")}>
+      <div
+        className="max-w-[210px] truncate text-[11px] text-slate-900 dark:text-slate-100"
+        title={String(v || "")}
+      >
         {v || "—"}
       </div>
     </div>
@@ -321,10 +327,10 @@ function TabBtn({ active, onClick, children }) {
       type="button"
       onClick={onClick}
       className={[
-        "px-3 py-1.5 rounded-xl text-[12px] font-semibold transition border",
+        "rounded-xl border px-3 py-1.5 text-[12px] font-semibold transition",
         active
-          ? "bg-slate-900 text-white border-slate-900 dark:bg-white dark:text-slate-900 dark:border-white"
-          : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 dark:bg-slate-950/30 dark:text-slate-200 dark:border-slate-800 dark:hover:bg-slate-900/40",
+          ? "border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-900"
+          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-200 dark:hover:bg-slate-900/40",
       ].join(" ")}
     >
       {children}
@@ -354,26 +360,20 @@ export default function ProposalDetail({
   proposal,
   busy,
   draftBusy,
-
   onRequestChanges,
   onApproveDraft,
-
   onRejectDraft,
   onReject,
-
   onPublish,
   onPublishDraft,
-
   draft,
 }) {
   const apiBase = useMemo(() => getApiBase(), []);
 
   const [feedback, setFeedback] = useState("");
   const [rejectReason, setRejectReason] = useState("");
-
   const [fetchedDraftRaw, setFetchedDraftRaw] = useState(null);
   const [fetchingDraft, setFetchingDraft] = useState(false);
-
   const [tab, setTab] = useState("design");
   const [showInputs, setShowInputs] = useState(true);
 
@@ -401,7 +401,6 @@ export default function ProposalDetail({
       const candidate = pickDraftCandidate(proposal, draft);
       const normalized = normalizeDraft(candidate);
       if (normalized?.pack) return;
-
       if (!apiBase) return;
 
       setFetchingDraft(true);
@@ -410,7 +409,6 @@ export default function ProposalDetail({
         if (!alive) return;
         setFetchedDraftRaw(item);
       } catch {
-        // ignore
       } finally {
         if (alive) setFetchingDraft(false);
       }
@@ -420,13 +418,17 @@ export default function ProposalDetail({
     return () => {
       alive = false;
     };
-  }, [apiBase, proposal?.id, draft]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [apiBase, proposal?.id, draft]);
 
   if (!proposal) {
     return (
-      <Card className="min-w-0 min-h-0 h-full flex flex-col justify-center items-center text-center" variant="panel" padded="lg">
+      <Card
+        className="flex h-full min-h-0 min-w-0 flex-col items-center justify-center text-center"
+        variant="panel"
+        padded="lg"
+      >
         <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Select an item</div>
-        <div className="mt-1 text-xs text-slate-500 dark:text-slate-400 max-w-[460px]">
+        <div className="mt-1 max-w-[460px] text-xs text-slate-500 dark:text-slate-400">
           Soldakı list-dən bir item seç — burada Draft Studio açılacaq.
         </div>
       </Card>
@@ -436,10 +438,10 @@ export default function ProposalDetail({
   const title = titleOf(proposal);
   const summary = summaryOf(proposal);
 
-  const status = String(proposal.status || "draft").toLowerCase();
-  const isRejected = status === "rejected";
-  const isPublished = status === "published";
-  const isApproved = status === "approved";
+  const proposalStatus = String(proposal.status || "draft").toLowerCase();
+  const isRejected = proposalStatus === "rejected";
+  const isPublished = proposalStatus === "published";
+  const isApproved = proposalStatus === "approved";
   const isDraftStage = !isRejected && !isPublished && !isApproved;
 
   const draftStatusLc = String(resolvedDraft?.status || "").toLowerCase();
@@ -449,10 +451,16 @@ export default function ProposalDetail({
     draftStatusLc.includes("revise");
 
   const isDraftReady =
-    Boolean(pack) && (draftStatusLc.includes("ready") || draftStatusLc === "" || draftStatusLc.includes("draft"));
+    Boolean(pack) &&
+    (draftStatusLc.includes("ready") || draftStatusLc === "" || draftStatusLc.includes("draft"));
 
   const isAssetReady = isAssetReadyStatus(resolvedDraft?.status);
-  const canPublish = Boolean(pack) && isAssetReady && !isPublished && !isRejected;
+  const canPublish =
+    Boolean(pack) &&
+    Boolean(resolvedDraft?.id) &&
+    isAssetReady &&
+    !isPublished &&
+    !isRejected;
 
   const effectiveBusy = Boolean(busy || draftBusy || fetchingDraft);
 
@@ -481,6 +489,7 @@ export default function ProposalDetail({
       await navigator.clipboard.writeText(String(t || ""));
     } catch {}
   };
+
   const copyJson = async (obj) => {
     try {
       await navigator.clipboard.writeText(pretty(obj));
@@ -490,15 +499,13 @@ export default function ProposalDetail({
   const doRequestChanges = async () => {
     if (!onRequestChanges) return;
     const fb = String(feedback || "").trim();
-    if (!fb) return;
-    if (!resolvedDraft?.id) return;
+    if (!fb || !resolvedDraft?.id) return;
     await onRequestChanges(String(proposal.id), String(resolvedDraft.id), fb);
     setFeedback("");
   };
 
   const doApproveDraft = async () => {
-    if (!onApproveDraft) return;
-    if (!resolvedDraft?.id) return;
+    if (!onApproveDraft || !resolvedDraft?.id) return;
     await onApproveDraft(String(proposal.id), String(resolvedDraft.id));
   };
 
@@ -506,8 +513,7 @@ export default function ProposalDetail({
     const handler = onRejectDraft || onReject;
     if (!handler) return;
     const r = String(rejectReason || "").trim();
-    if (!r) return;
-    if (!resolvedDraft?.id) return;
+    if (!r || !resolvedDraft?.id) return;
     await handler(String(proposal.id), String(resolvedDraft.id), r);
     setRejectReason("");
   };
@@ -516,42 +522,49 @@ export default function ProposalDetail({
     const handler = onPublish || onPublishDraft;
     if (!handler) return;
     if (!resolvedDraft?.id) return;
+    if (!canPublish) return;
     await handler(String(proposal.id), String(resolvedDraft.id));
   };
 
-  const requestDisabledReason = !showInputs ? "Inputs hidden" : !String(feedback || "").trim() ? "Write feedback" : "";
+  const requestDisabledReason = !showInputs
+    ? "Inputs hidden"
+    : !String(feedback || "").trim()
+    ? "Write feedback"
+    : "";
 
-  const publishDisabledReason =
-    effectiveBusy
-      ? "Busy"
-      : !(onPublish || onPublishDraft)
-      ? "Publish handler missing"
-      : !resolvedDraft?.id
-      ? "Content ID missing"
-      : isRejected
-      ? "Rejected"
-      : isPublished
-      ? "Already published"
-      : !pack
-      ? "Draft pack missing"
-      : !isAssetReady
-      ? "Asset not ready yet"
-      : "";
+  const publishDisabledReason = effectiveBusy
+    ? "Busy"
+    : !(onPublish || onPublishDraft)
+    ? "Publish handler missing"
+    : !resolvedDraft?.id
+    ? "Content ID missing"
+    : isRejected
+    ? "Rejected"
+    : isPublished
+    ? "Already published"
+    : !pack
+    ? "Draft pack missing"
+    : !isAssetReady
+    ? "Asset not ready yet"
+    : "";
 
   return (
-    <Card className="min-w-0 min-h-0 w-full flex flex-col" variant="elevated" padded={false} clip>
+    <Card className="flex min-h-0 min-w-0 w-full flex-col" variant="elevated" padded={false} clip>
       <div className="sticky top-0 z-10">
         <div className="h-[3px] bg-gradient-to-r from-indigo-500/70 via-cyan-400/55 to-emerald-400/55 dark:from-indigo-400/55 dark:via-cyan-300/45 dark:to-emerald-300/45" />
-        <div className="bg-white/82 backdrop-blur border-b border-slate-200/70 dark:bg-slate-950/72 dark:border-slate-800/70">
-          <div className="px-5 pt-4 pb-3">
+        <div className="border-b border-slate-200/70 bg-white/82 backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/72">
+          <div className="px-5 pb-3 pt-4">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="text-[15px] sm:text-[17px] font-semibold leading-snug min-w-0 break-words text-slate-900 dark:text-slate-100" title={title}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2
+                    className="min-w-0 break-words text-[15px] font-semibold leading-snug text-slate-900 dark:text-slate-100 sm:text-[17px]"
+                    title={title}
+                  >
                     {title}
                   </h2>
 
-                  <Badge tone={badgeTone(status)}>{status}</Badge>
+                  <Badge tone={badgeTone(proposalStatus)}>{proposalStatus}</Badge>
 
                   <Badge tone={draftTone(resolvedDraft?.status || (pack ? "draft.ready" : "no draft"))}>
                     {resolvedDraft?.status || (pack ? "draft.ready" : fetchingDraft ? "loading…" : "no draft")}
@@ -564,15 +577,17 @@ export default function ProposalDetail({
                 </div>
 
                 {summary ? (
-                  <div className="mt-1 text-[12px] text-slate-500 dark:text-slate-400 line-clamp-2 max-w-[960px]">
+                  <div className="mt-1 line-clamp-2 max-w-[960px] text-[12px] text-slate-500 dark:text-slate-400">
                     {summary}
                   </div>
                 ) : null}
 
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
-                  <span className="font-semibold text-slate-600 dark:text-slate-300">Ref</span> PR-{shortId(proposal.id).toUpperCase()}
+                  <span className="font-semibold text-slate-600 dark:text-slate-300">Ref</span>
+                  PR-{shortId(proposal.id).toUpperCase()}
                   <span className="opacity-50">·</span>
-                  <span className="font-semibold text-slate-600 dark:text-slate-300">Agent</span> {agent}
+                  <span className="font-semibold text-slate-600 dark:text-slate-300">Agent</span>
+                  {agent}
                   {created ? (
                     <>
                       <span className="opacity-50">·</span>
@@ -580,17 +595,22 @@ export default function ProposalDetail({
                     </>
                   ) : null}
                   <span className="opacity-50">·</span>
-                  <span className="font-semibold text-slate-600 dark:text-slate-300">Backend</span>{" "}
+                  <span className="font-semibold text-slate-600 dark:text-slate-300">Backend</span>
                   {apiBase || "VITE_API_BASE missing"}
                 </div>
               </div>
 
-              <div className="shrink-0 flex flex-col items-end gap-2">
-                <div className="flex items-center gap-2 flex-wrap justify-end">
+              <div className="flex shrink-0 flex-col items-end gap-2">
+                <div className="flex flex-wrap items-center justify-end gap-2">
                   <Button variant="outline" size="sm" onClick={() => copy(String(proposal.id))}>
                     Copy ID
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => copy(packCaption(pack))} disabled={!packCaption(pack)}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => copy(packCaption(pack))}
+                    disabled={!packCaption(pack)}
+                  >
                     Copy caption
                   </Button>
                   <Button variant="outline" size="sm" onClick={() => copyJson(pack)} disabled={!pack}>
@@ -598,7 +618,7 @@ export default function ProposalDetail({
                   </Button>
                 </div>
 
-                <div className="flex items-center gap-2 flex-wrap justify-end">
+                <div className="flex flex-wrap items-center justify-end gap-2">
                   <Button
                     variant="outline"
                     size="sm"
@@ -659,7 +679,7 @@ export default function ProposalDetail({
                     variant="primary"
                     size="sm"
                     isLoading={effectiveBusy && !isRegenerating}
-                    disabled={!canPublish || effectiveBusy || !(onPublish || onPublishDraft) || !resolvedDraft?.id}
+                    disabled={effectiveBusy || !canPublish || !(onPublish || onPublishDraft)}
                     onClick={doPublish}
                     title={publishDisabledReason}
                   >
@@ -680,7 +700,7 @@ export default function ProposalDetail({
         </div>
       </div>
 
-      <div className="min-w-0 min-h-0 px-5 py-5 pb-10">
+      <div className="min-h-0 min-w-0 px-5 py-5 pb-10">
         {!pack ? (
           <Card variant="panel" padded="lg" className="border border-dashed border-slate-300 dark:border-slate-700">
             <SectionTitle right={fetchingDraft ? "Loading…" : ""}>Draft Studio</SectionTitle>
@@ -694,11 +714,13 @@ export default function ProposalDetail({
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Caption</div>
-                  <div className="mt-2 text-[14px] leading-[1.75] text-slate-900 dark:text-slate-100 whitespace-pre-wrap break-words">
+                  <div className="mt-2 whitespace-pre-wrap break-words text-[14px] leading-[1.75] text-slate-900 dark:text-slate-100">
                     {packCaption(pack) || "—"}
                   </div>
                 </div>
-                <div className="shrink-0 flex items-start gap-2">{hook ? <Pill tone="neutral">Hook: {hook}</Pill> : null}</div>
+                <div className="flex shrink-0 items-start gap-2">
+                  {hook ? <Pill tone="neutral">Hook: {hook}</Pill> : null}
+                </div>
               </div>
 
               <div className="mt-4 flex flex-wrap gap-2">
@@ -713,16 +735,16 @@ export default function ProposalDetail({
               {keyPoints ? (
                 <div className="mt-4 rounded-2xl border border-slate-200/70 bg-white/70 p-4 dark:border-slate-800 dark:bg-slate-950/25">
                   <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Key points</div>
-                  <pre className="mt-2 text-xs whitespace-pre-wrap break-words text-slate-800 dark:text-slate-100">
+                  <pre className="mt-2 whitespace-pre-wrap break-words text-xs text-slate-800 dark:text-slate-100">
                     {asDisplay(keyPoints) || "—"}
                   </pre>
                 </div>
               ) : null}
             </div>
 
-            <div className="mt-5 grid gap-5 grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] items-start">
+            <div className="mt-5 grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
               <div className="min-w-0 space-y-4">
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex flex-wrap items-center gap-2">
                   <TabBtn active={tab === "design"} onClick={() => setTab("design")}>
                     Design
                   </TabBtn>
@@ -740,7 +762,9 @@ export default function ProposalDetail({
                   </TabBtn>
 
                   {isRegenerating ? (
-                    <span className="ml-2 text-[11px] text-slate-500 dark:text-slate-400">Regenerating… (n8n işləyir)</span>
+                    <span className="ml-2 text-[11px] text-slate-500 dark:text-slate-400">
+                      Regenerating… (n8n işləyir)
+                    </span>
                   ) : null}
                 </div>
 
@@ -748,7 +772,7 @@ export default function ProposalDetail({
                   {tab === "design" ? (
                     <>
                       <SectionTitle>Design / Layout instructions</SectionTitle>
-                      <div className="mt-2 text-[13px] whitespace-pre-wrap break-words text-slate-900 dark:text-slate-100">
+                      <div className="mt-2 whitespace-pre-wrap break-words text-[13px] text-slate-900 dark:text-slate-100">
                         {design || "—"}
                       </div>
 
@@ -757,7 +781,7 @@ export default function ProposalDetail({
                           <summary className="cursor-pointer text-[11px] font-semibold text-slate-500 dark:text-slate-400">
                             Image prompt (generator)
                           </summary>
-                          <pre className="mt-2 text-xs whitespace-pre-wrap break-words text-slate-800 dark:text-slate-100">
+                          <pre className="mt-2 whitespace-pre-wrap break-words text-xs text-slate-800 dark:text-slate-100">
                             {imgPrompt}
                           </pre>
                         </details>
@@ -768,7 +792,7 @@ export default function ProposalDetail({
                           <summary className="cursor-pointer text-[11px] font-semibold text-slate-500 dark:text-slate-400">
                             Compliance / Notes
                           </summary>
-                          <pre className="mt-2 text-xs whitespace-pre-wrap break-words text-slate-800 dark:text-slate-100">
+                          <pre className="mt-2 whitespace-pre-wrap break-words text-xs text-slate-800 dark:text-slate-100">
                             {compliance}
                           </pre>
                         </details>
@@ -777,7 +801,7 @@ export default function ProposalDetail({
                   ) : tab === "script" ? (
                     <>
                       <SectionTitle>Reel script / Voiceover</SectionTitle>
-                      <pre className="mt-3 text-xs whitespace-pre-wrap break-words rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4 text-slate-800 dark:border-slate-800 dark:bg-slate-950/25 dark:text-slate-100">
+                      <pre className="mt-3 rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4 whitespace-pre-wrap break-words text-xs text-slate-800 dark:border-slate-800 dark:bg-slate-950/25 dark:text-slate-100">
                         {script || "—"}
                       </pre>
                       {packMusic(pack) ? (
@@ -789,21 +813,21 @@ export default function ProposalDetail({
                   ) : tab === "storyboard" ? (
                     <>
                       <SectionTitle>Storyboard / Shotlist</SectionTitle>
-                      <pre className="mt-3 text-xs whitespace-pre-wrap break-words rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4 text-slate-800 dark:border-slate-800 dark:bg-slate-950/25 dark:text-slate-100">
+                      <pre className="mt-3 rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4 whitespace-pre-wrap break-words text-xs text-slate-800 dark:border-slate-800 dark:bg-slate-950/25 dark:text-slate-100">
                         {asDisplay(storyboard) || "—"}
                       </pre>
                     </>
                   ) : tab === "specs" ? (
                     <>
                       <SectionTitle>Asset specs / Output</SectionTitle>
-                      <pre className="mt-3 text-xs whitespace-pre-wrap break-words rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4 text-slate-800 dark:border-slate-800 dark:bg-slate-950/25 dark:text-slate-100">
+                      <pre className="mt-3 rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4 whitespace-pre-wrap break-words text-xs text-slate-800 dark:border-slate-800 dark:bg-slate-950/25 dark:text-slate-100">
                         {asDisplay(specs) || "—"}
                       </pre>
                     </>
                   ) : (
                     <>
                       <SectionTitle>Advanced (Raw)</SectionTitle>
-                      <pre className="mt-3 text-xs whitespace-pre-wrap break-words rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4 text-slate-800 dark:border-slate-800 dark:bg-slate-950/25 dark:text-slate-100">
+                      <pre className="mt-3 rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4 whitespace-pre-wrap break-words text-xs text-slate-800 dark:border-slate-800 dark:bg-slate-950/25 dark:text-slate-100">
                         {pretty({ proposal, draft: resolvedDraft, fetchedDraftRaw })}
                       </pre>
                     </>
@@ -817,28 +841,29 @@ export default function ProposalDetail({
                       Request changes → n8n revise → yeni draft (v2,v3…) → yenə approve/reject/publish.
                     </div>
 
-                    <div className="mt-3 grid gap-4 grid-cols-1 lg:grid-cols-2">
+                    <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
                       <div className="min-w-0">
-                        <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Change request</div>
+                        <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                          Change request
+                        </div>
                         <textarea
                           value={feedback}
                           onChange={(e) => setFeedback(e.target.value)}
                           rows={5}
-                          className="mt-2 w-full rounded-2xl border border-slate-200/70 bg-white/80 p-3 text-sm outline-none transition
-                                     focus:border-indigo-300/80 focus:ring-2 focus:ring-indigo-500/15
-                                     dark:border-slate-800 dark:bg-slate-950/20 dark:text-slate-100 dark:focus:border-indigo-500/50 dark:focus:ring-indigo-500/20"
+                          className="mt-2 w-full rounded-2xl border border-slate-200/70 bg-white/80 p-3 text-sm outline-none transition focus:border-indigo-300/80 focus:ring-2 focus:ring-indigo-500/15 dark:border-slate-800 dark:bg-slate-950/20 dark:text-slate-100 dark:focus:border-indigo-500/50 dark:focus:ring-indigo-500/20"
                           placeholder='Məs: "Caption daha qısa. 8 hashtag. CTA WhatsApp. Dizaynda 3 kadr: 1) hook 2) benefit 3) CTA."'
                           disabled={effectiveBusy || isRegenerating || isRejected || isPublished}
                         />
                       </div>
 
                       <div className="min-w-0">
-                        <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Reject reason</div>
+                        <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                          Reject reason
+                        </div>
                         <input
                           value={rejectReason}
                           onChange={(e) => setRejectReason(e.target.value)}
-                          className="mt-2 w-full rounded-2xl border border-slate-200/70 bg-white/80 px-3 py-2 text-sm outline-none
-                                     dark:border-slate-800 dark:bg-slate-950/20 dark:text-slate-100"
+                          className="mt-2 w-full rounded-2xl border border-slate-200/70 bg-white/80 px-3 py-2 text-sm outline-none dark:border-slate-800 dark:bg-slate-950/20 dark:text-slate-100"
                           placeholder='Məs: "Brand uyğun deyil" / "Bu gün video yox, carousel olsun"...'
                           disabled={effectiveBusy || isRegenerating}
                         />
@@ -876,14 +901,15 @@ export default function ProposalDetail({
                     {(hashtags || []).slice(0, 36).map((h, i) => (
                       <span
                         key={`${h}_${i}`}
-                        className="text-[11px] rounded-full border border-slate-200/70 bg-white/80 px-2.5 py-1
-                                   dark:border-slate-800 dark:bg-slate-950/25 text-slate-700 dark:text-slate-200"
+                        className="rounded-full border border-slate-200/70 bg-white/80 px-2.5 py-1 text-[11px] text-slate-700 dark:border-slate-800 dark:bg-slate-950/25 dark:text-slate-200"
                       >
                         {h}
                       </span>
                     ))}
                     {hashtags.length > 36 ? (
-                      <span className="text-[11px] text-slate-500 dark:text-slate-400">+{hashtags.length - 36} more</span>
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                        +{hashtags.length - 36} more
+                      </span>
                     ) : null}
                   </div>
                 </Card>
@@ -891,7 +917,7 @@ export default function ProposalDetail({
                 {hook ? (
                   <Card variant="panel" padded="lg">
                     <SectionTitle>Hook / Angle</SectionTitle>
-                    <div className="mt-2 text-[13px] text-slate-900 dark:text-slate-100 whitespace-pre-wrap break-words">
+                    <div className="mt-2 whitespace-pre-wrap break-words text-[13px] text-slate-900 dark:text-slate-100">
                       {hook}
                     </div>
                   </Card>
