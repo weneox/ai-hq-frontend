@@ -1,8 +1,7 @@
-// src/components/ProposalDetail.jsx (FINAL v5.2.3 — FIX: NO double scroll, no bottom cut)
-// ✅ Logic preserved
-// ✅ FIX: ProposalDetail no longer creates its own scroll container
-// ✅ Sticky header works with parent scroll (right panel)
-// ✅ Prevents bottom text cut
+// src/components/ProposalDetail.jsx (FINAL v5.2.4 — FIXED publish gating by asset.ready)
+// ✅ Publish button now follows backend rule: content must be asset.ready / assets.ready / publish.ready
+// ✅ Approve / Reject / Request logic preserved
+// ✅ No double scroll, no bottom cut preserved
 
 import { useEffect, useMemo, useState } from "react";
 import Card from "./ui/Card.jsx";
@@ -11,7 +10,7 @@ import Button from "./ui/Button.jsx";
 import { getApiBase } from "../api/client.js";
 
 /** =========================
- *  Helpers (unchanged)
+ *  Helpers
  *  ========================= */
 function safeText(x) {
   if (typeof x === "string") return x;
@@ -342,6 +341,15 @@ function SectionTitle({ children, right }) {
   );
 }
 
+function statusLc(x) {
+  return String(x || "").trim().toLowerCase();
+}
+
+function isAssetReadyStatus(s) {
+  const v = statusLc(s);
+  return v === "asset.ready" || v === "assets.ready" || v === "publish.ready";
+}
+
 export default function ProposalDetail({
   proposal,
   busy,
@@ -442,8 +450,9 @@ export default function ProposalDetail({
 
   const isDraftReady =
     Boolean(pack) && (draftStatusLc.includes("ready") || draftStatusLc === "" || draftStatusLc.includes("draft"));
-  const isDraftApproved = draftStatusLc.includes("approved") || isApproved;
-  const canPublish = Boolean(pack) && isDraftApproved && !isPublished;
+
+  const isAssetReady = isAssetReadyStatus(resolvedDraft?.status);
+  const canPublish = Boolean(pack) && isAssetReady && !isPublished && !isRejected;
 
   const effectiveBusy = Boolean(busy || draftBusy || fetchingDraft);
 
@@ -512,11 +521,25 @@ export default function ProposalDetail({
 
   const requestDisabledReason = !showInputs ? "Inputs hidden" : !String(feedback || "").trim() ? "Write feedback" : "";
 
+  const publishDisabledReason =
+    effectiveBusy
+      ? "Busy"
+      : !(onPublish || onPublishDraft)
+      ? "Publish handler missing"
+      : !resolvedDraft?.id
+      ? "Content ID missing"
+      : isRejected
+      ? "Rejected"
+      : isPublished
+      ? "Already published"
+      : !pack
+      ? "Draft pack missing"
+      : !isAssetReady
+      ? "Asset not ready yet"
+      : "";
+
   return (
-    // ✅ IMPORTANT: ProposalDetail does NOT create its own scroll container.
-    // Parent (Proposals.jsx right panel) owns the scroll.
     <Card className="min-w-0 min-h-0 w-full flex flex-col" variant="elevated" padded={false} clip>
-      {/* Sticky header */}
       <div className="sticky top-0 z-10">
         <div className="h-[3px] bg-gradient-to-r from-indigo-500/70 via-cyan-400/55 to-emerald-400/55 dark:from-indigo-400/55 dark:via-cyan-300/45 dark:to-emerald-300/45" />
         <div className="bg-white/82 backdrop-blur border-b border-slate-200/70 dark:bg-slate-950/72 dark:border-slate-800/70">
@@ -536,6 +559,8 @@ export default function ProposalDetail({
                       <span className="opacity-70"> · v{resolvedDraft.version}</span>
                     ) : null}
                   </Badge>
+
+                  {isAssetReady ? <Badge tone="success">asset ready</Badge> : null}
                 </div>
 
                 {summary ? (
@@ -560,7 +585,6 @@ export default function ProposalDetail({
                 </div>
               </div>
 
-              {/* Actions */}
               <div className="shrink-0 flex flex-col items-end gap-2">
                 <div className="flex items-center gap-2 flex-wrap justify-end">
                   <Button variant="outline" size="sm" onClick={() => copy(String(proposal.id))}>
@@ -635,8 +659,9 @@ export default function ProposalDetail({
                     variant="primary"
                     size="sm"
                     isLoading={effectiveBusy && !isRegenerating}
-                    disabled={effectiveBusy || !(onPublish || onPublishDraft) || !resolvedDraft?.id || !canPublish || isRejected}
+                    disabled={!canPublish || effectiveBusy || !(onPublish || onPublishDraft) || !resolvedDraft?.id}
                     onClick={doPublish}
+                    title={publishDisabledReason}
                   >
                     Publish
                   </Button>
@@ -655,7 +680,6 @@ export default function ProposalDetail({
         </div>
       </div>
 
-      {/* ✅ BODY: NO overflow here (parent owns scroll) */}
       <div className="min-w-0 min-h-0 px-5 py-5 pb-10">
         {!pack ? (
           <Card variant="panel" padded="lg" className="border border-dashed border-slate-300 dark:border-slate-700">
@@ -666,7 +690,6 @@ export default function ProposalDetail({
           </Card>
         ) : (
           <>
-            {/* Caption hero */}
             <div className="rounded-3xl border border-slate-200/70 bg-gradient-to-b from-white/90 to-slate-50/70 p-5 shadow-sm dark:border-slate-800 dark:from-slate-950/40 dark:to-slate-950/10">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -698,7 +721,6 @@ export default function ProposalDetail({
             </div>
 
             <div className="mt-5 grid gap-5 grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] items-start">
-              {/* LEFT */}
               <div className="min-w-0 space-y-4">
                 <div className="flex items-center gap-2 flex-wrap">
                   <TabBtn active={tab === "design"} onClick={() => setTab("design")}>
@@ -832,7 +854,6 @@ export default function ProposalDetail({
                 ) : null}
               </div>
 
-              {/* RIGHT */}
               <div className="min-w-0 space-y-4">
                 <Card variant="panel" padded="lg">
                   <SectionTitle>Overview</SectionTitle>
@@ -844,6 +865,8 @@ export default function ProposalDetail({
                     <KV k="CTA" v={cta || "—"} />
                     <KV k="Content ID" v={resolvedDraft?.id || "—"} />
                     <KV k="Updated" v={resolvedDraft?.updatedAt ? relTime(resolvedDraft.updatedAt) : "—"} />
+                    <KV k="Draft status" v={resolvedDraft?.status || "—"} />
+                    <KV k="Publish ready" v={canPublish ? "yes" : "no"} />
                   </div>
                 </Card>
 
