@@ -1,23 +1,34 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { NavLink } from "react-router-dom";
-import { ChevronRight, X } from "lucide-react";
-import Sidebar3DIcon from "./Sidebar3DIcon.jsx";
+import {
+  Bot,
+  BriefcaseBusiness,
+  ChevronRight,
+  CircleGauge,
+  Command,
+  Orbit,
+  ScanEye,
+  ShieldCheck,
+  SlidersHorizontal,
+  X,
+} from "lucide-react";
+import ExecutiveMark3D from "./ExecutiveMark3D.jsx";
 
 const NAV_ITEMS = [
-  { label: "Command", type: "command", to: "/" },
-  { label: "Analytics", type: "analytics", to: "/analytics" },
-  { label: "Proposals", type: "proposals", to: "/proposals" },
-  { label: "Executions", type: "executions", to: "/executions" },
-  { label: "Agents", type: "agents", to: "/agents" },
-  { label: "Threads", type: "threads", to: "/threads" },
-  { label: "Settings", type: "settings", to: "/settings" },
+  { label: "Command", icon: Command, to: "/" },
+  { label: "Analytics", icon: CircleGauge, to: "/analytics" },
+  { label: "Proposals", icon: BriefcaseBusiness, to: "/proposals" },
+  { label: "Executions", icon: Orbit, to: "/executions" },
+  { label: "Agents", icon: Bot, to: "/agents" },
+  { label: "Threads", icon: ScanEye, to: "/threads" },
+  { label: "Settings", icon: SlidersHorizontal, to: "/settings" },
 ];
 
-const COLLAPSED_W = 86;
-const EXPANDED_W = 286;
-const LABEL_W = 162;
-const NODE_SIZE = 50;
+const COLLAPSED_W = 78;
+const EXPANDED_W = 272;
+const LABEL_W = 156;
+const NODE_SIZE = 42;
 
 function cn(...classes) {
   return classes.filter(Boolean).join(" ");
@@ -30,9 +41,9 @@ function Reveal({ expanded, children, className = "" }) {
       style={{
         width: expanded ? LABEL_W : 0,
         opacity: expanded ? 1 : 0,
-        transform: expanded ? "translateX(0px)" : "translateX(-10px)",
+        transform: expanded ? "translateX(0px)" : "translateX(-8px)",
         transition:
-          "width 460ms cubic-bezier(0.22,1,0.36,1), opacity 180ms ease, transform 280ms cubic-bezier(0.22,1,0.36,1)",
+          "width 420ms cubic-bezier(0.22,1,0.36,1), opacity 160ms ease, transform 260ms cubic-bezier(0.22,1,0.36,1)",
       }}
       aria-hidden={!expanded}
     >
@@ -41,44 +52,25 @@ function Reveal({ expanded, children, className = "" }) {
   );
 }
 
-function RailNode({
-  active = false,
-  hovered = false,
-  children,
-  className = "",
-  canvasClassName = "",
-}) {
+function RailNode({ active = false, children, className = "" }) {
   return (
     <div
       className={cn(
-        "relative flex shrink-0 items-center justify-center overflow-hidden rounded-[18px] transition-all duration-300",
+        "relative flex shrink-0 items-center justify-center rounded-[14px] transition-all duration-300",
         active
-          ? "bg-[linear-gradient(180deg,rgba(255,255,255,0.075),rgba(255,255,255,0.028))] ring-1 ring-cyan-300/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_16px_34px_rgba(0,0,0,0.26),0_0_0_1px_rgba(125,211,252,0.08)]"
-          : "bg-[linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.008))]",
-        hovered && !active
-          ? "ring-1 ring-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_12px_26px_rgba(0,0,0,0.18)]"
-          : "",
+          ? "bg-[linear-gradient(180deg,rgba(255,255,255,0.065),rgba(255,255,255,0.03))] ring-1 ring-white/8 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_10px_26px_rgba(0,0,0,0.18)]"
+          : "bg-transparent",
         className
       )}
       style={{ width: NODE_SIZE, height: NODE_SIZE }}
     >
-      <div className="pointer-events-none absolute inset-[1px] rounded-[17px] bg-[radial-gradient(circle_at_30%_22%,rgba(255,255,255,0.10),transparent_44%),linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.01))]" />
-
       {active && (
         <>
-          <div className="pointer-events-none absolute inset-0 rounded-[18px] bg-[radial-gradient(circle_at_0%_50%,rgba(103,232,249,0.12),transparent_36%),radial-gradient(circle_at_100%_0%,rgba(99,102,241,0.10),transparent_34%)]" />
-          <div className="pointer-events-none absolute inset-y-[10px] left-0 w-px bg-gradient-to-b from-transparent via-cyan-200/80 to-transparent" />
+          <div className="pointer-events-none absolute inset-0 rounded-[14px] bg-[radial-gradient(circle_at_0%_50%,rgba(125,211,252,0.10),transparent_36%)]" />
+          <div className="pointer-events-none absolute inset-y-[9px] left-0 w-px bg-gradient-to-b from-transparent via-cyan-200/70 to-transparent" />
         </>
       )}
-
-      <div
-        className={cn(
-          "relative z-[2] h-[38px] w-[38px]",
-          canvasClassName
-        )}
-      >
-        {children}
-      </div>
+      {children}
     </div>
   );
 }
@@ -86,9 +78,9 @@ function RailNode({
 function BrandBlock({ expanded }) {
   return (
     <div className="px-4 pt-5">
-      <div className="flex h-[60px] items-center">
-        <RailNode active className="rounded-[20px]" canvasClassName="h-[40px] w-[40px]">
-          <Sidebar3DIcon type="brand" active />
+      <div className="flex h-[54px] items-center">
+        <RailNode className="bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))] ring-1 ring-white/8 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_10px_28px_rgba(0,0,0,0.22)]">
+          <ExecutiveMark3D className="h-[28px] w-[28px]" />
         </RailNode>
 
         <div className="ml-3 flex min-w-0 flex-1 items-center">
@@ -109,19 +101,17 @@ function BrandBlock({ expanded }) {
 }
 
 function NavItem({ item, expanded, onNavigate }) {
-  const [hovered, setHovered] = useState(false);
+  const Icon = item.icon;
 
   return (
     <NavLink
       to={item.to}
       end={item.to === "/"}
       onClick={onNavigate}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
       className={({ isActive }) =>
         cn(
-          "group relative flex h-[58px] items-center rounded-[18px] px-4 transition-all duration-300",
-          isActive ? "text-white" : "text-white/50 hover:text-white/88"
+          "group relative flex h-[50px] items-center rounded-[16px] px-4 transition-all duration-300",
+          isActive ? "text-white" : "text-white/48 hover:text-white/84"
         )
       }
     >
@@ -129,19 +119,21 @@ function NavItem({ item, expanded, onNavigate }) {
         <>
           <div
             className={cn(
-              "absolute inset-0 rounded-[18px] transition-all duration-300",
+              "absolute inset-0 rounded-[16px] transition-all duration-300",
               isActive
-                ? "bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.022))] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_18px_34px_rgba(0,0,0,0.18)]"
-                : "bg-transparent group-hover:bg-white/[0.03]"
+                ? "bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.025))] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_14px_34px_rgba(0,0,0,0.18)]"
+                : "bg-transparent group-hover:bg-white/[0.028]"
             )}
           />
 
-          <RailNode active={isActive} hovered={hovered}>
-            <Sidebar3DIcon
-              type={item.type}
-              active={isActive}
-              hovered={hovered}
-            />
+          <RailNode
+            active={isActive}
+            className={cn(
+              !isActive &&
+                "group-hover:bg-white/[0.03] group-hover:ring-1 group-hover:ring-white/6"
+            )}
+          >
+            <Icon className="h-[14px] w-[14px]" />
           </RailNode>
 
           <div className="ml-3 flex min-w-0 flex-1 items-center justify-between">
@@ -162,8 +154,8 @@ function NavItem({ item, expanded, onNavigate }) {
 
 function RailNav({ expanded, onNavigate }) {
   return (
-    <nav className="mt-5 px-2.5">
-      <div className="space-y-2">
+    <nav className="mt-5 px-2">
+      <div className="space-y-1.5">
         {NAV_ITEMS.map((item) => (
           <NavItem
             key={item.to}
@@ -180,14 +172,20 @@ function RailNav({ expanded, onNavigate }) {
 function RailFooter({ expanded }) {
   return (
     <div className="px-4 pb-5 pt-4">
-      <div className="flex h-[52px] items-center">
-        <RailNode
-          active
-          className="rounded-[18px]"
-          canvasClassName="h-[38px] w-[38px]"
-        >
-          <Sidebar3DIcon type="security" active />
-        </RailNode>
+      <div className="flex h-[44px] items-center">
+        <div className="relative flex shrink-0 items-center justify-center rounded-[14px] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.018))] shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_10px_24px_rgba(0,0,0,0.16)]">
+          <div
+            className="absolute inset-0 rounded-[14px] bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.07),transparent_55%)]"
+            style={{ width: NODE_SIZE, height: NODE_SIZE }}
+          />
+          <div
+            className="relative flex items-center justify-center rounded-[14px]"
+            style={{ width: NODE_SIZE, height: NODE_SIZE }}
+          >
+            <ShieldCheck className="h-[14px] w-[14px] text-white/72" />
+            <span className="absolute right-[9px] top-[9px] h-1.5 w-1.5 rounded-full bg-emerald-300/90 shadow-[0_0_10px_rgba(110,231,183,0.7)]" />
+          </div>
+        </div>
 
         <div className="ml-3 flex min-w-0 flex-1 items-center">
           <Reveal expanded={expanded} className="w-full">
@@ -239,17 +237,16 @@ function DesktopSidebar({ expanded, setExpanded }) {
         transition={
           shouldReduceMotion
             ? { duration: 0 }
-            : { duration: 0.46, ease: [0.22, 1, 0.36, 1] }
+            : { duration: 0.44, ease: [0.22, 1, 0.36, 1] }
         }
-        className="relative h-full overflow-hidden border-r border-white/[0.05] bg-[#040713]/88 backdrop-blur-[32px] will-change-[width]"
+        className="relative h-full overflow-hidden border-r border-white/[0.05] bg-[#050816]/88 backdrop-blur-[30px] will-change-[width]"
         style={{
           boxShadow:
-            "26px 0 90px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,0.03)",
+            "24px 0 80px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.03)",
         }}
       >
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_circle_at_0%_0%,rgba(99,102,241,0.16),transparent_24%),radial-gradient(620px_circle_at_0%_100%,rgba(34,211,238,0.09),transparent_22%),linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.008))]" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(850px_circle_at_0%_0%,rgba(99,102,241,0.15),transparent_24%),radial-gradient(620px_circle_at_0%_100%,rgba(34,211,238,0.08),transparent_22%),linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))]" />
         <div className="pointer-events-none absolute inset-y-0 right-0 w-px bg-white/[0.06]" />
-        <div className="pointer-events-none absolute inset-y-0 left-0 w-px bg-gradient-to-b from-transparent via-cyan-200/10 to-transparent" />
 
         <div className="relative flex h-full flex-col">
           <BrandBlock expanded={expanded} />
@@ -270,9 +267,9 @@ function MobileSidebar({ setMobileOpen }) {
       animate={{ x: 0 }}
       exit={{ x: -320 }}
       transition={{ type: "spring", stiffness: 220, damping: 28 }}
-      className="fixed inset-y-0 left-0 z-50 w-[296px] md:hidden"
+      className="fixed inset-y-0 left-0 z-50 w-[286px] md:hidden"
     >
-      <div className="relative h-full overflow-hidden border-r border-white/[0.06] bg-[#040713]/94 backdrop-blur-[32px] shadow-[24px_0_80px_rgba(0,0,0,0.42)]">
+      <div className="relative h-full overflow-hidden border-r border-white/[0.06] bg-[#050816]/94 backdrop-blur-[30px] shadow-[24px_0_80px_rgba(0,0,0,0.42)]">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(850px_circle_at_0%_0%,rgba(99,102,241,0.16),transparent_24%),radial-gradient(620px_circle_at_0%_100%,rgba(34,211,238,0.08),transparent_22%)]" />
 
         <div className="relative flex items-center justify-between px-4 pt-4">

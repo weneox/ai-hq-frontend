@@ -52,13 +52,8 @@ function StatusPill({ icon: Icon, label, tone = "default" }) {
 
 export default function Header({ onMenuClick }) {
   return (
-    <header className="sticky top-0 z-40 px-4 pt-4 md:px-6 md:pt-6">
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-        className="relative overflow-hidden rounded-[34px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(9,14,28,0.88),rgba(5,9,20,0.80))] shadow-[0_24px_90px_rgba(0,0,0,0.45),0_1px_0_rgba(255,255,255,0.05),inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-3xl"
-      >
+    <div className="fixed left-0 right-0 top-0 z-40 px-4 pt-3 md:px-6 md:pt-4">
+      <header className="relative mx-auto overflow-hidden rounded-[34px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(9,14,28,0.88),rgba(5,9,20,0.80))] shadow-[0_24px_90px_rgba(0,0,0,0.45),0_1px_0_rgba(255,255,255,0.05),inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-3xl md:ml-[86px]">
         <div className="pointer-events-none absolute inset-0 rounded-[34px] bg-[radial-gradient(700px_circle_at_0%_0%,rgba(67,97,238,0.16),transparent_24%),radial-gradient(600px_circle_at_100%_0%,rgba(34,211,238,0.10),transparent_22%),radial-gradient(460px_circle_at_50%_-10%,rgba(255,255,255,0.06),transparent_32%),linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))]" />
         <div className="pointer-events-none absolute inset-[1px] rounded-[33px] border border-white/[0.03]" />
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
@@ -142,7 +137,7 @@ export default function Header({ onMenuClick }) {
             </motion.button>
           </motion.div>
         </div>
-      </motion.div>
-    </header>
+      </header>
+    </div>
   );
 }
