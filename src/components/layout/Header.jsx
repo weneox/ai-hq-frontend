@@ -8,136 +8,172 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 
-const fadeUp = {
+const fade = {
   initial: { opacity: 0, y: 8 },
   animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] },
+  transition: { duration: 0.38, ease: [0.22, 1, 0.36, 1] },
 };
 
-function StatusPill({ icon: Icon, label, tone = "default" }) {
-  const toneClasses =
-    tone === "live"
-      ? "border-emerald-300/15 bg-[linear-gradient(180deg,rgba(16,185,129,0.10),rgba(255,255,255,0.02))] text-white/72"
-      : "border-cyan-300/10 bg-[linear-gradient(180deg,rgba(103,232,249,0.06),rgba(255,255,255,0.02))] text-white/60";
+function Divider({ className = "" }) {
+  return (
+    <div
+      className={[
+        "hidden lg:block h-8 w-px shrink-0 bg-gradient-to-b from-transparent via-white/[0.07] to-transparent",
+        className,
+      ].join(" ")}
+    />
+  );
+}
 
+function SearchZone() {
   return (
     <motion.div
-      whileHover={{ y: -1.5, scale: 1.01 }}
-      transition={{ duration: 0.22, ease: "easeOut" }}
-      className={[
-        "group relative inline-flex h-[50px] items-center gap-2.5 rounded-[18px] border px-4",
-        "shadow-[0_12px_34px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.05)]",
-        "backdrop-blur-xl",
-        toneClasses,
-      ].join(" ")}
+      {...fade}
+      transition={{ ...fade.transition, delay: 0.03 }}
+      className="relative min-w-0 flex-1 max-w-[760px]"
     >
-      <div className="pointer-events-none absolute inset-0 rounded-[18px] bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.008))]" />
-      <div className="relative flex items-center gap-2.5">
-        {tone === "live" ? (
-          <span className="relative flex h-2.5 w-2.5">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400/45" />
-            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_14px_rgba(74,222,128,0.9)]" />
-          </span>
-        ) : (
-          <Icon className="h-[13px] w-[13px] text-cyan-200/75" />
-        )}
+      <div className="absolute inset-0 rounded-[18px] border border-white/[0.05] bg-[linear-gradient(180deg,rgba(255,255,255,0.025),rgba(255,255,255,0.008))]" />
+      <div className="absolute inset-[1px] rounded-[17px] bg-[linear-gradient(180deg,rgba(5,10,19,0.96),rgba(4,8,16,0.90))]" />
+      <div className="pointer-events-none absolute left-[54px] top-1/2 h-7 w-px -translate-y-1/2 bg-gradient-to-b from-transparent via-white/[0.08] to-transparent" />
 
-        <span className="text-[10px] font-semibold uppercase tracking-[0.30em]">
-          {label}
-        </span>
+      <div className="relative flex h-[46px] items-center px-2.5">
+        <div className="mr-3 flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] bg-white/[0.03] text-white/68 ring-1 ring-white/[0.05]">
+          <Search className="h-[14px] w-[14px]" />
+        </div>
+
+        <input
+          type="text"
+          placeholder="Search flows, agents, signals, incidents..."
+          className="w-full bg-transparent pr-3 text-[13px] font-medium tracking-[0.01em] text-white/88 outline-none placeholder:text-white/28"
+        />
       </div>
     </motion.div>
   );
 }
 
+function LiveBlock() {
+  return (
+    <motion.div
+      {...fade}
+      transition={{ ...fade.transition, delay: 0.08 }}
+      className="hidden xl:flex items-center gap-2.5"
+    >
+      <span className="relative flex h-2.5 w-2.5 shrink-0">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400/40" />
+        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_16px_rgba(74,222,128,0.82)]" />
+      </span>
+
+      <div className="leading-none">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-white/80">
+          Live System
+        </div>
+        <div className="mt-1 text-[10px] tracking-[0.06em] text-white/34">
+          Operational layer stable
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function ShellBlock() {
+  return (
+    <motion.div
+      {...fade}
+      transition={{ ...fade.transition, delay: 0.12 }}
+      className="hidden 2xl:flex items-center gap-2.5"
+    >
+      <div className="flex h-8 w-8 items-center justify-center rounded-[12px] bg-white/[0.03] ring-1 ring-white/[0.05]">
+        <Activity className="h-[13px] w-[13px] text-cyan-200/75" />
+      </div>
+
+      <div className="leading-none">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-white/70">
+          Executive Shell
+        </div>
+        <div className="mt-1 text-[10px] tracking-[0.06em] text-white/32">
+          Strategic access enabled
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function AlertButton() {
+  return (
+    <motion.button
+      {...fade}
+      transition={{ ...fade.transition, delay: 0.16 }}
+      whileHover={{ y: -1 }}
+      whileTap={{ scale: 0.98 }}
+      className="group relative flex h-9 w-9 shrink-0 items-center justify-center rounded-[13px] bg-white/[0.03] text-white/72 ring-1 ring-white/[0.06] transition duration-300 hover:bg-white/[0.055] hover:text-white"
+    >
+      <Bell className="h-[15px] w-[15px]" />
+      <span className="absolute right-[7px] top-[7px] h-2 w-2 rounded-full bg-cyan-300 shadow-[0_0_12px_rgba(103,232,249,0.95)]" />
+    </motion.button>
+  );
+}
+
+function EnterLayerButton() {
+  return (
+    <motion.button
+      {...fade}
+      transition={{ ...fade.transition, delay: 0.2 }}
+      whileHover={{ y: -1 }}
+      whileTap={{ scale: 0.985 }}
+      className="group relative hidden h-[44px] shrink-0 items-center gap-2.5 rounded-[16px] px-4 lg:inline-flex"
+    >
+      <div className="absolute inset-0 rounded-[16px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(255,255,255,0.032),rgba(255,255,255,0.01))]" />
+      <div className="absolute inset-[1px] rounded-[15px] bg-[linear-gradient(180deg,rgba(8,14,27,0.96),rgba(6,11,21,0.88))]" />
+
+      <div className="relative flex items-center gap-2.5">
+        <div className="flex h-8 w-8 items-center justify-center rounded-[12px] bg-white/[0.04] text-cyan-200/80 ring-1 ring-white/[0.05]">
+          <ShieldCheck className="h-[14px] w-[14px]" />
+        </div>
+
+        <div className="text-left leading-none">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-white/80">
+            Enter Layer
+          </div>
+          <div className="mt-1 text-[10px] tracking-[0.05em] text-white/34">
+            Secure executive access
+          </div>
+        </div>
+
+        <ChevronRight className="h-4 w-4 text-white/46 transition duration-300 group-hover:translate-x-0.5 group-hover:text-white/72" />
+      </div>
+    </motion.button>
+  );
+}
+
 export default function Header({ onMenuClick }) {
   return (
-    <div className="fixed left-0 right-0 top-0 z-40 px-4 pt-3 md:px-6 md:pt-4">
-      <header className="relative mx-auto overflow-hidden rounded-[34px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(9,14,28,0.88),rgba(5,9,20,0.80))] shadow-[0_24px_90px_rgba(0,0,0,0.45),0_1px_0_rgba(255,255,255,0.05),inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-3xl md:ml-[86px]">
-        <div className="pointer-events-none absolute inset-0 rounded-[34px] bg-[radial-gradient(700px_circle_at_0%_0%,rgba(67,97,238,0.16),transparent_24%),radial-gradient(600px_circle_at_100%_0%,rgba(34,211,238,0.10),transparent_22%),radial-gradient(460px_circle_at_50%_-10%,rgba(255,255,255,0.06),transparent_32%),linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))]" />
-        <div className="pointer-events-none absolute inset-[1px] rounded-[33px] border border-white/[0.03]" />
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-        <div className="pointer-events-none absolute bottom-0 left-[10%] right-[10%] h-px bg-gradient-to-r from-transparent via-cyan-200/10 to-transparent" />
-        <div className="pointer-events-none absolute inset-y-0 left-[16%] w-px bg-gradient-to-b from-transparent via-white/[0.06] to-transparent" />
-        <div className="pointer-events-none absolute inset-y-0 right-[18%] w-px bg-gradient-to-b from-transparent via-cyan-300/[0.06] to-transparent" />
-        <div className="pointer-events-none absolute -left-8 top-6 h-24 w-24 rounded-full bg-indigo-500/10 blur-3xl" />
-        <div className="pointer-events-none absolute right-10 top-0 h-28 w-28 rounded-full bg-cyan-400/10 blur-3xl" />
+    <header className="fixed inset-x-0 top-0 z-[120] border-b border-white/[0.06] bg-[rgba(3,7,15,0.82)] backdrop-blur-[22px]">
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.010)_40%,rgba(255,255,255,0.006)_100%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(700px_circle_at_8%_-140%,rgba(34,211,238,0.10),transparent_28%),radial-gradient(700px_circle_at_92%_-140%,rgba(99,102,241,0.12),transparent_30%)]" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
-        <div className="relative flex h-[88px] items-center gap-3 px-3 md:h-[96px] md:gap-4 md:px-4 xl:px-5">
-          <motion.button
-            {...fadeUp}
-            onClick={onMenuClick}
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] text-white/72 shadow-[0_10px_30px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.05)] transition duration-300 hover:border-white/[0.14] hover:bg-white/[0.06] active:scale-[0.98] md:hidden"
-          >
-            <Menu className="h-[17px] w-[17px]" />
-          </motion.button>
+      <div className="relative flex h-[var(--header-h)] items-center gap-3 px-3 md:gap-4 md:pl-[calc(var(--sidebar-w)+14px)] md:pr-5 xl:pr-6">
+        <motion.button
+          {...fade}
+          onClick={onMenuClick}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-white/[0.03] text-white/70 ring-1 ring-white/[0.06] transition duration-300 hover:bg-white/[0.05] hover:text-white md:hidden"
+        >
+          <Menu className="h-[18px] w-[18px]" />
+        </motion.button>
 
-          <motion.div
-            {...fadeUp}
-            transition={{ ...fadeUp.transition, delay: 0.04 }}
-            className="group relative min-w-0 flex-1"
-          >
-            <div className="absolute inset-0 rounded-[26px] bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.014))]" />
-            <div className="absolute inset-[1px] rounded-[25px] bg-[linear-gradient(180deg,rgba(8,13,25,0.96),rgba(7,11,22,0.90))]" />
-            <div className="pointer-events-none absolute inset-y-[10px] left-[74px] w-px bg-gradient-to-b from-transparent via-white/[0.06] to-transparent" />
-            <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+        <SearchZone />
 
-            <div className="relative flex h-[60px] items-center rounded-[26px] border border-white/[0.08] px-3 pr-3 shadow-[0_20px_50px_rgba(0,0,0,0.24),inset_0_1px_0_rgba(255,255,255,0.04)] transition duration-300 focus-within:border-cyan-300/25 focus-within:shadow-[0_26px_70px_rgba(0,0,0,0.32),inset_0_1px_0_rgba(255,255,255,0.05)]">
-              <motion.div
-                whileHover={{ scale: 1.03 }}
-                className="mr-3 flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] border border-white/[0.07] bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] text-white/62 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
-              >
-                <Search className="h-[15px] w-[15px]" />
-              </motion.div>
+        <Divider className="xl:block" />
+        <LiveBlock />
 
-              <div className="min-w-0 flex-1">
-                <input
-                  type="text"
-                  placeholder="Search flows, agents, signals, incidents..."
-                  className="w-full bg-transparent text-[14px] font-medium tracking-[0.01em] text-white/90 outline-none placeholder:text-white/26"
-                />
-              </div>
-            </div>
-          </motion.div>
+        <Divider className="2xl:block" />
+        <ShellBlock />
 
-          <motion.div
-            {...fadeUp}
-            transition={{ ...fadeUp.transition, delay: 0.08 }}
-            className="hidden items-center gap-2.5 xl:flex"
-          >
-            <StatusPill icon={Activity} label="Live System" tone="live" />
-            <StatusPill icon={Activity} label="Executive Shell" />
-          </motion.div>
+        <Divider className="lg:block" />
+        <AlertButton />
 
-          <motion.button
-            {...fadeUp}
-            transition={{ ...fadeUp.transition, delay: 0.12 }}
-            whileHover={{ y: -1.5, scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className="group relative flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] text-white/72 shadow-[0_12px_34px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.05)] transition duration-300 hover:border-white/[0.14] hover:bg-white/[0.06]"
-          >
-            <Bell className="h-[16px] w-[16px] transition duration-300 group-hover:scale-105" />
-            <span className="absolute right-[11px] top-[11px] h-2.5 w-2.5 rounded-full bg-cyan-300 shadow-[0_0_16px_rgba(103,232,249,0.95)]" />
-            <span className="pointer-events-none absolute inset-0 rounded-[18px] bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.08),transparent_45%)] opacity-70" />
-          </motion.button>
-
-          <motion.div
-            {...fadeUp}
-            transition={{ ...fadeUp.transition, delay: 0.16 }}
-            className="hidden 2xl:flex"
-          >
-            <motion.button
-              whileHover={{ y: -1.5, scale: 1.01 }}
-              whileTap={{ scale: 0.985 }}
-              className="group inline-flex h-12 items-center gap-2.5 rounded-[18px] border border-white/[0.07] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] px-4 text-[11px] font-medium uppercase tracking-[0.24em] text-white/46 shadow-[0_12px_30px_rgba(0,0,0,0.16),inset_0_1px_0_rgba(255,255,255,0.05)] transition hover:border-white/[0.12] hover:bg-white/[0.055] hover:text-white/68"
-            >
-              <ShieldCheck className="h-3.5 w-3.5 text-cyan-200/70" />
-              Enter Layer
-              <ChevronRight className="h-3.5 w-3.5 transition duration-300 group-hover:translate-x-0.5" />
-            </motion.button>
-          </motion.div>
-        </div>
-      </header>
-    </div>
+        <EnterLayerButton />
+      </div>
+    </header>
   );
 }
