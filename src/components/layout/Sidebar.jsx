@@ -25,86 +25,73 @@ const NAV_ITEMS = [
   { label: "Settings", icon: SlidersHorizontal, to: "/settings" },
 ];
 
-const COLLAPSED_W = 76;
-const EXPANDED_W = 232;
-const LABEL_W = 128;
-const ICON_COL_W = 52;
+const COLLAPSED_W = 74;
+const EXPANDED_W = 286;
+const ICON_COL_W = 74;
+const ITEM_H = 56;
+const BRAND_H = 92;
 
 function cn(...classes) {
   return classes.filter(Boolean).join(" ");
 }
 
-function Reveal({ expanded, children, className = "" }) {
+function ItemGlow({ isActive }) {
   return (
-    <div
-      className={cn("min-w-0 overflow-hidden", className)}
-      style={{
-        width: expanded ? LABEL_W : 0,
-        opacity: expanded ? 1 : 0,
-        transform: expanded ? "translateX(0px)" : "translateX(-6px)",
-        transition:
-          "width 360ms cubic-bezier(0.22,1,0.36,1), opacity 150ms ease, transform 220ms cubic-bezier(0.22,1,0.36,1)",
-      }}
-      aria-hidden={!expanded}
-    >
-      {children}
-    </div>
-  );
-}
-
-function RailTop({ expanded }) {
-  return (
-    <div className={cn("px-2", expanded ? "pt-4 pb-3" : "pt-4 pb-4")}>
+    <>
       <div
         className={cn(
-          "relative overflow-hidden rounded-[18px] border border-white/[0.05] bg-[linear-gradient(180deg,rgba(255,255,255,0.022),rgba(255,255,255,0.006))]",
-          expanded ? "px-3 py-3" : "mx-auto flex h-[52px] w-[52px] items-center justify-center"
+          "pointer-events-none absolute left-[13px] top-1/2 h-[28px] w-[2px] -translate-y-1/2 rounded-full transition-all duration-300",
+          isActive
+            ? "bg-cyan-300/80 opacity-100 shadow-[0_0_16px_rgba(103,232,249,0.32)]"
+            : "opacity-0"
         )}
-      >
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(120px_circle_at_50%_0%,rgba(99,102,241,0.10),transparent_52%),linear-gradient(180deg,rgba(255,255,255,0.02),transparent)]" />
-
-        {expanded ? (
-          <div className="relative flex items-center gap-3">
-            <div className="flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-[14px] bg-white/[0.035] ring-1 ring-white/[0.06]">
-              <ExecutiveMark3D className="h-[24px] w-[24px]" />
-            </div>
-
-            <div className="min-w-0">
-              <div className="truncate text-[10px] uppercase tracking-[0.22em] text-white/38">
-                AI Headquarters
-              </div>
-              <div className="truncate pt-1 text-[13px] font-semibold tracking-[-0.02em] text-white/92">
-                Command Center
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="relative flex items-center justify-center">
-            <ExecutiveMark3D className="h-[24px] w-[24px]" />
-          </div>
+      />
+      <div
+        className={cn(
+          "pointer-events-none absolute inset-y-[6px] left-[8px] right-[8px] rounded-[18px] transition-all duration-300",
+          isActive
+            ? "bg-[linear-gradient(90deg,rgba(255,255,255,0.05),rgba(255,255,255,0.016)_34%,rgba(255,255,255,0.006)_58%,transparent)]"
+            : "bg-transparent group-hover:bg-[linear-gradient(90deg,rgba(255,255,255,0.024),rgba(255,255,255,0.01)_32%,transparent)]"
         )}
-      </div>
-    </div>
+      />
+    </>
   );
 }
 
-function NavIcon({ Icon, active }) {
+function BrandDock({ expanded }) {
   return (
-    <div
-      className={cn(
-        "relative flex h-[38px] w-[38px] items-center justify-center rounded-[13px] transition-all duration-300",
-        active
-          ? "bg-white/[0.045] text-white ring-1 ring-white/[0.07] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
-          : "bg-transparent text-white/56"
-      )}
-    >
-      {active && (
-        <div className="pointer-events-none absolute inset-0 rounded-[13px] bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.06),transparent_55%)]" />
-      )}
-      <Icon
-        className={cn("relative", active ? "h-[15px] w-[15px]" : "h-[14px] w-[14px]")}
-        strokeWidth={1.9}
-      />
+    <div className="relative" style={{ height: BRAND_H }}>
+      <div className="relative flex h-full items-center overflow-hidden">
+        <div
+          className="relative z-[2] flex h-full shrink-0 items-center justify-center"
+          style={{ width: ICON_COL_W }}
+        >
+          <div className="relative flex h-[38px] w-[38px] items-center justify-center">
+            <div className="absolute inset-0 rounded-[14px] bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.10),transparent_68%),linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.004))]" />
+            <div className="absolute inset-0 rounded-[14px] ring-1 ring-white/[0.04]" />
+            <ExecutiveMark3D className="relative h-[20px] w-[20px]" />
+          </div>
+        </div>
+
+        <AnimatePresence initial={false}>
+          {expanded && (
+            <motion.div
+              initial={{ opacity: 0, x: -10, filter: "blur(6px)" }}
+              animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
+              exit={{ opacity: 0, x: -8, filter: "blur(6px)" }}
+              transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+              className="relative z-[2] min-w-0 flex-1 pr-4"
+            >
+              <div className="w-[164px] text-[10px] font-semibold uppercase tracking-[0.34em] text-white/52">
+                AI HEADQUARTERS
+              </div>
+              <div className="w-[164px] pt-1 text-[14px] font-semibold tracking-[-0.02em] text-white/96">
+                Executive Command
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }
@@ -117,52 +104,44 @@ function NavItem({ item, expanded, onNavigate }) {
       to={item.to}
       end={item.to === "/"}
       onClick={onNavigate}
-      className={({ isActive }) =>
-        cn(
-          "group relative flex items-center transition-all duration-300",
-          expanded ? "h-[52px] rounded-[16px] px-2.5" : "h-[54px] justify-center rounded-[16px]",
-          isActive ? "text-white" : "text-white/60 hover:text-white/86"
-        )
-      }
+      className="group relative block"
     >
       {({ isActive }) => (
-        <>
-          <div
-            className={cn(
-              "absolute transition-all duration-300",
-              expanded
-                ? "inset-0 rounded-[16px]"
-                : "inset-x-2 inset-y-1 rounded-[16px]",
-              isActive
-                ? "bg-white/[0.03] ring-1 ring-white/[0.05]"
-                : "bg-transparent group-hover:bg-white/[0.015]"
-            )}
-          />
+        <div className="relative flex items-center overflow-hidden" style={{ height: ITEM_H }}>
+          <ItemGlow isActive={isActive} />
 
           <div
-            className={cn(
-              "absolute left-[10px] top-1/2 -translate-y-1/2 rounded-full transition-all duration-300",
-              expanded ? "h-[20px] w-px" : "h-[24px] w-px",
-              isActive ? "bg-cyan-200/60 opacity-100" : "opacity-0"
-            )}
-          />
-
-          <div
-            className={cn(
-              "relative flex shrink-0 items-center justify-center",
-              expanded ? `w-[${ICON_COL_W}px]` : "w-full"
-            )}
-            style={expanded ? { width: ICON_COL_W } : undefined}
+            className="relative z-[2] flex h-full shrink-0 items-center justify-center"
+            style={{ width: ICON_COL_W }}
           >
-            <NavIcon Icon={Icon} active={isActive} />
+            <div className="relative flex h-[34px] w-[34px] items-center justify-center">
+              <Icon
+                className={cn(
+                  "transition-colors duration-300",
+                  isActive
+                    ? "h-[15px] w-[15px] text-white"
+                    : "h-[14.5px] w-[14.5px] text-white/58 group-hover:text-white/84"
+                )}
+                strokeWidth={1.9}
+              />
+            </div>
           </div>
 
-          <Reveal expanded={expanded} className="flex-1">
-            <div className="flex min-w-0 items-center justify-between">
+          <div
+            className={cn(
+              "relative z-[2] min-w-0 flex-1 pr-3 transition-all duration-300",
+              expanded
+                ? "pointer-events-auto translate-x-0 opacity-100"
+                : "pointer-events-none -translate-x-2 opacity-0"
+            )}
+          >
+            <div className="flex items-center justify-between gap-3">
               <span
                 className={cn(
-                  "truncate text-[13px] font-medium tracking-[-0.01em] transition-colors duration-300",
-                  isActive ? "text-white/94" : "text-white/62 group-hover:text-white/88"
+                  "truncate text-[12.8px] font-medium tracking-[-0.01em] transition-colors duration-300",
+                  isActive
+                    ? "text-white/95"
+                    : "text-white/70 group-hover:text-white/88"
                 )}
               >
                 {item.label}
@@ -170,15 +149,15 @@ function NavItem({ item, expanded, onNavigate }) {
 
               <ChevronRight
                 className={cn(
-                  "ml-3 h-[13px] w-[13px] shrink-0 transition-all duration-300",
+                  "h-[12px] w-[12px] shrink-0 transition-all duration-300",
                   isActive
-                    ? "text-white/30"
+                    ? "text-white/28"
                     : "text-white/14 group-hover:translate-x-0.5 group-hover:text-white/22"
                 )}
               />
             </div>
-          </Reveal>
-        </>
+          </div>
+        </div>
       )}
     </NavLink>
   );
@@ -186,8 +165,8 @@ function NavItem({ item, expanded, onNavigate }) {
 
 function RailNav({ expanded, onNavigate }) {
   return (
-    <nav className="px-2 pt-1">
-      <div className="space-y-1.5">
+    <nav className="px-0 pt-3">
+      <div className="space-y-2">
         {NAV_ITEMS.map((item) => (
           <NavItem
             key={item.to}
@@ -203,31 +182,39 @@ function RailNav({ expanded, onNavigate }) {
 
 function RailFooter({ expanded }) {
   return (
-    <div className={cn(expanded ? "px-3 pb-4 pt-4" : "px-2 pb-4 pt-4")}>
-      {expanded ? (
-        <div className="flex items-center gap-3 rounded-[16px] border border-white/[0.04] bg-white/[0.018] px-2.5 py-2.5">
-          <div className="relative flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-[12px] bg-white/[0.03] ring-1 ring-white/[0.05]">
-            <ShieldCheck className="h-[14px] w-[14px] text-white/78" />
-            <span className="absolute right-[7px] top-[7px] h-1.5 w-1.5 rounded-full bg-emerald-300/90" />
-          </div>
+    <div className="px-0 pb-4 pt-4">
+      <div className="group relative flex h-[56px] items-center overflow-hidden">
+        <div className="pointer-events-none absolute inset-y-[6px] left-[8px] right-[8px] rounded-[18px] bg-[linear-gradient(90deg,rgba(255,255,255,0.02),rgba(255,255,255,0.008)_28%,transparent)]" />
 
-          <div className="min-w-0">
-            <div className="truncate text-[10px] uppercase tracking-[0.20em] text-white/40">
-              Secure Rail
-            </div>
-            <div className="truncate pt-0.5 text-[11px] text-white/64">
-              Private operational layer
-            </div>
+        <div
+          className="relative z-[2] flex h-full shrink-0 items-center justify-center"
+          style={{ width: ICON_COL_W }}
+        >
+          <div className="relative flex h-[34px] w-[34px] items-center justify-center">
+            <ShieldCheck
+              className="h-[14px] w-[14px] text-white/82"
+              strokeWidth={1.9}
+            />
+            <span className="absolute right-[6px] top-[6px] h-[6px] w-[6px] rounded-full bg-emerald-300 shadow-[0_0_10px_rgba(110,231,183,0.72)]" />
           </div>
         </div>
-      ) : (
-        <div className="flex justify-center">
-          <div className="relative flex h-[44px] w-[44px] items-center justify-center rounded-[14px] bg-white/[0.02] ring-1 ring-white/[0.05]">
-            <ShieldCheck className="h-[14px] w-[14px] text-white/78" />
-            <span className="absolute right-[8px] top-[8px] h-1.5 w-1.5 rounded-full bg-emerald-300/90" />
+
+        <div
+          className={cn(
+            "relative z-[2] min-w-0 flex-1 pr-3 transition-all duration-300",
+            expanded
+              ? "pointer-events-auto translate-x-0 opacity-100"
+              : "pointer-events-none -translate-x-2 opacity-0"
+          )}
+        >
+          <div className="truncate text-[9.5px] uppercase tracking-[0.24em] text-white/38">
+            Secure Rail
+          </div>
+          <div className="truncate pt-0.5 text-[10.5px] text-white/60">
+            Private operational layer
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -246,23 +233,20 @@ function DesktopSidebar({ expanded, setExpanded }) {
 
   const handleEnter = () => {
     clearTimeout(closeTimer.current);
-    openTimer.current = setTimeout(() => setExpanded(true), 70);
+    openTimer.current = setTimeout(() => setExpanded(true), 55);
   };
 
   const handleLeave = () => {
     clearTimeout(openTimer.current);
-    closeTimer.current = setTimeout(() => setExpanded(false), 110);
+    closeTimer.current = setTimeout(() => setExpanded(false), 120);
   };
 
   return (
     <aside
       onMouseEnter={handleEnter}
       onMouseLeave={handleLeave}
-      className="fixed left-0 hidden md:block z-[90]"
-      style={{
-        top: "var(--header-h)",
-        height: "calc(100vh - var(--header-h))",
-      }}
+      className="fixed left-0 top-0 z-[130] hidden md:block"
+      style={{ height: "100vh" }}
     >
       <motion.div
         animate={{ width: expanded ? EXPANDED_W : COLLAPSED_W }}
@@ -271,20 +255,17 @@ function DesktopSidebar({ expanded, setExpanded }) {
             ? { duration: 0 }
             : { duration: 0.34, ease: [0.22, 1, 0.36, 1] }
         }
-        className="relative h-full overflow-hidden border-r border-white/[0.05] bg-[rgba(4,8,18,0.76)] backdrop-blur-[22px] will-change-[width]"
-        style={{
-          boxShadow: expanded
-            ? "20px 0 56px rgba(0,0,0,0.34)"
-            : "10px 0 26px rgba(0,0,0,0.18)",
-        }}
+        className="relative h-full overflow-hidden"
+        style={{ willChange: "width" }}
       >
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(6,10,22,0.94),rgba(3,7,16,0.98))]" />
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(220px_circle_at_50%_0%,rgba(99,102,241,0.08),transparent_40%),radial-gradient(260px_circle_at_50%_100%,rgba(34,211,238,0.04),transparent_45%)]" />
-        <div className="pointer-events-none absolute right-0 top-0 h-full w-px bg-gradient-to-b from-transparent via-white/[0.06] to-transparent" />
+        <div className="absolute inset-0 rounded-r-[30px] bg-[linear-gradient(180deg,rgba(3,7,15,0.975),rgba(3,7,16,0.992))]" />
+        <div className="absolute inset-0 rounded-r-[30px] backdrop-blur-[28px]" />
+        <div className="absolute inset-0 rounded-r-[30px] bg-[radial-gradient(240px_circle_at_0%_0%,rgba(34,211,238,0.045),transparent_34%),radial-gradient(320px_circle_at_50%_46%,rgba(99,102,241,0.045),transparent_42%),radial-gradient(220px_circle_at_0%_100%,rgba(255,255,255,0.014),transparent_38%)]" />
+        <div className="absolute inset-0 rounded-r-[30px] shadow-[18px_0_48px_rgba(0,0,0,0.24),inset_0_1px_0_rgba(255,255,255,0.024)]" />
 
         <div className="relative flex h-full flex-col">
-          <RailTop expanded={expanded} />
-          <RailNav expanded={expanded} />
+          <BrandDock expanded={expanded} />
+          <RailNav expanded={expanded} onNavigate={() => {}} />
           <div className="mt-auto">
             <RailFooter expanded={expanded} />
           </div>
@@ -294,54 +275,131 @@ function DesktopSidebar({ expanded, setExpanded }) {
   );
 }
 
-function MobileBrand() {
-  return (
-    <div className="flex items-center gap-3 px-4 pt-5">
-      <div className="flex h-[56px] w-[56px] items-center justify-center rounded-[18px] bg-white/[0.03] ring-1 ring-white/[0.06] shadow-[0_12px_30px_rgba(0,0,0,0.20)]">
-        <ExecutiveMark3D className="h-[32px] w-[32px]" />
-      </div>
+function MobileNavItem({ item, onNavigate }) {
+  const Icon = item.icon;
 
-      <div className="min-w-0">
-        <div className="truncate text-[10px] uppercase tracking-[0.24em] text-white/40">
-          AI Headquarters
+  return (
+    <NavLink
+      to={item.to}
+      end={item.to === "/"}
+      onClick={onNavigate}
+      className="group relative block"
+    >
+      {({ isActive }) => (
+        <div className="relative flex h-[56px] items-center overflow-hidden">
+          <ItemGlow isActive={isActive} />
+
+          <div
+            className="relative z-[2] flex h-full shrink-0 items-center justify-center"
+            style={{ width: ICON_COL_W }}
+          >
+            <div className="relative flex h-[34px] w-[34px] items-center justify-center">
+              <Icon
+                className={cn(
+                  "transition-colors duration-300",
+                  isActive
+                    ? "h-[15px] w-[15px] text-white"
+                    : "h-[14.5px] w-[14.5px] text-white/58 group-hover:text-white/84"
+                )}
+                strokeWidth={1.9}
+              />
+            </div>
+          </div>
+
+          <div className="relative z-[2] min-w-0 flex-1 pr-3">
+            <div className="flex items-center justify-between gap-3">
+              <span
+                className={cn(
+                  "truncate text-[12.8px] font-medium tracking-[-0.01em] transition-colors duration-300",
+                  isActive
+                    ? "text-white/95"
+                    : "text-white/70 group-hover:text-white/88"
+                )}
+              >
+                {item.label}
+              </span>
+
+              <ChevronRight
+                className={cn(
+                  "h-[12px] w-[12px] shrink-0 transition-all duration-300",
+                  isActive
+                    ? "text-white/28"
+                    : "text-white/14 group-hover:translate-x-0.5 group-hover:text-white/22"
+                )}
+              />
+            </div>
+          </div>
         </div>
-        <div className="truncate pt-1 text-[15px] font-semibold tracking-[-0.025em] text-white/94">
-          Command Center
-        </div>
-      </div>
-    </div>
+      )}
+    </NavLink>
   );
 }
 
 function MobileSidebar({ setMobileOpen }) {
   return (
     <motion.aside
-      initial={{ x: -280 }}
+      initial={{ x: -286 }}
       animate={{ x: 0 }}
-      exit={{ x: -280 }}
-      transition={{ type: "spring", stiffness: 240, damping: 30 }}
-      className="fixed inset-y-0 left-0 z-[140] w-[250px] md:hidden"
+      exit={{ x: -286 }}
+      transition={{ type: "spring", stiffness: 240, damping: 28 }}
+      className="fixed inset-y-0 left-0 z-[160] w-[286px] md:hidden"
     >
-      <div className="relative h-full overflow-hidden border-r border-white/[0.05] bg-[rgba(5,8,22,0.96)] backdrop-blur-[24px] shadow-[20px_0_60px_rgba(0,0,0,0.38)]">
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(7,11,24,0.98),rgba(4,8,20,0.98))]" />
+      <div className="relative h-full overflow-hidden border-r border-white/[0.04] bg-[rgba(3,7,15,0.98)] backdrop-blur-[28px] shadow-[20px_0_60px_rgba(0,0,0,0.40)]">
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,11,24,0.98),rgba(4,8,20,0.98))]" />
+        <div className="absolute inset-0 bg-[radial-gradient(260px_circle_at_0%_0%,rgba(99,102,241,0.08),transparent_34%),radial-gradient(320px_circle_at_50%_50%,rgba(34,211,238,0.03),transparent_42%)]" />
 
-        <div className="relative flex items-start justify-between px-1 pt-1">
-          <div className="min-w-0 flex-1">
-            <MobileBrand />
-          </div>
-
+        <div className="relative flex items-center justify-end px-4 pt-4 pb-3">
           <button
             onClick={() => setMobileOpen(false)}
-            className="mt-4 mr-4 flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-white/[0.04] text-white/84 ring-1 ring-white/[0.06] transition hover:bg-white/[0.07]"
+            className="flex h-9 w-9 items-center justify-center rounded-[12px] bg-white/[0.045] text-white/84 ring-1 ring-white/[0.06] transition hover:bg-white/[0.07]"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="relative mt-3 flex h-[calc(100%-100px)] flex-col">
-          <RailNav expanded onNavigate={() => setMobileOpen(false)} />
-          <div className="mt-auto">
-            <RailFooter expanded />
+        <div className="relative flex h-[calc(100%-64px)] flex-col">
+          <div className="px-0">
+            <BrandDock expanded />
+          </div>
+
+          <nav className="px-0 pt-2">
+            <div className="space-y-2">
+              {NAV_ITEMS.map((item) => (
+                <MobileNavItem
+                  key={item.to}
+                  item={item}
+                  onNavigate={() => setMobileOpen(false)}
+                />
+              ))}
+            </div>
+          </nav>
+
+          <div className="mt-auto px-0 pb-4 pt-4">
+            <div className="relative flex h-[56px] items-center overflow-hidden">
+              <div className="pointer-events-none absolute inset-y-[6px] left-[8px] right-[8px] rounded-[18px] bg-[linear-gradient(90deg,rgba(255,255,255,0.02),rgba(255,255,255,0.008)_28%,transparent)]" />
+
+              <div
+                className="relative z-[2] flex h-full shrink-0 items-center justify-center"
+                style={{ width: ICON_COL_W }}
+              >
+                <div className="relative flex h-[34px] w-[34px] items-center justify-center">
+                  <ShieldCheck
+                    className="h-[14px] w-[14px] text-white/82"
+                    strokeWidth={1.9}
+                  />
+                  <span className="absolute right-[6px] top-[6px] h-[6px] w-[6px] rounded-full bg-emerald-300 shadow-[0_0_10px_rgba(110,231,183,0.72)]" />
+                </div>
+              </div>
+
+              <div className="relative z-[2] min-w-0 flex-1 pr-3">
+                <div className="truncate text-[9.5px] uppercase tracking-[0.24em] text-white/38">
+                  Secure Rail
+                </div>
+                <div className="truncate pt-0.5 text-[10.5px] text-white/60">
+                  Private operational layer
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -367,7 +425,7 @@ export default function Sidebar({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setMobileOpen(false)}
-              className="fixed inset-0 z-[130] bg-black/56 backdrop-blur-sm md:hidden"
+              className="fixed inset-0 z-[150] bg-black/58 backdrop-blur-sm md:hidden"
             />
             <MobileSidebar setMobileOpen={setMobileOpen} />
           </>
