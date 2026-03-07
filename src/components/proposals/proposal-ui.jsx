@@ -1,20 +1,20 @@
-function cn(...classes) {
-  return classes.filter(Boolean).join(" ");
-}
+import { cn } from "./proposal-utils.js";
 
-function ToneBadge({ tone = "neutral", children }) {
+function ToneBadge({ tone = "neutral", children, className = "" }) {
   const map = {
-    neutral: "border-white/[0.08] bg-white/[0.05] text-white/72",
-    success: "border-emerald-400/20 bg-emerald-400/10 text-emerald-200/90",
-    warn: "border-amber-400/20 bg-amber-400/10 text-amber-200/90",
-    danger: "border-rose-400/20 bg-rose-400/10 text-rose-200/90",
+    neutral: "border-white/[0.07] bg-white/[0.035] text-white/68",
+    success: "border-emerald-400/18 bg-emerald-400/08 text-emerald-200/88",
+    warn: "border-amber-400/18 bg-amber-400/08 text-amber-200/88",
+    danger: "border-rose-400/18 bg-rose-400/08 text-rose-200/88",
   };
 
   return (
     <span
       className={cn(
         "inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold",
-        map[tone] || map.neutral
+        "transition-colors duration-200",
+        map[tone] || map.neutral,
+        className
       )}
     >
       {children}
@@ -31,11 +31,11 @@ function GlassButton({
 }) {
   const variants = {
     default:
-      "border-white/[0.08] bg-white/[0.045] text-white/80 hover:bg-white/[0.07]",
+      "border-white/[0.08] bg-white/[0.04] text-white/80 hover:bg-white/[0.06]",
     primary:
-      "border-cyan-300/20 bg-cyan-300/12 text-cyan-100 hover:bg-cyan-300/18",
+      "border-cyan-300/18 bg-cyan-300/10 text-cyan-100 hover:bg-cyan-300/14",
     danger:
-      "border-rose-300/20 bg-rose-300/10 text-rose-100 hover:bg-rose-300/16",
+      "border-rose-300/18 bg-rose-300/09 text-rose-100 hover:bg-rose-300/14",
   };
 
   return (
@@ -43,8 +43,9 @@ function GlassButton({
       {...props}
       disabled={disabled}
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-[16px] border px-3.5 py-2 text-[12px] font-medium transition duration-200",
-        "shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-xl",
+        "inline-flex items-center justify-center gap-2 rounded-[16px] border px-3.5 py-2 text-[12px] font-medium",
+        "transition-[background,border-color,color,transform] duration-200 ease-out",
+        "shadow-[0_8px_22px_rgba(0,0,0,0.14)]",
         variants[variant] || variants.default,
         disabled && "cursor-not-allowed opacity-45 hover:bg-inherit",
         className
@@ -55,4 +56,18 @@ function GlassButton({
   );
 }
 
-export { cn, ToneBadge, GlassButton };
+function SurfacePill({ children, className = "" }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full border border-white/[0.055] bg-white/[0.03] px-2.5 py-1 text-[11px] text-white/54",
+        "transition-colors duration-200",
+        className
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+export { ToneBadge, GlassButton, SurfacePill };

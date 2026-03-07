@@ -1,8 +1,4 @@
-// src/pages/Proposals.jsx
-// SINGLE-SURFACE CANVAS VERSION
-
 import { useEffect, useRef, useState } from "react";
-import TopBar from "../components/TopBar.jsx";
 import ProposalCanvas from "../components/ProposalCanvas.jsx";
 
 import {
@@ -61,20 +57,18 @@ function uniqById(items) {
 }
 
 function mergeDraftItems(draft, inProgress, pendingMaybe) {
-  return uniqById([...(draft || []), ...(inProgress || []), ...(pendingMaybe || [])]).sort(
-    sortNewestFirst
-  );
+  return uniqById([
+    ...(draft || []),
+    ...(inProgress || []),
+    ...(pendingMaybe || []),
+  ]).sort(sortNewestFirst);
 }
 
 function EmptyBox({ title, desc }) {
   return (
-    <div className="rounded-2xl border border-slate-200/70 bg-white/70 p-5 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-950/35">
-      <div className="text-[13px] font-semibold text-slate-900 dark:text-slate-100">
-        {title}
-      </div>
-      <div className="mt-1 text-[12px] text-slate-500 dark:text-slate-400">
-        {desc}
-      </div>
+    <div className="rounded-[26px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(7,12,22,0.72),rgba(5,9,18,0.56))] p-5 shadow-[0_14px_34px_rgba(0,0,0,0.16),inset_0_1px_0_rgba(255,255,255,0.03)] backdrop-blur-2xl">
+      <div className="text-[13px] font-semibold text-white">{title}</div>
+      <div className="mt-1 text-[12px] text-white/48">{desc}</div>
     </div>
   );
 }
@@ -199,7 +193,9 @@ export default function ProposalsPage() {
         next[s] = Array.isArray(items) ? items.length : 0;
       }
 
-      next.draft = (next.draft || 0) + (next.in_progress || 0) + (next.pending || 0);
+      next.draft =
+        (next.draft || 0) + (next.in_progress || 0) + (next.pending || 0);
+
       setStats(next);
     } catch {}
   };
@@ -248,7 +244,8 @@ export default function ProposalsPage() {
     const ws = createWsClient({
       onStatus: (s) => setWsStatus(s),
       onEvent: ({ type }) => {
-        const isProposalEvent = type === "proposal.created" || type === "proposal.updated";
+        const isProposalEvent =
+          type === "proposal.created" || type === "proposal.updated";
         const isContentEvent = type === "content.updated";
         const isExecEvent = type === "execution.updated" || type === "job.updated";
 
@@ -256,9 +253,12 @@ export default function ProposalsPage() {
           refreshStats();
 
           const currentStatus = statusRef.current;
-          refreshProposals(isProposalEvent && type === "proposal.created" ? "New item" : "", {
-            status: currentStatus,
-          });
+          refreshProposals(
+            isProposalEvent && type === "proposal.created" ? "New item" : "",
+            {
+              status: currentStatus,
+            }
+          );
         }
       },
     });
@@ -387,11 +387,6 @@ export default function ProposalsPage() {
     }
   };
 
-  const handleManualRefresh = async () => {
-    await refreshProposals("Refreshed");
-    await refreshStats();
-  };
-
   const handleCanvasRequestChanges = async (item, resolvedDraft, feedbackText) => {
     if (busy) return;
 
@@ -451,19 +446,8 @@ export default function ProposalsPage() {
   return (
     <div className="min-h-0 h-full min-w-0 overflow-y-auto overscroll-contain pr-1">
       <div className="min-w-0 flex flex-col gap-5 pb-10">
-        <div className="sticky top-0 z-30">
-          <div className="rounded-2xl bg-white/55 backdrop-blur-xl dark:bg-slate-950/30">
-            <TopBar
-              wsStatus={wsStatus}
-              onRefresh={handleManualRefresh}
-              stats={stats}
-              toast={toast}
-            />
-          </div>
-        </div>
-
         {err ? (
-          <div className="rounded-2xl border border-rose-200/70 bg-rose-50/80 p-4 text-sm text-rose-900 shadow-sm dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+          <div className="rounded-[24px] border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-rose-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] backdrop-blur-xl">
             {err}
           </div>
         ) : null}
@@ -485,6 +469,7 @@ export default function ProposalsPage() {
         ) : (
           <ProposalCanvas
             proposals={proposals}
+            stats={stats}
             status={status}
             setStatus={(s) => {
               const next = UI_TABS.includes(String(s)) ? String(s) : "draft";
@@ -493,6 +478,12 @@ export default function ProposalsPage() {
             search={search}
             setSearch={setSearch}
             busy={busy}
+            toast={toast}
+            wsStatus={wsStatus}
+            onRefresh={async () => {
+              await refreshProposals("Refreshed");
+              await refreshStats();
+            }}
             onApprove={handleCanvasApprove}
             onReject={handleCanvasReject}
             onPublish={handleCanvasPublish}
