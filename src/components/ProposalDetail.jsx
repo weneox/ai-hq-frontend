@@ -1,5 +1,5 @@
 // src/components/ProposalDetail.jsx
-// FINAL v5.4.0 — FIXED publish gating + caption normalization + tolerant asset detection
+// FINAL v5.5.0 — FIXED publish gating from approved tab + tolerant asset lookup across proposal/draft/result/output
 
 import { useEffect, useMemo, useState } from "react";
 import Card from "./ui/Card.jsx";
@@ -18,6 +18,7 @@ function safeText(x) {
     if (typeof x.caption === "string") return x.caption;
     if (typeof x.label === "string") return x.label;
     if (typeof x.name === "string") return x.name;
+    if (typeof x.title === "string") return x.title;
   }
   return "";
 }
@@ -181,21 +182,25 @@ function summaryOf(p) {
 }
 
 function pickDraftCandidate(proposal, draftProp) {
-  return (
-    draftProp ||
+  if (draftProp) return draftProp;
+
+  const preferred =
     proposal?.latestContent ||
     proposal?.latestDraft ||
     proposal?.latest_draft ||
     proposal?.draft ||
     proposal?.contentDraft ||
+    proposal?.content_item ||
+    proposal?.contentItem ||
     proposal?.latest_execution ||
     proposal?.lastExecution ||
     proposal?.latestExecution ||
     proposal?.execution ||
     proposal?.job ||
     (Array.isArray(proposal?.jobs) ? proposal.jobs[0] : null) ||
-    null
-  );
+    null;
+
+  return preferred;
 }
 
 function normalizeDraft(rawDraft) {
@@ -322,31 +327,81 @@ function firstNonEmpty(...vals) {
   return "";
 }
 
-function getAssetUrls(pack) {
-  if (!pack || typeof pack !== "object") return [];
+function addUrl(out, value) {
+  const s = String(value || "").trim();
+  if (!s) return;
+  if (/^https?:\/\//i.test(s)) out.push(s);
+}
 
-  const out = [];
-  const push = (u) => {
-    const s = String(u || "").trim();
-    if (s) out.push(s);
-  };
+function collectUrlsDeep(node, out, depth = 0) {
+  if (!node || depth > 6) return;
 
-  push(pack.imageUrl);
-  push(pack.image_url);
-  push(pack.videoUrl);
-  push(pack.video_url);
-  push(pack.coverUrl);
-  push(pack.cover_url);
-  push(pack.thumbnailUrl);
-  push(pack.thumbnail_url);
-
-  const assets = Array.isArray(pack.assets) ? pack.assets : [];
-  for (const a of assets) {
-    push(a?.url);
-    push(a?.secure_url);
-    push(a?.publicUrl);
-    push(a?.public_url);
+  if (typeof node === "string") {
+    addUrl(out, node);
+    return;
   }
+
+  if (Array.isArray(node)) {
+    for (const item of node) collectUrlsDeep(item, out, depth + 1);
+    return;
+  }
+
+  if (typeof node !== "object") return;
+
+  addUrl(out, node.url);
+  addUrl(out, node.secure_url);
+  addUrl(out, node.publicUrl);
+  addUrl(out, node.public_url);
+
+  addUrl(out, node.imageUrl);
+  addUrl(out, node.image_url);
+  addUrl(out, node.videoUrl);
+  addUrl(out, node.video_url);
+  addUrl(out, node.coverUrl);
+  addUrl(out, node.cover_url);
+  addUrl(out, node.thumbnailUrl);
+  addUrl(out, node.thumbnail_url);
+  addUrl(out, node.permalink);
+
+  const likelyChildren = [
+    node.assets,
+    node.media,
+    node.images,
+    node.videos,
+    node.publish,
+    node.result,
+    node.output,
+    node.contentPack,
+    node.content_pack,
+    node.payload,
+    node.data,
+    node.item,
+    node.items,
+  ];
+
+  for (const child of likelyChildren) {
+    collectUrlsDeep(child, out, depth + 1);
+  }
+}
+
+function getAssetUrlsFromEverywhere(proposal, resolvedDraft, pack) {
+  const out = [];
+
+  collectUrlsDeep(pack, out);
+  collectUrlsDeep(resolvedDraft?.raw, out);
+  collectUrlsDeep(proposal?.latestContent, out);
+  collectUrlsDeep(proposal?.latestDraft, out);
+  collectUrlsDeep(proposal?.latest_draft, out);
+  collectUrlsDeep(proposal?.draft, out);
+  collectUrlsDeep(proposal?.contentDraft, out);
+  collectUrlsDeep(proposal?.content_item, out);
+  collectUrlsDeep(proposal?.contentItem, out);
+  collectUrlsDeep(proposal?.result, out);
+  collectUrlsDeep(proposal?.output, out);
+  collectUrlsDeep(proposal?.publish, out);
+  collectUrlsDeep(proposal?.media, out);
+  collectUrlsDeep(proposal?.assets, out);
+  collectUrlsDeep(proposal?.payload, out);
 
   return Array.from(new Set(out));
 }
@@ -440,7 +495,8 @@ function isAssetReadyStatus(s) {
     v === "assets.ready" ||
     v === "publish.ready" ||
     v === "approved" ||
-    v === "draft.approved"
+    v === "draft.approved" ||
+    v === "content.approved"
   );
 }
 
@@ -466,8 +522,15 @@ export default function ProposalDetail({
   const [showInputs, setShowInputs] = useState(true);
 
   const resolvedDraft = useMemo(() => {
-    const candidate = pickDraftCandidate(proposal, draft) || fetchedDraftRaw;
-    return normalizeDraft(candidate);
+    const primary = pickDraftCandidate(proposal, draft);
+    const normalizedPrimary = normalizeDraft(primary);
+
+    if (normalizedPrimary?.id) return normalizedPrimary;
+
+    const normalizedFetched = normalizeDraft(fetchedDraftRaw);
+    if (normalizedFetched?.id) return normalizedFetched;
+
+    return normalizedPrimary || normalizedFetched || null;
   }, [proposal, draft, fetchedDraftRaw]);
 
   const pack = resolvedDraft?.pack || null;
@@ -488,6 +551,7 @@ export default function ProposalDetail({
 
       const candidate = pickDraftCandidate(proposal, draft);
       const normalized = normalizeDraft(candidate);
+
       if (normalized?.pack && normalized?.id) return;
       if (!apiBase) return;
 
@@ -542,12 +606,15 @@ export default function ProposalDetail({
     Boolean(pack) &&
     (draftStatusLc.includes("ready") || draftStatusLc === "" || draftStatusLc.includes("draft"));
 
-  const assetUrls = getAssetUrls(pack);
+  const assetUrls = getAssetUrlsFromEverywhere(proposal, resolvedDraft, pack);
   const hasPublishableAsset = assetUrls.length > 0;
-  const isAssetReady = isAssetReadyStatus(resolvedDraft?.status) || (isApproved && hasPublishableAsset);
+
+  const isAssetReady =
+    isAssetReadyStatus(resolvedDraft?.status) ||
+    isAssetReadyStatus(proposalStatus) ||
+    (isApproved && hasPublishableAsset);
 
   const canPublish =
-    Boolean(pack) &&
     Boolean(resolvedDraft?.id) &&
     hasPublishableAsset &&
     isAssetReady &&
@@ -635,8 +702,6 @@ export default function ProposalDetail({
     ? "Rejected"
     : isPublished
     ? "Already published"
-    : !pack
-    ? "Draft pack missing"
     : !hasPublishableAsset
     ? "Asset URL missing"
     : !isAssetReady
@@ -708,7 +773,7 @@ export default function ProposalDetail({
                   >
                     Copy caption
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => copyJson(pack)} disabled={!pack}>
+                  <Button variant="outline" size="sm" onClick={() => copyJson(pack || resolvedDraft?.raw || proposal)} disabled={!(pack || resolvedDraft?.raw || proposal)}>
                     Copy JSON
                   </Button>
                 </div>
@@ -935,7 +1000,7 @@ export default function ProposalDetail({
                     <>
                       <SectionTitle>Advanced (Raw)</SectionTitle>
                       <pre className="mt-3 rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4 whitespace-pre-wrap break-words text-xs text-slate-800 dark:border-slate-800 dark:bg-slate-950/25 dark:text-slate-100">
-                        {pretty({ proposal, draft: resolvedDraft, fetchedDraftRaw, assetUrls })}
+                        {pretty({ proposal, draft: resolvedDraft, fetchedDraftRaw, assetUrls, canPublish, isAssetReady })}
                       </pre>
                     </>
                   )}
