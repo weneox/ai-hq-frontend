@@ -1,4 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  AlertCircle,
+  ArrowUpRight,
+  CheckCircle2,
+  Clock3,
+  LoaderCircle,
+  Sparkles,
+} from "lucide-react";
+
 import ProposalCanvas from "../components/ProposalCanvas.jsx";
 
 import {
@@ -19,7 +28,12 @@ const BACKEND_STATUSES = [
   "rejected",
   "pending",
 ];
+
 const UI_TABS = ["draft", "approved", "published", "rejected"];
+
+function cn(...classes) {
+  return classes.filter(Boolean).join(" ");
+}
 
 function normalizeList(resp) {
   if (Array.isArray(resp)) return resp;
@@ -62,15 +76,6 @@ function mergeDraftItems(draft, inProgress, pendingMaybe) {
     ...(inProgress || []),
     ...(pendingMaybe || []),
   ]).sort(sortNewestFirst);
-}
-
-function EmptyBox({ title, desc }) {
-  return (
-    <div className="rounded-[26px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(7,12,22,0.72),rgba(5,9,18,0.56))] p-5 shadow-[0_14px_34px_rgba(0,0,0,0.16),inset_0_1px_0_rgba(255,255,255,0.03)] backdrop-blur-2xl">
-      <div className="text-[13px] font-semibold text-white">{title}</div>
-      <div className="mt-1 text-[12px] text-white/48">{desc}</div>
-    </div>
-  );
 }
 
 function safeJson(x) {
@@ -134,6 +139,47 @@ function pickContentIdFromProposal(p) {
   return "";
 }
 
+function SurfaceMessage({
+  icon,
+  tone = "neutral",
+  title,
+  desc,
+  action,
+}) {
+  const toneStyles = {
+    neutral:
+      "bg-[linear-gradient(180deg,rgba(8,14,26,0.92),rgba(5,10,18,0.84))]",
+    danger:
+      "bg-[linear-gradient(180deg,rgba(58,12,20,0.34),rgba(24,8,14,0.28))]",
+    info:
+      "bg-[linear-gradient(180deg,rgba(8,20,34,0.92),rgba(5,10,18,0.84))]",
+  };
+
+  return (
+    <div
+      className={cn(
+        "relative overflow-hidden rounded-[30px] px-5 py-5 shadow-[0_24px_80px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-2xl md:px-6 md:py-6",
+        toneStyles[tone]
+      )}
+    >
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(700px_circle_at_0%_0%,rgba(255,255,255,0.03),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.02),transparent_44%)]" />
+      <div className="relative flex items-start gap-4">
+        <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/[0.05] text-white/84 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+          {icon}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="text-[15px] font-semibold tracking-[-0.02em] text-white">
+            {title}
+          </div>
+          <p className="mt-1 text-[13px] leading-6 text-white/50">{desc}</p>
+          {action ? <div className="mt-4">{action}</div> : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ProposalsPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -165,7 +211,7 @@ export default function ProposalsPage() {
   const showToast = (msg) => {
     if (!msg) return;
     setToast(msg);
-    window.setTimeout(() => setToast(""), 1300);
+    window.setTimeout(() => setToast(""), 1400);
   };
 
   const refreshStats = async () => {
@@ -210,7 +256,11 @@ export default function ProposalsPage() {
         listProposals("pending"),
       ]);
 
-      return mergeDraftItems(normalizeList(a), normalizeList(b), normalizeList(c));
+      return mergeDraftItems(
+        normalizeList(a),
+        normalizeList(b),
+        normalizeList(c)
+      );
     }
 
     const list = await listProposals(s);
@@ -247,7 +297,8 @@ export default function ProposalsPage() {
         const isProposalEvent =
           type === "proposal.created" || type === "proposal.updated";
         const isContentEvent = type === "content.updated";
-        const isExecEvent = type === "execution.updated" || type === "job.updated";
+        const isExecEvent =
+          type === "execution.updated" || type === "job.updated";
 
         if (isProposalEvent || isContentEvent || isExecEvent) {
           refreshStats();
@@ -255,9 +306,7 @@ export default function ProposalsPage() {
           const currentStatus = statusRef.current;
           refreshProposals(
             isProposalEvent && type === "proposal.created" ? "New item" : "",
-            {
-              status: currentStatus,
-            }
+            { status: currentStatus }
           );
         }
       },
@@ -295,7 +344,7 @@ export default function ProposalsPage() {
 
     try {
       await requestDraftChanges(proposalId, contentId, feedbackText);
-      await refreshProposals("Changes requested ✅", {
+      await refreshProposals("Changes requested", {
         status: statusRef.current,
       });
       await refreshStats();
@@ -318,7 +367,7 @@ export default function ProposalsPage() {
         setStatus("draft");
       }
 
-      await refreshProposals("Asset generation started ✅", {
+      await refreshProposals("Asset generation started", {
         status: "draft",
       });
     } catch (e) {
@@ -340,7 +389,7 @@ export default function ProposalsPage() {
         setStatus("rejected");
       }
 
-      await refreshProposals("Rejected ❌", {
+      await refreshProposals("Rejected", {
         status: "rejected",
       });
     } catch (e) {
@@ -366,7 +415,7 @@ export default function ProposalsPage() {
       const currentList = await fetchByUiStatus(currentStatus);
       setProposals(currentList);
 
-      showToast("Publish requested ✅");
+      showToast("Publish requested");
 
       try {
         const publishedItems = await fetchByUiStatus("published");
@@ -377,7 +426,7 @@ export default function ProposalsPage() {
         if (nowPublished) {
           setStatus("published");
           setProposals(publishedItems);
-          showToast("Published ✅");
+          showToast("Published");
         }
       } catch {}
     } catch (e) {
@@ -387,7 +436,11 @@ export default function ProposalsPage() {
     }
   };
 
-  const handleCanvasRequestChanges = async (item, resolvedDraft, feedbackText) => {
+  const handleCanvasRequestChanges = async (
+    item,
+    resolvedDraft,
+    feedbackText
+  ) => {
     if (busy) return;
 
     const proposalId = String(item?.id || "");
@@ -405,7 +458,9 @@ export default function ProposalsPage() {
     if (busy) return;
 
     const proposalId = String(item?.id || "");
-    const contentId = String(resolvedDraft?.id || pickContentIdFromProposal(item) || "");
+    const contentId = String(
+      resolvedDraft?.id || pickContentIdFromProposal(item) || ""
+    );
 
     if (!proposalId || !contentId) {
       setErr("Approve üçün content ID tapılmadı.");
@@ -419,21 +474,29 @@ export default function ProposalsPage() {
     if (busy) return;
 
     const proposalId = String(item?.id || "");
-    const contentId = String(resolvedDraft?.id || pickContentIdFromProposal(item) || "");
+    const contentId = String(
+      resolvedDraft?.id || pickContentIdFromProposal(item) || ""
+    );
 
     if (!proposalId || !contentId) {
       setErr("Reject üçün content ID tapılmadı.");
       return;
     }
 
-    await onRejectDraft(proposalId, contentId, reasonText || "Rejected from canvas");
+    await onRejectDraft(
+      proposalId,
+      contentId,
+      reasonText || "Rejected from canvas"
+    );
   };
 
   const handleCanvasPublish = async (item, resolvedDraft) => {
     if (busy) return;
 
     const proposalId = String(item?.id || "");
-    const contentId = String(resolvedDraft?.id || pickContentIdFromProposal(item) || "");
+    const contentId = String(
+      resolvedDraft?.id || pickContentIdFromProposal(item) || ""
+    );
 
     if (!proposalId || !contentId) {
       setErr("Publish üçün content ID tapılmadı.");
@@ -443,52 +506,104 @@ export default function ProposalsPage() {
     await onPublish(proposalId, contentId);
   };
 
+  const counts = useMemo(
+    () => ({
+      all:
+        (stats?.draft || 0) +
+        (stats?.approved || 0) +
+        (stats?.published || 0) +
+        (stats?.rejected || 0),
+      draft: stats?.draft || 0,
+      approved: stats?.approved || 0,
+      published: stats?.published || 0,
+      rejected: stats?.rejected || 0,
+    }),
+    [stats]
+  );
+
   return (
     <div className="min-h-0 h-full min-w-0 overflow-y-auto overscroll-contain pr-1">
-      <div className="min-w-0 flex flex-col gap-5 pb-10">
+      <div className="mx-auto flex min-w-0 max-w-[1800px] flex-col gap-5 pb-10">
         {err ? (
-          <div className="rounded-[24px] border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-rose-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] backdrop-blur-xl">
-            {err}
-          </div>
+          <SurfaceMessage
+            tone="danger"
+            icon={<AlertCircle className="h-5 w-5" />}
+            title="Workflow issue"
+            desc={err}
+            action={
+              <button
+                type="button"
+                onClick={async () => {
+                  await refreshProposals();
+                  await refreshStats();
+                }}
+                className="inline-flex items-center gap-2 rounded-full bg-white/[0.06] px-4 py-2 text-[13px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition hover:bg-white/[0.09]"
+              >
+                Retry refresh
+                <ArrowUpRight className="h-4 w-4" />
+              </button>
+            }
+          />
         ) : null}
 
         {loading ? (
-          <EmptyBox
-            title="Loading…"
-            desc="Fetching proposals and drafts from backend."
+          <SurfaceMessage
+            tone="info"
+            icon={<LoaderCircle className="h-5 w-5 animate-spin" />}
+            title="Loading proposals"
+            desc="Fetching drafts, approvals, publishing states, and latest surface context from the backend."
           />
         ) : proposals.length === 0 ? (
-          <EmptyBox
-            title="No items yet"
+          <SurfaceMessage
+            tone="neutral"
+            icon={<Sparkles className="h-5 w-5" />}
+            title="No items in this view"
             desc={
               status === "draft"
-                ? "Drafts will appear here (including in_progress). Trigger a daily cron or create a new proposal."
-                : "Nothing in this tab yet."
+                ? "Draft intake is empty right now. New drafts, pending items, and in-progress items will appear here as soon as they enter the queue."
+                : "There is nothing in this state yet. Switch the surface state or refresh when new items arrive."
+            }
+            action={
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex items-center gap-2 rounded-full bg-white/[0.05] px-3 py-2 text-[12px] text-white/62 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                  <Clock3 className="h-3.5 w-3.5" />
+                  Live polling fallback active
+                </div>
+                <div className="inline-flex items-center gap-2 rounded-full bg-white/[0.05] px-3 py-2 text-[12px] text-white/62 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Current view: {status}
+                </div>
+              </div>
             }
           />
         ) : (
-          <ProposalCanvas
-            proposals={proposals}
-            stats={stats}
-            status={status}
-            setStatus={(s) => {
-              const next = UI_TABS.includes(String(s)) ? String(s) : "draft";
-              setStatus(next);
-            }}
-            search={search}
-            setSearch={setSearch}
-            busy={busy}
-            toast={toast}
-            wsStatus={wsStatus}
-            onRefresh={async () => {
-              await refreshProposals("Refreshed");
-              await refreshStats();
-            }}
-            onApprove={handleCanvasApprove}
-            onReject={handleCanvasReject}
-            onPublish={handleCanvasPublish}
-            onRequestChanges={handleCanvasRequestChanges}
-          />
+          <div className="relative overflow-hidden rounded-[36px] bg-[linear-gradient(180deg,rgba(7,12,24,0.52),rgba(4,8,16,0.28))] p-[1px] shadow-[0_30px_120px_rgba(0,0,0,0.28)]">
+            <div className="rounded-[35px] bg-[linear-gradient(180deg,rgba(4,9,18,0.88),rgba(3,7,14,0.76))] p-2 md:p-3">
+              <ProposalCanvas
+                proposals={proposals}
+                stats={stats}
+                status={status}
+                setStatus={(s) => {
+                  const next = UI_TABS.includes(String(s)) ? String(s) : "draft";
+                  setStatus(next);
+                }}
+                search={search}
+                setSearch={setSearch}
+                busy={busy}
+                toast={toast}
+                wsStatus={wsStatus}
+                counts={counts}
+                onRefresh={async () => {
+                  await refreshProposals("Refreshed");
+                  await refreshStats();
+                }}
+                onApprove={handleCanvasApprove}
+                onReject={handleCanvasReject}
+                onPublish={handleCanvasPublish}
+                onRequestChanges={handleCanvasRequestChanges}
+              />
+            </div>
+          </div>
         )}
       </div>
     </div>

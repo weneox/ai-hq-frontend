@@ -25,12 +25,12 @@ const NAV_ITEMS = [
   { label: "Settings", icon: SlidersHorizontal, to: "/settings" },
 ];
 
-const COLLAPSED_W = 84;
-const EXPANDED_W = 262;
-const ICON_COL_W = 84;
-const ITEM_H = 56;
-const BRAND_H = 104;
-const SIDEBAR_RADIUS = 30;
+const COLLAPSED_W = 88;
+const EXPANDED_W = 286;
+const ICON_COL_W = 82;
+const ITEM_H = 58;
+const BRAND_H = 118;
+const SIDEBAR_RADIUS = 32;
 
 function cn(...classes) {
   return classes.filter(Boolean).join(" ");
@@ -51,7 +51,7 @@ function SidebarSurface({ expanded }) {
         style={{
           ...railRadiusStyle(),
           background:
-            "linear-gradient(180deg, rgba(4,9,18,0.92) 0%, rgba(3,7,16,0.965) 34%, rgba(2,6,14,0.985) 72%, rgba(2,5,12,0.992) 100%)",
+            "linear-gradient(180deg, rgba(4,10,20,0.96) 0%, rgba(3,8,18,0.985) 38%, rgba(2,6,15,0.995) 72%, rgba(1,5,12,0.998) 100%)",
         }}
       />
 
@@ -59,8 +59,8 @@ function SidebarSurface({ expanded }) {
         className="absolute inset-0"
         style={{
           ...railRadiusStyle(),
-          backdropFilter: expanded ? "blur(14px)" : "blur(10px)",
-          WebkitBackdropFilter: expanded ? "blur(14px)" : "blur(10px)",
+          backdropFilter: expanded ? "blur(16px)" : "blur(12px)",
+          WebkitBackdropFilter: expanded ? "blur(16px)" : "blur(12px)",
         }}
       />
 
@@ -69,47 +69,87 @@ function SidebarSurface({ expanded }) {
         style={{
           ...railRadiusStyle(),
           background: expanded
-            ? "radial-gradient(280px circle at 0% 0%, rgba(90,220,255,0.06), transparent 34%), radial-gradient(260px circle at 40% 32%, rgba(90,110,255,0.05), transparent 42%), linear-gradient(180deg, rgba(255,255,255,0.016), transparent 24%)"
-            : "radial-gradient(220px circle at 0% 0%, rgba(90,220,255,0.045), transparent 34%), radial-gradient(200px circle at 40% 32%, rgba(90,110,255,0.04), transparent 42%), linear-gradient(180deg, rgba(255,255,255,0.012), transparent 24%)",
+            ? `
+              radial-gradient(340px circle at 0% 0%, rgba(114, 233, 255, 0.08), transparent 34%),
+              radial-gradient(280px circle at 18% 22%, rgba(76, 139, 255, 0.06), transparent 40%),
+              radial-gradient(260px circle at 100% 12%, rgba(255,255,255,0.035), transparent 26%),
+              linear-gradient(180deg, rgba(255,255,255,0.024), transparent 22%)
+            `
+            : `
+              radial-gradient(280px circle at 0% 0%, rgba(114, 233, 255, 0.06), transparent 34%),
+              radial-gradient(220px circle at 18% 22%, rgba(76, 139, 255, 0.045), transparent 40%),
+              radial-gradient(220px circle at 100% 12%, rgba(255,255,255,0.028), transparent 24%),
+              linear-gradient(180deg, rgba(255,255,255,0.016), transparent 20%)
+            `,
         }}
       />
 
       <div
-        className="absolute inset-0 ring-1 ring-white/[0.04]"
+        className="pointer-events-none absolute inset-0 opacity-[0.085]"
+        style={{
+          ...railRadiusStyle(),
+          backgroundImage: `
+            repeating-linear-gradient(
+              180deg,
+              rgba(255,255,255,0.08) 0px,
+              rgba(255,255,255,0.08) 1px,
+              transparent 1px,
+              transparent 4px
+            )
+          `,
+          mixBlendMode: "soft-light",
+        }}
+      />
+
+      <div
+        className="absolute inset-0 ring-1 ring-white/[0.05]"
         style={railRadiusStyle()}
       />
 
       <div
-        className="absolute inset-0 shadow-[0_18px_60px_rgba(0,0,0,0.26),inset_0_1px_0_rgba(255,255,255,0.03)]"
-        style={railRadiusStyle()}
+        className="absolute inset-0"
+        style={{
+          ...railRadiusStyle(),
+          boxShadow:
+            "0 24px 80px rgba(0,0,0,0.42), inset 0 1px 0 rgba(255,255,255,0.045), inset -1px 0 0 rgba(255,255,255,0.04)",
+        }}
       />
 
       <div className="pointer-events-none absolute left-0 top-0 h-full w-px bg-[linear-gradient(180deg,transparent,rgba(255,255,255,0.035),transparent)]" />
 
-      <div className="pointer-events-none absolute right-0 top-[18px] h-[120px] w-px bg-[linear-gradient(180deg,rgba(255,255,255,0.05),transparent)]" />
+      <div className="pointer-events-none absolute right-0 top-[14px] h-[160px] w-px bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.015),transparent)]" />
 
       <div
         className={cn(
           "pointer-events-none absolute inset-y-0 right-0 transition-all duration-300",
-          expanded ? "w-[54px]" : "w-[34px]"
+          expanded ? "w-[68px]" : "w-[42px]"
         )}
         style={{
           ...railRadiusStyle(),
           background: expanded
-            ? "linear-gradient(270deg, rgba(255,255,255,0.045) 0%, rgba(103,232,249,0.018) 18%, rgba(255,255,255,0.008) 40%, transparent 76%)"
-            : "linear-gradient(270deg, rgba(255,255,255,0.05) 0%, rgba(103,232,249,0.018) 20%, rgba(255,255,255,0.008) 42%, transparent 80%)",
+            ? "linear-gradient(270deg, rgba(255,255,255,0.065) 0%, rgba(105,235,255,0.024) 18%, rgba(255,255,255,0.012) 34%, transparent 82%)"
+            : "linear-gradient(270deg, rgba(255,255,255,0.05) 0%, rgba(105,235,255,0.02) 16%, rgba(255,255,255,0.008) 30%, transparent 80%)",
         }}
       />
 
       <div
         className={cn(
-          "pointer-events-none absolute right-[-10px] top-[86px] transition-all duration-300",
-          expanded ? "h-[170px] w-[64px]" : "h-[140px] w-[40px]"
+          "pointer-events-none absolute right-[-18px] top-[76px] transition-all duration-300",
+          expanded ? "h-[220px] w-[92px]" : "h-[160px] w-[56px]"
         )}
         style={{
           background:
-            "radial-gradient(circle at 0% 50%, rgba(103,232,249,0.07), rgba(103,232,249,0.025) 34%, transparent 72%)",
-          filter: "blur(16px)",
+            "radial-gradient(circle at 0% 50%, rgba(111, 238, 255, 0.08), rgba(111, 238, 255, 0.02) 34%, transparent 70%)",
+          filter: "blur(18px)",
+        }}
+      />
+
+      <div
+        className="pointer-events-none absolute inset-y-0 -right-10 w-16"
+        style={{
+          background:
+            "linear-gradient(90deg, rgba(4,9,18,0.0), rgba(4,9,18,0.22) 35%, rgba(4,9,18,0.0) 100%)",
+          filter: "blur(10px)",
         }}
       />
     </>
@@ -121,29 +161,42 @@ function ItemGlow({ isActive }) {
     <>
       <div
         className={cn(
-          "pointer-events-none absolute left-[12px] top-1/2 h-[24px] w-[3px] -translate-y-1/2 rounded-full transition-all duration-300",
+          "pointer-events-none absolute left-[12px] top-1/2 h-[30px] w-[3px] -translate-y-1/2 rounded-full transition-all duration-300",
           isActive
-            ? "opacity-100 bg-[linear-gradient(180deg,rgba(165,243,252,0),rgba(165,243,252,0.95),rgba(125,211,252,0.32),rgba(165,243,252,0))] shadow-[0_0_12px_rgba(103,232,249,0.16)]"
+            ? "opacity-100 shadow-[0_0_16px_rgba(110,241,255,0.16)]"
             : "opacity-0"
         )}
+        style={{
+          background: isActive
+            ? "linear-gradient(180deg, rgba(155,243,255,0) 0%, rgba(155,243,255,0.96) 44%, rgba(124,211,252,0.42) 78%, rgba(155,243,255,0) 100%)"
+            : "transparent",
+        }}
       />
 
       <div
         className={cn(
-          "pointer-events-none absolute left-[18px] top-1/2 h-[34px] w-[34px] -translate-y-1/2 rounded-full transition-all duration-300",
+          "pointer-events-none absolute left-[18px] top-1/2 h-[44px] w-[44px] -translate-y-1/2 rounded-full transition-all duration-300",
           isActive
-            ? "opacity-100 bg-[radial-gradient(circle,rgba(103,232,249,0.10),rgba(103,232,249,0.022)_48%,transparent_74%)] blur-[5px]"
-            : "opacity-0 group-hover:opacity-100 group-hover:bg-[radial-gradient(circle,rgba(255,255,255,0.045),rgba(255,255,255,0.012)_48%,transparent_74%)] group-hover:blur-[4px]"
+            ? "opacity-100 blur-[8px]"
+            : "opacity-0 group-hover:opacity-100 group-hover:blur-[7px]"
         )}
+        style={{
+          background: isActive
+            ? "radial-gradient(circle, rgba(110,241,255,0.12), rgba(110,241,255,0.03) 46%, transparent 76%)"
+            : "radial-gradient(circle, rgba(255,255,255,0.05), rgba(255,255,255,0.014) 46%, transparent 76%)",
+        }}
       />
 
       <div
         className={cn(
-          "pointer-events-none absolute inset-y-[10px] left-[12px] right-[12px] rounded-[16px] transition-all duration-300",
-          isActive
-            ? "opacity-100 bg-[linear-gradient(90deg,rgba(255,255,255,0.024),rgba(255,255,255,0.008)_34%,transparent_72%)]"
-            : "opacity-0 group-hover:opacity-100 group-hover:bg-[linear-gradient(90deg,rgba(255,255,255,0.012),rgba(255,255,255,0.004)_34%,transparent_72%)]"
+          "pointer-events-none absolute inset-y-[8px] left-[12px] right-[12px] rounded-[18px] transition-all duration-300",
+          isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"
         )}
+        style={{
+          background: isActive
+            ? "linear-gradient(90deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.012) 34%, rgba(255,255,255,0.0) 80%)"
+            : "linear-gradient(90deg, rgba(255,255,255,0.014) 0%, rgba(255,255,255,0.006) 34%, rgba(255,255,255,0.0) 82%)",
+        }}
       />
     </>
   );
@@ -152,7 +205,7 @@ function ItemGlow({ isActive }) {
 function BrandDock({ expanded }) {
   return (
     <div className="relative" style={{ height: BRAND_H }}>
-      <div className="pointer-events-none absolute bottom-0 left-[14px] right-[16px] h-px bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.045),transparent)]" />
+      <div className="pointer-events-none absolute bottom-0 left-[14px] right-[16px] h-px bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.07),transparent)]" />
 
       <div className="relative flex h-full items-center overflow-hidden">
         <div
@@ -160,7 +213,7 @@ function BrandDock({ expanded }) {
           style={{ width: ICON_COL_W }}
         >
           <div className="relative flex items-center justify-center">
-            <div className="absolute h-[62px] w-[62px] rounded-full bg-[radial-gradient(circle,rgba(125,211,252,0.055),rgba(125,211,252,0.014)_44%,transparent_72%)] blur-[10px]" />
+            <div className="absolute h-[64px] w-[64px] rounded-full bg-[radial-gradient(circle,rgba(110,241,255,0.05),rgba(110,241,255,0.014)_46%,transparent_72%)] blur-[10px]" />
             <ExecutiveMark3D className="relative h-[38px] w-[38px]" />
           </div>
         </div>
@@ -168,25 +221,25 @@ function BrandDock({ expanded }) {
         <AnimatePresence initial={false}>
           {expanded && (
             <motion.div
-              initial={{ opacity: 0, x: -8, filter: "blur(6px)" }}
+              initial={{ opacity: 0, x: -10, filter: "blur(8px)" }}
               animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
-              exit={{ opacity: 0, x: -8, filter: "blur(6px)" }}
+              exit={{ opacity: 0, x: -10, filter: "blur(8px)" }}
               transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
-              className="relative z-[2] -ml-[6px] min-w-0 flex-1 pr-4"
+              className="relative z-[2] -ml-[2px] min-w-0 flex-1 pr-4"
             >
               <div className="min-w-0">
-                <div className="truncate text-[9px] font-semibold uppercase tracking-[0.32em] text-white/46">
+                <div className="truncate text-[9px] font-semibold uppercase tracking-[0.34em] text-white/42">
                   AI HEADQUARTERS
                 </div>
 
-                <div className="mt-[5px] truncate text-[16px] font-semibold tracking-[-0.045em] text-white/96">
+                <div className="mt-[7px] truncate text-[17px] font-semibold tracking-[-0.05em] text-white/96">
                   Executive Command
                 </div>
 
-                <div className="mt-[8px] flex items-center gap-2">
-                  <div className="h-px flex-1 bg-[linear-gradient(90deg,rgba(255,255,255,0.11),rgba(255,255,255,0.02),transparent)]" />
-                  <span className="shrink-0 text-[8px] font-semibold uppercase tracking-[0.24em] text-white/26">
-                    Rail
+                <div className="mt-[11px] flex items-center gap-2.5">
+                  <span className="h-[5px] w-[5px] rounded-full bg-cyan-200/80 shadow-[0_0_12px_rgba(165,243,252,0.28)]" />
+                  <span className="truncate text-[10px] font-medium tracking-[0.02em] text-white/54">
+                    Private operational navigation rail
                   </span>
                 </div>
               </div>
@@ -238,7 +291,7 @@ function NavItem({ item, expanded, onNavigate }) {
             <div className="flex items-center justify-between gap-3">
               <span
                 className={cn(
-                  "truncate text-[12.8px] font-medium tracking-[-0.01em] transition-colors duration-300",
+                  "truncate text-[13px] font-medium tracking-[-0.015em] transition-colors duration-300",
                   isActive
                     ? "text-white/96"
                     : "text-white/68 group-hover:text-white/86"
@@ -251,8 +304,8 @@ function NavItem({ item, expanded, onNavigate }) {
                 className={cn(
                   "h-[12px] w-[12px] shrink-0 transition-all duration-300",
                   isActive
-                    ? "translate-x-[1px] text-white/20"
-                    : "text-white/12 group-hover:translate-x-0.5 group-hover:text-white/20"
+                    ? "translate-x-[1px] text-white/18"
+                    : "text-white/10 group-hover:translate-x-0.5 group-hover:text-white/18"
                 )}
               />
             </div>
@@ -265,7 +318,7 @@ function NavItem({ item, expanded, onNavigate }) {
 
 function RailNav({ expanded, onNavigate }) {
   return (
-    <nav className="px-0 pt-3">
+    <nav className="px-0 pt-4">
       <div className="space-y-1.5">
         {NAV_ITEMS.map((item) => (
           <NavItem
@@ -282,20 +335,21 @@ function RailNav({ expanded, onNavigate }) {
 
 function RailFooter({ expanded }) {
   return (
-    <div className="px-0 pb-5 pt-4">
-      <div className="mx-[14px] mb-2 h-px bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.04),transparent)]" />
+    <div className="px-0 pb-5 pt-5">
+      <div className="mx-[14px] mb-2 h-px bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.05),transparent)]" />
 
-      <div className="relative flex h-[56px] items-center overflow-hidden">
+      <div className="relative flex h-[60px] items-center overflow-hidden">
         <div
           className="relative z-[2] flex h-full shrink-0 items-center justify-center"
           style={{ width: ICON_COL_W }}
         >
           <div className="relative flex items-center justify-center">
+            <div className="absolute h-[34px] w-[34px] rounded-full bg-[radial-gradient(circle,rgba(110,231,183,0.08),rgba(110,231,183,0.02)_50%,transparent_72%)] blur-[8px]" />
             <ShieldCheck
-              className="relative z-[2] h-[15px] w-[15px] text-white/76"
+              className="relative z-[2] h-[15px] w-[15px] text-white/74"
               strokeWidth={1.9}
             />
-            <span className="absolute right-[-4px] top-[-3px] z-[3] h-[6px] w-[6px] rounded-full bg-emerald-300 shadow-[0_0_10px_rgba(110,231,183,0.55)]" />
+            <span className="absolute right-[-4px] top-[-2px] z-[3] h-[6px] w-[6px] rounded-full bg-emerald-300 shadow-[0_0_12px_rgba(110,231,183,0.56)]" />
           </div>
         </div>
 
@@ -307,10 +361,10 @@ function RailFooter({ expanded }) {
               : "pointer-events-none -translate-x-2 opacity-0"
           )}
         >
-          <div className="truncate text-[9.2px] uppercase tracking-[0.22em] text-white/34">
+          <div className="truncate text-[9.5px] uppercase tracking-[0.24em] text-white/34">
             Secure Rail
           </div>
-          <div className="truncate pt-0.5 text-[10.3px] text-white/56">
+          <div className="truncate pt-0.5 text-[10.5px] text-white/56">
             Private operational layer
           </div>
         </div>
@@ -333,7 +387,7 @@ function DesktopSidebar({ expanded, setExpanded }) {
 
   const handleEnter = () => {
     clearTimeout(closeTimer.current);
-    openTimer.current = setTimeout(() => setExpanded(true), 50);
+    openTimer.current = setTimeout(() => setExpanded(true), 40);
   };
 
   const handleLeave = () => {
@@ -356,7 +410,7 @@ function DesktopSidebar({ expanded, setExpanded }) {
         transition={
           shouldReduceMotion
             ? { duration: 0 }
-            : { duration: 0.32, ease: [0.22, 1, 0.36, 1] }
+            : { duration: 0.34, ease: [0.22, 1, 0.36, 1] }
         }
         className="relative h-full overflow-hidden transform-gpu"
         style={{
@@ -390,7 +444,7 @@ function MobileNavItem({ item, onNavigate }) {
       className="group relative block"
     >
       {({ isActive }) => (
-        <div className="relative flex h-[56px] items-center overflow-hidden">
+        <div className="relative flex h-[58px] items-center overflow-hidden">
           <ItemGlow isActive={isActive} />
 
           <div
@@ -412,7 +466,7 @@ function MobileNavItem({ item, onNavigate }) {
             <div className="flex items-center justify-between gap-3">
               <span
                 className={cn(
-                  "truncate text-[12.8px] font-medium tracking-[-0.01em] transition-colors duration-300",
+                  "truncate text-[13px] font-medium tracking-[-0.015em] transition-colors duration-300",
                   isActive
                     ? "text-white/96"
                     : "text-white/68 group-hover:text-white/86"
@@ -425,8 +479,8 @@ function MobileNavItem({ item, onNavigate }) {
                 className={cn(
                   "h-[12px] w-[12px] shrink-0 transition-all duration-300",
                   isActive
-                    ? "translate-x-[1px] text-white/20"
-                    : "text-white/12 group-hover:translate-x-0.5 group-hover:text-white/20"
+                    ? "translate-x-[1px] text-white/18"
+                    : "text-white/10 group-hover:translate-x-0.5 group-hover:text-white/18"
                 )}
               />
             </div>
@@ -440,11 +494,11 @@ function MobileNavItem({ item, onNavigate }) {
 function MobileSidebar({ setMobileOpen }) {
   return (
     <motion.aside
-      initial={{ x: -264 }}
+      initial={{ x: -300 }}
       animate={{ x: 0 }}
-      exit={{ x: -264 }}
+      exit={{ x: -300 }}
       transition={{ type: "spring", stiffness: 260, damping: 30 }}
-      className="fixed inset-y-0 left-0 z-[160] w-[262px] md:hidden"
+      className="fixed inset-y-0 left-0 z-[160] w-[286px] md:hidden"
       style={railRadiusStyle()}
     >
       <div className="relative h-full overflow-hidden" style={railRadiusStyle()}>
@@ -453,7 +507,8 @@ function MobileSidebar({ setMobileOpen }) {
         <div className="relative flex items-center justify-end px-4 pb-2 pt-4">
           <button
             onClick={() => setMobileOpen(false)}
-            className="flex h-9 w-9 items-center justify-center rounded-[12px] border border-white/[0.08] bg-white/[0.04] text-white/84 transition hover:bg-white/[0.07]"
+            aria-label="Close sidebar"
+            className="flex h-9 w-9 items-center justify-center rounded-[12px] text-white/78 transition hover:bg-white/[0.05] hover:text-white"
           >
             <X className="h-4 w-4" />
           </button>
@@ -461,7 +516,7 @@ function MobileSidebar({ setMobileOpen }) {
 
         <div className="relative flex h-[calc(100%-60px)] flex-col">
           <BrandDock expanded />
-          <nav className="px-0 pt-2">
+          <nav className="px-0 pt-3">
             <div className="space-y-1.5">
               {NAV_ITEMS.map((item) => (
                 <MobileNavItem
@@ -499,7 +554,7 @@ export default function Sidebar({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setMobileOpen(false)}
-              className="fixed inset-0 z-[150] bg-black/45 backdrop-blur-sm md:hidden"
+              className="fixed inset-0 z-[150] bg-black/40 backdrop-blur-[6px] md:hidden"
             />
             <MobileSidebar setMobileOpen={setMobileOpen} />
           </>

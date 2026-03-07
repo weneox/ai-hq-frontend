@@ -12,7 +12,8 @@ import {
 import { getApiBase } from "../../api/client.js";
 import { fetchLatestDraft } from "../../features/proposals/proposal.api.js";
 import { DetailSection, MetaRow } from "./ProposalSections.jsx";
-import { GlassButton, ToneBadge, cn } from "./proposal-ui.jsx";
+import { GlassButton, ToneBadge, SurfacePill } from "./proposal-ui.jsx";
+import { cn } from "./proposal-utils.js";
 import {
   asDisplay,
   firstNonEmpty,
@@ -50,6 +51,38 @@ import {
 
 function readString(v) {
   return typeof v === "string" ? v : "";
+}
+
+function panelTone(stage) {
+  if (stage === "approved") {
+    return {
+      glow:
+        "bg-[radial-gradient(760px_circle_at_0%_0%,rgba(16,185,129,0.10),transparent_28%),radial-gradient(620px_circle_at_100%_0%,rgba(20,184,166,0.08),transparent_32%)]",
+      rail: "bg-emerald-300/75",
+    };
+  }
+
+  if (stage === "published") {
+    return {
+      glow:
+        "bg-[radial-gradient(760px_circle_at_0%_0%,rgba(245,158,11,0.10),transparent_28%),radial-gradient(620px_circle_at_100%_0%,rgba(251,191,36,0.08),transparent_32%)]",
+      rail: "bg-amber-300/75",
+    };
+  }
+
+  if (stage === "rejected") {
+    return {
+      glow:
+        "bg-[radial-gradient(760px_circle_at_0%_0%,rgba(244,63,94,0.10),transparent_28%),radial-gradient(620px_circle_at_100%_0%,rgba(251,113,133,0.08),transparent_32%)]",
+      rail: "bg-rose-300/75",
+    };
+  }
+
+  return {
+    glow:
+      "bg-[radial-gradient(760px_circle_at_0%_0%,rgba(34,211,238,0.09),transparent_28%),radial-gradient(620px_circle_at_100%_0%,rgba(99,102,241,0.09),transparent_32%)]",
+    rail: "bg-cyan-300/75",
+  };
 }
 
 export default function ProposalExpanded({
@@ -124,6 +157,8 @@ export default function ProposalExpanded({
 
   const title = titleFrom(item);
   const summary = summaryOf(item);
+  const stage = stageOf(item);
+  const tone = panelTone(stage);
 
   const proposalStatus = String(item?.status || "draft").toLowerCase();
   const isRejected = proposalStatus === "rejected";
@@ -238,16 +273,17 @@ export default function ProposalExpanded({
   return (
     <motion.div
       layoutId={`proposal-card-${item?.id}`}
-      className="relative overflow-hidden rounded-[32px] border border-white/[0.10] bg-[linear-gradient(180deg,rgba(8,14,24,0.90),rgba(5,9,18,0.82))] shadow-[0_28px_90px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-2xl"
+      className="relative overflow-hidden rounded-[34px] border border-white/[0.09] bg-[linear-gradient(180deg,rgba(8,14,24,0.94),rgba(5,9,18,0.86))] shadow-[0_28px_90px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-2xl"
     >
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(720px_circle_at_0%_0%,rgba(34,211,238,0.08),transparent_28%),radial-gradient(620px_circle_at_100%_0%,rgba(99,102,241,0.10),transparent_32%),linear-gradient(180deg,rgba(255,255,255,0.02),transparent_26%)]" />
+      <div className={cn("pointer-events-none absolute inset-0", tone.glow)} />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/12 to-transparent" />
 
-      <div className="relative border-b border-white/[0.07] px-5 py-5 md:px-6">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-          <div className="min-w-0">
+      <div className="relative border-b border-white/[0.07] px-5 py-5 md:px-6 md:py-6">
+        <div className="flex flex-col gap-5 2xl:flex-row 2xl:items-start 2xl:justify-between">
+          <div className="min-w-0 max-w-[980px]">
             <div className="flex flex-wrap items-center gap-2">
-              <ToneBadge tone={stageTone(stageOf(item), rawStatusOf(item))}>
-                {stageOf(item) === "draft" ? "Draft" : stageOf(item)}
+              <ToneBadge tone={stageTone(stage, rawStatusOf(item))}>
+                {stage === "draft" ? "Draft" : stage}
               </ToneBadge>
 
               {postType ? <ToneBadge tone="neutral">{postType}</ToneBadge> : null}
@@ -260,24 +296,24 @@ export default function ProposalExpanded({
               </ToneBadge>
 
               {isAssetReady ? <ToneBadge tone="success">asset ready</ToneBadge> : null}
+
+              <SurfacePill className="text-white/48">
+                PR-{shortId(item?.id).toUpperCase()}
+              </SurfacePill>
             </div>
 
-            <h2 className="mt-3 max-w-[900px] text-[24px] font-semibold leading-[1.02] tracking-[-0.05em] text-white md:text-[32px]">
+            <h2 className="mt-4 max-w-[980px] text-[28px] font-semibold leading-[0.98] tracking-[-0.06em] text-white md:text-[38px]">
               {title}
             </h2>
 
             {summary ? (
-              <div className="mt-2 max-w-[920px] text-[13px] leading-6 text-white/46">
+              <p className="mt-3 max-w-[900px] text-[14px] leading-7 text-white/46">
                 {summary}
-              </div>
+              </p>
             ) : null}
 
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-[12px] text-white/40">
-              <span className="font-medium text-white/58">
-                PR-{shortId(item?.id).toUpperCase()}
-              </span>
-              <span>·</span>
-              <span>{agent}</span>
+            <div className="mt-4 flex flex-wrap items-center gap-2 text-[12px] text-white/40">
+              <span className="font-medium text-white/60">{agent}</span>
               {created ? (
                 <>
                   <span>·</span>
@@ -289,23 +325,24 @@ export default function ProposalExpanded({
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <GlassButton onClick={() => copy(String(item?.id || ""))}>
+          <div className="flex flex-wrap items-center gap-2 2xl:max-w-[420px] 2xl:justify-end">
+            <GlassButton size="lg" onClick={() => copy(String(item?.id || ""))}>
               <Copy className="h-4 w-4" />
               Copy ID
             </GlassButton>
 
-            <GlassButton onClick={() => copy(captionText)} disabled={!captionText}>
+            <GlassButton size="lg" onClick={() => copy(captionText)} disabled={!captionText}>
               <Copy className="h-4 w-4" />
               Copy caption
             </GlassButton>
 
-            <GlassButton onClick={() => copyJson(pack || resolvedDraft?.raw || item)}>
+            <GlassButton size="lg" onClick={() => copyJson(pack || resolvedDraft?.raw || item)}>
               <Copy className="h-4 w-4" />
               Copy JSON
             </GlassButton>
 
             <GlassButton
+              size="lg"
               variant="primary"
               onClick={doApprove}
               disabled={
@@ -322,6 +359,7 @@ export default function ProposalExpanded({
             </GlassButton>
 
             <GlassButton
+              size="lg"
               variant="danger"
               onClick={doReject}
               disabled={
@@ -338,6 +376,7 @@ export default function ProposalExpanded({
             </GlassButton>
 
             <GlassButton
+              size="lg"
               variant="primary"
               onClick={doPublish}
               disabled={effectiveBusy || !canPublish}
@@ -362,7 +401,7 @@ export default function ProposalExpanded({
               Publish
             </GlassButton>
 
-            <GlassButton onClick={onClose}>
+            <GlassButton size="lg" onClick={onClose}>
               <ArrowLeft className="h-4 w-4" />
               Back
             </GlassButton>
@@ -381,14 +420,14 @@ export default function ProposalExpanded({
             </div>
           </DetailSection>
         ) : (
-          <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_320px]">
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1.12fr)_340px]">
             <div className="min-w-0 space-y-5">
               <DetailSection
                 title="Caption"
                 right={
                   <div className="flex items-center gap-2 text-[11px] text-white/34">
                     <Clock3 className="h-3.5 w-3.5" />
-                    Canvas focus view
+                    Continuous review
                   </div>
                 }
               >
@@ -408,7 +447,7 @@ export default function ProposalExpanded({
                 </div>
 
                 {keyPoints ? (
-                  <div className="mt-4 rounded-[18px] border border-white/[0.06] bg-black/10 p-4">
+                  <div className="mt-4 rounded-[20px] border border-white/[0.06] bg-black/10 p-4">
                     <div className="text-[11px] uppercase tracking-[0.18em] text-white/34">
                       Key points
                     </div>
@@ -419,30 +458,32 @@ export default function ProposalExpanded({
                 ) : null}
               </DetailSection>
 
-              <div className="flex flex-wrap items-center gap-2">
-                {tabs.map((t) => {
-                  const active = tab === t.value;
+              <div className="rounded-[24px] border border-white/[0.06] bg-white/[0.025] p-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  {tabs.map((t) => {
+                    const active = tab === t.value;
 
-                  return (
-                    <button
-                      key={t.value}
-                      type="button"
-                      onClick={() => setTab(t.value)}
-                      className={cn(
-                        "rounded-full border px-3.5 py-2 text-[12px] font-medium transition",
-                        active
-                          ? "border-white/[0.12] bg-white/[0.09] text-white"
-                          : "border-white/[0.06] bg-white/[0.03] text-white/56 hover:bg-white/[0.05] hover:text-white/82"
-                      )}
-                    >
-                      {t.label}
-                    </button>
-                  );
-                })}
+                    return (
+                      <button
+                        key={t.value}
+                        type="button"
+                        onClick={() => setTab(t.value)}
+                        className={cn(
+                          "rounded-full border px-3.5 py-2 text-[12px] font-medium transition",
+                          active
+                            ? "border-white/[0.12] bg-white/[0.09] text-white"
+                            : "border-white/[0.06] bg-white/[0.03] text-white/56 hover:bg-white/[0.05] hover:text-white/82"
+                        )}
+                      >
+                        {t.label}
+                      </button>
+                    );
+                  })}
 
-                {isRegenerating ? (
-                  <span className="ml-2 text-[11px] text-white/34">Regenerating…</span>
-                ) : null}
+                  {isRegenerating ? (
+                    <span className="ml-2 text-[11px] text-white/34">Regenerating…</span>
+                  ) : null}
+                </div>
               </div>
 
               <AnimatePresence mode="wait">
@@ -535,7 +576,7 @@ export default function ProposalExpanded({
                   right={<div className="text-[11px] text-white/34">Loop</div>}
                 >
                   <div className="text-[12px] leading-6 text-white/44">
-                    Request changes → n8n revise → yeni draft → yenə approve / reject / publish.
+                    Request changes → revise → new draft → approve / reject / publish.
                   </div>
 
                   <div className="mt-4 grid gap-4 lg:grid-cols-2">
@@ -548,13 +589,14 @@ export default function ProposalExpanded({
                         value={feedback}
                         onChange={(e) => setFeedback(e.target.value)}
                         rows={5}
-                        className="mt-2 w-full rounded-[18px] border border-white/[0.08] bg-white/[0.04] p-3 text-[13px] text-white outline-none placeholder:text-white/24 focus:border-cyan-300/20"
+                        className="mt-2 w-full rounded-[20px] border border-white/[0.08] bg-white/[0.04] p-3 text-[13px] text-white outline-none placeholder:text-white/24 transition focus:border-cyan-300/20 focus:bg-white/[0.055]"
                         placeholder='Məs: "Caption daha qısa. 8 hashtag. CTA WhatsApp. Dizaynda 3 kadr..."'
                         disabled={effectiveBusy || isRegenerating || isRejected || isPublished}
                       />
 
                       <div className="mt-3">
                         <GlassButton
+                          size="lg"
                           onClick={doRequestChanges}
                           disabled={
                             effectiveBusy ||
@@ -579,7 +621,7 @@ export default function ProposalExpanded({
                       <input
                         value={rejectReason}
                         onChange={(e) => setRejectReason(e.target.value)}
-                        className="mt-2 h-12 w-full rounded-[18px] border border-white/[0.08] bg-white/[0.04] px-3 text-[13px] text-white outline-none placeholder:text-white/24 focus:border-rose-300/20"
+                        className="mt-2 h-12 w-full rounded-[20px] border border-white/[0.08] bg-white/[0.04] px-3 text-[13px] text-white outline-none placeholder:text-white/24 transition focus:border-rose-300/20 focus:bg-white/[0.055]"
                         placeholder='Məs: "Brand uyğun deyil"...'
                         disabled={effectiveBusy || isRegenerating}
                       />
@@ -622,6 +664,10 @@ export default function ProposalExpanded({
                     v={hasPublishableAsset ? `${assetUrls.length} linked` : "—"}
                   />
                   <MetaRow k="Publish ready" v={canPublish ? "yes" : "no"} />
+                </div>
+
+                <div className="mt-5">
+                  <span className={cn("block h-[4px] w-14 rounded-full", tone.rail)} />
                 </div>
               </DetailSection>
 
