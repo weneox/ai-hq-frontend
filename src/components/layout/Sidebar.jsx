@@ -29,7 +29,8 @@ const COLLAPSED_W = 76;
 const EXPANDED_W = 264;
 const ICON_COL_W = 76;
 const ITEM_H = 58;
-const BRAND_H = 108;
+const BRAND_H = 106;
+const SIDEBAR_RADIUS = 34;
 
 function cn(...classes) {
   return classes.filter(Boolean).join(" ");
@@ -38,19 +39,19 @@ function cn(...classes) {
 function SidebarSurface() {
   return (
     <>
-      <div className="absolute inset-0 rounded-r-[36px] bg-[linear-gradient(180deg,rgba(2,7,18,0.76)_0%,rgba(3,8,20,0.88)_28%,rgba(3,8,21,0.95)_68%,rgba(2,7,18,0.985)_100%)]" />
-      <div className="absolute inset-0 rounded-r-[36px] backdrop-blur-[32px]" />
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(2,7,18,0.74)_0%,rgba(3,8,20,0.86)_22%,rgba(3,8,21,0.92)_66%,rgba(2,7,18,0.96)_100%)]" />
+      <div className="absolute inset-0 backdrop-blur-[26px]" />
 
-      <div className="absolute inset-0 rounded-r-[36px] bg-[radial-gradient(260px_circle_at_0%_0%,rgba(56,189,248,0.08),transparent_34%),radial-gradient(320px_circle_at_30%_38%,rgba(99,102,241,0.08),transparent_42%),radial-gradient(220px_circle_at_0%_100%,rgba(255,255,255,0.025),transparent_38%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(280px_circle_at_0%_0%,rgba(56,189,248,0.09),transparent_34%),radial-gradient(340px_circle_at_38%_36%,rgba(99,102,241,0.07),transparent_42%),radial-gradient(220px_circle_at_0%_100%,rgba(255,255,255,0.02),transparent_38%)]" />
 
-      <div className="absolute inset-0 rounded-r-[36px] ring-1 ring-white/[0.03]" />
-      <div className="absolute inset-0 rounded-r-[36px] shadow-[0_24px_76px_rgba(0,0,0,0.36),inset_0_1px_0_rgba(255,255,255,0.03)]" />
+      <div className="absolute inset-0 ring-1 ring-white/[0.03]" />
+      <div className="absolute inset-0 shadow-[0_22px_80px_rgba(0,0,0,0.26),inset_0_1px_0_rgba(255,255,255,0.03)]" />
 
       <div className="pointer-events-none absolute left-0 top-0 h-full w-px bg-[linear-gradient(180deg,transparent,rgba(255,255,255,0.03),transparent)]" />
-      <div className="pointer-events-none absolute bottom-0 left-[14px] right-[18px] h-px bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.028),transparent)]" />
+      <div className="pointer-events-none absolute right-0 top-[18px] h-[120px] w-px bg-[linear-gradient(180deg,rgba(255,255,255,0.05),transparent)]" />
 
-      <div className="pointer-events-none absolute inset-y-0 right-[-96px] w-[140px] bg-[linear-gradient(90deg,rgba(7,13,28,0.42)_0%,rgba(7,13,28,0.20)_42%,rgba(7,13,28,0.08)_68%,rgba(7,13,28,0)_100%)] blur-[18px]" />
-      <div className="pointer-events-none absolute inset-y-[18px] right-[-18px] w-[44px] bg-[radial-gradient(circle_at_0%_50%,rgba(103,232,249,0.07),rgba(103,232,249,0.03)_34%,transparent_72%)] blur-[16px]" />
+      <div className="pointer-events-none absolute inset-y-0 right-[-118px] w-[180px] bg-[linear-gradient(90deg,rgba(6,12,28,0.34)_0%,rgba(6,12,28,0.15)_42%,rgba(6,12,28,0.05)_70%,rgba(6,12,28,0)_100%)] blur-[28px]" />
+      <div className="pointer-events-none absolute inset-y-[18px] right-[-22px] w-[56px] bg-[radial-gradient(circle_at_0%_50%,rgba(103,232,249,0.06),rgba(103,232,249,0.02)_34%,transparent_72%)] blur-[20px]" />
     </>
   );
 }
@@ -72,7 +73,7 @@ function ItemGlow({ isActive }) {
           "pointer-events-none absolute left-[2px] top-1/2 h-[42px] w-[42px] -translate-y-1/2 rounded-full transition-all duration-300",
           isActive
             ? "opacity-100 bg-[radial-gradient(circle,rgba(103,232,249,0.12),rgba(103,232,249,0.03)_45%,transparent_74%)] blur-[6px]"
-            : "opacity-0 group-hover:opacity-100 group-hover:bg-[radial-gradient(circle,rgba(255,255,255,0.055),rgba(255,255,255,0.016)_44%,transparent_74%)] group-hover:blur-[5px]"
+            : "opacity-0 group-hover:opacity-100 group-hover:bg-[radial-gradient(circle,rgba(255,255,255,0.05),rgba(255,255,255,0.016)_44%,transparent_74%)] group-hover:blur-[5px]"
         )}
       />
 
@@ -80,8 +81,8 @@ function ItemGlow({ isActive }) {
         className={cn(
           "pointer-events-none absolute inset-y-[9px] left-[10px] right-[10px] transition-all duration-300",
           isActive
-            ? "opacity-100 bg-[linear-gradient(90deg,rgba(255,255,255,0.028),rgba(255,255,255,0.012)_34%,rgba(255,255,255,0.004)_55%,transparent_72%)]"
-            : "opacity-0 group-hover:opacity-100 group-hover:bg-[linear-gradient(90deg,rgba(255,255,255,0.012),rgba(255,255,255,0.004)_34%,transparent_68%)]"
+            ? "opacity-100 bg-[linear-gradient(90deg,rgba(255,255,255,0.024),rgba(255,255,255,0.01)_34%,rgba(255,255,255,0.003)_55%,transparent_72%)]"
+            : "opacity-0 group-hover:opacity-100 group-hover:bg-[linear-gradient(90deg,rgba(255,255,255,0.010),rgba(255,255,255,0.004)_34%,transparent_68%)]"
         )}
       />
     </>
@@ -91,15 +92,15 @@ function ItemGlow({ isActive }) {
 function BrandDock({ expanded }) {
   return (
     <div className="relative" style={{ height: BRAND_H }}>
-      <div className="pointer-events-none absolute bottom-0 left-[14px] right-[18px] h-px bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.045),transparent)]" />
+      <div className="pointer-events-none absolute bottom-0 left-[14px] right-[18px] h-px bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.04),transparent)]" />
 
       <div className="relative flex h-full items-center overflow-hidden">
         <div
           className="relative z-[2] flex h-full shrink-0 items-center justify-center"
-          style={{ width: ICON_COL_W }}
+          style={{ width: 68 }}
         >
           <div className="relative flex items-center justify-center">
-            <div className="absolute h-[74px] w-[74px] rounded-full bg-[radial-gradient(circle,rgba(125,211,252,0.08),rgba(125,211,252,0.02)_42%,transparent_72%)] blur-[10px]" />
+            <div className="absolute h-[72px] w-[72px] rounded-full bg-[radial-gradient(circle,rgba(125,211,252,0.08),rgba(125,211,252,0.02)_42%,transparent_72%)] blur-[10px]" />
             <ExecutiveMark3D className="relative h-[42px] w-[42px]" />
           </div>
         </div>
@@ -107,17 +108,34 @@ function BrandDock({ expanded }) {
         <AnimatePresence initial={false}>
           {expanded && (
             <motion.div
-              initial={{ opacity: 0, x: -10, filter: "blur(6px)" }}
+              initial={{ opacity: 0, x: -8, filter: "blur(6px)" }}
               animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
               exit={{ opacity: 0, x: -8, filter: "blur(6px)" }}
               transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
-              className="relative z-[2] min-w-0 flex-1 pr-4"
+              className="relative z-[2] -ml-[6px] min-w-0 flex-1 pr-4"
             >
-              <div className="w-[162px] truncate text-[9.8px] font-semibold uppercase tracking-[0.34em] text-white/48">
-                AI HEADQUARTERS
-              </div>
-              <div className="w-[162px] truncate pt-1 text-[14.4px] font-semibold tracking-[-0.02em] text-white/96">
-                Executive Command
+              <div className="pointer-events-none absolute -left-3 top-1/2 h-[58px] w-[58px] -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(103,232,249,0.08),rgba(103,232,249,0.015)_48%,transparent_72%)] blur-[12px]" />
+
+              <div className="relative min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="h-[4px] w-[4px] shrink-0 rounded-full bg-cyan-200/80 shadow-[0_0_10px_rgba(165,243,252,0.75)]" />
+                  <div className="min-w-0 truncate text-[9.6px] font-semibold uppercase tracking-[0.34em] text-white/62">
+                    AI HEADQUARTERS
+                  </div>
+                </div>
+
+                <div className="mt-[3px] min-w-0">
+                  <div className="truncate text-[16.8px] font-semibold leading-[1.02] tracking-[-0.048em] text-white [text-shadow:0_1px_0_rgba(255,255,255,0.08),0_10px_26px_rgba(120,220,255,0.10)]">
+                    Executive Command
+                  </div>
+                </div>
+
+                <div className="mt-[8px] flex items-center gap-2">
+                  <div className="h-px flex-1 bg-[linear-gradient(90deg,rgba(255,255,255,0.14),rgba(255,255,255,0.03),transparent)]" />
+                  <span className="shrink-0 text-[8px] font-semibold uppercase tracking-[0.28em] text-white/30">
+                    PRIME RAIL
+                  </span>
+                </div>
               </div>
             </motion.div>
           )}
@@ -138,27 +156,22 @@ function NavItem({ item, expanded, onNavigate }) {
       className="group relative block"
     >
       {({ isActive }) => (
-        <div
-          className="relative flex items-center overflow-hidden"
-          style={{ height: ITEM_H }}
-        >
+        <div className="relative flex items-center overflow-hidden" style={{ height: ITEM_H }}>
           <ItemGlow isActive={isActive} />
 
           <div
             className="relative z-[2] flex h-full shrink-0 items-center justify-center"
             style={{ width: ICON_COL_W }}
           >
-            <div className="relative flex items-center justify-center">
-              <Icon
-                className={cn(
-                  "relative z-[2] transition-all duration-300",
-                  isActive
-                    ? "h-[17px] w-[17px] text-white"
-                    : "h-[16px] w-[16px] text-white/56 group-hover:text-white/84"
-                )}
-                strokeWidth={1.9}
-              />
-            </div>
+            <Icon
+              className={cn(
+                "relative z-[2] transition-all duration-300",
+                isActive
+                  ? "h-[17px] w-[17px] text-white"
+                  : "h-[16px] w-[16px] text-white/56 group-hover:text-white/84"
+              )}
+              strokeWidth={1.9}
+            />
           </div>
 
           <div
@@ -217,7 +230,7 @@ function RailNav({ expanded, onNavigate }) {
 function RailFooter({ expanded }) {
   return (
     <div className="px-0 pb-5 pt-5">
-      <div className="mx-[14px] mb-3 h-px bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.05),transparent)]" />
+      <div className="mx-[14px] mb-3 h-px bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.04),transparent)]" />
 
       <div className="group relative flex h-[58px] items-center overflow-hidden">
         <div className="pointer-events-none absolute left-[2px] top-1/2 h-[42px] w-[42px] -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(110,231,183,0.12),rgba(110,231,183,0.03)_44%,transparent_74%)] blur-[6px]" />
@@ -291,12 +304,12 @@ function DesktopSidebar({ expanded, setExpanded }) {
             ? { duration: 0 }
             : { duration: 0.38, ease: [0.22, 1, 0.36, 1] }
         }
-        className="relative h-full overflow-visible"
+        className="relative h-full overflow-hidden rounded-r-[34px]"
         style={{ willChange: "width" }}
       >
-        <div className="absolute inset-0 overflow-hidden rounded-r-[36px]">
-          <SidebarSurface />
-        </div>
+        <SidebarSurface />
+
+        <div className="pointer-events-none absolute right-[-10px] top-[58px] h-[160px] w-[90px] bg-[radial-gradient(circle_at_0%_0%,rgba(78,230,255,0.08),transparent_72%)] blur-3xl" />
 
         <div className="relative flex h-full flex-col">
           <BrandDock expanded={expanded} />
@@ -328,17 +341,15 @@ function MobileNavItem({ item, onNavigate }) {
             className="relative z-[2] flex h-full shrink-0 items-center justify-center"
             style={{ width: ICON_COL_W }}
           >
-            <div className="relative flex items-center justify-center">
-              <Icon
-                className={cn(
-                  "relative z-[2] transition-all duration-300",
-                  isActive
-                    ? "h-[17px] w-[17px] text-white"
-                    : "h-[16px] w-[16px] text-white/56 group-hover:text-white/84"
-                )}
-                strokeWidth={1.9}
-              />
-            </div>
+            <Icon
+              className={cn(
+                "relative z-[2] transition-all duration-300",
+                isActive
+                  ? "h-[17px] w-[17px] text-white"
+                  : "h-[16px] w-[16px] text-white/56 group-hover:text-white/84"
+              )}
+              strokeWidth={1.9}
+            />
           </div>
 
           <div className="relative z-[2] min-w-0 flex-1 pr-3">
@@ -379,9 +390,9 @@ function MobileSidebar({ setMobileOpen }) {
       transition={{ type: "spring", stiffness: 250, damping: 30 }}
       className="fixed inset-y-0 left-0 z-[160] w-[264px] md:hidden"
     >
-      <div className="relative h-full overflow-hidden rounded-r-[36px]">
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(2,7,18,0.95),rgba(3,8,21,0.985))]" />
-        <div className="absolute inset-0 backdrop-blur-[32px]" />
+      <div className="relative h-full overflow-hidden rounded-r-[34px]">
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(2,7,18,0.94),rgba(3,8,21,0.985))]" />
+        <div className="absolute inset-0 backdrop-blur-[30px]" />
         <div className="absolute inset-0 bg-[radial-gradient(260px_circle_at_0%_0%,rgba(56,189,248,0.08),transparent_34%),radial-gradient(320px_circle_at_30%_38%,rgba(99,102,241,0.08),transparent_42%),radial-gradient(220px_circle_at_0%_100%,rgba(255,255,255,0.025),transparent_38%)]" />
         <div className="absolute inset-0 ring-1 ring-white/[0.03]" />
         <div className="absolute inset-0 shadow-[0_24px_76px_rgba(0,0,0,0.36),inset_0_1px_0_rgba(255,255,255,0.03)]" />
