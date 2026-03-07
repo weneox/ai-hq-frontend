@@ -1,8 +1,5 @@
-// src/components/ProposalDetail.jsx (FINAL v5.2.5 — FIXED publish safety + stable gating)
-// ✅ Publish yalnız asset.ready / assets.ready / publish.ready olanda aktivdir
-// ✅ Asset hazır deyilsə publish işləmir
-// ✅ Request / Approve / Reject logic saxlanılıb
-// ✅ No double scroll / no cut saxlanılıb
+// src/components/ProposalDetail.jsx
+// FINAL v5.4.0 — FIXED publish gating + caption normalization + tolerant asset detection
 
 import { useEffect, useMemo, useState } from "react";
 import Card from "./ui/Card.jsx";
@@ -18,6 +15,9 @@ function safeText(x) {
   if (x && typeof x === "object") {
     if (typeof x.text === "string") return x.text;
     if (typeof x.value === "string") return x.value;
+    if (typeof x.caption === "string") return x.caption;
+    if (typeof x.label === "string") return x.label;
+    if (typeof x.name === "string") return x.name;
   }
   return "";
 }
@@ -91,6 +91,51 @@ function normalizeHashtags(h) {
   return [];
 }
 
+function asDisplay(v) {
+  if (v == null) return "";
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  if (Array.isArray(v)) {
+    return v
+      .map((item) => {
+        if (typeof item === "string") return item;
+        if (typeof item === "number" || typeof item === "boolean") return String(item);
+        if (item && typeof item === "object") {
+          return (
+            safeText(item) ||
+            safeText(item.caption) ||
+            safeText(item.text) ||
+            safeText(item.value) ||
+            pretty(item)
+          );
+        }
+        return "";
+      })
+      .filter(Boolean)
+      .join("\n");
+  }
+  if (typeof v === "object") {
+    return (
+      safeText(v) ||
+      safeText(v.caption) ||
+      safeText(v.text) ||
+      safeText(v.value) ||
+      pretty(v)
+    );
+  }
+  return String(v);
+}
+
+function normalizeInlineText(v) {
+  const raw = asDisplay(v);
+  return String(raw || "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\u00a0/g, " ")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function pickPayloadObj(p) {
   const raw =
     p?.payload ??
@@ -118,7 +163,7 @@ function titleOf(p) {
       safeText(obj.summary) ||
       safeText(obj.goal);
     if (t) return t;
-    const c = safeText(obj.caption) || safeText(obj.text) || "";
+    const c = normalizeInlineText(obj.caption || obj.text || "");
     if (c) return c.slice(0, 80);
   }
   return `Item #${shortId(p?.id)}`;
@@ -127,9 +172,9 @@ function titleOf(p) {
 function summaryOf(p) {
   const obj = pickPayloadObj(p);
   if (obj) {
-    const s = safeText(obj.summary) || safeText(obj.description) || safeText(obj.value) || "";
+    const s = normalizeInlineText(obj.summary || obj.description || obj.value || "");
     if (s) return s;
-    const c = safeText(obj.caption) || safeText(obj.text) || "";
+    const c = normalizeInlineText(obj.caption || obj.text || "");
     if (c) return c.slice(0, 140);
   }
   return "";
@@ -170,8 +215,7 @@ function normalizeDraft(rawDraft) {
     null;
 
   const pack = typeof contentPack === "string" ? safeJson(contentPack) : contentPack;
-
-  const status = d.status || d.draftStatus || (pack ? "draft.ready" : "") || "";
+  const status = d.status || d.draftStatus || d.state || (pack ? "draft.ready" : "") || "";
   const version = Number(d.version || pack?.version || 1) || 1;
 
   return {
@@ -181,6 +225,7 @@ function normalizeDraft(rawDraft) {
     updatedAt: d.updated_at || d.updatedAt || null,
     lastFeedback: d.last_feedback || d.lastFeedback || "",
     pack: pack || null,
+    raw: d,
   };
 }
 
@@ -190,7 +235,15 @@ function packType(pack) {
 }
 function packCaption(pack) {
   if (!pack) return "";
-  return pack.caption || pack.postCaption || pack.text || "";
+  return normalizeInlineText(
+    pack.caption ||
+      pack.postCaption ||
+      pack.text ||
+      pack.copy ||
+      pack.body ||
+      pack.lines ||
+      ""
+  );
 }
 function packHashtags(pack) {
   if (!pack) return [];
@@ -210,26 +263,26 @@ function packPlatform(pack) {
 }
 function packCta(pack) {
   if (!pack) return "";
-  return pack.cta || pack.call_to_action || pack.callToAction || "";
+  return normalizeInlineText(pack.cta || pack.call_to_action || pack.callToAction || "");
 }
 function packReelScript(pack) {
   if (!pack) return "";
-  return pack.reel_script || pack.reelScript || pack.script || pack.voiceover || "";
+  return normalizeInlineText(pack.reel_script || pack.reelScript || pack.script || pack.voiceover || "");
 }
 function packImagePrompt(pack) {
   if (!pack) return "";
-  return pack.image_prompt || pack.imagePrompt || pack.visual_prompt || pack.visualPrompt || "";
+  return normalizeInlineText(pack.image_prompt || pack.imagePrompt || pack.visual_prompt || pack.visualPrompt || "");
 }
 function packDesign(pack) {
   if (!pack) return "";
-  return (
+  return normalizeInlineText(
     pack.design_instructions ||
-    pack.designInstructions ||
-    pack.layout_instructions ||
-    pack.layoutInstructions ||
-    pack.visual_direction ||
-    pack.visualDirection ||
-    ""
+      pack.designInstructions ||
+      pack.layout_instructions ||
+      pack.layoutInstructions ||
+      pack.visual_direction ||
+      pack.visualDirection ||
+      ""
   );
 }
 function packStoryboard(pack) {
@@ -242,7 +295,7 @@ function packAssetSpecs(pack) {
 }
 function packHook(pack) {
   if (!pack) return "";
-  return pack.hook || pack.opening_line || pack.openingLine || "";
+  return normalizeInlineText(pack.hook || pack.opening_line || pack.openingLine || "");
 }
 function packKeyPoints(pack) {
   if (!pack) return null;
@@ -250,23 +303,52 @@ function packKeyPoints(pack) {
 }
 function packMusic(pack) {
   if (!pack) return "";
-  return pack.music || pack.audio || pack.sound || "";
+  return normalizeInlineText(pack.music || pack.audio || pack.sound || "");
 }
 function packCompliance(pack) {
   if (!pack) return "";
-  return pack.compliance_notes || pack.complianceNotes || pack.rules || "";
+  return normalizeInlineText(pack.compliance_notes || pack.complianceNotes || pack.rules || "");
 }
 function packShotDuration(pack) {
   if (!pack) return "";
-  return pack.duration || pack.video_duration || pack.videoDuration || "";
+  return normalizeInlineText(pack.duration || pack.video_duration || pack.videoDuration || "");
 }
 
-function asDisplay(v) {
-  if (v == null) return "";
-  if (typeof v === "string") return v;
-  if (Array.isArray(v)) return v.map(asDisplay).filter(Boolean).join("\n");
-  if (typeof v === "object") return pretty(v);
-  return String(v);
+function firstNonEmpty(...vals) {
+  for (const v of vals) {
+    const s = normalizeInlineText(v);
+    if (s) return s;
+  }
+  return "";
+}
+
+function getAssetUrls(pack) {
+  if (!pack || typeof pack !== "object") return [];
+
+  const out = [];
+  const push = (u) => {
+    const s = String(u || "").trim();
+    if (s) out.push(s);
+  };
+
+  push(pack.imageUrl);
+  push(pack.image_url);
+  push(pack.videoUrl);
+  push(pack.video_url);
+  push(pack.coverUrl);
+  push(pack.cover_url);
+  push(pack.thumbnailUrl);
+  push(pack.thumbnail_url);
+
+  const assets = Array.isArray(pack.assets) ? pack.assets : [];
+  for (const a of assets) {
+    push(a?.url);
+    push(a?.secure_url);
+    push(a?.publicUrl);
+    push(a?.public_url);
+  }
+
+  return Array.from(new Set(out));
 }
 
 async function fetchLatestDraft(apiBase, proposalId) {
@@ -353,7 +435,13 @@ function statusLc(x) {
 
 function isAssetReadyStatus(s) {
   const v = statusLc(s);
-  return v === "asset.ready" || v === "assets.ready" || v === "publish.ready";
+  return (
+    v === "asset.ready" ||
+    v === "assets.ready" ||
+    v === "publish.ready" ||
+    v === "approved" ||
+    v === "draft.approved"
+  );
 }
 
 export default function ProposalDetail({
@@ -400,7 +488,7 @@ export default function ProposalDetail({
 
       const candidate = pickDraftCandidate(proposal, draft);
       const normalized = normalizeDraft(candidate);
-      if (normalized?.pack) return;
+      if (normalized?.pack && normalized?.id) return;
       if (!apiBase) return;
 
       setFetchingDraft(true);
@@ -454,10 +542,14 @@ export default function ProposalDetail({
     Boolean(pack) &&
     (draftStatusLc.includes("ready") || draftStatusLc === "" || draftStatusLc.includes("draft"));
 
-  const isAssetReady = isAssetReadyStatus(resolvedDraft?.status);
+  const assetUrls = getAssetUrls(pack);
+  const hasPublishableAsset = assetUrls.length > 0;
+  const isAssetReady = isAssetReadyStatus(resolvedDraft?.status) || (isApproved && hasPublishableAsset);
+
   const canPublish =
     Boolean(pack) &&
     Boolean(resolvedDraft?.id) &&
+    hasPublishableAsset &&
     isAssetReady &&
     !isPublished &&
     !isRejected;
@@ -483,6 +575,7 @@ export default function ProposalDetail({
   const keyPoints = packKeyPoints(pack);
   const compliance = packCompliance(pack);
   const duration = packShotDuration(pack);
+  const captionText = firstNonEmpty(packCaption(pack), pack?.headline, pack?.copy, pack?.summary);
 
   const copy = async (t) => {
     try {
@@ -544,6 +637,8 @@ export default function ProposalDetail({
     ? "Already published"
     : !pack
     ? "Draft pack missing"
+    : !hasPublishableAsset
+    ? "Asset URL missing"
     : !isAssetReady
     ? "Asset not ready yet"
     : "";
@@ -608,8 +703,8 @@ export default function ProposalDetail({
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => copy(packCaption(pack))}
-                    disabled={!packCaption(pack)}
+                    onClick={() => copy(captionText)}
+                    disabled={!captionText}
                   >
                     Copy caption
                   </Button>
@@ -715,7 +810,7 @@ export default function ProposalDetail({
                 <div className="min-w-0">
                   <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Caption</div>
                   <div className="mt-2 whitespace-pre-wrap break-words text-[14px] leading-[1.75] text-slate-900 dark:text-slate-100">
-                    {packCaption(pack) || "—"}
+                    {captionText || "—"}
                   </div>
                 </div>
                 <div className="flex shrink-0 items-start gap-2">
@@ -730,6 +825,7 @@ export default function ProposalDetail({
                 {postTime ? <Pill>Time: {postTime}</Pill> : null}
                 {cta ? <Pill>CTA: {cta}</Pill> : null}
                 {duration ? <Pill>Dur: {duration}</Pill> : null}
+                {hasPublishableAsset ? <Pill tone="success">Asset linked</Pill> : null}
               </div>
 
               {keyPoints ? (
@@ -797,6 +893,17 @@ export default function ProposalDetail({
                           </pre>
                         </details>
                       ) : null}
+
+                      {hasPublishableAsset ? (
+                        <details className="mt-3">
+                          <summary className="cursor-pointer text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                            Asset URLs
+                          </summary>
+                          <pre className="mt-2 whitespace-pre-wrap break-words text-xs text-slate-800 dark:text-slate-100">
+                            {assetUrls.join("\n")}
+                          </pre>
+                        </details>
+                      ) : null}
                     </>
                   ) : tab === "script" ? (
                     <>
@@ -828,7 +935,7 @@ export default function ProposalDetail({
                     <>
                       <SectionTitle>Advanced (Raw)</SectionTitle>
                       <pre className="mt-3 rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4 whitespace-pre-wrap break-words text-xs text-slate-800 dark:border-slate-800 dark:bg-slate-950/25 dark:text-slate-100">
-                        {pretty({ proposal, draft: resolvedDraft, fetchedDraftRaw })}
+                        {pretty({ proposal, draft: resolvedDraft, fetchedDraftRaw, assetUrls })}
                       </pre>
                     </>
                   )}
@@ -891,6 +998,7 @@ export default function ProposalDetail({
                     <KV k="Content ID" v={resolvedDraft?.id || "—"} />
                     <KV k="Updated" v={resolvedDraft?.updatedAt ? relTime(resolvedDraft.updatedAt) : "—"} />
                     <KV k="Draft status" v={resolvedDraft?.status || "—"} />
+                    <KV k="Assets" v={hasPublishableAsset ? `${assetUrls.length} linked` : "—"} />
                     <KV k="Publish ready" v={canPublish ? "yes" : "no"} />
                   </div>
                 </Card>

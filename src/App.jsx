@@ -1,7 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import Shell from "./components/layout/Shell.jsx";
 
-import Dashboard from "./pages/Dashboard.jsx";
+import CommandPage from "./pages/CommandPage.jsx";
 import Proposals from "./pages/Proposals.jsx";
 import Executions from "./pages/Executions.jsx";
 import Agents from "./pages/Agents.jsx";
@@ -14,13 +14,13 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route element={<Shell />}>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/analytics" element={<Analytics />} />
-          <Route path="/proposals" element={<Proposals />} />
-          <Route path="/executions" element={<Executions />} />
-          <Route path="/agents" element={<Agents />} />
-          <Route path="/threads" element={<Threads />} />
-          <Route path="/settings" element={<Settings />} />
+          <Route index element={<CommandPage />} />
+          <Route path="analytics" element={<Analytics />} />
+          <Route path="proposals" element={<Proposals />} />
+          <Route path="executions" element={<Executions />} />
+          <Route path="agents" element={<Agents />} />
+          <Route path="threads" element={<Threads />} />
+          <Route path="settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

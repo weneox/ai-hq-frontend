@@ -1,299 +1,233 @@
+import { AnimatePresence, motion } from "framer-motion";
 import { NavLink } from "react-router-dom";
-import { cx } from "../../lib/cx.js";
 import {
-  LayoutDashboard,
-  FileText,
-  PlayCircle,
+  Bell,
+  Binary,
   Bot,
-  MessagesSquare,
-  BarChart3,
-  Settings,
+  BriefcaseBusiness,
   ChevronRight,
+  CircleGauge,
+  Command,
+  Gem,
+  Orbit,
+  ScanEye,
+  SlidersHorizontal,
   Sparkles,
-  Activity,
   X,
 } from "lucide-react";
 
-const nav = [
-  { to: "/", label: "Dashboard", icon: LayoutDashboard, group: "AI OPERATIONS" },
-  { to: "/proposals", label: "Proposals", icon: FileText, group: "AI OPERATIONS" },
-  { to: "/executions", label: "Executions", icon: PlayCircle, group: "AI OPERATIONS" },
-  { to: "/threads", label: "Threads", icon: MessagesSquare, group: "AI OPERATIONS" },
-
-  { to: "/agents", label: "Agents", icon: Bot, group: "AI SYSTEM" },
-  { to: "/analytics", label: "Analytics", icon: BarChart3, group: "AI SYSTEM" },
-
-  { to: "/settings", label: "Settings", icon: Settings, group: "SYSTEM" },
+const NAV_ITEMS = [
+  { label: "Command", icon: Command, to: "/" },
+  { label: "Analytics", icon: CircleGauge, to: "/analytics" },
+  { label: "Proposals", icon: BriefcaseBusiness, to: "/proposals" },
+  { label: "Executions", icon: Orbit, to: "/executions" },
+  { label: "Agents", icon: Bot, to: "/agents" },
+  { label: "Threads", icon: ScanEye, to: "/threads" },
+  { label: "Settings", icon: SlidersHorizontal, to: "/settings" },
 ];
 
-function Pill({ tone = "indigo", children }) {
-  const tones = {
-    indigo:
-      "border-indigo-200/60 bg-indigo-50 text-indigo-700 dark:border-indigo-500/20 dark:bg-indigo-500/10 dark:text-indigo-200",
-    emerald:
-      "border-emerald-200/60 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200",
-    slate:
-      "border-slate-200/60 bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-200",
-  };
-  return (
-    <span
-      className={cx(
-        "inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-medium",
-        tones[tone] || tones.slate
-      )}
-    >
-      {children}
-    </span>
-  );
+function cn(...classes) {
+  return classes.filter(Boolean).join(" ");
 }
 
-function SectionLabel({ children }) {
+function BrandBlock({ expanded }) {
   return (
-    <div className="px-1 pt-4 pb-2 text-[11px] font-semibold tracking-[0.14em] text-slate-400 dark:text-slate-500">
-      {children}
-    </div>
-  );
-}
-
-function StatusRow({ icon: Icon, label, value, tone = "indigo" }) {
-  const toneCls =
-    tone === "emerald"
-      ? "text-emerald-600 dark:text-emerald-300"
-      : tone === "cyan"
-      ? "text-cyan-600 dark:text-cyan-300"
-      : "text-indigo-600 dark:text-indigo-300";
-
-  return (
-    <div className="group flex items-center justify-between rounded-xl px-3 py-2 transition hover:bg-white/40 dark:hover:bg-slate-900/40">
-      <div className="flex items-center gap-2 min-w-0">
-        <span
-          className={cx(
-            "flex h-9 w-9 items-center justify-center rounded-lg",
-            "bg-white/70 ring-1 ring-slate-200/70 shadow-sm",
-            "dark:bg-slate-950/40 dark:ring-slate-800"
-          )}
-        >
-          <Icon className={cx("h-4 w-4", toneCls)} />
-        </span>
-        <div className="min-w-0">
-          <div className="text-[12px] font-semibold text-slate-800 dark:text-slate-100 truncate">
-            {label}
-          </div>
-          <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-            Live system metrics
-          </div>
-        </div>
+    <div className="flex h-[84px] items-center px-4">
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] border border-white/10 bg-white/[0.06] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+        <Gem className="h-[17px] w-[17px] text-white" />
       </div>
 
-      <div className="flex items-center gap-2">
-        <Pill tone={tone === "emerald" ? "emerald" : "indigo"}>{value}</Pill>
-        <ChevronRight className="h-4 w-4 text-slate-300 opacity-0 transition group-hover:opacity-100 dark:text-slate-600" />
-      </div>
-    </div>
-  );
-}
-
-function AgentDot({ state = "active" }) {
-  const cls =
-    state === "active"
-      ? "bg-emerald-500"
-      : state === "thinking"
-      ? "bg-cyan-500"
-      : "bg-slate-400";
-  return <span className={cx("h-2.5 w-2.5 rounded-full", cls)} />;
-}
-
-function AgentRow({ name, state, sub }) {
-  return (
-    <div className="flex items-center justify-between rounded-xl px-3 py-2 hover:bg-white/40 dark:hover:bg-slate-900/40 transition">
-      <div className="flex items-center gap-2 min-w-0">
-        <span className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-white/70 ring-1 ring-slate-200/70 shadow-sm dark:bg-slate-950/40 dark:ring-slate-800">
-          <Sparkles className="h-4 w-4 text-indigo-600 dark:text-indigo-300" />
-        </span>
-        <div className="min-w-0">
-          <div className="text-[12px] font-semibold text-slate-800 dark:text-slate-100 truncate">
-            {name}
-          </div>
-          <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{sub}</div>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <AgentDot state={state} />
-        <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-          {state}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function NavItem({ it }) {
-  const Icon = it.icon;
-
-  return (
-    <NavLink
-      to={it.to}
-      end={it.to === "/"}
-      className={({ isActive }) =>
-        cx(
-          "relative group flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition",
-          "hover:bg-white/45 hover:text-slate-900 dark:hover:bg-slate-900/40 dark:hover:text-slate-50",
-          isActive ? "text-slate-900 dark:text-slate-50" : "text-slate-700 dark:text-slate-200",
-          // Active background + ring + glow
-          isActive
-            ? cx(
-                "bg-white/70 ring-1 ring-indigo-200/60 shadow-[0_10px_30px_-24px_rgba(79,70,229,0.55)]",
-                "dark:bg-indigo-500/10 dark:ring-indigo-500/20"
-              )
-            : "",
-          // left gradient accent
-          isActive
-            ? "before:absolute before:left-0 before:top-0 before:h-full before:w-1 before:rounded-l-xl before:bg-gradient-to-b before:from-indigo-500/70 before:via-cyan-400/60 before:to-emerald-400/60"
-            : ""
-        )
-      }
-    >
-      <span
-        className={cx(
-          "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition",
-          "bg-white/60 ring-1 ring-slate-200/60 shadow-sm",
-          "dark:bg-slate-950/30 dark:ring-slate-800",
-          "group-hover:scale-[1.02]"
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -10 }}
+            transition={{ duration: 0.18 }}
+            className="ml-3 min-w-0"
+          >
+            <div className="text-[10px] font-medium uppercase tracking-[0.34em] text-white/30">
+              AI Headquarters
+            </div>
+            <div className="truncate pt-0.5 text-[14px] font-medium text-white/92">
+              Executive Command
+            </div>
+          </motion.div>
         )}
-      >
-        <Icon className="h-4 w-4 opacity-90" />
-      </span>
-
-      <span className="min-w-0 truncate font-medium">{it.label}</span>
-
-      <ChevronRight className="ml-auto h-4 w-4 text-slate-300 opacity-0 transition group-hover:opacity-100 dark:text-slate-600" />
-    </NavLink>
+      </AnimatePresence>
+    </div>
   );
 }
 
-/**
- * Sidebar
- * @param {object} props
- * @param {"desktop"|"mobile"} props.variant
- * @param {function} props.onClose
- */
-export default function Sidebar({ variant = "desktop", onClose }) {
-  const grouped = {
-    "AI OPERATIONS": nav.filter((x) => x.group === "AI OPERATIONS"),
-    "AI SYSTEM": nav.filter((x) => x.group === "AI SYSTEM"),
-    SYSTEM: nav.filter((x) => x.group === "SYSTEM"),
-  };
-
+function RailNav({ expanded, onNavigate }) {
   return (
-    <aside
-      className={cx(
-        "w-full max-w-[320px] overflow-hidden rounded-2xl border",
-        "border-slate-200/70 bg-white/72 backdrop-blur-xl",
-        "shadow-[0_12px_44px_-22px_rgba(2,6,23,0.40)]",
-        "dark:border-slate-800 dark:bg-slate-950/35",
-        // subtle top gradient strip inside
-        "relative"
-      )}
-    >
-      {/* inner glow */}
-      <div className="pointer-events-none absolute inset-0 opacity-60 [mask-image:radial-gradient(520px_circle_at_25%_0%,black,transparent_55%)]">
-        <div className="absolute inset-0 bg-[radial-gradient(520px_circle_at_25%_0%,rgba(99,102,241,0.20),transparent_60%)] dark:bg-[radial-gradient(520px_circle_at_25%_0%,rgba(99,102,241,0.24),transparent_62%)]" />
+    <nav className="px-3 pb-3 pt-2">
+      <div className="space-y-1.5">
+        {NAV_ITEMS.map((item) => {
+          const Icon = item.icon;
+
+          return (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              onClick={onNavigate}
+              end={item.to === "/"}
+              className={({ isActive }) =>
+                cn(
+                  "group relative flex h-[54px] items-center overflow-hidden rounded-[18px] px-4 transition-all duration-300",
+                  isActive
+                    ? "bg-white/[0.085] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_10px_30px_rgba(0,0,0,0.18)]"
+                    : "text-white/34 hover:bg-white/[0.04] hover:text-white/82"
+                )
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  {isActive && (
+                    <>
+                      <div className="absolute inset-y-3 left-0 w-px bg-gradient-to-b from-transparent via-cyan-300/80 to-transparent" />
+                      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.05),transparent_55%)]" />
+                    </>
+                  )}
+
+                  <div className="relative z-10 flex min-w-[18px] items-center justify-center">
+                    <Icon className="h-[17px] w-[17px]" />
+                  </div>
+
+                  <AnimatePresence initial={false}>
+                    {expanded && (
+                      <motion.div
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -10 }}
+                        transition={{ duration: 0.18 }}
+                        className="ml-4 flex min-w-0 flex-1 items-center justify-between"
+                      >
+                        <span className="truncate text-[14px] font-medium tracking-[0.01em]">
+                          {item.label}
+                        </span>
+                        <ChevronRight className="h-4 w-4 text-white/18 transition-transform duration-300 group-hover:translate-x-0.5" />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </>
+              )}
+            </NavLink>
+          );
+        })}
       </div>
+    </nav>
+  );
+}
 
-      <div className="relative p-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-              AI HQ
+function RailFooter({ expanded }) {
+  return (
+    <div className="p-3 pt-2">
+      <div className="overflow-hidden rounded-[22px] border border-white/8 bg-white/[0.04] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+        <AnimatePresence initial={false}>
+          {expanded ? (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              transition={{ duration: 0.2 }}
+              className="p-4"
+            >
+              <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.34em] text-white/26">
+                <Binary className="h-3.5 w-3.5" />
+                <span>System layer</span>
+              </div>
+              <div className="mt-2 text-[14px] font-medium text-white/88">
+                Adaptive command mode
+              </div>
+              <div className="mt-1 text-[12px] leading-5 text-white/42">
+                Silent by default. Expands only when intention appears.
+              </div>
+            </motion.div>
+          ) : (
+            <div className="flex h-[88px] items-center justify-center">
+              <Sparkles className="h-4 w-4 text-white/54" />
             </div>
-            <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-              CEO Command Center
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Pill tone="slate">MVP</Pill>
-
-            {variant === "mobile" ? (
-              <button
-                onClick={onClose}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200/70 bg-white/70 hover:bg-white transition dark:border-slate-800 dark:bg-slate-950/40 dark:hover:bg-slate-900/60"
-                aria-label="Close"
-                title="Close"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            ) : null}
-          </div>
-        </div>
-
-        {/* System Status */}
-        <div className="mt-4 rounded-2xl border border-slate-200/60 bg-white/55 p-2 dark:border-slate-800 dark:bg-slate-950/25">
-          <div className="flex items-center justify-between px-2 pb-2">
-            <div className="text-[12px] font-semibold text-slate-800 dark:text-slate-100">
-              System Status
-            </div>
-            <span className="text-[11px] text-slate-500 dark:text-slate-400">Live</span>
-          </div>
-
-          <div className="space-y-1">
-            <StatusRow icon={Activity} label="Agents Active" value="4" tone="emerald" />
-            <StatusRow icon={PlayCircle} label="Jobs Running" value="2" tone="indigo" />
-            <StatusRow icon={FileText} label="Queue" value="6" tone="cyan" />
-          </div>
-        </div>
-
-        {/* Navigation */}
-        <nav className="mt-4">
-          <SectionLabel>AI OPERATIONS</SectionLabel>
-          <div className="space-y-1">
-            {grouped["AI OPERATIONS"].map((it) => (
-              <NavItem key={it.to} it={it} />
-            ))}
-          </div>
-
-          <SectionLabel>AI SYSTEM</SectionLabel>
-          <div className="space-y-1">
-            {grouped["AI SYSTEM"].map((it) => (
-              <NavItem key={it.to} it={it} />
-            ))}
-          </div>
-
-          <SectionLabel>SYSTEM</SectionLabel>
-          <div className="space-y-1">
-            {grouped["SYSTEM"].map((it) => (
-              <NavItem key={it.to} it={it} />
-            ))}
-          </div>
-        </nav>
-
-        {/* Agents Online */}
-        <div className="mt-5 rounded-2xl border border-slate-200/60 bg-white/55 p-2 dark:border-slate-800 dark:bg-slate-950/25">
-          <div className="flex items-center justify-between px-2 pb-2">
-            <div className="text-[12px] font-semibold text-slate-800 dark:text-slate-100">
-              Agents Online
-            </div>
-            <Pill tone="emerald">3</Pill>
-          </div>
-
-          <div className="space-y-1">
-            <AgentRow name="Nova" state="active" sub="Generating drafts" />
-            <AgentRow name="Atlas" state="active" sub="Ops + execution" />
-            <AgentRow name="Echo" state="thinking" sub="Analyzing trends" />
-          </div>
-        </div>
-
-        {/* Sprint Note */}
-        <div className="mt-5 rounded-2xl border border-slate-200/60 bg-slate-50/80 p-3 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-300">
-          <div className="font-semibold text-slate-800 dark:text-slate-100">
-            Sprint 1
-          </div>
-          <div className="mt-1">
-            Shell + Pages + Theme toggle hazırdır. Sidebar artıq “Control Center” oldu.
-          </div>
-        </div>
+          )}
+        </AnimatePresence>
       </div>
-    </aside>
+    </div>
+  );
+}
+
+export default function Sidebar({
+  expanded,
+  setExpanded,
+  mobileOpen,
+  setMobileOpen,
+}) {
+  return (
+    <>
+      <aside
+        onMouseEnter={() => setExpanded(true)}
+        onMouseLeave={() => setExpanded(false)}
+        className="fixed inset-y-0 left-0 z-50 hidden md:block w-[72px]"
+      >
+        <motion.div
+          animate={{ width: expanded ? 248 : 72 }}
+          transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+          className="relative h-full overflow-hidden border-r border-white/[0.06] bg-[#050816]/96 shadow-[20px_0_60px_rgba(0,0,0,0.32)] backdrop-blur-2xl will-change-[width]"
+        >
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(700px_circle_at_0%_0%,rgba(99,102,241,0.18),transparent_24%),radial-gradient(640px_circle_at_0%_100%,rgba(34,211,238,0.14),transparent_22%),linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01))]" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-px bg-white/[0.08]" />
+
+          <div className="relative flex h-full flex-col">
+            <BrandBlock expanded={expanded} />
+            <RailNav expanded={expanded} />
+            <div className="mt-auto">
+              <RailFooter expanded={expanded} />
+            </div>
+          </div>
+        </motion.div>
+      </aside>
+
+      <AnimatePresence>
+        {mobileOpen && (
+          <>
+            <motion.button
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setMobileOpen(false)}
+              className="fixed inset-0 z-40 bg-black/62 backdrop-blur-sm md:hidden"
+            />
+
+            <motion.aside
+              initial={{ x: -320 }}
+              animate={{ x: 0 }}
+              exit={{ x: -320 }}
+              transition={{ type: "spring", stiffness: 240, damping: 28 }}
+              className="fixed inset-y-0 left-0 z-50 w-[272px] md:hidden"
+            >
+              <div className="relative h-full overflow-hidden border-r border-white/[0.08] bg-[#050816]/98 shadow-[20px_0_60px_rgba(0,0,0,0.45)] backdrop-blur-2xl">
+                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(700px_circle_at_0%_0%,rgba(99,102,241,0.18),transparent_24%),radial-gradient(640px_circle_at_0%_100%,rgba(34,211,238,0.14),transparent_22%)]" />
+
+                <div className="relative flex items-center justify-between px-4 pt-4">
+                  <BrandBlock expanded />
+                  <button
+                    onClick={() => setMobileOpen(false)}
+                    className="mr-4 flex h-10 w-10 items-center justify-center rounded-[16px] border border-white/10 bg-white/[0.04] text-white/84"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div className="relative -mt-2 flex h-[calc(100%-84px)] flex-col">
+                  <RailNav expanded onNavigate={() => setMobileOpen(false)} />
+                  <div className="mt-auto">
+                    <RailFooter expanded />
+                  </div>
+                </div>
+              </div>
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
+    </>
   );
 }

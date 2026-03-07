@@ -1,18 +1,8 @@
-// src/api/proposals.js (FINAL v2 — FIXED status mapping + tolerant actions)
+// src/api/proposals.js
+// FINAL v2.1 — FIXED publish/approve response handling + tolerant mapping
 
 import { apiGet, apiPost } from "./client.js";
 
-/**
- * UI / page can request:
- * - draft
- * - pending
- * - in_progress
- * - approved
- * - published
- * - rejected
- *
- * We should pass these through correctly.
- */
 function mapUiStatusToBackend(status) {
   const s = String(status || "").trim().toLowerCase();
 
@@ -45,10 +35,6 @@ export async function decideProposal(id, decision, reason) {
   });
 }
 
-// ==========================
-// Draft actions (content_items)
-// ==========================
-
 export async function requestDraftChanges(_proposalId, contentId, feedback) {
   const did = encodeURIComponent(String(contentId));
   const fb = String(feedback || "").trim();
@@ -65,10 +51,6 @@ export async function requestDraftChanges(_proposalId, contentId, feedback) {
   };
 }
 
-/**
- * Approve draft:
- * content approve => asset generation request
- */
 export async function approveDraft(_proposalId, contentId) {
   const did = encodeURIComponent(String(contentId));
 
@@ -93,9 +75,6 @@ export async function rejectDraft(proposalId, _contentId, reason) {
   });
 }
 
-/**
- * Publish
- */
 export async function publishDraft(_proposalId, contentId) {
   const did = encodeURIComponent(String(contentId));
 
@@ -105,6 +84,7 @@ export async function publishDraft(_proposalId, contentId) {
     ok: !!j?.ok,
     content: j?.content || null,
     proposal: j?.proposal || null,
+    contentId: j?.contentId || j?.content_id || null,
     jobId: j?.jobId || j?.job_id || null,
     note: j?.note || null,
     error: j?.ok ? null : j?.error || "publish failed",

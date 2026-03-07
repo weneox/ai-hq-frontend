@@ -1,10 +1,5 @@
-// src/pages/Proposals.jsx (FINAL v3.3.5 — FIXED async publish flow)
-// ✅ Draft Approve draft mərhələsində qalır
-// ✅ Publish request async-dir, dərhal Published tab-a atmır
-// ✅ Publish sonrası boş ekran problemi həll olundu
-// ✅ selectedId qorunur
-// ✅ WebSocket / polling ilə stabil işləyir
-// ✅ draft tab = draft + in_progress + pending
+// src/pages/Proposals.jsx
+// FINAL v3.3.6 — FIXED async publish flow + stable selected refresh
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import TopBar from "../components/TopBar.jsx";
@@ -206,7 +201,7 @@ export default function ProposalsPage() {
             keepSelectedId: currentSelectedId,
           });
 
-          const pid = payload?.proposalId || payload?.proposal_id || payload?.id;
+          const pid = payload?.proposalId || payload?.proposal_id || payload?.id || payload?.proposal?.id;
           if (pid && String(pid) === String(currentSelectedId)) {
             refreshProposals("", {
               status: currentStatus,
@@ -328,16 +323,12 @@ export default function ProposalsPage() {
 
     try {
       const res = await publishDraft(proposalId, contentId);
-
       if (res?.ok === false) {
         throw new Error(res?.error || "publish failed");
       }
 
       await refreshStats();
 
-      // Publish async request-dir.
-      // Dərhal Published tab-a keçmək olmaz.
-      // Əvvəl cari tabda qalırıq və həmin item-i saxlamağa çalışırıq.
       const currentStatus = statusRef.current;
       const currentList = await fetchByUiStatus(currentStatus);
 
@@ -352,7 +343,6 @@ export default function ProposalsPage() {
 
       showToast("Publish requested ✅");
 
-      // Əgər backend artıq həqiqətən published edibsə, onda tab-ı dəyiş.
       try {
         const publishedItems = await fetchByUiStatus("published");
         const nowPublished = publishedItems.some((p) => String(p?.id) === String(proposalId));
