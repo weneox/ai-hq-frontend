@@ -54,11 +54,8 @@ export default function AgentCapabilityMatrix({ agents, activeIndex }) {
             ))}
 
             {rows.map((row) => (
-              <>
-                <div
-                  key={`${row.key}-label`}
-                  className="flex items-center rounded-[18px] border border-white/8 bg-white/[0.025] px-4 py-4 text-sm text-white/62"
-                >
+              <div key={row.key} className="contents">
+                <div className="flex items-center rounded-[18px] border border-white/8 bg-white/[0.025] px-4 py-4 text-sm text-white/62">
                   {row.label}
                 </div>
 
@@ -78,7 +75,7 @@ export default function AgentCapabilityMatrix({ agents, activeIndex }) {
                     />
                   </div>
                 ))}
-              </>
+              </div>
             ))}
           </div>
         </div>

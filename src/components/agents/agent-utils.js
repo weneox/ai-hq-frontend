@@ -22,72 +22,78 @@ export function relativeIndex(index, activeIndex, length) {
 export function slotConfig(slot) {
   if (slot === 0) {
     return {
-      x: "0vw",
-      y: -8,
+      x: "0%",
+      y: "0%",
       scale: 1,
       opacity: 1,
       zIndex: 40,
       filter: "blur(0px)",
-      width: "min(76vw, 900px)",
+      width: "min(72vw, 920px)",
+      pointerEvents: "auto",
     };
   }
 
   if (slot === -1) {
     return {
-      x: "-28vw",
-      y: 48,
+      x: "-34%",
+      y: "12%",
       scale: 0.78,
-      opacity: 0.62,
-      zIndex: 28,
-      filter: "blur(1.5px)",
-      width: "min(52vw, 560px)",
+      opacity: 0.56,
+      zIndex: 24,
+      filter: "blur(1px)",
+      width: "min(28vw, 360px)",
+      pointerEvents: "auto",
     };
   }
 
   if (slot === 1) {
     return {
-      x: "28vw",
-      y: 48,
+      x: "34%",
+      y: "12%",
       scale: 0.78,
-      opacity: 0.62,
-      zIndex: 28,
-      filter: "blur(1.5px)",
-      width: "min(52vw, 560px)",
+      opacity: 0.56,
+      zIndex: 24,
+      filter: "blur(1px)",
+      width: "min(28vw, 360px)",
+      pointerEvents: "auto",
     };
   }
 
   if (slot === -2) {
     return {
-      x: "-47vw",
-      y: 88,
-      scale: 0.56,
-      opacity: 0.18,
-      zIndex: 12,
-      filter: "blur(5px)",
-      width: "min(38vw, 420px)",
+      x: "-52%",
+      y: "17%",
+      scale: 0.58,
+      opacity: 0.16,
+      zIndex: 10,
+      filter: "blur(4px)",
+      width: "min(20vw, 260px)",
+      pointerEvents: "none",
     };
   }
 
   if (slot === 2) {
     return {
-      x: "47vw",
-      y: 88,
-      scale: 0.56,
-      opacity: 0.18,
-      zIndex: 12,
-      filter: "blur(5px)",
-      width: "min(38vw, 420px)",
+      x: "52%",
+      y: "17%",
+      scale: 0.58,
+      opacity: 0.16,
+      zIndex: 10,
+      filter: "blur(4px)",
+      width: "min(20vw, 260px)",
+      pointerEvents: "none",
     };
   }
 
   return {
-    x: "0vw",
-    y: 120,
+    x: "0%",
+    y: "20%",
     scale: 0.4,
     opacity: 0,
     zIndex: 1,
     filter: "blur(8px)",
-    width: "min(30vw, 320px)",
+    width: "220px",
+    pointerEvents: "none",
   };
 }
 
