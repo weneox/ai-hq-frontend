@@ -1,6 +1,16 @@
 import { useEffect } from "react";
 import { createWsClient } from "../lib/ws.js";
 
+function emitRetryQueueRefresh(detail = {}) {
+  try {
+    window.dispatchEvent(
+      new CustomEvent("inbox:retry-queue-refresh", {
+        detail,
+      })
+    );
+  } catch {}
+}
+
 export function useInboxRealtime({
   selectedThread,
   setWsState,
@@ -67,10 +77,66 @@ export function useInboxRealtime({
           }
 
           loadThreads(selectedThread?.id || threadId);
+
           if (selectedThread?.id === threadId) {
             loadThreadDetail(threadId);
             loadRelatedLead(threadId);
           }
+
+          return;
+        }
+
+        if (type === "inbox.message.updated") {
+          const threadId = payload?.threadId || payload?.message?.thread_id;
+          const message = payload?.message;
+          if (!threadId || !message?.id) return;
+
+          if (selectedThread?.id === threadId) {
+            setMessages((prev) =>
+              prev.map((m) => (m.id === message.id ? { ...m, ...message } : m))
+            );
+          }
+
+          loadThreads(selectedThread?.id || threadId);
+
+          if (selectedThread?.id === threadId) {
+            loadThreadDetail(threadId);
+          }
+
+          emitRetryQueueRefresh({
+            threadId,
+            reason: "message_updated",
+          });
+
+          return;
+        }
+
+        if (
+          type === "inbox.outbound.attempt.created" ||
+          type === "inbox.outbound.attempt.updated"
+        ) {
+          const attempt = payload?.attempt;
+          const threadId = attempt?.thread_id || "";
+          if (!attempt?.id) return;
+
+          if (threadId) {
+            loadThreads(selectedThread?.id || threadId);
+
+            if (selectedThread?.id === threadId) {
+              loadThreadDetail(threadId);
+            }
+          }
+
+          emitRetryQueueRefresh({
+            threadId,
+            attemptId: attempt.id,
+            status: attempt.status || "",
+            reason:
+              type === "inbox.outbound.attempt.created"
+                ? "attempt_created"
+                : "attempt_updated",
+          });
+
           return;
         }
 

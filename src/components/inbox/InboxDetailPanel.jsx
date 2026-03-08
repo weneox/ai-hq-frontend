@@ -64,6 +64,7 @@ export default function InboxDetailPanel({
   releaseHandoff,
   setThreadStatus,
 }) {
+  const hasThread = Boolean(selectedThread?.id);
   const selectedName =
     selectedThread?.customer_name ||
     selectedThread?.external_username ||
@@ -72,6 +73,20 @@ export default function InboxDetailPanel({
 
   const selectedState = deriveThreadState(selectedThread);
   const selectedLabels = Array.isArray(selectedThread?.labels) ? selectedThread.labels : [];
+  const unreadCount = Number(selectedThread?.unread_count ?? 0);
+  const handoffActive = Boolean(selectedThread?.handoff_active);
+  const assignedTo = selectedThread?.assigned_to || "—";
+
+  const canAssign = hasThread && busyAction !== "assign";
+  const canActivateHandoff = hasThread && !handoffActive && busyAction !== "handoff";
+  const canReleaseHandoff = hasThread && handoffActive && busyAction !== "release";
+  const canResolve =
+    hasThread &&
+    selectedThread?.status !== "resolved" &&
+    selectedThread?.status !== "closed" &&
+    busyAction !== "resolved";
+  const canClose = hasThread && selectedThread?.status !== "closed" && busyAction !== "closed";
+  const canMarkRead = hasThread && unreadCount > 0 && busyAction !== "read";
 
   return (
     <div className="rounded-[30px] border border-white/10 bg-white/[0.03] p-5 shadow-[0_22px_60px_rgba(0,0,0,0.22)] backdrop-blur-xl">
@@ -85,13 +100,13 @@ export default function InboxDetailPanel({
           </div>
         </div>
 
-        {selectedThread?.id ? (
+        {hasThread ? (
           <Button
             onClick={() => markRead(selectedThread.id)}
-            disabled={busyAction === "read"}
+            disabled={!canMarkRead}
             icon={CheckCheck}
           >
-            Mark as read
+            {busyAction === "read" ? "Marking..." : "Mark as read"}
           </Button>
         ) : null}
       </div>
@@ -130,7 +145,7 @@ export default function InboxDetailPanel({
               </div>
             ) : null}
 
-            {selectedThread?.handoff_active ? (
+            {handoffActive ? (
               <div
                 className={`rounded-full border px-2.5 py-1 text-[10px] uppercase tracking-[0.16em] ${getPriorityTone(
                   selectedThread.handoff_priority
@@ -145,14 +160,10 @@ export default function InboxDetailPanel({
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <InboxMiniInfo
             label="AI state"
-            value={selectedThread?.handoff_active ? "AI paused" : "AI active"}
+            value={handoffActive ? "AI paused" : "AI active"}
             icon={Bot}
           />
-          <InboxMiniInfo
-            label="Assigned"
-            value={selectedThread?.assigned_to || "—"}
-            icon={UserCog}
-          />
+          <InboxMiniInfo label="Assigned" value={assignedTo} icon={UserCog} />
           <InboxMiniInfo
             label="Last activity"
             value={fmtRelative(selectedThread?.last_message_at || selectedThread?.updated_at)}
@@ -160,7 +171,7 @@ export default function InboxDetailPanel({
           />
           <InboxMiniInfo
             label="Unread"
-            value={String(selectedThread?.unread_count ?? 0)}
+            value={String(unreadCount)}
             icon={AlertTriangle}
           />
           <InboxMiniInfo
@@ -200,50 +211,50 @@ export default function InboxDetailPanel({
             tone="violet"
             icon={UserCog}
             onClick={() => assignThread(selectedThread?.id)}
-            disabled={!selectedThread?.id || busyAction === "assign"}
+            disabled={!canAssign}
           >
-            Assign
+            {busyAction === "assign" ? "Assigning..." : "Assign"}
           </Button>
 
           <Button
             tone="amber"
             icon={ShieldAlert}
             onClick={() => activateHandoff(selectedThread?.id)}
-            disabled={!selectedThread?.id || busyAction === "handoff"}
+            disabled={!canActivateHandoff}
           >
-            Activate handoff
+            {busyAction === "handoff" ? "Activating..." : "Activate handoff"}
           </Button>
 
           <Button
             tone="cyan"
             icon={Bot}
             onClick={() => releaseHandoff(selectedThread?.id)}
-            disabled={!selectedThread?.id || busyAction === "release"}
+            disabled={!canReleaseHandoff}
           >
-            Release AI
+            {busyAction === "release" ? "Releasing..." : "Release AI"}
           </Button>
 
           <Button
             tone="emerald"
             icon={CheckCircle2}
             onClick={() => setThreadStatus(selectedThread?.id, "resolved")}
-            disabled={!selectedThread?.id || busyAction === "resolved"}
+            disabled={!canResolve}
           >
-            Resolve
+            {busyAction === "resolved" ? "Resolving..." : "Resolve"}
           </Button>
 
           <Button
             tone="rose"
             icon={XCircle}
             onClick={() => setThreadStatus(selectedThread?.id, "closed")}
-            disabled={!selectedThread?.id || busyAction === "closed"}
+            disabled={!canClose}
           >
-            Close
+            {busyAction === "closed" ? "Closing..." : "Close"}
           </Button>
         </div>
 
         <div className="mt-5 max-h-[360px] space-y-4 overflow-y-auto pr-1">
-          {!selectedThread ? (
+          {!hasThread ? (
             <div className="rounded-[22px] border border-dashed border-white/10 px-4 py-10 text-center">
               <div className="text-sm font-medium text-white/66">Select a thread</div>
               <div className="mt-2 text-sm leading-6 text-white/40">

@@ -17,6 +17,8 @@ import InboxToolbar from "../components/inbox/InboxToolbar.jsx";
 import InboxDetailPanel from "../components/inbox/InboxDetailPanel.jsx";
 import InboxLeadPanel from "../components/inbox/InboxLeadPanel.jsx";
 import InboxComposer from "../components/inbox/InboxComposer.jsx";
+import RetryQueuePanel from "../components/inbox/RetryQueuePanel.jsx";
+import ThreadOutboundAttemptsPanel from "../components/inbox/ThreadOutboundAttemptsPanel.jsx";
 
 import { useNavigate } from "react-router-dom";
 
@@ -137,6 +139,8 @@ export default function Inbox() {
         <InboxStatCard label="Resolved" value={stats.resolved} icon={CheckCircle2} tone="emerald" />
       </div>
 
+      <RetryQueuePanel tenantKey="neox" actor={operatorName || "operator"} className="mt-6" />
+
       <div className="mt-6 grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
         <div className="rounded-[30px] border border-white/10 bg-white/[0.03] p-5 shadow-[0_22px_60px_rgba(0,0,0,0.22)] backdrop-blur-xl">
           <div className="flex flex-col gap-4 border-b border-white/8 pb-4 md:flex-row md:items-center md:justify-between">
@@ -221,6 +225,11 @@ export default function Inbox() {
             busyAction={busyAction}
             sendOperatorReply={() => sendOperatorReply(selectedThread, replyText, setReplyText)}
             releaseHandoff={releaseHandoff}
+          />
+
+          <ThreadOutboundAttemptsPanel
+            selectedThread={selectedThread}
+            actor={operatorName || "operator"}
           />
 
           <div className="rounded-[30px] border border-white/10 bg-white/[0.03] p-5 shadow-[0_22px_60px_rgba(0,0,0,0.22)] backdrop-blur-xl">

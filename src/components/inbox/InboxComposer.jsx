@@ -1,6 +1,12 @@
 import { Bot, Send } from "lucide-react";
 
-function Button({ children, onClick, tone = "default", disabled = false, icon: Icon }) {
+function Button({
+  children,
+  onClick,
+  tone = "default",
+  disabled = false,
+  icon: Icon,
+}) {
   const toneMap = {
     cyan:
       "border-cyan-400/20 bg-cyan-400/[0.08] text-cyan-100 hover:border-cyan-400/30 hover:bg-cyan-400/[0.12]",
@@ -33,6 +39,11 @@ export default function InboxComposer({
   sendOperatorReply,
   releaseHandoff,
 }) {
+  const hasThread = Boolean(selectedThread?.id);
+  const handoffActive = Boolean(selectedThread?.handoff_active);
+  const sending = busyAction === "reply";
+  const releasing = busyAction === "release";
+
   return (
     <div className="rounded-[30px] border border-white/10 bg-white/[0.03] p-5 shadow-[0_22px_60px_rgba(0,0,0,0.22)] backdrop-blur-xl">
       <div className="flex items-center gap-3">
@@ -53,8 +64,11 @@ export default function InboxComposer({
         <textarea
           value={replyText}
           onChange={(e) => setReplyText(e.target.value)}
-          placeholder="Reply as operator..."
-          className="min-h-[120px] w-full resize-none rounded-[20px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/28"
+          disabled={!hasThread || sending}
+          placeholder={
+            hasThread ? "Reply as operator..." : "Select a thread first..."
+          }
+          className="min-h-[120px] w-full resize-none rounded-[20px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-white/28 disabled:cursor-not-allowed disabled:opacity-50"
         />
 
         <div className="mt-4 flex flex-wrap gap-2">
@@ -62,18 +76,18 @@ export default function InboxComposer({
             tone="violet"
             icon={Send}
             onClick={sendOperatorReply}
-            disabled={!selectedThread?.id || !replyText.trim() || busyAction === "reply"}
+            disabled={!hasThread || !replyText.trim() || sending}
           >
-            Send operator reply
+            {sending ? "Sending..." : "Send operator reply"}
           </Button>
 
           <Button
             tone="cyan"
             icon={Bot}
             onClick={() => releaseHandoff(selectedThread?.id)}
-            disabled={!selectedThread?.id || busyAction === "release"}
+            disabled={!hasThread || !handoffActive || releasing}
           >
-            Release handoff
+            {releasing ? "Releasing..." : "Release handoff"}
           </Button>
         </div>
       </div>

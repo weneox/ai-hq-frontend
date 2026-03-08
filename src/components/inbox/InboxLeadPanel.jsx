@@ -47,7 +47,9 @@ export default function InboxLeadPanel({
   relatedLead,
   openLeadDetail,
 }) {
-  const relatedLeadValue = relatedLead ? formatMoneyAZN(pickLeadValue(relatedLead)) : "—";
+  const hasThread = Boolean(selectedThread?.id);
+  const hasLead = Boolean(relatedLead?.id);
+  const relatedLeadValue = hasLead ? formatMoneyAZN(pickLeadValue(relatedLead)) : "—";
   const relatedLeadScore = Number(relatedLead?.score || 0);
 
   return (
@@ -67,11 +69,11 @@ export default function InboxLeadPanel({
       </div>
 
       <div className="mt-5 rounded-[22px] border border-white/10 bg-black/20 p-4">
-        {!selectedThread ? (
+        {!hasThread ? (
           <div className="text-sm text-white/46">No thread selected.</div>
         ) : loadingLead ? (
           <div className="text-sm text-white/52">Loading related lead...</div>
-        ) : !relatedLead ? (
+        ) : !hasLead ? (
           <div className="rounded-[18px] border border-dashed border-white/10 px-4 py-8 text-center">
             <div className="text-sm font-medium text-white/66">No related lead</div>
             <div className="mt-2 text-sm leading-6 text-white/40">
@@ -148,7 +150,12 @@ export default function InboxLeadPanel({
             </div>
 
             <div className="mt-4 flex flex-wrap gap-2">
-              <Button tone="violet" icon={ArrowUpRight} onClick={() => openLeadDetail(relatedLead)}>
+              <Button
+                tone="violet"
+                icon={ArrowUpRight}
+                onClick={() => openLeadDetail(relatedLead)}
+                disabled={!hasLead}
+              >
                 Open in Leads
               </Button>
             </div>

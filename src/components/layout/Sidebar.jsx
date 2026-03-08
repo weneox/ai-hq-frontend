@@ -16,6 +16,7 @@ import {
   FolderKanban,
   MessageSquareText,
   Users,
+  MessageCircle,
 } from "lucide-react";
 import ExecutiveMark3D from "./ExecutiveMark3D.jsx";
 
@@ -29,6 +30,7 @@ const NAV_ITEMS = [
       { label: "Proposals", icon: BriefcaseBusiness, to: "/proposals" },
       { label: "Inbox", icon: MessageSquareText, to: "/inbox", badgeKey: "inboxUnread" },
       { label: "Leads", icon: Users, to: "/leads", badgeKey: "leadsOpen" },
+      { label: "Comments", icon: MessageCircle, to: "/comments", badgeKey: "commentsCount" },
     ],
   },
   { label: "Executions", icon: Orbit, to: "/executions" },
@@ -349,7 +351,7 @@ function NavItem({ item, expanded, onNavigate }) {
 function OperationsGroup({ expanded, onNavigate, mobile = false, shellStats = {} }) {
   const location = useLocation();
   const childRoutes = useMemo(
-    () => ["/proposals", "/inbox", "/leads"],
+    () => ["/proposals", "/inbox", "/leads", "/comments"],
     []
   );
 

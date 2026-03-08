@@ -48,6 +48,7 @@ export default function Shell() {
     inboxUnread: 0,
     inboxOpen: 0,
     leadsOpen: 0,
+    commentsCount: 0,
     notificationsUnread: 0,
     dbDisabled: false,
     wsState: "idle",
@@ -55,13 +56,15 @@ export default function Shell() {
 
   async function loadShellStats() {
     try {
-      const [inboxRes, leadsRes] = await Promise.all([
+      const [inboxRes, leadsRes, commentsRes] = await Promise.all([
         apiGet("/api/inbox/threads?tenantKey=neox"),
         apiGet("/api/leads?tenantKey=neox"),
+        apiGet("/api/comments?tenantKey=neox&limit=200"),
       ]);
 
       const threads = Array.isArray(inboxRes?.threads) ? inboxRes.threads : [];
       const leads = Array.isArray(leadsRes?.leads) ? leadsRes.leads : [];
+      const comments = Array.isArray(commentsRes?.comments) ? commentsRes.comments : [];
 
       const inboxUnread = threads.reduce(
         (sum, t) => sum + Number(t?.unread_count || 0),
@@ -77,13 +80,18 @@ export default function Shell() {
         (l) => String(l?.status || "open").toLowerCase() === "open"
       ).length;
 
+      const commentsCount = comments.length;
+
       setShellStats((prev) => ({
         ...prev,
         inboxUnread,
         inboxOpen,
         leadsOpen,
-        notificationsUnread: inboxUnread + leadsOpen,
-        dbDisabled: Boolean(inboxRes?.dbDisabled || leadsRes?.dbDisabled),
+        commentsCount,
+        notificationsUnread: inboxUnread + leadsOpen + commentsCount,
+        dbDisabled: Boolean(
+          inboxRes?.dbDisabled || leadsRes?.dbDisabled || commentsRes?.dbDisabled
+        ),
       }));
     } catch {
       setShellStats((prev) => ({ ...prev }));
@@ -127,7 +135,9 @@ export default function Shell() {
           type === "inbox.thread.read" ||
           type === "inbox.thread.created" ||
           type === "lead.created" ||
-          type === "lead.updated"
+          type === "lead.updated" ||
+          type === "comment.created" ||
+          type === "comment.updated"
         ) {
           scheduleShellRefresh(120);
         }

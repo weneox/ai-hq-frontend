@@ -10,6 +10,7 @@ import Analytics from "./pages/Analytics.jsx";
 import Settings from "./pages/Settings.jsx";
 import Inbox from "./pages/Inbox.jsx";
 import Leads from "./pages/Leads.jsx";
+import Comments from "./pages/Comments.jsx";
 
 export default function App() {
   return (
@@ -21,6 +22,7 @@ export default function App() {
           <Route path="proposals" element={<Proposals />} />
           <Route path="inbox" element={<Inbox />} />
           <Route path="leads" element={<Leads />} />
+          <Route path="comments" element={<Comments />} />
           <Route path="executions" element={<Executions />} />
           <Route path="agents" element={<Agents />} />
           <Route path="threads" element={<Threads />} />
