@@ -1,5 +1,5 @@
 const WS_TOKEN = String(import.meta.env.VITE_WS_TOKEN || "").trim();
-const API_BASE = String(import.meta.env.VITE_API_BASE || "").replace(/\/+$/, "");
+const API_BASE = String(import.meta.env.VITE_API_BASE || "").trim().replace(/\/+$/, "");
 const WS_URL = String(import.meta.env.VITE_WS_URL || "").trim();
 
 function safeJson(x) {
@@ -12,7 +12,6 @@ function safeJson(x) {
 }
 
 function buildWsUrl() {
-  // Prefer explicit WS URL if provided (Cloudflare Pages friendly)
   if (WS_URL) {
     if (!WS_TOKEN) return WS_URL;
     const sep = WS_URL.includes("?") ? "&" : "?";
@@ -24,105 +23,192 @@ function buildWsUrl() {
   return `${wsBase}/ws?token=${encodeURIComponent(WS_TOKEN)}`;
 }
 
-/**
- * Simple WS client with:
- * - auto reconnect (exponential backoff)
- * - status events
- * - subscribe/unsubscribe
- */
 export function createWsClient({ onEvent, onStatus, maxDelayMs = 12000 } = {}) {
   let ws = null;
   let stopped = false;
   let attempt = 0;
-  let t = 0;
+  let reconnectTimer = null;
+  let currentUrl = "";
+  let manuallyClosed = false;
 
-  const notifyStatus = (s) => {
+  const notifyStatus = (status) => {
     try {
-      onStatus && onStatus(s);
+      if (typeof onStatus === "function") onStatus(status);
     } catch {}
   };
 
+  const clearReconnectTimer = () => {
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+  };
+
+  const cleanupSocket = () => {
+    if (!ws) return;
+
+    try {
+      ws.onopen = null;
+      ws.onclose = null;
+      ws.onerror = null;
+      ws.onmessage = null;
+    } catch {}
+
+    try {
+      if (
+        ws.readyState === WebSocket.OPEN ||
+        ws.readyState === WebSocket.CONNECTING
+      ) {
+        manuallyClosed = true;
+        ws.close();
+      }
+    } catch {}
+
+    ws = null;
+  };
+
+  const scheduleReconnect = () => {
+    if (stopped) return;
+
+    attempt = Math.min(attempt + 1, 50);
+
+    const base = Math.min(maxDelayMs, 450 * Math.pow(1.6, attempt));
+    const jitter = Math.floor(Math.random() * 300);
+    const delay = Math.min(maxDelayMs, base + jitter);
+
+    clearReconnectTimer();
+
+    notifyStatus({
+      state: "reconnecting",
+      attempt,
+      delayMs: delay,
+    });
+
+    reconnectTimer = setTimeout(() => {
+      if (stopped) return;
+      connect();
+    }, delay);
+  };
+
   const connect = () => {
+    if (stopped) return;
+
     const url = buildWsUrl();
+    currentUrl = url;
+
     if (!url) {
-      notifyStatus({ state: "off", detail: "missing VITE_WS_TOKEN or VITE_API_BASE/VITE_WS_URL" });
+      notifyStatus({
+        state: "off",
+        detail: "missing VITE_WS_TOKEN or VITE_API_BASE/VITE_WS_URL",
+      });
       return;
     }
 
-    notifyStatus({ state: attempt === 0 ? "connecting" : "reconnecting", attempt });
+    clearReconnectTimer();
+    cleanupSocket();
+    manuallyClosed = false;
+
+    notifyStatus({
+      state: attempt === 0 ? "connecting" : "reconnecting",
+      attempt,
+      url,
+    });
 
     try {
       ws = new WebSocket(url);
 
       ws.onopen = () => {
         attempt = 0;
-        notifyStatus({ state: "connected" });
+        notifyStatus({
+          state: "connected",
+          url: currentUrl,
+        });
       };
 
-      ws.onclose = () => {
-        notifyStatus({ state: "disconnected" });
-        if (stopped) return;
+      ws.onclose = (ev) => {
+        const wasManual = manuallyClosed;
+        manuallyClosed = false;
+        ws = null;
+
+        notifyStatus({
+          state: "disconnected",
+          code: ev?.code ?? null,
+          reason: ev?.reason || "",
+          wasClean: Boolean(ev?.wasClean),
+        });
+
+        if (stopped || wasManual) return;
         scheduleReconnect();
       };
 
       ws.onerror = () => {
-        notifyStatus({ state: "error" });
-        // reconnect handled by onclose
+        notifyStatus({
+          state: "error",
+          url: currentUrl,
+        });
       };
 
       ws.onmessage = (ev) => {
         const msg = safeJson(ev.data);
-        if (!msg) return;
+        if (!msg || typeof msg !== "object") return;
+
         const type = msg.type || msg.event;
         if (!type) return;
 
         try {
-          onEvent && onEvent({ type, payload: msg });
+          if (typeof onEvent === "function") {
+            onEvent({
+              type,
+              payload: msg,
+              raw: ev.data,
+            });
+          }
         } catch {}
       };
-    } catch {
-      notifyStatus({ state: "error" });
+    } catch (err) {
+      notifyStatus({
+        state: "error",
+        detail: String(err?.message || err || "WebSocket init failed"),
+      });
       scheduleReconnect();
     }
-  };
-
-  const scheduleReconnect = () => {
-    attempt = Math.min(attempt + 1, 50);
-    const base = Math.min(maxDelayMs, 400 * Math.pow(1.6, attempt));
-    const jitter = Math.floor(Math.random() * 250);
-    const delay = Math.min(maxDelayMs, base + jitter);
-
-    clearTimeout(t);
-    t = setTimeout(() => {
-      if (stopped) return;
-      connect();
-    }, delay);
-
-    // optional: keep UI updated
-    notifyStatus({ state: "reconnecting", attempt, delayMs: delay });
   };
 
   return {
     start() {
       stopped = false;
+      attempt = 0;
+      clearReconnectTimer();
       connect();
     },
+
     stop() {
       stopped = true;
-      clearTimeout(t);
-      try {
-        ws && ws.close();
-      } catch {}
-      ws = null;
+      clearReconnectTimer();
+      cleanupSocket();
       notifyStatus({ state: "stopped" });
     },
+
     send(obj) {
       try {
-        if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
-      } catch {}
+        if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+        ws.send(JSON.stringify(obj));
+        return true;
+      } catch {
+        return false;
+      }
     },
+
     canUseWs() {
       return Boolean((WS_URL || API_BASE) && WS_TOKEN);
+    },
+
+    getState() {
+      if (!ws) return "idle";
+      if (ws.readyState === WebSocket.CONNECTING) return "connecting";
+      if (ws.readyState === WebSocket.OPEN) return "open";
+      if (ws.readyState === WebSocket.CLOSING) return "closing";
+      return "closed";
     },
   };
 }

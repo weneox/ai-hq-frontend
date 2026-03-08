@@ -1,14 +1,101 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import Sidebar from "./Sidebar.jsx";
 import Header from "./Header.jsx";
+import { createWsClient } from "../../lib/ws.js";
 
 const SIDEBAR_RAIL_W = 84;
+
+function getApiBase() {
+  const raw = String(import.meta.env.VITE_API_BASE || "").trim();
+  return raw ? raw.replace(/\/+$/, "") : "";
+}
+
+async function readJsonSafe(r) {
+  const text = await r.text().catch(() => "");
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { raw: text };
+  }
+}
+
+async function apiGet(path) {
+  const base = getApiBase();
+  if (!base) throw new Error("VITE_API_BASE is not set");
+
+  const r = await fetch(`${base}${path}`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+
+  const j = await readJsonSafe(r);
+  if (!r.ok || j?.ok === false) {
+    throw new Error(j?.error || j?.details?.message || "Request failed");
+  }
+  return j;
+}
 
 export default function Shell() {
   const [expanded, setExpanded] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+  const wsRef = useRef(null);
+  const refreshTimerRef = useRef(0);
+
+  const [shellStats, setShellStats] = useState({
+    inboxUnread: 0,
+    inboxOpen: 0,
+    leadsOpen: 0,
+    notificationsUnread: 0,
+    dbDisabled: false,
+    wsState: "idle",
+  });
+
+  async function loadShellStats() {
+    try {
+      const [inboxRes, leadsRes] = await Promise.all([
+        apiGet("/api/inbox/threads?tenantKey=neox"),
+        apiGet("/api/leads?tenantKey=neox"),
+      ]);
+
+      const threads = Array.isArray(inboxRes?.threads) ? inboxRes.threads : [];
+      const leads = Array.isArray(leadsRes?.leads) ? leadsRes.leads : [];
+
+      const inboxUnread = threads.reduce(
+        (sum, t) => sum + Number(t?.unread_count || 0),
+        0
+      );
+
+      const inboxOpen = threads.filter((t) => {
+        const status = String(t?.status || "open").toLowerCase();
+        return status !== "resolved" && status !== "closed";
+      }).length;
+
+      const leadsOpen = leads.filter(
+        (l) => String(l?.status || "open").toLowerCase() === "open"
+      ).length;
+
+      setShellStats((prev) => ({
+        ...prev,
+        inboxUnread,
+        inboxOpen,
+        leadsOpen,
+        notificationsUnread: inboxUnread + leadsOpen,
+        dbDisabled: Boolean(inboxRes?.dbDisabled || leadsRes?.dbDisabled),
+      }));
+    } catch {
+      setShellStats((prev) => ({ ...prev }));
+    }
+  }
+
+  function scheduleShellRefresh(delay = 180) {
+    clearTimeout(refreshTimerRef.current);
+    refreshTimerRef.current = setTimeout(() => {
+      loadShellStats();
+    }, delay);
+  }
 
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -24,6 +111,46 @@ export default function Shell() {
   useEffect(() => {
     setMobileOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    loadShellStats();
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const ws = createWsClient({
+      onEvent(evt) {
+        const type = String(evt?.type || "");
+
+        if (
+          type === "inbox.message.created" ||
+          type === "inbox.thread.updated" ||
+          type === "inbox.thread.read" ||
+          type === "inbox.thread.created" ||
+          type === "lead.created" ||
+          type === "lead.updated"
+        ) {
+          scheduleShellRefresh(120);
+        }
+      },
+      onStatus(status) {
+        setShellStats((prev) => ({
+          ...prev,
+          wsState: String(status?.state || "idle"),
+        }));
+      },
+    });
+
+    wsRef.current = ws;
+    ws.start();
+
+    return () => {
+      clearTimeout(refreshTimerRef.current);
+      try {
+        ws.stop();
+      } catch {}
+      wsRef.current = null;
+    };
+  }, []);
 
   return (
     <div
@@ -43,6 +170,7 @@ export default function Shell() {
         setExpanded={setExpanded}
         mobileOpen={mobileOpen}
         setMobileOpen={setMobileOpen}
+        shellStats={shellStats}
       />
 
       <div className="relative z-10 min-h-screen md:pl-[var(--sidebar-rail-w)]">
@@ -54,7 +182,10 @@ export default function Shell() {
 
           <div className="relative flex min-h-screen flex-col">
             <div className="px-3 pt-3 md:px-4 md:pt-4 lg:px-5 lg:pt-5">
-              <Header onMenuClick={() => setMobileOpen(true)} />
+              <Header
+                onMenuClick={() => setMobileOpen(true)}
+                shellStats={shellStats}
+              />
             </div>
 
             <main className="relative flex-1 px-3 pb-4 pt-4 md:px-4 md:pb-5 lg:px-5 lg:pb-6">

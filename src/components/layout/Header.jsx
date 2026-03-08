@@ -17,7 +17,7 @@ function cn(...classes) {
   return classes.filter(Boolean).join(" ");
 }
 
-function StatusPill({ live = true, pending = 12, scheduled = 4 }) {
+function StatusPill({ live = true, pending = 0, scheduled = 0 }) {
   return (
     <div
       className={cn(
@@ -56,14 +56,14 @@ function StatusPill({ live = true, pending = 12, scheduled = 4 }) {
         <div className="mt-1 flex items-center gap-2 text-[11px] text-white/40">
           <span className="inline-flex items-center gap-1.5">
             <Clock3 className="h-3 w-3" strokeWidth={1.9} />
-            {pending} pending
+            {pending} open leads
           </span>
 
           <span className="h-1 w-1 rounded-full bg-white/15" />
 
           <span className="inline-flex items-center gap-1.5">
             <CheckCircle2 className="h-3 w-3" strokeWidth={1.9} />
-            {scheduled} queued
+            {scheduled} open threads
           </span>
         </div>
       </div>
@@ -71,7 +71,9 @@ function StatusPill({ live = true, pending = 12, scheduled = 4 }) {
   );
 }
 
-function NotificationButton({ hasUnread = true }) {
+function NotificationButton({ unread = 0 }) {
+  const hasUnread = unread > 0;
+
   return (
     <button
       type="button"
@@ -95,19 +97,21 @@ function NotificationButton({ hasUnread = true }) {
 
       {hasUnread ? (
         <>
-          <span className="absolute right-[7px] top-[7px] z-20 h-2.5 w-2.5 rounded-full bg-cyan-300 shadow-[0_0_14px_rgba(103,232,249,0.95)]" />
-          <span className="absolute right-[7px] top-[7px] z-10 h-2.5 w-2.5 animate-ping rounded-full bg-cyan-300/60" />
+          <span className="absolute right-[7px] top-[7px] z-20 flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full border border-cyan-200/20 bg-cyan-300 px-1 text-[10px] font-bold leading-none text-slate-900 shadow-[0_0_14px_rgba(103,232,249,0.95)]">
+            {unread > 99 ? "99+" : unread}
+          </span>
+          <span className="absolute right-[7px] top-[7px] z-10 h-4 w-4 animate-ping rounded-full bg-cyan-300/35" />
         </>
       ) : null}
     </button>
   );
 }
 
-export default function Header() {
-  const hasUnread = true;
+export default function Header({ shellStats = {} }) {
   const live = true;
-  const pending = 12;
-  const scheduled = 4;
+  const pending = Number(shellStats?.leadsOpen || 0);
+  const scheduled = Number(shellStats?.inboxOpen || 0);
+  const unread = Number(shellStats?.notificationsUnread || 0);
 
   return (
     <header className="sticky top-0 z-40 px-3 pt-3 md:px-5 md:pt-4">
@@ -141,7 +145,7 @@ export default function Header() {
 
           <div className="flex items-center gap-2 md:gap-3">
             <StatusPill live={live} pending={pending} scheduled={scheduled} />
-            <NotificationButton hasUnread={hasUnread} />
+            <NotificationButton unread={unread} />
           </div>
         </div>
       </motion.div>

@@ -27,8 +27,8 @@ const NAV_ITEMS = [
     icon: FolderKanban,
     children: [
       { label: "Proposals", icon: BriefcaseBusiness, to: "/proposals" },
-      { label: "Inbox", icon: MessageSquareText, to: "/inbox" },
-      { label: "Leads", icon: Users, to: "/leads" },
+      { label: "Inbox", icon: MessageSquareText, to: "/inbox", badgeKey: "inboxUnread" },
+      { label: "Leads", icon: Users, to: "/leads", badgeKey: "leadsOpen" },
     ],
   },
   { label: "Executions", icon: Orbit, to: "/executions" },
@@ -54,6 +54,23 @@ function railRadiusStyle() {
     borderTopRightRadius: `${SIDEBAR_RADIUS}px`,
     borderBottomRightRadius: `${SIDEBAR_RADIUS}px`,
   };
+}
+
+function CountBadge({ count, active = false }) {
+  if (!count || count <= 0) return null;
+
+  return (
+    <span
+      className={cn(
+        "inline-flex min-w-[20px] items-center justify-center rounded-full border px-1.5 py-0.5 text-[10px] font-semibold leading-none",
+        active
+          ? "border-cyan-300/20 bg-cyan-300/90 text-slate-900"
+          : "border-white/10 bg-white/[0.06] text-white/82"
+      )}
+    >
+      {count > 99 ? "99+" : count}
+    </span>
+  );
 }
 
 function SidebarSurface({ expanded }) {
@@ -329,7 +346,7 @@ function NavItem({ item, expanded, onNavigate }) {
   );
 }
 
-function OperationsGroup({ expanded, onNavigate, mobile = false }) {
+function OperationsGroup({ expanded, onNavigate, mobile = false, shellStats = {} }) {
   const location = useLocation();
   const childRoutes = useMemo(
     () => ["/proposals", "/inbox", "/leads"],
@@ -428,6 +445,8 @@ function OperationsGroup({ expanded, onNavigate, mobile = false }) {
 
                 {NAV_ITEMS.find((x) => x.label === "Operations")?.children?.map((child) => {
                   const ChildIcon = child.icon;
+                  const badgeCount = Number(shellStats?.[child.badgeKey] || 0);
+
                   return (
                     <NavLink
                       key={child.to}
@@ -451,27 +470,31 @@ function OperationsGroup({ expanded, onNavigate, mobile = false }) {
                             />
                           </div>
 
-                          <div className="relative z-[2] flex min-w-0 flex-1 items-center gap-2 pr-3">
-                            <ChildIcon
-                              className={cn(
-                                "h-[14px] w-[14px] shrink-0 transition-all duration-300",
-                                isActive
-                                  ? "text-white/90"
-                                  : "text-white/42 group-hover/child:text-white/72"
-                              )}
-                              strokeWidth={1.9}
-                            />
+                          <div className="relative z-[2] flex min-w-0 flex-1 items-center justify-between gap-2 pr-3">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <ChildIcon
+                                className={cn(
+                                  "h-[14px] w-[14px] shrink-0 transition-all duration-300",
+                                  isActive
+                                    ? "text-white/90"
+                                    : "text-white/42 group-hover/child:text-white/72"
+                                )}
+                                strokeWidth={1.9}
+                              />
 
-                            <span
-                              className={cn(
-                                "truncate text-[12px] font-medium tracking-[-0.01em] transition-colors duration-300",
-                                isActive
-                                  ? "text-white/94"
-                                  : "text-white/56 group-hover/child:text-white/82"
-                              )}
-                            >
-                              {child.label}
-                            </span>
+                              <span
+                                className={cn(
+                                  "truncate text-[12px] font-medium tracking-[-0.01em] transition-colors duration-300",
+                                  isActive
+                                    ? "text-white/94"
+                                    : "text-white/56 group-hover/child:text-white/82"
+                                )}
+                              >
+                                {child.label}
+                              </span>
+                            </div>
+
+                            <CountBadge count={badgeCount} active={isActive} />
                           </div>
                         </div>
                       )}
@@ -487,7 +510,7 @@ function OperationsGroup({ expanded, onNavigate, mobile = false }) {
   );
 }
 
-function RailNav({ expanded, onNavigate }) {
+function RailNav({ expanded, onNavigate, shellStats = {} }) {
   return (
     <nav className="px-0 pt-4">
       <div className="space-y-1.5">
@@ -498,6 +521,7 @@ function RailNav({ expanded, onNavigate }) {
                 key={item.label}
                 expanded={expanded}
                 onNavigate={onNavigate}
+                shellStats={shellStats}
               />
             );
           }
@@ -556,7 +580,7 @@ function RailFooter({ expanded }) {
   );
 }
 
-function DesktopSidebar({ expanded, setExpanded }) {
+function DesktopSidebar({ expanded, setExpanded, shellStats = {} }) {
   const shouldReduceMotion = useReducedMotion();
   const openTimer = useRef(null);
   const closeTimer = useRef(null);
@@ -606,7 +630,7 @@ function DesktopSidebar({ expanded, setExpanded }) {
 
         <div className="relative flex h-full flex-col">
           <BrandDock expanded={expanded} />
-          <RailNav expanded={expanded} onNavigate={() => {}} />
+          <RailNav expanded={expanded} onNavigate={() => {}} shellStats={shellStats} />
           <div className="mt-auto">
             <RailFooter expanded={expanded} />
           </div>
@@ -674,7 +698,7 @@ function MobileNavItem({ item, onNavigate }) {
   );
 }
 
-function MobileSidebar({ setMobileOpen }) {
+function MobileSidebar({ setMobileOpen, shellStats = {} }) {
   return (
     <motion.aside
       initial={{ x: -300 }}
@@ -709,6 +733,7 @@ function MobileSidebar({ setMobileOpen }) {
                       expanded
                       mobile
                       onNavigate={() => setMobileOpen(false)}
+                      shellStats={shellStats}
                     />
                   );
                 }
@@ -737,10 +762,15 @@ export default function Sidebar({
   setExpanded,
   mobileOpen,
   setMobileOpen,
+  shellStats = {},
 }) {
   return (
     <>
-      <DesktopSidebar expanded={expanded} setExpanded={setExpanded} />
+      <DesktopSidebar
+        expanded={expanded}
+        setExpanded={setExpanded}
+        shellStats={shellStats}
+      />
 
       <AnimatePresence>
         {mobileOpen && (
@@ -752,7 +782,10 @@ export default function Sidebar({
               onClick={() => setMobileOpen(false)}
               className="fixed inset-0 z-[150] bg-black/40 backdrop-blur-[6px] md:hidden"
             />
-            <MobileSidebar setMobileOpen={setMobileOpen} />
+            <MobileSidebar
+              setMobileOpen={setMobileOpen}
+              shellStats={shellStats}
+            />
           </>
         )}
       </AnimatePresence>
