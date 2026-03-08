@@ -1,9 +1,10 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import {
   Bot,
   BriefcaseBusiness,
+  ChevronDown,
   ChevronRight,
   CircleGauge,
   Command,
@@ -12,13 +13,24 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   X,
+  FolderKanban,
+  MessageSquareText,
+  Users,
 } from "lucide-react";
 import ExecutiveMark3D from "./ExecutiveMark3D.jsx";
 
 const NAV_ITEMS = [
   { label: "Command", icon: Command, to: "/" },
   { label: "Analytics", icon: CircleGauge, to: "/analytics" },
-  { label: "Proposals", icon: BriefcaseBusiness, to: "/proposals" },
+  {
+    label: "Operations",
+    icon: FolderKanban,
+    children: [
+      { label: "Proposals", icon: BriefcaseBusiness, to: "/proposals" },
+      { label: "Inbox", icon: MessageSquareText, to: "/inbox" },
+      { label: "Leads", icon: Users, to: "/leads" },
+    ],
+  },
   { label: "Executions", icon: Orbit, to: "/executions" },
   { label: "Agents", icon: Bot, to: "/agents" },
   { label: "Threads", icon: ScanEye, to: "/threads" },
@@ -29,6 +41,7 @@ const COLLAPSED_W = 88;
 const EXPANDED_W = 286;
 const ICON_COL_W = 82;
 const ITEM_H = 58;
+const SUB_ITEM_H = 48;
 const BRAND_H = 118;
 const SIDEBAR_RADIUS = 32;
 
@@ -316,18 +329,188 @@ function NavItem({ item, expanded, onNavigate }) {
   );
 }
 
+function OperationsGroup({ expanded, onNavigate, mobile = false }) {
+  const location = useLocation();
+  const childRoutes = useMemo(
+    () => ["/proposals", "/inbox", "/leads"],
+    []
+  );
+
+  const isGroupActive = childRoutes.some((path) =>
+    location.pathname === path || location.pathname.startsWith(`${path}/`)
+  );
+
+  const [open, setOpen] = useState(isGroupActive);
+
+  useEffect(() => {
+    if (isGroupActive) setOpen(true);
+  }, [isGroupActive]);
+
+  const ItemIcon = FolderKanban;
+  const iconColWidth = mobile ? ICON_COL_W : ICON_COL_W;
+
+  return (
+    <div className="group relative">
+      <div className="relative flex flex-col overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="relative flex items-center text-left"
+          style={{ height: ITEM_H }}
+        >
+          <ItemGlow isActive={isGroupActive} />
+
+          <div
+            className="relative z-[2] flex h-full shrink-0 items-center justify-center"
+            style={{ width: iconColWidth }}
+          >
+            <ItemIcon
+              className={cn(
+                "relative z-[2] transition-all duration-300",
+                isGroupActive
+                  ? "h-[17px] w-[17px] text-white"
+                  : "h-[16px] w-[16px] text-white/54 group-hover:text-white/82"
+              )}
+              strokeWidth={1.9}
+            />
+          </div>
+
+          <div
+            className={cn(
+              "relative z-[2] min-w-0 flex-1 pr-3 transition-all duration-300",
+              expanded || mobile
+                ? "pointer-events-auto translate-x-0 opacity-100"
+                : "pointer-events-none -translate-x-2 opacity-0"
+            )}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <span
+                className={cn(
+                  "truncate text-[13px] font-medium tracking-[-0.015em] transition-colors duration-300",
+                  isGroupActive
+                    ? "text-white/96"
+                    : "text-white/68 group-hover:text-white/86"
+                )}
+              >
+                Operations
+              </span>
+
+              {open ? (
+                <ChevronDown
+                  className={cn(
+                    "h-[12px] w-[12px] shrink-0 transition-all duration-300",
+                    isGroupActive ? "text-white/22" : "text-white/14"
+                  )}
+                />
+              ) : (
+                <ChevronRight
+                  className={cn(
+                    "h-[12px] w-[12px] shrink-0 transition-all duration-300",
+                    isGroupActive ? "text-white/22" : "text-white/14"
+                  )}
+                />
+              )}
+            </div>
+          </div>
+        </button>
+
+        <AnimatePresence initial={false}>
+          {open && (expanded || mobile) && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              className="overflow-hidden"
+            >
+              <div className="relative pb-1">
+                <div className="pointer-events-none absolute bottom-2 left-[41px] top-0 w-px bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.018),transparent)]" />
+
+                {NAV_ITEMS.find((x) => x.label === "Operations")?.children?.map((child) => {
+                  const ChildIcon = child.icon;
+                  return (
+                    <NavLink
+                      key={child.to}
+                      to={child.to}
+                      onClick={onNavigate}
+                      className="group/child relative block"
+                    >
+                      {({ isActive }) => (
+                        <div
+                          className="relative flex items-center overflow-hidden"
+                          style={{ height: SUB_ITEM_H }}
+                        >
+                          <div className="relative z-[2] flex h-full shrink-0 items-center justify-center pl-[34px]">
+                            <span
+                              className={cn(
+                                "h-[6px] w-[6px] rounded-full transition-all duration-300",
+                                isActive
+                                  ? "bg-cyan-200 shadow-[0_0_12px_rgba(165,243,252,0.3)]"
+                                  : "bg-white/18 group-hover/child:bg-white/30"
+                              )}
+                            />
+                          </div>
+
+                          <div className="relative z-[2] flex min-w-0 flex-1 items-center gap-2 pr-3">
+                            <ChildIcon
+                              className={cn(
+                                "h-[14px] w-[14px] shrink-0 transition-all duration-300",
+                                isActive
+                                  ? "text-white/90"
+                                  : "text-white/42 group-hover/child:text-white/72"
+                              )}
+                              strokeWidth={1.9}
+                            />
+
+                            <span
+                              className={cn(
+                                "truncate text-[12px] font-medium tracking-[-0.01em] transition-colors duration-300",
+                                isActive
+                                  ? "text-white/94"
+                                  : "text-white/56 group-hover/child:text-white/82"
+                              )}
+                            >
+                              {child.label}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </NavLink>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+}
+
 function RailNav({ expanded, onNavigate }) {
   return (
     <nav className="px-0 pt-4">
       <div className="space-y-1.5">
-        {NAV_ITEMS.map((item) => (
-          <NavItem
-            key={item.to}
-            item={item}
-            expanded={expanded}
-            onNavigate={onNavigate}
-          />
-        ))}
+        {NAV_ITEMS.map((item) => {
+          if (item.children) {
+            return (
+              <OperationsGroup
+                key={item.label}
+                expanded={expanded}
+                onNavigate={onNavigate}
+              />
+            );
+          }
+
+          return (
+            <NavItem
+              key={item.to}
+              item={item}
+              expanded={expanded}
+              onNavigate={onNavigate}
+            />
+          );
+        })}
       </div>
     </nav>
   );
@@ -518,13 +701,26 @@ function MobileSidebar({ setMobileOpen }) {
           <BrandDock expanded />
           <nav className="px-0 pt-3">
             <div className="space-y-1.5">
-              {NAV_ITEMS.map((item) => (
-                <MobileNavItem
-                  key={item.to}
-                  item={item}
-                  onNavigate={() => setMobileOpen(false)}
-                />
-              ))}
+              {NAV_ITEMS.map((item) => {
+                if (item.children) {
+                  return (
+                    <OperationsGroup
+                      key={item.label}
+                      expanded
+                      mobile
+                      onNavigate={() => setMobileOpen(false)}
+                    />
+                  );
+                }
+
+                return (
+                  <MobileNavItem
+                    key={item.to}
+                    item={item}
+                    onNavigate={() => setMobileOpen(false)}
+                  />
+                );
+              })}
             </div>
           </nav>
           <div className="mt-auto">
