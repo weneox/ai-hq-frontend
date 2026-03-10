@@ -1,17 +1,18 @@
-// src/components/ui/Tabs.jsx (ULTRA v3 — Premium Segmented Tabs)
-// ✅ Clean segmented control, consistent with Card/Input
-// ✅ Optional counts
+// src/components/ui/Tabs.jsx
+// ULTRA v5 — Editorial Premium Segmented Tabs
+
 import { cx } from "../../lib/cx.js";
 
 function Count({ n, active }) {
   if (n == null) return null;
+
   return (
     <span
       className={cx(
-        "ml-2 inline-flex items-center justify-center rounded-lg px-2 py-0.5 text-[11px] font-semibold",
+        "ml-2 inline-flex min-w-[22px] items-center justify-center rounded-[10px] px-1.5 py-0.5 text-[11px] font-semibold",
         active
-          ? "bg-slate-900/10 text-slate-800 dark:bg-white/12 dark:text-slate-100"
-          : "bg-slate-200/60 text-slate-700 dark:bg-slate-800/60 dark:text-slate-200"
+          ? "bg-slate-900/8 text-slate-700 dark:bg-white/10 dark:text-slate-100"
+          : "bg-slate-200/70 text-slate-600 dark:bg-white/[0.06] dark:text-slate-300"
       )}
     >
       {Number(n) || 0}
@@ -22,17 +23,18 @@ function Count({ n, active }) {
 export function Tabs({ value, onChange, items = [], className }) {
   return (
     <div
-      className={cx(
-        "min-w-0 w-full rounded-2xl border border-slate-200 bg-white p-1.5",
-        "shadow-[0_1px_0_rgba(15,23,42,0.04),0_10px_26px_rgba(15,23,42,0.06)]",
-        "dark:border-slate-800 dark:bg-slate-950/55",
-        "dark:shadow-[0_1px_0_rgba(255,255,255,0.06),0_18px_44px_rgba(0,0,0,0.60)]",
-        className
-      )}
       role="tablist"
       aria-label="Tabs"
+      className={cx(
+        "w-full min-w-0 rounded-[24px] border p-1.5",
+        "border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.92))]",
+        "shadow-[inset_0_1px_0_rgba(255,255,255,0.76),0_12px_32px_rgba(15,23,42,0.06)]",
+        "dark:border-white/10 dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.72),rgba(2,6,23,0.80))]",
+        "dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_18px_44px_rgba(0,0,0,0.46)]",
+        className
+      )}
     >
-      <div className="min-w-0 flex w-full flex-wrap gap-1">
+      <div className="flex min-w-0 w-full flex-wrap gap-1">
         {items.map((it) => {
           const active = String(it.value) === String(value);
 
@@ -44,30 +46,28 @@ export function Tabs({ value, onChange, items = [], className }) {
               aria-selected={active}
               onClick={() => (onChange ? onChange(it.value) : null)}
               className={cx(
-                "relative inline-flex items-center rounded-xl px-3 py-2 text-xs font-semibold",
-                "transition-[box-shadow,background-color,border-color,color] duration-200",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/18",
+                "relative inline-flex items-center rounded-[16px] px-3.5 py-2 text-[12px] font-semibold tracking-[-0.01em]",
+                "border transition-[box-shadow,background-color,border-color,color,transform] duration-200",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/16",
                 active
                   ? cx(
-                      "text-slate-900 dark:text-white",
-                      "border border-slate-200 dark:border-slate-700/70",
-                      "bg-white dark:bg-slate-900/70",
-                      "shadow-[0_1px_0_rgba(15,23,42,0.06),0_14px_34px_rgba(15,23,42,0.10)]"
+                      "border-slate-200/90 bg-white text-slate-900",
+                      "shadow-[inset_0_1px_0_rgba(255,255,255,0.80),0_10px_24px_rgba(15,23,42,0.08)]",
+                      "dark:border-white/10 dark:bg-slate-900/78 dark:text-white",
+                      "dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_16px_36px_rgba(0,0,0,0.46)]"
                     )
                   : cx(
-                      "border border-transparent",
-                      "text-slate-600 hover:text-slate-900 hover:bg-slate-50",
-                      "dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-900/60"
+                      "border-transparent text-slate-500",
+                      "hover:bg-slate-50 hover:text-slate-900",
+                      "dark:text-slate-300 dark:hover:bg-white/[0.05] dark:hover:text-white"
                     )
               )}
             >
               {active ? (
                 <span
                   aria-hidden="true"
-                  className="pointer-events-none absolute inset-0 rounded-xl [mask-image:radial-gradient(420px_circle_at_50%_0%,black,transparent_60%)]"
-                >
-                  <span className="absolute inset-0 bg-gradient-to-b from-white/60 to-transparent dark:from-white/10" />
-                </span>
+                  className="pointer-events-none absolute inset-0 rounded-[16px] bg-[linear-gradient(180deg,rgba(255,255,255,0.24),transparent_44%)] dark:bg-[linear-gradient(180deg,rgba(255,255,255,0.05),transparent_40%)]"
+                />
               ) : null}
 
               <span className="relative z-10">{it.label}</span>

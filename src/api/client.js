@@ -1,4 +1,5 @@
-// src/api/client.js (FIXED — do NOT throw on {ok:false} when HTTP is 200)
+// src/api/client.js
+// FINAL — do NOT throw on {ok:false} when HTTP is 200
 
 const RAW = (import.meta.env.VITE_API_BASE || "").trim();
 const API_BASE = RAW ? RAW.replace(/\/+$/, "") : "";
@@ -38,15 +39,19 @@ function pickErr(j, fallback) {
  * IMPORTANT:
  * - Throws ONLY when HTTP status is not ok (4xx/5xx) or network error.
  * - If backend returns HTTP 200 with {ok:false}, we return the JSON (no throw).
- *   Upper layers (api/proposals.js etc.) will handle j.ok.
+ *   Upper layers handle j.ok themselves.
  */
+
 export async function apiGet(path) {
   assertConfigured();
   const url = `${API_BASE}${path}`;
 
   let r;
   try {
-    r = await fetch(url, { headers: { Accept: "application/json" } });
+    r = await fetch(url, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+    });
   } catch (e) {
     throw new Error(`Network error (GET ${path}): ${String(e?.message || e)}`);
   }
@@ -82,6 +87,58 @@ export async function apiPost(path, body) {
 
   if (!r.ok) {
     throw new Error(pickErr(j, `POST ${path} failed (${r.status})`));
+  }
+
+  return j;
+}
+
+export async function apiPatch(path, body) {
+  assertConfigured();
+  const url = `${API_BASE}${path}`;
+
+  let r;
+  try {
+    r = await fetch(url, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(body ?? {}),
+    });
+  } catch (e) {
+    throw new Error(`Network error (PATCH ${path}): ${String(e?.message || e)}`);
+  }
+
+  const j = await readJson(r);
+
+  if (!r.ok) {
+    throw new Error(pickErr(j, `PATCH ${path} failed (${r.status})`));
+  }
+
+  return j;
+}
+
+export async function apiDelete(path) {
+  assertConfigured();
+  const url = `${API_BASE}${path}`;
+
+  let r;
+  try {
+    r = await fetch(url, {
+      method: "DELETE",
+      headers: {
+        Accept: "application/json",
+      },
+    });
+  } catch (e) {
+    throw new Error(`Network error (DELETE ${path}): ${String(e?.message || e)}`);
+  }
+
+  const j = await readJson(r);
+
+  if (!r.ok) {
+    throw new Error(pickErr(j, `DELETE ${path} failed (${r.status})`));
   }
 
   return j;
