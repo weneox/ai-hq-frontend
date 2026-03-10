@@ -1,3 +1,5 @@
+// src/pages/AdminTenants.jsx
+
 import { useEffect, useMemo, useState } from "react";
 import Card from "../components/ui/Card.jsx";
 import Button from "../components/ui/Button.jsx";
@@ -59,6 +61,7 @@ const EMPTY_FORM = {
   tenant_key: "",
   company_name: "",
   owner_email: "",
+  owner_password: "",
 };
 
 export default function AdminTenants() {
@@ -123,7 +126,11 @@ export default function AdminTenants() {
     if (!selectedKey && filtered[0]?.tenant_key) {
       setSelectedKey(filtered[0].tenant_key);
     }
-    if (selectedKey && !items.some((x) => x.tenant_key === selectedKey) && filtered[0]?.tenant_key) {
+    if (
+      selectedKey &&
+      !items.some((x) => x.tenant_key === selectedKey) &&
+      filtered[0]?.tenant_key
+    ) {
       setSelectedKey(filtered[0].tenant_key);
     }
   }, [filtered, items, selectedKey]);
@@ -141,10 +148,13 @@ export default function AdminTenants() {
       const tenant_key = String(form.tenant_key || "").trim().toLowerCase();
       const company_name = String(form.company_name || "").trim();
       const owner_email = String(form.owner_email || "").trim().toLowerCase();
+      const owner_password = String(form.owner_password || "");
 
       if (!tenant_key) throw new Error("Tenant key tələb olunur");
       if (!company_name) throw new Error("Company name tələb olunur");
       if (!owner_email) throw new Error("Owner email tələb olunur");
+      if (!owner_password) throw new Error("Owner password tələb olunur");
+      if (owner_password.length < 8) throw new Error("Owner password minimum 8 simvol olmalıdır");
 
       const res = await createTenant({
         tenant: {
@@ -159,6 +169,7 @@ export default function AdminTenants() {
         owner: {
           user_email: owner_email,
           full_name: company_name,
+          password: owner_password,
         },
       });
 
@@ -166,10 +177,7 @@ export default function AdminTenants() {
       setForm(EMPTY_FORM);
       await load();
 
-      const createdKey =
-        res?.tenant?.tenant_key ||
-        tenant_key;
-
+      const createdKey = res?.tenant?.tenant_key || tenant_key;
       setSelectedKey(createdKey);
     } catch (e) {
       setError(String(e?.message || e || "Failed to create tenant"));
@@ -307,6 +315,18 @@ export default function AdminTenants() {
                   value={form.owner_email}
                   onChange={(e) => patchForm("owner_email", e.target.value)}
                   placeholder="owner@company.com"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-xs font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                  Owner Password
+                </label>
+                <Input
+                  type="password"
+                  value={form.owner_password}
+                  onChange={(e) => patchForm("owner_password", e.target.value)}
+                  placeholder="minimum 8 simvol"
                 />
               </div>
 

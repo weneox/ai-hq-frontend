@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import Shell from "./components/layout/Shell.jsx";
 import AdminShell from "./components/admin/AdminShell.jsx";
 import AdminRouteGuard from "./components/admin/AdminRouteGuard.jsx";
+import UserRouteGuard from "./components/auth/UserRouteGuard.jsx";
 
 import CommandPage from "./pages/CommandPage.jsx";
 import Proposals from "./pages/Proposals.jsx";
@@ -13,6 +14,7 @@ import Settings from "./pages/Settings.jsx";
 import Inbox from "./pages/Inbox.jsx";
 import Leads from "./pages/Leads.jsx";
 import Comments from "./pages/Comments.jsx";
+import Login from "./pages/Login.jsx";
 
 import AdminLogin from "./pages/AdminLogin.jsx";
 import AdminTenants from "./pages/AdminTenants.jsx";
@@ -23,6 +25,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/login" element={<Login />} />
         <Route path="/admin/login" element={<AdminLogin />} />
 
         <Route
@@ -39,7 +42,13 @@ export default function App() {
           <Route path="secrets" element={<AdminSecrets />} />
         </Route>
 
-        <Route element={<Shell />}>
+        <Route
+          element={
+            <UserRouteGuard>
+              <Shell />
+            </UserRouteGuard>
+          }
+        >
           <Route index element={<CommandPage />} />
           <Route path="analytics" element={<Analytics />} />
           <Route path="proposals" element={<Proposals />} />

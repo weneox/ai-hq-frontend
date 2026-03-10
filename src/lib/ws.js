@@ -55,12 +55,9 @@ export function createWsClient({ onEvent, onStatus, maxDelayMs = 12000 } = {}) {
     } catch {}
 
     try {
-      if (
-        ws.readyState === WebSocket.OPEN ||
-        ws.readyState === WebSocket.CONNECTING
-      ) {
+      if (ws.readyState === WebSocket.OPEN) {
         manuallyClosed = true;
-        ws.close();
+        ws.close(1000, "manual");
       }
     } catch {}
 
@@ -93,6 +90,10 @@ export function createWsClient({ onEvent, onStatus, maxDelayMs = 12000 } = {}) {
   const connect = () => {
     if (stopped) return;
 
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+
     const url = buildWsUrl();
     currentUrl = url;
 
@@ -105,7 +106,6 @@ export function createWsClient({ onEvent, onStatus, maxDelayMs = 12000 } = {}) {
     }
 
     clearReconnectTimer();
-    cleanupSocket();
     manuallyClosed = false;
 
     notifyStatus({
