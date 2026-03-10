@@ -1,5 +1,4 @@
 // src/api/client.js
-// FINAL — do NOT throw on {ok:false} when HTTP is 200
 
 const RAW = (import.meta.env.VITE_API_BASE || "").trim();
 const API_BASE = RAW ? RAW.replace(/\/+$/, "") : "";
@@ -35,13 +34,6 @@ function pickErr(j, fallback) {
   return String(m || fallback);
 }
 
-/**
- * IMPORTANT:
- * - Throws ONLY when HTTP status is not ok (4xx/5xx) or network error.
- * - If backend returns HTTP 200 with {ok:false}, we return the JSON (no throw).
- *   Upper layers handle j.ok themselves.
- */
-
 export async function apiGet(path) {
   assertConfigured();
   const url = `${API_BASE}${path}`;
@@ -50,6 +42,7 @@ export async function apiGet(path) {
   try {
     r = await fetch(url, {
       method: "GET",
+      credentials: "include",
       headers: { Accept: "application/json" },
     });
   } catch (e) {
@@ -73,6 +66,7 @@ export async function apiPost(path, body) {
   try {
     r = await fetch(url, {
       method: "POST",
+      credentials: "include",
       headers: {
         "Content-Type": "application/json; charset=utf-8",
         Accept: "application/json",
@@ -100,6 +94,7 @@ export async function apiPatch(path, body) {
   try {
     r = await fetch(url, {
       method: "PATCH",
+      credentials: "include",
       headers: {
         "Content-Type": "application/json; charset=utf-8",
         Accept: "application/json",
@@ -127,6 +122,7 @@ export async function apiDelete(path) {
   try {
     r = await fetch(url, {
       method: "DELETE",
+      credentials: "include",
       headers: {
         Accept: "application/json",
       },

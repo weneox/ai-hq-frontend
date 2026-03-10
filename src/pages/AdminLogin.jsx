@@ -21,7 +21,7 @@ export default function AdminLogin() {
     getAdminAuthMe()
       .then((j) => {
         if (!alive) return;
-        setAuthed(!!j?.authenticated);
+        setAuthed(!!j?.authenticated?.admin);
       })
       .catch(() => {
         if (!alive) return;
@@ -49,10 +49,16 @@ export default function AdminLogin() {
 
     try {
       await loginAdminAuth(passcode);
+
+      const me = await getAdminAuthMe();
+      if (!me?.authenticated?.admin) {
+        throw new Error("Admin session was not established");
+      }
+
       const next = location.state?.from?.pathname || "/admin/tenants";
       navigate(next, { replace: true });
     } catch (e2) {
-      setError(String(e2?.message || e2));
+      setError(String(e2?.message || e2 || "Login failed"));
     } finally {
       setBusy(false);
     }
