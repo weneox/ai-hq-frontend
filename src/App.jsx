@@ -14,6 +14,7 @@ import Settings from "./pages/Settings.jsx";
 import Inbox from "./pages/Inbox.jsx";
 import Leads from "./pages/Leads.jsx";
 import Comments from "./pages/Comments.jsx";
+import Voice from "./pages/Voice.jsx";
 import Login from "./pages/Login.jsx";
 
 import AdminLogin from "./pages/AdminLogin.jsx";
@@ -55,6 +56,7 @@ export default function App() {
           <Route path="inbox" element={<Inbox />} />
           <Route path="leads" element={<Leads />} />
           <Route path="comments" element={<Comments />} />
+          <Route path="voice" element={<Voice />} />
           <Route path="executions" element={<Executions />} />
           <Route path="agents" element={<Agents />} />
           <Route path="threads" element={<Threads />} />

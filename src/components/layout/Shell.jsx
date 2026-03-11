@@ -37,6 +37,19 @@ async function apiGet(path) {
   return j;
 }
 
+function normalizeArray(j, key) {
+  if (Array.isArray(j)) return j;
+  if (Array.isArray(j?.[key])) return j[key];
+  if (Array.isArray(j?.items)) return j.items;
+  if (Array.isArray(j?.rows)) return j.rows;
+  return [];
+}
+
+function isLiveVoiceStatus(v) {
+  const s = String(v || "").trim().toLowerCase();
+  return ["live", "active", "in_progress", "ongoing", "ringing", "queued", "bridged"].includes(s);
+}
+
 export default function Shell() {
   const [expanded, setExpanded] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -49,6 +62,7 @@ export default function Shell() {
     inboxOpen: 0,
     leadsOpen: 0,
     commentsCount: 0,
+    voiceLive: 0,
     notificationsUnread: 0,
     dbDisabled: false,
     wsState: "idle",
@@ -56,15 +70,17 @@ export default function Shell() {
 
   async function loadShellStats() {
     try {
-      const [inboxRes, leadsRes, commentsRes] = await Promise.all([
+      const [inboxRes, leadsRes, commentsRes, voiceRes] = await Promise.all([
         apiGet("/api/inbox/threads?tenantKey=neox"),
         apiGet("/api/leads?tenantKey=neox"),
         apiGet("/api/comments?tenantKey=neox&limit=200"),
+        apiGet("/api/voice/calls?tenantKey=neox&limit=100").catch(() => ({ calls: [] })),
       ]);
 
       const threads = Array.isArray(inboxRes?.threads) ? inboxRes.threads : [];
       const leads = Array.isArray(leadsRes?.leads) ? leadsRes.leads : [];
       const comments = Array.isArray(commentsRes?.comments) ? commentsRes.comments : [];
+      const voiceCalls = normalizeArray(voiceRes, "calls");
 
       const inboxUnread = threads.reduce(
         (sum, t) => sum + Number(t?.unread_count || 0),
@@ -82,15 +98,20 @@ export default function Shell() {
 
       const commentsCount = comments.length;
 
+      const voiceLive = voiceCalls.filter((c) =>
+        isLiveVoiceStatus(c?.status || c?.callStatus || c?.call_status)
+      ).length;
+
       setShellStats((prev) => ({
         ...prev,
         inboxUnread,
         inboxOpen,
         leadsOpen,
         commentsCount,
-        notificationsUnread: inboxUnread + leadsOpen + commentsCount,
+        voiceLive,
+        notificationsUnread: inboxUnread + leadsOpen + commentsCount + voiceLive,
         dbDisabled: Boolean(
-          inboxRes?.dbDisabled || leadsRes?.dbDisabled || commentsRes?.dbDisabled
+          inboxRes?.dbDisabled || leadsRes?.dbDisabled || commentsRes?.dbDisabled || voiceRes?.dbDisabled
         ),
       }));
     } catch {
@@ -137,7 +158,12 @@ export default function Shell() {
           type === "lead.created" ||
           type === "lead.updated" ||
           type === "comment.created" ||
-          type === "comment.updated"
+          type === "comment.updated" ||
+          type === "voice.call.created" ||
+          type === "voice.call.updated" ||
+          type === "voice.call.ended" ||
+          type === "voice.session.created" ||
+          type === "voice.session.updated"
         ) {
           scheduleShellRefresh(120);
         }

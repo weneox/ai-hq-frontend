@@ -17,6 +17,7 @@ import {
   MessageSquareText,
   Users,
   MessageCircle,
+  PhoneCall,
 } from "lucide-react";
 import ExecutiveMark3D from "./ExecutiveMark3D.jsx";
 
@@ -31,6 +32,7 @@ const NAV_ITEMS = [
       { label: "Inbox", icon: MessageSquareText, to: "/inbox", badgeKey: "inboxUnread" },
       { label: "Leads", icon: Users, to: "/leads", badgeKey: "leadsOpen" },
       { label: "Comments", icon: MessageCircle, to: "/comments", badgeKey: "commentsCount" },
+      { label: "Voice", icon: PhoneCall, to: "/voice", badgeKey: "voiceLive" },
     ],
   },
   { label: "Executions", icon: Orbit, to: "/executions" },
@@ -351,7 +353,7 @@ function NavItem({ item, expanded, onNavigate }) {
 function OperationsGroup({ expanded, onNavigate, mobile = false, shellStats = {} }) {
   const location = useLocation();
   const childRoutes = useMemo(
-    () => ["/proposals", "/inbox", "/leads", "/comments"],
+    () => ["/proposals", "/inbox", "/leads", "/comments", "/voice"],
     []
   );
 
