@@ -1,6 +1,3 @@
-// src/api/settings.js
-// client workspace settings only
-
 import { apiGet, apiPost } from "./client.js";
 
 export async function getWorkspaceSettings() {
@@ -39,4 +36,24 @@ export async function saveWorkspaceAgent(agentKey, payload) {
   const j = await apiPost(`/api/settings/agents/${k}`, payload);
   if (!j?.ok) throw new Error(j?.error || "Failed to save agent");
   return j?.agent || j;
+}
+
+// ----------------------------------------
+// Meta / Instagram connect flow
+// ----------------------------------------
+
+export async function getMetaChannelStatus() {
+  const j = await apiGet(`/api/channels/meta/status`);
+  if (!j?.ok) throw new Error(j?.error || "Failed to load Meta channel status");
+  return j;
+}
+
+export function getMetaConnectUrl() {
+  return `/api/channels/meta/connect`;
+}
+
+export async function disconnectMetaChannel() {
+  const j = await apiPost(`/api/channels/meta/disconnect`, {});
+  if (!j?.ok) throw new Error(j?.error || "Failed to disconnect Meta");
+  return j;
 }
