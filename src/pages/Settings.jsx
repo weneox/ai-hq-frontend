@@ -1,5 +1,5 @@
 // src/pages/Settings.jsx
-// PREMIUM v4.0 — final editorial settings assembly
+// PREMIUM v4.1 — final settings assembly with branded channel connect flow
 
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -36,8 +36,6 @@ import {
 import {
   getWorkspaceSettings,
   saveWorkspaceSettings,
-  getWorkspaceChannels,
-  saveWorkspaceChannel,
   getWorkspaceAgents,
   saveWorkspaceAgent,
 } from "../api/settings.js";
@@ -897,9 +895,7 @@ export default function Settings() {
     })
   );
 
-  const [channels, setChannels] = useState([]);
   const [agents, setAgents] = useState([]);
-  const [channelsLoading, setChannelsLoading] = useState(true);
   const [agentsLoading, setAgentsLoading] = useState(true);
 
   const [perm, setPerm] = useState("default");
@@ -996,14 +992,12 @@ export default function Settings() {
 
     async function loadAll() {
       setLoading(true);
-      setChannelsLoading(true);
       setAgentsLoading(true);
       setMessage("");
 
       try {
-        const [settings, ch, ag] = await Promise.all([
+        const [settings, ag] = await Promise.all([
           getWorkspaceSettings(),
-          getWorkspaceChannels().catch(() => []),
           getWorkspaceAgents().catch(() => []),
         ]);
 
@@ -1012,7 +1006,6 @@ export default function Settings() {
         const normalized = normalizeWorkspace(settings);
         setWorkspace(normalized);
         setInitialWorkspace(normalized);
-        setChannels(Array.isArray(ch) ? ch : []);
         setAgents(Array.isArray(ag) ? ag : []);
       } catch (e) {
         if (!mounted) return;
@@ -1020,7 +1013,6 @@ export default function Settings() {
       } finally {
         if (!mounted) return;
         setLoading(false);
-        setChannelsLoading(false);
         setAgentsLoading(false);
       }
     }
@@ -1082,37 +1074,6 @@ export default function Settings() {
   function onResetWorkspace() {
     setWorkspace(initialWorkspace);
     setMessage("↩️ Dəyişikliklər geri qaytarıldı.");
-  }
-
-  async function saveChannel(channelType, existing = {}) {
-    if (!canManageSettings) {
-      setMessage("Channel dəyişiklikləri yalnız owner/admin üçündür.");
-      return;
-    }
-
-    try {
-      const payload = {
-        provider: existing.provider || "meta",
-        display_name: existing.display_name || "",
-        external_account_id: existing.external_account_id || null,
-        external_page_id: existing.external_page_id || null,
-        external_user_id: existing.external_user_id || null,
-        external_username: existing.external_username || null,
-        status: existing.status || "disconnected",
-        is_primary: !!existing.is_primary,
-        config: existing.config || {},
-        secrets_ref: existing.secrets_ref || null,
-        health: existing.health || {},
-        last_sync_at: existing.last_sync_at || null,
-      };
-
-      await saveWorkspaceChannel(channelType, payload);
-      const ch = await getWorkspaceChannels();
-      setChannels(Array.isArray(ch) ? ch : []);
-      setMessage(`✅ ${channelType} channel yeniləndi.`);
-    } catch (e) {
-      setMessage(String(e?.message || e));
-    }
   }
 
   async function saveAgent(agentKey, payload) {
@@ -1210,14 +1171,7 @@ export default function Settings() {
         );
 
       case "channels":
-        return (
-          <ChannelsPanel
-            channels={channels}
-            loading={channelsLoading}
-            canManage={canManageSettings}
-            onSaveChannel={saveChannel}
-          />
-        );
+        return <ChannelsPanel canManage={canManageSettings} />;
 
       case "agents":
         return (
@@ -1281,14 +1235,12 @@ export default function Settings() {
               Refresh
             </Button>
 
-            {!dirty ? (
-              <Button
-                onClick={onSaveWorkspace}
-                disabled={loading || saving || !canManageSettings}
-              >
-                {saving ? "Saving..." : "Save Workspace"}
-              </Button>
-            ) : null}
+            <Button
+              onClick={onSaveWorkspace}
+              disabled={loading || saving || !canManageSettings}
+            >
+              {saving ? "Saving..." : "Save Workspace"}
+            </Button>
           </div>
         </div>
 
