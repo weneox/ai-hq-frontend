@@ -13,7 +13,7 @@ export default function AdminRouteGuard({ children }) {
     getAdminAuthMe()
       .then((j) => {
         if (!alive) return;
-        setAuthed(!!j?.authenticated);
+        setAuthed(!!j?.authenticated?.admin);
       })
       .catch(() => {
         if (!alive) return;
