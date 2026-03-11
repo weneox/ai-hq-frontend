@@ -1,5 +1,3 @@
-// src/pages/AdminTeam.jsx
-
 import { useEffect, useMemo, useState } from "react";
 import Card from "../components/ui/Card.jsx";
 import Button from "../components/ui/Button.jsx";
@@ -35,6 +33,25 @@ function statusTone(status) {
   if (s === "disabled") return "border-rose-400/20 bg-rose-500/10 text-rose-200";
   if (s === "removed") return "border-slate-400/20 bg-slate-500/10 text-slate-300";
   return "border-white/10 bg-white/[0.04] text-slate-200";
+}
+
+function roleLabel(role) {
+  const r = String(role || "").toLowerCase();
+  if (r === "owner") return "Owner";
+  if (r === "admin") return "Administrator";
+  if (r === "operator") return "Operator";
+  if (r === "marketer") return "Marketing";
+  if (r === "analyst") return "Analyst";
+  return "Team member";
+}
+
+function statusLabel(status) {
+  const s = String(status || "").toLowerCase();
+  if (s === "active") return "Active";
+  if (s === "invited") return "Pending setup";
+  if (s === "disabled") return "Disabled";
+  if (s === "removed") return "Removed";
+  return "Unknown";
 }
 
 function Chip({ children, className = "" }) {
@@ -93,7 +110,7 @@ export default function AdminTeam() {
         setTenantKey(rows[0].tenant_key);
       }
     } catch (e) {
-      setError(String(e?.message || e || "Failed to load tenants"));
+      setError(String(e?.message || e || "Unable to load workspaces"));
       setTenants([]);
     } finally {
       setLoadingTenants(false);
@@ -112,7 +129,7 @@ export default function AdminTeam() {
       const rows = await listTenantUsers(key);
       setUsers(Array.isArray(rows) ? rows : []);
     } catch (e) {
-      setError(String(e?.message || e || "Failed to load tenant users"));
+      setError(String(e?.message || e || "Unable to load users"));
       setUsers([]);
     } finally {
       setLoadingUsers(false);
@@ -137,12 +154,7 @@ export default function AdminTeam() {
     if (!q) return users;
 
     return users.filter((u) => {
-      const hay = [
-        u?.user_email,
-        u?.full_name,
-        u?.role,
-        u?.status,
-      ]
+      const hay = [u?.user_email, u?.full_name, u?.role, u?.status]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
@@ -175,9 +187,9 @@ export default function AdminTeam() {
     setSuccess("");
 
     try {
-      if (!tenantKey) throw new Error("Tenant seçilməyib");
-      if (!createForm.email.trim()) throw new Error("Email tələb olunur");
-      if (!createForm.full_name.trim()) throw new Error("Full name tələb olunur");
+      if (!tenantKey) throw new Error("Please select a workspace");
+      if (!createForm.email.trim()) throw new Error("Email address is required");
+      if (!createForm.full_name.trim()) throw new Error("Full name is required");
 
       const res = await createTenantUser(tenantKey, {
         user_email: createForm.email.trim().toLowerCase(),
@@ -187,11 +199,11 @@ export default function AdminTeam() {
         password: createForm.password || undefined,
       });
 
-      setSuccess(`✅ ${res?.user?.user_email || "User"} yaradıldı`);
+      setSuccess(`${res?.user?.user_email || "User"} has been created`);
       setCreateForm(EMPTY_CREATE);
       await loadUsers(tenantKey);
     } catch (e) {
-      setError(String(e?.message || e || "Failed to create tenant user"));
+      setError(String(e?.message || e || "Unable to create user"));
     } finally {
       setCreating(false);
     }
@@ -203,8 +215,8 @@ export default function AdminTeam() {
     setSuccess("");
 
     try {
-      if (!tenantKey) throw new Error("Tenant seçilməyib");
-      if (!editForm.id) throw new Error("User seçilməyib");
+      if (!tenantKey) throw new Error("Please select a workspace");
+      if (!editForm.id) throw new Error("Please select a user");
 
       const res = await updateTenantUser(tenantKey, editForm.id, {
         user_email: editForm.email.trim().toLowerCase(),
@@ -213,10 +225,10 @@ export default function AdminTeam() {
         status: editForm.status,
       });
 
-      setSuccess(`✅ ${res?.user?.user_email || "User"} yeniləndi`);
+      setSuccess(`${res?.user?.user_email || "User"} has been updated`);
       await loadUsers(tenantKey);
     } catch (e) {
-      setError(String(e?.message || e || "Failed to update tenant user"));
+      setError(String(e?.message || e || "Unable to save changes"));
     } finally {
       setSavingEdit(false);
     }
@@ -227,12 +239,12 @@ export default function AdminTeam() {
     setSuccess("");
 
     try {
-      if (!tenantKey) throw new Error("Tenant seçilməyib");
+      if (!tenantKey) throw new Error("Please select a workspace");
       const res = await setTenantUserStatus(tenantKey, userId, status);
-      setSuccess(`✅ ${res?.user?.user_email || "User"} status yeniləndi`);
+      setSuccess(`${res?.user?.user_email || "User"} status has been updated`);
       await loadUsers(tenantKey);
     } catch (e) {
-      setError(String(e?.message || e || "Failed to update status"));
+      setError(String(e?.message || e || "Unable to update status"));
     }
   }
 
@@ -242,17 +254,19 @@ export default function AdminTeam() {
     setSuccess("");
 
     try {
-      if (!tenantKey) throw new Error("Tenant seçilməyib");
-      if (!passwordUserId) throw new Error("Password üçün user seçilməyib");
-      if (!newPassword) throw new Error("Yeni password tələb olunur");
-      if (newPassword.length < 8) throw new Error("Password minimum 8 simvol olmalıdır");
+      if (!tenantKey) throw new Error("Please select a workspace");
+      if (!passwordUserId) throw new Error("Please select a user");
+      if (!newPassword) throw new Error("A new password is required");
+      if (newPassword.length < 8) {
+        throw new Error("Password must be at least 8 characters");
+      }
 
       const res = await setTenantUserPassword(tenantKey, passwordUserId, newPassword);
-      setSuccess(`✅ ${res?.user?.user_email || "User"} password yeniləndi`);
+      setSuccess(`${res?.user?.user_email || "User"} password has been updated`);
       setNewPassword("");
       await loadUsers(tenantKey);
     } catch (e) {
-      setError(String(e?.message || e || "Failed to update password"));
+      setError(String(e?.message || e || "Unable to update password"));
     } finally {
       setSavingPassword(false);
     }
@@ -264,9 +278,10 @@ export default function AdminTeam() {
     setSuccess("");
 
     try {
-      if (!tenantKey) throw new Error("Tenant seçilməyib");
+      if (!tenantKey) throw new Error("Please select a workspace");
       await deleteTenantUser(tenantKey, userId);
-      setSuccess("✅ User silindi");
+      setSuccess("User has been deleted");
+
       if (editForm.id === userId) {
         setEditForm(EMPTY_EDIT);
       }
@@ -274,9 +289,10 @@ export default function AdminTeam() {
         setPasswordUserId("");
         setNewPassword("");
       }
+
       await loadUsers(tenantKey);
     } catch (e) {
-      setError(String(e?.message || e || "Failed to delete user"));
+      setError(String(e?.message || e || "Unable to delete user"));
     } finally {
       setRemovingId("");
     }
@@ -287,10 +303,10 @@ export default function AdminTeam() {
       <Card className="p-6">
         <div className="space-y-1">
           <div className="text-xl font-semibold text-slate-900 dark:text-white">
-            Admin · Team
+            Team Management
           </div>
           <div className="text-sm text-slate-500 dark:text-slate-400">
-            Tenant user-lərini platform səviyyəsində idarə et.
+            Manage team members, access levels, and passwords for each workspace.
           </div>
         </div>
       </Card>
@@ -312,22 +328,22 @@ export default function AdminTeam() {
           <Card className="p-5">
             <div className="mb-4">
               <div className="text-base font-semibold text-slate-900 dark:text-white">
-                Tenant Select
+                Workspace Selection
               </div>
               <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Hansı tenantın user-lərini idarə etmək istədiyini seç.
+                Choose the workspace you want to manage.
               </div>
             </div>
 
             {loadingTenants ? (
-              <div className="text-sm text-slate-400">Yüklənir...</div>
+              <div className="text-sm text-slate-400">Loading workspaces...</div>
             ) : (
               <select
                 value={tenantKey}
                 onChange={(e) => setTenantKey(e.target.value)}
                 className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none"
               >
-                <option value="">Tenant seç</option>
+                <option value="">Select workspace</option>
                 {tenants.map((t) => (
                   <option key={t.tenant_key} value={t.tenant_key}>
                     {t.company_name || t.tenant_key} ({t.tenant_key})
@@ -340,10 +356,10 @@ export default function AdminTeam() {
           <Card className="p-5">
             <div className="mb-4">
               <div className="text-base font-semibold text-slate-900 dark:text-white">
-                Create User
+                Add New User
               </div>
               <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Seçilmiş tenant üçün yeni user yarat.
+                Create a new login for the selected workspace.
               </div>
             </div>
 
@@ -351,7 +367,7 @@ export default function AdminTeam() {
               <Input
                 value={createForm.email}
                 onChange={(e) => patchCreate("email", e.target.value)}
-                placeholder="user@company.com"
+                placeholder="Email address"
               />
               <Input
                 value={createForm.full_name}
@@ -364,12 +380,12 @@ export default function AdminTeam() {
                 onChange={(e) => patchCreate("role", e.target.value)}
                 className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none"
               >
-                <option value="owner">owner</option>
-                <option value="admin">admin</option>
-                <option value="operator">operator</option>
-                <option value="member">member</option>
-                <option value="marketer">marketer</option>
-                <option value="analyst">analyst</option>
+                <option value="owner">Owner</option>
+                <option value="admin">Administrator</option>
+                <option value="operator">Operator</option>
+                <option value="member">Team member</option>
+                <option value="marketer">Marketing</option>
+                <option value="analyst">Analyst</option>
               </select>
 
               <select
@@ -377,16 +393,16 @@ export default function AdminTeam() {
                 onChange={(e) => patchCreate("status", e.target.value)}
                 className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none"
               >
-                <option value="invited">invited</option>
-                <option value="active">active</option>
-                <option value="disabled">disabled</option>
+                <option value="invited">Pending setup</option>
+                <option value="active">Active</option>
+                <option value="disabled">Disabled</option>
               </select>
 
               <Input
                 type="password"
                 value={createForm.password}
                 onChange={(e) => patchCreate("password", e.target.value)}
-                placeholder="Optional initial password"
+                placeholder="Initial login password"
               />
 
               <div className="flex justify-end">
@@ -400,10 +416,10 @@ export default function AdminTeam() {
           <Card className="p-5">
             <div className="mb-4">
               <div className="text-base font-semibold text-slate-900 dark:text-white">
-                Edit User
+                Edit User Details
               </div>
               <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Siyahıdan user seç və məlumatlarını yenilə.
+                Select a user from the list and update their account details.
               </div>
             </div>
 
@@ -411,7 +427,7 @@ export default function AdminTeam() {
               <Input
                 value={editForm.email}
                 onChange={(e) => patchEdit("email", e.target.value)}
-                placeholder="Email"
+                placeholder="Email address"
                 disabled={!editForm.id}
               />
               <Input
@@ -427,12 +443,12 @@ export default function AdminTeam() {
                 disabled={!editForm.id}
                 className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none disabled:opacity-50"
               >
-                <option value="owner">owner</option>
-                <option value="admin">admin</option>
-                <option value="operator">operator</option>
-                <option value="member">member</option>
-                <option value="marketer">marketer</option>
-                <option value="analyst">analyst</option>
+                <option value="owner">Owner</option>
+                <option value="admin">Administrator</option>
+                <option value="operator">Operator</option>
+                <option value="member">Team member</option>
+                <option value="marketer">Marketing</option>
+                <option value="analyst">Analyst</option>
               </select>
 
               <select
@@ -441,10 +457,10 @@ export default function AdminTeam() {
                 disabled={!editForm.id}
                 className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none disabled:opacity-50"
               >
-                <option value="invited">invited</option>
-                <option value="active">active</option>
-                <option value="disabled">disabled</option>
-                <option value="removed">removed</option>
+                <option value="invited">Pending setup</option>
+                <option value="active">Active</option>
+                <option value="disabled">Disabled</option>
+                <option value="removed">Removed</option>
               </select>
 
               <div className="flex justify-end">
@@ -453,7 +469,7 @@ export default function AdminTeam() {
                   onClick={handleSaveEdit}
                   disabled={savingEdit || !editForm.id}
                 >
-                  {savingEdit ? "Saving..." : "Save User"}
+                  {savingEdit ? "Saving..." : "Save Changes"}
                 </Button>
               </div>
             </div>
@@ -462,10 +478,10 @@ export default function AdminTeam() {
           <Card className="p-5">
             <div className="mb-4">
               <div className="text-base font-semibold text-slate-900 dark:text-white">
-                Reset Password
+                Reset User Password
               </div>
               <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Seçilmiş user üçün yeni password təyin et.
+                Set a new login password for an existing user.
               </div>
             </div>
 
@@ -475,7 +491,7 @@ export default function AdminTeam() {
                 onChange={(e) => setPasswordUserId(e.target.value)}
                 className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none"
               >
-                <option value="">User seç</option>
+                <option value="">Select user</option>
                 {users.map((u) => (
                   <option key={u.id} value={u.id}>
                     {u.full_name || u.user_email} ({u.user_email})
@@ -487,7 +503,7 @@ export default function AdminTeam() {
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="New password"
+                placeholder="New login password"
               />
 
               <div className="flex justify-end">
@@ -496,7 +512,7 @@ export default function AdminTeam() {
                   onClick={handleSetPassword}
                   disabled={savingPassword || !tenantKey}
                 >
-                  {savingPassword ? "Updating..." : "Set Password"}
+                  {savingPassword ? "Updating..." : "Update Password"}
                 </Button>
               </div>
             </div>
@@ -508,10 +524,10 @@ export default function AdminTeam() {
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <div className="text-base font-semibold text-slate-900 dark:text-white">
-                  User List
+                  Team Members
                 </div>
                 <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                  Seçilmiş tenantın user-ləri
+                  Users in the selected workspace
                 </div>
               </div>
 
@@ -524,18 +540,18 @@ export default function AdminTeam() {
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Axtar: email, full name, role..."
+                placeholder="Search by email, name, role, or status"
               />
             </div>
 
             <div className="max-h-[980px] space-y-3 overflow-auto pr-1">
               {loadingUsers ? (
                 <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-400">
-                  Yüklənir...
+                  Loading users...
                 </div>
               ) : !tenantKey ? (
                 <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-4 text-sm text-slate-400">
-                  Tenant seç.
+                  Select a workspace to view users.
                 </div>
               ) : filteredUsers.length ? (
                 filteredUsers.map((user) => {
@@ -562,21 +578,22 @@ export default function AdminTeam() {
                           </div>
 
                           <div className="mt-3 flex flex-wrap gap-2">
-                            <Chip className={roleTone(user.role)}>{user.role}</Chip>
-                            <Chip className={statusTone(user.status)}>{user.status}</Chip>
+                            <Chip className={roleTone(user.role)}>
+                              {roleLabel(user.role)}
+                            </Chip>
+                            <Chip className={statusTone(user.status)}>
+                              {statusLabel(user.status)}
+                            </Chip>
                           </div>
 
                           <div className="mt-3 text-xs text-slate-500">
-                            Created:{" "}
+                            Created on{" "}
                             {user.created_at ? new Date(user.created_at).toLocaleString() : "-"}
                           </div>
                         </div>
 
                         <div className="flex flex-wrap gap-2">
-                          <Button
-                            variant="outline"
-                            onClick={() => startEdit(user)}
-                          >
+                          <Button variant="outline" onClick={() => startEdit(user)}>
                             Edit
                           </Button>
 
@@ -587,7 +604,7 @@ export default function AdminTeam() {
                               setNewPassword("");
                             }}
                           >
-                            Password
+                            Change Password
                           </Button>
 
                           {user.status !== "active" ? (
@@ -622,7 +639,7 @@ export default function AdminTeam() {
                 })
               ) : (
                 <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-4 text-sm text-slate-400">
-                  User tapılmadı
+                  No users found.
                 </div>
               )}
             </div>
