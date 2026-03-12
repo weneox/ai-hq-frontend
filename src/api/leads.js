@@ -28,6 +28,7 @@ async function req(path, init = {}) {
 
   const r = await fetch(`${API_BASE}${path}`, {
     ...init,
+    credentials: "include",
     headers: {
       Accept: "application/json",
       ...(init.body ? { "Content-Type": "application/json; charset=utf-8" } : {}),
@@ -43,7 +44,6 @@ async function req(path, init = {}) {
 }
 
 export async function listLeads({
-  tenantKey = "neox",
   stage = "",
   status = "",
   owner = "",
@@ -52,7 +52,6 @@ export async function listLeads({
   limit = 50,
 } = {}) {
   const qs = new URLSearchParams();
-  qs.set("tenantKey", tenantKey);
   if (stage) qs.set("stage", stage);
   if (status) qs.set("status", status);
   if (owner) qs.set("owner", owner);

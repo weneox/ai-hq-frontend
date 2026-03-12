@@ -21,6 +21,7 @@ async function apiGet(path) {
 
   const r = await fetch(`${base}${path}`, {
     method: "GET",
+    credentials: "include",
     headers: { Accept: "application/json" },
   });
 
@@ -32,14 +33,12 @@ async function apiGet(path) {
 }
 
 export async function listComments({
-  tenantKey = "neox",
   channel = "",
   category = "",
   q = "",
   limit = 50,
 } = {}) {
   const params = new URLSearchParams();
-  params.set("tenantKey", tenantKey);
   if (channel) params.set("channel", channel);
   if (category) params.set("category", category);
   if (q) params.set("q", q);
