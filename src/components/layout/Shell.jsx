@@ -27,7 +27,13 @@ async function apiGet(path) {
 
   const r = await fetch(`${base}${path}`, {
     method: "GET",
-    headers: { Accept: "application/json" },
+    credentials: "include",
+    headers: {
+      Accept: "application/json",
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+    },
+    cache: "no-store",
   });
 
   const j = await readJsonSafe(r);
