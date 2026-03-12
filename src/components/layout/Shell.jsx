@@ -3,6 +3,7 @@ import { Outlet, useLocation } from "react-router-dom";
 import Sidebar from "./Sidebar.jsx";
 import Header from "./Header.jsx";
 import { createWsClient } from "../../lib/ws.js";
+import { getAuthMe } from "../../api/auth.js";
 
 const SIDEBAR_RAIL_W = 84;
 
@@ -34,9 +35,21 @@ async function apiGet(path) {
   });
 
   const j = await readJsonSafe(r);
-  if (!r.ok || j?.ok === false) {
-    throw new Error(j?.error || j?.details?.message || "Request failed");
+
+  if (r.status === 401) {
+    const err = new Error("Unauthorized");
+    err.status = 401;
+    err.payload = j;
+    throw err;
   }
+
+  if (!r.ok || j?.ok === false) {
+    const err = new Error(j?.error || j?.details?.message || "Request failed");
+    err.status = r.status || 500;
+    err.payload = j;
+    throw err;
+  }
+
   return j;
 }
 
@@ -64,6 +77,7 @@ function isLiveVoiceStatus(v) {
 export default function Shell() {
   const [expanded, setExpanded] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
   const location = useLocation();
   const wsRef = useRef(null);
   const refreshTimerRef = useRef(0);
@@ -82,10 +96,10 @@ export default function Shell() {
   async function loadShellStats() {
     try {
       const [inboxRes, leadsRes, commentsRes, voiceRes] = await Promise.all([
-        apiGet("/api/inbox/threads?tenantKey=neox"),
-        apiGet("/api/leads?tenantKey=neox"),
-        apiGet("/api/comments?tenantKey=neox&limit=200"),
-        apiGet("/api/voice/calls?tenantKey=neox&limit=100").catch(() => ({
+        apiGet("/api/inbox/threads"),
+        apiGet("/api/leads"),
+        apiGet("/api/comments?limit=200"),
+        apiGet("/api/voice/calls?limit=100").catch(() => ({
           calls: [],
         })),
       ]);
@@ -133,17 +147,42 @@ export default function Shell() {
             voiceRes?.dbDisabled
         ),
       }));
-    } catch {
+    } catch (e) {
+      if (Number(e?.status) === 401) {
+        return;
+      }
+
       setShellStats((prev) => ({ ...prev }));
     }
   }
 
   function scheduleShellRefresh(delay = 180) {
+    if (!authReady) return;
+
     clearTimeout(refreshTimerRef.current);
     refreshTimerRef.current = setTimeout(() => {
       loadShellStats();
     }, delay);
   }
+
+  useEffect(() => {
+    let alive = true;
+
+    (async () => {
+      try {
+        const j = await getAuthMe();
+        if (!alive) return;
+        setAuthReady(!!j?.authenticated);
+      } catch {
+        if (!alive) return;
+        setAuthReady(false);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -162,10 +201,13 @@ export default function Shell() {
   }, [location.pathname]);
 
   useEffect(() => {
+    if (!authReady) return;
     loadShellStats();
-  }, [location.pathname]);
+  }, [authReady, location.pathname]);
 
   useEffect(() => {
+    if (!authReady) return;
+
     const ws = createWsClient({
       onEvent(evt) {
         const type = String(evt?.type || "");
@@ -206,7 +248,7 @@ export default function Shell() {
       } catch {}
       wsRef.current = null;
     };
-  }, []);
+  }, [authReady]);
 
   return (
     <div
