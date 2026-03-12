@@ -19,7 +19,7 @@ export default function UserRouteGuard({ children }) {
         const j = await getAuthMe();
         if (!alive) return;
 
-        const userOk = !!j?.authenticated?.user;
+        const userOk = !!j?.authenticated;
         setState({
           loading: false,
           ok: userOk,

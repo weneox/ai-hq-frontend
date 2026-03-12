@@ -23,6 +23,10 @@ function assertConfigured() {
   }
 }
 
+function pickErr(j, fallback) {
+  return String(j?.error || j?.message || j?.raw || fallback);
+}
+
 export async function loginUser({ email, password, tenantKey }) {
   assertConfigured();
 
@@ -43,7 +47,7 @@ export async function loginUser({ email, password, tenantKey }) {
   const j = await readJson(r);
 
   if (!r.ok) {
-    throw new Error(j?.error || `Login failed (${r.status})`);
+    throw new Error(pickErr(j, `Login failed (${r.status})`));
   }
 
   return j;
@@ -63,7 +67,7 @@ export async function logoutUser() {
   const j = await readJson(r);
 
   if (!r.ok) {
-    throw new Error(j?.error || `Logout failed (${r.status})`);
+    throw new Error(pickErr(j, `Logout failed (${r.status})`));
   }
 
   return j;
@@ -72,7 +76,7 @@ export async function logoutUser() {
 export async function getAuthMe() {
   assertConfigured();
 
-  const r = await fetch(apiUrl("/api/admin-auth/me"), {
+  const r = await fetch(apiUrl("/api/auth/me"), {
     method: "GET",
     credentials: "include",
     headers: {
@@ -83,7 +87,7 @@ export async function getAuthMe() {
   const j = await readJson(r);
 
   if (!r.ok) {
-    throw new Error(j?.error || `Auth check failed (${r.status})`);
+    throw new Error(pickErr(j, `Auth check failed (${r.status})`));
   }
 
   return j;
