@@ -77,11 +77,13 @@ function isLiveVoiceStatus(v) {
 export default function Shell() {
   const [expanded, setExpanded] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-
   const [authChecking, setAuthChecking] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const location = useLocation();
+  const pathname = location.pathname;
+  const isLoginRoute = pathname === "/login";
+
   const wsRef = useRef(null);
   const refreshTimerRef = useRef(0);
 
@@ -102,9 +104,7 @@ export default function Shell() {
         apiGet("/api/inbox/threads"),
         apiGet("/api/leads"),
         apiGet("/api/comments?limit=200"),
-        apiGet("/api/voice/calls?limit=100").catch(() => ({
-          calls: [],
-        })),
+        apiGet("/api/voice/calls?limit=100").catch(() => ({ calls: [] })),
       ]);
 
       const threads = Array.isArray(inboxRes?.threads) ? inboxRes.threads : [];
@@ -155,8 +155,6 @@ export default function Shell() {
         setIsAuthenticated(false);
         return;
       }
-
-      setShellStats((prev) => ({ ...prev }));
     }
   }
 
@@ -170,17 +168,20 @@ export default function Shell() {
   }
 
   useEffect(() => {
+    if (isLoginRoute) {
+      setAuthChecking(false);
+      return;
+    }
+
     let alive = true;
 
     (async () => {
       try {
         const j = await getAuthMe();
         if (!alive) return;
-
         setIsAuthenticated(!!j?.authenticated);
       } catch {
         if (!alive) return;
-
         setIsAuthenticated(false);
       } finally {
         if (!alive) return;
@@ -191,15 +192,11 @@ export default function Shell() {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [isLoginRoute]);
 
   useEffect(() => {
     const prev = document.body.style.overflow;
-
-    if (mobileOpen) {
-      document.body.style.overflow = "hidden";
-    }
-
+    if (mobileOpen) document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
     };
@@ -207,20 +204,19 @@ export default function Shell() {
 
   useEffect(() => {
     setMobileOpen(false);
-  }, [location.pathname]);
+  }, [pathname]);
 
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || isLoginRoute) return;
     loadShellStats();
-  }, [isAuthenticated, location.pathname]);
+  }, [isAuthenticated, pathname, isLoginRoute]);
 
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || isLoginRoute) return;
 
     const ws = createWsClient({
       onEvent(evt) {
         const type = String(evt?.type || "");
-
         if (
           type === "inbox.message.created" ||
           type === "inbox.thread.updated" ||
@@ -257,7 +253,11 @@ export default function Shell() {
       } catch {}
       wsRef.current = null;
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isLoginRoute]);
+
+  if (isLoginRoute) {
+    return <Outlet />;
+  }
 
   if (authChecking) {
     return (
@@ -270,15 +270,13 @@ export default function Shell() {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace state={{ from: location }} />;
+    return <Navigate to="/login" replace />;
   }
 
   return (
     <div
       className="relative min-h-screen overflow-x-clip bg-[#02050c] text-white selection:bg-cyan-300/20 selection:text-white"
-      style={{
-        "--sidebar-rail-w": `${SIDEBAR_RAIL_W}px`,
-      }}
+      style={{ "--sidebar-rail-w": `${SIDEBAR_RAIL_W}px` }}
     >
       <div className="pointer-events-none fixed inset-0 -z-[100] bg-[linear-gradient(180deg,#02050c_0%,#040814_34%,#030611_72%,#02050c_100%)]" />
       <div className="pointer-events-none fixed inset-0 -z-[90] bg-[radial-gradient(1100px_circle_at_0%_0%,rgba(44,212,255,0.10),transparent_24%),radial-gradient(920px_circle_at_100%_0%,rgba(99,102,241,0.10),transparent_24%),radial-gradient(1100px_circle_at_50%_100%,rgba(109,40,217,0.08),transparent_28%)]" />
