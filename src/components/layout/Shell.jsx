@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Outlet, useLocation } from "react-router-dom";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
 import Sidebar from "./Sidebar.jsx";
 import Header from "./Header.jsx";
 import { createWsClient } from "../../lib/ws.js";
@@ -77,7 +77,10 @@ function isLiveVoiceStatus(v) {
 export default function Shell() {
   const [expanded, setExpanded] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [authReady, setAuthReady] = useState(false);
+
+  const [authChecking, setAuthChecking] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
   const location = useLocation();
   const wsRef = useRef(null);
   const refreshTimerRef = useRef(0);
@@ -149,6 +152,7 @@ export default function Shell() {
       }));
     } catch (e) {
       if (Number(e?.status) === 401) {
+        setIsAuthenticated(false);
         return;
       }
 
@@ -157,7 +161,7 @@ export default function Shell() {
   }
 
   function scheduleShellRefresh(delay = 180) {
-    if (!authReady) return;
+    if (!isAuthenticated) return;
 
     clearTimeout(refreshTimerRef.current);
     refreshTimerRef.current = setTimeout(() => {
@@ -172,10 +176,15 @@ export default function Shell() {
       try {
         const j = await getAuthMe();
         if (!alive) return;
-        setAuthReady(!!j?.authenticated);
+
+        setIsAuthenticated(!!j?.authenticated);
       } catch {
         if (!alive) return;
-        setAuthReady(false);
+
+        setIsAuthenticated(false);
+      } finally {
+        if (!alive) return;
+        setAuthChecking(false);
       }
     })();
 
@@ -201,12 +210,12 @@ export default function Shell() {
   }, [location.pathname]);
 
   useEffect(() => {
-    if (!authReady) return;
+    if (!isAuthenticated) return;
     loadShellStats();
-  }, [authReady, location.pathname]);
+  }, [isAuthenticated, location.pathname]);
 
   useEffect(() => {
-    if (!authReady) return;
+    if (!isAuthenticated) return;
 
     const ws = createWsClient({
       onEvent(evt) {
@@ -248,7 +257,21 @@ export default function Shell() {
       } catch {}
       wsRef.current = null;
     };
-  }, [authReady]);
+  }, [isAuthenticated]);
+
+  if (authChecking) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#02050c] text-white">
+        <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm text-white/70 backdrop-blur-xl">
+          Checking session...
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
+  }
 
   return (
     <div
