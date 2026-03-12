@@ -8,7 +8,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { logoutUser } from "../api/auth.js";
+import { logoutUser } from "../../api/auth.js";
 
 const fade = {
   initial: { opacity: 0, y: 10 },
