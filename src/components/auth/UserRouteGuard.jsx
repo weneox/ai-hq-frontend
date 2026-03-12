@@ -1,5 +1,3 @@
-// src/components/auth/UserRouteGuard.jsx
-
 import { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { getAuthMe } from "../../api/auth.js";
@@ -19,13 +17,13 @@ export default function UserRouteGuard({ children }) {
         const j = await getAuthMe();
         if (!alive) return;
 
-        const userOk = !!j?.authenticated;
         setState({
           loading: false,
-          ok: userOk,
+          ok: !!j?.authenticated,
         });
       } catch {
         if (!alive) return;
+
         setState({
           loading: false,
           ok: false,
@@ -36,7 +34,7 @@ export default function UserRouteGuard({ children }) {
     return () => {
       alive = false;
     };
-  }, [location.pathname]);
+  }, []);
 
   if (state.loading) {
     return (

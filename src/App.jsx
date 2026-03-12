@@ -44,6 +44,7 @@ export default function App() {
         </Route>
 
         <Route
+          path="/"
           element={
             <UserRouteGuard>
               <Shell />
@@ -61,8 +62,9 @@ export default function App() {
           <Route path="agents" element={<Agents />} />
           <Route path="threads" element={<Threads />} />
           <Route path="settings" element={<Settings />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
+
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );

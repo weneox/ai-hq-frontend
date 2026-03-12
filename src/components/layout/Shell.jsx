@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import Sidebar from "./Sidebar.jsx";
 import Header from "./Header.jsx";
 import { createWsClient } from "../../lib/ws.js";
-import { getAuthMe } from "../../api/auth.js";
 
 const SIDEBAR_RAIL_W = 84;
 
@@ -77,13 +76,8 @@ function isLiveVoiceStatus(v) {
 export default function Shell() {
   const [expanded, setExpanded] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [authChecking, setAuthChecking] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const location = useLocation();
-  const pathname = location.pathname;
-  const isLoginRoute = pathname === "/login";
-
   const wsRef = useRef(null);
   const refreshTimerRef = useRef(0);
 
@@ -104,7 +98,9 @@ export default function Shell() {
         apiGet("/api/inbox/threads"),
         apiGet("/api/leads"),
         apiGet("/api/comments?limit=200"),
-        apiGet("/api/voice/calls?limit=100").catch(() => ({ calls: [] })),
+        apiGet("/api/voice/calls?limit=100").catch(() => ({
+          calls: [],
+        })),
       ]);
 
       const threads = Array.isArray(inboxRes?.threads) ? inboxRes.threads : [];
@@ -152,15 +148,14 @@ export default function Shell() {
       }));
     } catch (e) {
       if (Number(e?.status) === 401) {
-        setIsAuthenticated(false);
         return;
       }
+
+      setShellStats((prev) => ({ ...prev }));
     }
   }
 
   function scheduleShellRefresh(delay = 180) {
-    if (!isAuthenticated) return;
-
     clearTimeout(refreshTimerRef.current);
     refreshTimerRef.current = setTimeout(() => {
       loadShellStats();
@@ -168,35 +163,12 @@ export default function Shell() {
   }
 
   useEffect(() => {
-    if (isLoginRoute) {
-      setAuthChecking(false);
-      return;
+    const prev = document.body.style.overflow;
+
+    if (mobileOpen) {
+      document.body.style.overflow = "hidden";
     }
 
-    let alive = true;
-
-    (async () => {
-      try {
-        const j = await getAuthMe();
-        if (!alive) return;
-        setIsAuthenticated(!!j?.authenticated);
-      } catch {
-        if (!alive) return;
-        setIsAuthenticated(false);
-      } finally {
-        if (!alive) return;
-        setAuthChecking(false);
-      }
-    })();
-
-    return () => {
-      alive = false;
-    };
-  }, [isLoginRoute]);
-
-  useEffect(() => {
-    const prev = document.body.style.overflow;
-    if (mobileOpen) document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
     };
@@ -204,19 +176,17 @@ export default function Shell() {
 
   useEffect(() => {
     setMobileOpen(false);
-  }, [pathname]);
+  }, [location.pathname]);
 
   useEffect(() => {
-    if (!isAuthenticated || isLoginRoute) return;
     loadShellStats();
-  }, [isAuthenticated, pathname, isLoginRoute]);
+  }, [location.pathname]);
 
   useEffect(() => {
-    if (!isAuthenticated || isLoginRoute) return;
-
     const ws = createWsClient({
       onEvent(evt) {
         const type = String(evt?.type || "");
+
         if (
           type === "inbox.message.created" ||
           type === "inbox.thread.updated" ||
@@ -253,30 +223,14 @@ export default function Shell() {
       } catch {}
       wsRef.current = null;
     };
-  }, [isAuthenticated, isLoginRoute]);
-
-  if (isLoginRoute) {
-    return <Outlet />;
-  }
-
-  if (authChecking) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#02050c] text-white">
-        <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm text-white/70 backdrop-blur-xl">
-          Checking session...
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
+  }, []);
 
   return (
     <div
       className="relative min-h-screen overflow-x-clip bg-[#02050c] text-white selection:bg-cyan-300/20 selection:text-white"
-      style={{ "--sidebar-rail-w": `${SIDEBAR_RAIL_W}px` }}
+      style={{
+        "--sidebar-rail-w": `${SIDEBAR_RAIL_W}px`,
+      }}
     >
       <div className="pointer-events-none fixed inset-0 -z-[100] bg-[linear-gradient(180deg,#02050c_0%,#040814_34%,#030611_72%,#02050c_100%)]" />
       <div className="pointer-events-none fixed inset-0 -z-[90] bg-[radial-gradient(1100px_circle_at_0%_0%,rgba(44,212,255,0.10),transparent_24%),radial-gradient(920px_circle_at_100%_0%,rgba(99,102,241,0.10),transparent_24%),radial-gradient(1100px_circle_at_50%_100%,rgba(109,40,217,0.08),transparent_28%)]" />
