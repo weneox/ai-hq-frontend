@@ -42,6 +42,13 @@ async function apiGet(path) {
     throw err;
   }
 
+  if (r.status === 403) {
+    const err = new Error("Forbidden");
+    err.status = 403;
+    err.payload = j;
+    throw err;
+  }
+
   if (!r.ok || j?.ok === false) {
     const err = new Error(j?.error || j?.details?.message || "Request failed");
     err.status = r.status || 500;
@@ -50,6 +57,20 @@ async function apiGet(path) {
   }
 
   return j;
+}
+
+async function safeApiGet(path, fallback = {}) {
+  try {
+    return await apiGet(path);
+  } catch (e) {
+    const status = Number(e?.status || 0);
+
+    if (status === 401 || status === 403) {
+      return fallback;
+    }
+
+    return fallback;
+  }
 }
 
 function normalizeArray(j, key) {
@@ -93,64 +114,56 @@ export default function Shell() {
   });
 
   async function loadShellStats() {
-    try {
-      const [inboxRes, leadsRes, commentsRes, voiceRes] = await Promise.all([
-        apiGet("/api/inbox/threads"),
-        apiGet("/api/leads"),
-        apiGet("/api/comments?limit=200"),
-        apiGet("/api/voice/calls?limit=100").catch(() => ({
-          calls: [],
-        })),
-      ]);
+    const [inboxRes, leadsRes, commentsRes, voiceRes] = await Promise.all([
+      safeApiGet("/api/inbox/threads", { threads: [], dbDisabled: false }),
+      safeApiGet("/api/leads", { leads: [], dbDisabled: false }),
+      safeApiGet("/api/comments?limit=200", { comments: [], dbDisabled: false }),
+      safeApiGet("/api/voice/calls?limit=100", { calls: [], dbDisabled: false }),
+    ]);
 
-      const threads = Array.isArray(inboxRes?.threads) ? inboxRes.threads : [];
-      const leads = Array.isArray(leadsRes?.leads) ? leadsRes.leads : [];
-      const comments = Array.isArray(commentsRes?.comments)
-        ? commentsRes.comments
-        : [];
-      const voiceCalls = normalizeArray(voiceRes, "calls");
+    const threads = Array.isArray(inboxRes?.threads) ? inboxRes.threads : [];
+    const leads = Array.isArray(leadsRes?.leads) ? leadsRes.leads : [];
+    const comments = Array.isArray(commentsRes?.comments)
+      ? commentsRes.comments
+      : [];
+    const voiceCalls = normalizeArray(voiceRes, "calls");
 
-      const inboxUnread = threads.reduce(
-        (sum, t) => sum + Number(t?.unread_count || 0),
-        0
-      );
+    const inboxUnread = threads.reduce(
+      (sum, t) => sum + Number(t?.unread_count || 0),
+      0
+    );
 
-      const inboxOpen = threads.filter((t) => {
-        const status = String(t?.status || "open").toLowerCase();
-        return status !== "resolved" && status !== "closed";
-      }).length;
+    const inboxOpen = threads.filter((t) => {
+      const status = String(t?.status || "open").toLowerCase();
+      return status !== "resolved" && status !== "closed";
+    }).length;
 
-      const leadsOpen = leads.filter(
-        (l) => String(l?.status || "open").toLowerCase() === "open"
-      ).length;
+    const leadsOpen = leads.filter(
+      (l) => String(l?.status || "open").toLowerCase() === "open"
+    ).length;
 
-      const commentsCount = comments.length;
+    const commentsCount = comments.length;
 
-      const voiceLive = voiceCalls.filter((c) =>
-        isLiveVoiceStatus(c?.status || c?.callStatus || c?.call_status)
-      ).length;
+    const voiceLive = voiceCalls.filter((c) =>
+      isLiveVoiceStatus(c?.status || c?.callStatus || c?.call_status)
+    ).length;
 
-      setShellStats((prev) => ({
-        ...prev,
-        inboxUnread,
-        inboxOpen,
-        leadsOpen,
-        commentsCount,
-        voiceLive,
-        notificationsUnread:
-          inboxUnread + leadsOpen + commentsCount + voiceLive,
-        dbDisabled: Boolean(
-          inboxRes?.dbDisabled ||
-            leadsRes?.dbDisabled ||
-            commentsRes?.dbDisabled ||
-            voiceRes?.dbDisabled
-        ),
-      }));
-    } catch (e) {
-      if (Number(e?.status) === 401) {
-        return;
-      }
-    }
+    setShellStats((prev) => ({
+      ...prev,
+      inboxUnread,
+      inboxOpen,
+      leadsOpen,
+      commentsCount,
+      voiceLive,
+      notificationsUnread:
+        inboxUnread + leadsOpen + commentsCount + voiceLive,
+      dbDisabled: Boolean(
+        inboxRes?.dbDisabled ||
+          leadsRes?.dbDisabled ||
+          commentsRes?.dbDisabled ||
+          voiceRes?.dbDisabled
+      ),
+    }));
   }
 
   function scheduleShellRefresh(delay = 180) {
