@@ -22,8 +22,8 @@ export function useInboxData({ filter, operatorName, navigate }) {
 
         const qs =
           filter === "handoff"
-            ? "/api/inbox/threads?tenantKey=neox&handoffOnly=true"
-            : "/api/inbox/threads?tenantKey=neox";
+            ? "/api/inbox/threads?handoffOnly=true"
+            : "/api/inbox/threads";
 
         const j = await apiGet(qs);
         const arr = Array.isArray(j?.threads) ? j.threads : [];
@@ -95,7 +95,7 @@ export function useInboxData({ filter, operatorName, navigate }) {
 
     try {
       setLoadingLead(true);
-      const j = await apiGet("/api/leads?tenantKey=neox");
+      const j = await apiGet("/api/leads");
       const arr = Array.isArray(j?.leads) ? j.leads : [];
       const found = arr.find((x) => String(x?.inbox_thread_id || "") === String(threadId));
       setRelatedLead(found || null);
@@ -228,7 +228,6 @@ export function useInboxData({ filter, operatorName, navigate }) {
       try {
         setBusyAction("reply");
         await apiPost(`/api/inbox/threads/${selectedThreadArg.id}/messages`, {
-          tenantKey: "neox",
           direction: "outbound",
           senderType: "agent",
           operatorName,
