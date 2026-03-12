@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { loginUser } from "../api/auth.js";
+import { loginUser, getAuthMe } from "../api/auth.js";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -12,9 +12,33 @@ export default function Login() {
     password: "",
   });
   const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(true);
   const [error, setError] = useState("");
 
   const from = location.state?.from?.pathname || "/";
+
+  useEffect(() => {
+    let alive = true;
+
+    (async () => {
+      try {
+        const j = await getAuthMe();
+        if (!alive) return;
+
+        if (j?.authenticated) {
+          navigate(from, { replace: true });
+          return;
+        }
+      } catch {}
+
+      if (!alive) return;
+      setChecking(false);
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [navigate, from]);
 
   function onChange(e) {
     const { name, value } = e.target;
@@ -29,16 +53,19 @@ export default function Login() {
       setError("Company code is required");
       return;
     }
+
     if (!form.email.trim()) {
       setError("Email address is required");
       return;
     }
+
     if (!form.password) {
       setError("Password is required");
       return;
     }
 
     setLoading(true);
+
     try {
       await loginUser({
         tenantKey: form.tenantKey.trim().toLowerCase(),
@@ -52,6 +79,14 @@ export default function Login() {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (checking) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-950 p-6 text-slate-100">
+        <div className="text-sm text-slate-400">Checking session...</div>
+      </div>
+    );
   }
 
   return (
@@ -77,6 +112,7 @@ export default function Login() {
               value={form.tenantKey}
               onChange={onChange}
               placeholder="e.g. neox"
+              autoComplete="organization"
               className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 outline-none focus:border-cyan-400"
             />
           </div>
@@ -91,6 +127,7 @@ export default function Login() {
               value={form.email}
               onChange={onChange}
               placeholder="name@company.com"
+              autoComplete="username"
               className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 outline-none focus:border-cyan-400"
             />
           </div>
@@ -105,6 +142,7 @@ export default function Login() {
               value={form.password}
               onChange={onChange}
               placeholder="Enter your password"
+              autoComplete="current-password"
               className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 outline-none focus:border-cyan-400"
             />
           </div>
