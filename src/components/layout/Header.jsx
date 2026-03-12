@@ -3,9 +3,12 @@ import {
   BellRing,
   CheckCircle2,
   Clock3,
+  LogOut,
   Radio,
   Sparkles,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { logoutUser } from "../api/auth.js";
 
 const fade = {
   initial: { opacity: 0, y: 10 },
@@ -107,6 +110,47 @@ function NotificationButton({ unread = 0 }) {
   );
 }
 
+function LogoutButton() {
+  const navigate = useNavigate();
+
+  async function onLogout() {
+    try {
+      await logoutUser();
+    } catch (e) {
+      console.error("Logout failed:", e);
+    } finally {
+      navigate("/login", { replace: true });
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onLogout}
+      aria-label="Logout"
+      className={cn(
+        "group relative flex h-12 items-center justify-center gap-2 overflow-hidden rounded-full px-4",
+        "border border-white/[0.09] bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))]",
+        "shadow-[0_12px_40px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.06)]",
+        "backdrop-blur-xl transition-all duration-300",
+        "hover:-translate-y-[1px] hover:border-rose-300/20 hover:bg-white/[0.06]"
+      )}
+    >
+      <div className="pointer-events-none absolute inset-0 rounded-full bg-[radial-gradient(circle_at_30%_25%,rgba(255,255,255,0.07),transparent_34%),radial-gradient(circle_at_72%_78%,rgba(251,113,133,0.10),transparent_38%)] opacity-80 transition duration-300 group-hover:opacity-100" />
+
+      <div className="pointer-events-none absolute inset-[1px] rounded-full border border-white/[0.04]" />
+
+      <LogOut
+        className="relative z-10 h-[16px] w-[16px] text-white/78 transition duration-300 group-hover:text-white"
+        strokeWidth={1.9}
+      />
+      <span className="relative z-10 hidden text-[13px] font-medium text-white/82 sm:inline">
+        Logout
+      </span>
+    </button>
+  );
+}
+
 export default function Header({ shellStats = {} }) {
   const live = true;
   const pending = Number(shellStats?.leadsOpen || 0);
@@ -146,6 +190,7 @@ export default function Header({ shellStats = {} }) {
           <div className="flex items-center gap-2 md:gap-3">
             <StatusPill live={live} pending={pending} scheduled={scheduled} />
             <NotificationButton unread={unread} />
+            <LogoutButton />
           </div>
         </div>
       </motion.div>
