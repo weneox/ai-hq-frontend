@@ -72,24 +72,45 @@ export default function ChannelsPanel({ canManage = true }) {
   }
 
   useEffect(() => {
-    loadStatus();
+    let alive = true;
 
-    try {
-      const url = new URL(window.location.href);
-      const ok = url.searchParams.get("meta_connected");
-      const err = url.searchParams.get("meta_error");
+    async function boot() {
+      try {
+        const url = new URL(window.location.href);
+        const ok = url.searchParams.get("meta_connected");
+        const err = url.searchParams.get("meta_error");
 
-      if (ok === "1") {
-        setMessage("✅ Instagram uğurla qoşuldu.");
-        url.searchParams.delete("meta_connected");
-        url.searchParams.delete("channel");
-        window.history.replaceState({}, "", url.toString());
-      } else if (err) {
-        setMessage(`❌ ${err}`);
-        url.searchParams.delete("meta_error");
-        window.history.replaceState({}, "", url.toString());
+        if (ok === "1") {
+          await loadStatus();
+          if (!alive) return;
+
+          setMessage("✅ Instagram uğurla qoşuldu.");
+          url.searchParams.delete("meta_connected");
+          url.searchParams.delete("channel");
+          window.history.replaceState({}, "", url.toString());
+          return;
+        }
+
+        if (err) {
+          if (!alive) return;
+          setMessage(`❌ ${err}`);
+          url.searchParams.delete("meta_error");
+          window.history.replaceState({}, "", url.toString());
+          await loadStatus();
+          return;
+        }
+
+        await loadStatus();
+      } catch {
+        await loadStatus();
       }
-    } catch {}
+    }
+
+    boot();
+
+    return () => {
+      alive = false;
+    };
   }, []);
 
   function onConnect() {
