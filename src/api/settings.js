@@ -1,4 +1,4 @@
-import { apiGet, apiPost, getApiBase } from "./client.js";
+import { apiGet, apiPost } from "./client.js";
 
 export async function getWorkspaceSettings() {
   const j = await apiGet(`/api/settings/workspace`);
@@ -48,14 +48,12 @@ export async function getMetaChannelStatus() {
   return j;
 }
 
-export function getMetaConnectUrl() {
-  const base = getApiBase();
-  if (!base) {
-    throw new Error(
-      "VITE_API_BASE is not set. (Example: https://ai-hq-backend-production.up.railway.app)"
-    );
+export async function getMetaConnectUrl() {
+  const j = await apiGet(`/api/channels/meta/connect-url`);
+  if (!j?.ok || !j?.url) {
+    throw new Error(j?.error || "Failed to build Meta connect URL");
   }
-  return `${base}/api/channels/meta/connect`;
+  return j.url;
 }
 
 export async function disconnectMetaChannel() {
