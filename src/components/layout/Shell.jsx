@@ -30,10 +30,7 @@ async function apiGet(path) {
     credentials: "include",
     headers: {
       Accept: "application/json",
-      "Cache-Control": "no-cache",
-      Pragma: "no-cache",
     },
-    cache: "no-store",
   });
 
   const j = await readJsonSafe(r);
@@ -53,7 +50,15 @@ function normalizeArray(j, key) {
 
 function isLiveVoiceStatus(v) {
   const s = String(v || "").trim().toLowerCase();
-  return ["live", "active", "in_progress", "ongoing", "ringing", "queued", "bridged"].includes(s);
+  return [
+    "live",
+    "active",
+    "in_progress",
+    "ongoing",
+    "ringing",
+    "queued",
+    "bridged",
+  ].includes(s);
 }
 
 export default function Shell() {
@@ -80,12 +85,16 @@ export default function Shell() {
         apiGet("/api/inbox/threads?tenantKey=neox"),
         apiGet("/api/leads?tenantKey=neox"),
         apiGet("/api/comments?tenantKey=neox&limit=200"),
-        apiGet("/api/voice/calls?tenantKey=neox&limit=100").catch(() => ({ calls: [] })),
+        apiGet("/api/voice/calls?tenantKey=neox&limit=100").catch(() => ({
+          calls: [],
+        })),
       ]);
 
       const threads = Array.isArray(inboxRes?.threads) ? inboxRes.threads : [];
       const leads = Array.isArray(leadsRes?.leads) ? leadsRes.leads : [];
-      const comments = Array.isArray(commentsRes?.comments) ? commentsRes.comments : [];
+      const comments = Array.isArray(commentsRes?.comments)
+        ? commentsRes.comments
+        : [];
       const voiceCalls = normalizeArray(voiceRes, "calls");
 
       const inboxUnread = threads.reduce(
@@ -115,9 +124,13 @@ export default function Shell() {
         leadsOpen,
         commentsCount,
         voiceLive,
-        notificationsUnread: inboxUnread + leadsOpen + commentsCount + voiceLive,
+        notificationsUnread:
+          inboxUnread + leadsOpen + commentsCount + voiceLive,
         dbDisabled: Boolean(
-          inboxRes?.dbDisabled || leadsRes?.dbDisabled || commentsRes?.dbDisabled || voiceRes?.dbDisabled
+          inboxRes?.dbDisabled ||
+            leadsRes?.dbDisabled ||
+            commentsRes?.dbDisabled ||
+            voiceRes?.dbDisabled
         ),
       }));
     } catch {
@@ -134,6 +147,7 @@ export default function Shell() {
 
   useEffect(() => {
     const prev = document.body.style.overflow;
+
     if (mobileOpen) {
       document.body.style.overflow = "hidden";
     }
