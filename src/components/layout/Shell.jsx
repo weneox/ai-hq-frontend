@@ -150,8 +150,6 @@ export default function Shell() {
       if (Number(e?.status) === 401) {
         return;
       }
-
-      setShellStats((prev) => ({ ...prev }));
     }
   }
 
