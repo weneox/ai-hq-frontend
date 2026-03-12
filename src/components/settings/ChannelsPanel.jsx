@@ -49,9 +49,10 @@ export default function ChannelsPanel({ canManage = true }) {
     hasToken: false,
   });
 
-  async function loadStatus() {
+  async function loadStatus({ preserveMessage = false } = {}) {
     setLoading(true);
-    setMessage("");
+    if (!preserveMessage) setMessage("");
+
     try {
       const j = await getMetaChannelStatus();
       setMeta({
@@ -60,12 +61,14 @@ export default function ChannelsPanel({ canManage = true }) {
         hasToken: !!j?.hasToken,
       });
     } catch (e) {
-      setMessage(String(e?.message || e));
       setMeta({
         connected: false,
         channel: null,
         hasToken: false,
       });
+      if (!preserveMessage) {
+        setMessage(String(e?.message || e));
+      }
     } finally {
       setLoading(false);
     }
@@ -81,7 +84,7 @@ export default function ChannelsPanel({ canManage = true }) {
         const err = url.searchParams.get("meta_error");
 
         if (ok === "1") {
-          await loadStatus();
+          await loadStatus({ preserveMessage: true });
           if (!alive) return;
 
           setMessage("✅ Instagram uğurla qoşuldu.");
@@ -92,17 +95,18 @@ export default function ChannelsPanel({ canManage = true }) {
         }
 
         if (err) {
+          await loadStatus({ preserveMessage: true });
           if (!alive) return;
+
           setMessage(`❌ ${err}`);
           url.searchParams.delete("meta_error");
           window.history.replaceState({}, "", url.toString());
-          await loadStatus();
           return;
         }
 
-        await loadStatus();
+        await loadStatus({ preserveMessage: true });
       } catch {
-        await loadStatus();
+        await loadStatus({ preserveMessage: true });
       }
     }
 
@@ -113,19 +117,34 @@ export default function ChannelsPanel({ canManage = true }) {
     };
   }, []);
 
-  function onConnect() {
-    window.location.href = getMetaConnectUrl();
+  async function onConnect() {
+    if (!canManage || busy) return;
+
+    try {
+      setBusy(true);
+      setMessage("");
+
+      const url = await getMetaConnectUrl();
+      if (!url || typeof url !== "string") {
+        throw new Error("Meta connect URL is empty");
+      }
+
+      window.location.assign(url);
+    } catch (e) {
+      setMessage(String(e?.message || e));
+      setBusy(false);
+    }
   }
 
   async function onDisconnect() {
-    if (!canManage) return;
+    if (!canManage || busy) return;
 
     setBusy(true);
     setMessage("");
 
     try {
       await disconnectMetaChannel();
-      await loadStatus();
+      await loadStatus({ preserveMessage: true });
       setMessage("✅ Instagram bağlantısı ayrıldı.");
     } catch (e) {
       setMessage(String(e?.message || e));
@@ -339,7 +358,7 @@ export default function ChannelsPanel({ canManage = true }) {
 
                     <Button
                       variant="secondary"
-                      onClick={loadStatus}
+                      onClick={() => loadStatus({ preserveMessage: false })}
                       disabled={busy}
                     >
                       Refresh Status

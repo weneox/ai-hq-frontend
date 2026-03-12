@@ -38,10 +38,6 @@ export async function saveWorkspaceAgent(agentKey, payload) {
   return j?.agent || j;
 }
 
-// ----------------------------------------
-// Meta / Instagram connect flow
-// ----------------------------------------
-
 export async function getMetaChannelStatus() {
   const j = await apiGet(`/api/channels/meta/status`);
   if (!j?.ok) throw new Error(j?.error || "Failed to load Meta channel status");
