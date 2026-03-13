@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
-import { Navigate, useLocation } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import { getAuthMe } from "../../api/auth.js";
 
-export default function UserRouteGuard({ children }) {
-  const location = useLocation();
+export default function GuestRouteGuard({ children }) {
   const [state, setState] = useState({
-    loading: true,
+    checked: false,
     ok: false,
   });
 
@@ -18,14 +17,14 @@ export default function UserRouteGuard({ children }) {
         if (!alive) return;
 
         setState({
-          loading: false,
+          checked: true,
           ok: !!j?.authenticated,
         });
       } catch {
         if (!alive) return;
 
         setState({
-          loading: false,
+          checked: true,
           ok: false,
         });
       }
@@ -36,12 +35,8 @@ export default function UserRouteGuard({ children }) {
     };
   }, []);
 
-  if (state.loading) {
-    return null;
-  }
-
-  if (!state.ok) {
-    return <Navigate to="/login" replace state={{ from: location }} />;
+  if (state.checked && state.ok) {
+    return <Navigate to="/" replace />;
   }
 
   return children;

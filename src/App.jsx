@@ -3,6 +3,7 @@ import Shell from "./components/layout/Shell.jsx";
 import AdminShell from "./components/admin/AdminShell.jsx";
 import AdminRouteGuard from "./components/admin/AdminRouteGuard.jsx";
 import UserRouteGuard from "./components/auth/UserRouteGuard.jsx";
+import GuestRouteGuard from "./components/guards/GuestRouteGuard.jsx";
 
 import CommandPage from "./pages/CommandPage.jsx";
 import Proposals from "./pages/Proposals.jsx";
@@ -26,7 +27,15 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={<Login />} />
+        <Route
+          path="/login"
+          element={
+            <GuestRouteGuard>
+              <Login />
+            </GuestRouteGuard>
+          }
+        />
+
         <Route path="/admin/login" element={<AdminLogin />} />
 
         <Route
