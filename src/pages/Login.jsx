@@ -1,36 +1,202 @@
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { Canvas, useFrame } from "@react-three/fiber";
+import {
+  Float,
+  Environment,
+  MeshTransmissionMaterial,
+  PerspectiveCamera,
+} from "@react-three/drei";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
   Eye,
   EyeOff,
-  Building2,
   Mail,
-  LockKeyhole,
-  Check,
+  Lock,
   ShieldCheck,
-  Sparkles,
-  ArrowUpRight,
+  Check,
 } from "lucide-react";
+import * as THREE from "three";
 import { loginUser } from "../api/auth.js";
+
+function OrbCluster() {
+  const group = useMemo(() => new THREE.Group(), []);
+
+  useFrame((state) => {
+    const t = state.clock.getElapsedTime();
+    group.rotation.y = t * 0.08;
+    group.rotation.x = Math.sin(t * 0.25) * 0.08;
+  });
+
+  return (
+    <primitive object={group}>
+      <Float speed={1.4} rotationIntensity={0.35} floatIntensity={0.7}>
+        <mesh position={[-1.8, 0.5, -0.3]}>
+          <icosahedronGeometry args={[1.25, 16]} />
+          <MeshTransmissionMaterial
+            thickness={0.8}
+            roughness={0.05}
+            transmission={1}
+            ior={1.2}
+            chromaticAberration={0.06}
+            backside
+          />
+        </mesh>
+      </Float>
+
+      <Float speed={1.7} rotationIntensity={0.5} floatIntensity={0.85}>
+        <mesh position={[1.9, -0.2, -0.6]}>
+          <octahedronGeometry args={[1.05, 0]} />
+          <meshStandardMaterial
+            metalness={1}
+            roughness={0.08}
+            color="#dcefff"
+            envMapIntensity={1.7}
+          />
+        </mesh>
+      </Float>
+
+      <Float speed={1.2} rotationIntensity={0.45} floatIntensity={0.65}>
+        <mesh position={[0.2, 1.45, -1.5]}>
+          <torusKnotGeometry args={[0.78, 0.2, 220, 32]} />
+          <meshStandardMaterial
+            color="#f8fbff"
+            metalness={0.95}
+            roughness={0.1}
+            envMapIntensity={1.5}
+          />
+        </mesh>
+      </Float>
+
+      <Float speed={1.5} rotationIntensity={0.4} floatIntensity={0.65}>
+        <mesh position={[0.1, -1.5, -1.2]}>
+          <sphereGeometry args={[0.75, 64, 64]} />
+          <MeshTransmissionMaterial
+            thickness={0.9}
+            roughness={0.03}
+            transmission={1}
+            ior={1.18}
+            chromaticAberration={0.03}
+            backside
+          />
+        </mesh>
+      </Float>
+    </primitive>
+  );
+}
+
+function ParticlesField() {
+  const points = useMemo(() => {
+    const count = 800;
+    const positions = new Float32Array(count * 3);
+
+    for (let i = 0; i < count; i++) {
+      positions[i * 3 + 0] = (Math.random() - 0.5) * 24;
+      positions[i * 3 + 1] = (Math.random() - 0.5) * 14;
+      positions[i * 3 + 2] = (Math.random() - 0.5) * 12;
+    }
+
+    return positions;
+  }, []);
+
+  const ref = useMemo(() => ({ current: null }), []);
+
+  useFrame((state) => {
+    if (!ref.current) return;
+    ref.current.rotation.y = state.clock.getElapsedTime() * 0.015;
+    ref.current.rotation.x = Math.sin(state.clock.getElapsedTime() * 0.08) * 0.04;
+  });
+
+  return (
+    <points ref={(el) => (ref.current = el)}>
+      <bufferGeometry>
+        <bufferAttribute
+          attach="attributes-position"
+          count={points.length / 3}
+          array={points}
+          itemSize={3}
+        />
+      </bufferGeometry>
+      <pointsMaterial size={0.03} color="#b9d9ff" transparent opacity={0.6} />
+    </points>
+  );
+}
+
+function SceneGlow() {
+  return (
+    <>
+      <mesh position={[-4.5, 2.4, -3]}>
+        <sphereGeometry args={[1.6, 32, 32]} />
+        <meshBasicMaterial color="#b9e4ff" transparent opacity={0.22} />
+      </mesh>
+
+      <mesh position={[4.8, -1.8, -4]}>
+        <sphereGeometry args={[2.1, 32, 32]} />
+        <meshBasicMaterial color="#d7c6ff" transparent opacity={0.16} />
+      </mesh>
+    </>
+  );
+}
+
+function LoginScene() {
+  return (
+    <Canvas dpr={[1, 2]} gl={{ antialias: true, alpha: true }}>
+      <PerspectiveCamera makeDefault position={[0, 0, 7]} fov={42} />
+      <color attach="background" args={["#f4f8fd"]} />
+      <fog attach="fog" args={["#f4f8fd", 8, 18]} />
+
+      <ambientLight intensity={1.2} />
+      <directionalLight position={[4, 4, 5]} intensity={2.4} color="#ffffff" />
+      <pointLight position={[-4, 2, 4]} intensity={2.2} color="#bfe3ff" />
+      <pointLight position={[4, -2, 3]} intensity={1.8} color="#e5d9ff" />
+
+      <Suspense fallback={null}>
+        <Environment preset="city" />
+        <SceneGlow />
+        <ParticlesField />
+        <OrbCluster />
+      </Suspense>
+    </Canvas>
+  );
+}
+
+function StatPill({ label, value }) {
+  return (
+    <div className="login-stat-pill">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function getErrorMessage(error) {
+  const message =
+    error?.response?.data?.error ||
+    error?.response?.data?.message ||
+    error?.message ||
+    "Login failed.";
+
+  if (typeof message !== "string") return "Login failed.";
+  return message;
+}
 
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const [showPassword, setShowPassword] = useState(false);
+  const [focusedField, setFocusedField] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
   const [form, setForm] = useState({
-    tenantKey: "",
     email: "",
     password: "",
     remember: true,
   });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [focusedField, setFocusedField] = useState("");
 
-  const from = location.state?.from?.pathname || "/";
+  const redirectTo = location.state?.from?.pathname || "/";
 
   function onChange(e) {
     const { name, value, type, checked } = e.target;
@@ -38,348 +204,192 @@ export default function Login() {
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
+    if (error) setError("");
   }
 
   async function onSubmit(e) {
     e.preventDefault();
+    if (loading) return;
+
     setError("");
 
-    if (!form.tenantKey.trim()) {
-      setError("Workspace code is required");
+    const email = String(form.email || "").trim();
+    const password = String(form.password || "");
+
+    if (!email || !password) {
+      setError("Email və şifrəni daxil et.");
       return;
     }
-
-    if (!form.email.trim()) {
-      setError("Email address is required");
-      return;
-    }
-
-    if (!form.password) {
-      setError("Password is required");
-      return;
-    }
-
-    setLoading(true);
 
     try {
+      setLoading(true);
+
       await loginUser({
-        tenantKey: form.tenantKey.trim().toLowerCase(),
-        email: form.email.trim().toLowerCase(),
-        password: form.password,
+        email,
+        password,
+        remember: !!form.remember,
       });
 
-      navigate(from, { replace: true });
+      navigate(redirectTo, { replace: true });
     } catch (err) {
-      setError(String(err?.message || err || "Unable to sign in"));
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
   }
 
-  const fieldState = useMemo(
-    () => ({
-      tenantKey: getFieldVisualState("tenantKey", focusedField, form.tenantKey),
-      email: getFieldVisualState("email", focusedField, form.email),
-      password: getFieldVisualState("password", focusedField, form.password),
-    }),
-    [focusedField, form]
-  );
-
   return (
-    <div className="hqlogin-page">
-      <div className="hqlogin-bg" aria-hidden="true">
-        <div className="hqlogin-grid" />
-        <div className="hqlogin-glow glow-a" />
-        <div className="hqlogin-glow glow-b" />
-        <div className="hqlogin-glow glow-c" />
-        <div className="hqlogin-lightband band-a" />
-        <div className="hqlogin-lightband band-b" />
+    <div className="login-page">
+      <div className="login-bg-3d">
+        <LoginScene />
       </div>
 
-      <div className="hqlogin-layout">
-        <motion.section
-          className="hqlogin-hero"
+      <div className="login-noise" />
+      <div className="login-grid-lines" />
+
+      <div className="login-shell">
+        <motion.div
+          className="login-left"
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.48, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: 0.8 }}
         >
-          <div className="hqlogin-topline">
-            <div className="hqlogin-brand">
-              <AIHQMark />
-              <div className="hqlogin-brand-copy">
-                <div className="hqlogin-brand-title">AI HQ</div>
-                <div className="hqlogin-brand-sub">
-                  orchestration for modern companies
-                </div>
+          <div className="login-badge">
+            <ShieldCheck size={16} />
+            <span>Secure access portal</span>
+          </div>
+
+          <h1 className="login-title">
+            Control your
+            <br />
+            next-generation
+            <br />
+            workspace
+          </h1>
+
+          <p className="login-subtitle">
+            Premium command access for teams, operations, analytics and AI-powered workflows.
+          </p>
+
+          <div className="login-stats">
+            <StatPill label="Latency" value="24ms" />
+            <StatPill label="Security" value="AES-256" />
+            <StatPill label="Sessions" value="Protected" />
+          </div>
+        </motion.div>
+
+        <motion.div
+          className="login-right"
+          initial={{ opacity: 0, y: 26, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.8, delay: 0.12 }}
+        >
+          <div className="login-card">
+            <div className="login-card-top">
+              <div className="login-logo-wrap">
+                <div className="login-logo-core" />
               </div>
-            </div>
 
-            <div className="hqlogin-mini-pill">
-              <Sparkles className="h-[14px] w-[14px]" />
-              Enterprise intelligence
-            </div>
-          </div>
-
-          <div className="hqlogin-copy-wrap">
-            <p className="hqlogin-kicker">Control your system</p>
-
-            <h1 className="hqlogin-title">
-              One place
-              <br />
-              for decisions,
-              <br />
-              automations
-              <br />
-              and execution.
-            </h1>
-
-            <p className="hqlogin-desc">
-              AI HQ brings your operations, approvals, workflows and intelligence
-              layer into one premium control surface.
-            </p>
-          </div>
-
-          <div className="hqlogin-stat-row">
-            <InfoTile label="Realtime" value="Live ops" />
-            <InfoTile label="Approval flow" value="Protected" />
-            <InfoTile label="Automation" value="24/7" />
-          </div>
-        </motion.section>
-
-        <motion.section
-          className="hqlogin-stage"
-          initial={{ opacity: 0, scale: 0.985 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.58, delay: 0.06, ease: [0.22, 1, 0.36, 1] }}
-        >
-          <div className="hqlogin-stage-frame" />
-          <div className="hqlogin-stage-panel panel-a" />
-          <div className="hqlogin-stage-panel panel-b" />
-          <div className="hqlogin-stage-panel panel-c" />
-
-          <div className="hqlogin-stage-lines">
-            <span />
-            <span />
-            <span />
-          </div>
-
-          <div className="hqlogin-floating-note note-a">
-            <span className="dot" />
-            Smart governance
-          </div>
-
-          <div className="hqlogin-floating-note note-b">
-            <span className="dot" />
-            Connected workflows
-          </div>
-
-          <motion.div
-            className="hqlogin-auth"
-            initial={{ opacity: 0, x: 26, y: 18 }}
-            animate={{ opacity: 1, x: 0, y: 0 }}
-            transition={{ duration: 0.52, delay: 0.14, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <div className="hqlogin-auth-head">
               <div>
-                <div className="hqlogin-auth-eyebrow">Secure access</div>
-                <h2 className="hqlogin-auth-title">Sign in</h2>
-              </div>
-
-              <div className="hqlogin-auth-badge">
-                <ShieldCheck className="h-[14px] w-[14px]" />
-                Verified
+                <p className="login-kicker">Welcome back</p>
+                <h2 className="login-card-title">Sign in</h2>
               </div>
             </div>
 
-            <form className="hqlogin-form" onSubmit={onSubmit} noValidate>
-              <Field
-                label="Workspace"
-                name="tenantKey"
-                value={form.tenantKey}
-                onChange={onChange}
-                onFocus={() => setFocusedField("tenantKey")}
-                onBlur={() =>
-                  setFocusedField((prev) => (prev === "tenantKey" ? "" : prev))
-                }
-                placeholder="company / tenant code"
-                autoComplete="organization"
-                icon={Building2}
-                state={fieldState.tenantKey}
-              />
+            <form className="login-form" onSubmit={onSubmit}>
+              <label className="login-field">
+                <span className="login-field-label">Email address</span>
+                <div
+                  className={`login-input-wrap ${
+                    focusedField === "email" ? "is-active" : ""
+                  }`}
+                >
+                  <div className="login-input-icon">
+                    <Mail size={18} />
+                  </div>
+                  <input
+                    type="email"
+                    name="email"
+                    placeholder="name@company.com"
+                    value={form.email}
+                    onChange={onChange}
+                    onFocus={() => setFocusedField("email")}
+                    onBlur={() => setFocusedField("")}
+                    autoComplete="email"
+                  />
+                </div>
+              </label>
 
-              <Field
-                label="Email"
-                name="email"
-                type="email"
-                value={form.email}
-                onChange={onChange}
-                onFocus={() => setFocusedField("email")}
-                onBlur={() =>
-                  setFocusedField((prev) => (prev === "email" ? "" : prev))
-                }
-                placeholder="Email address"
-                autoComplete="username"
-                icon={Mail}
-                state={fieldState.email}
-              />
-
-              <Field
-                label="Password"
-                name="password"
-                type={showPassword ? "text" : "password"}
-                value={form.password}
-                onChange={onChange}
-                onFocus={() => setFocusedField("password")}
-                onBlur={() =>
-                  setFocusedField((prev) => (prev === "password" ? "" : prev))
-                }
-                placeholder="Password"
-                autoComplete="current-password"
-                icon={LockKeyhole}
-                state={fieldState.password}
-                trailing={
+              <label className="login-field">
+                <span className="login-field-label">Password</span>
+                <div
+                  className={`login-input-wrap ${
+                    focusedField === "password" ? "is-active" : ""
+                  }`}
+                >
+                  <div className="login-input-icon">
+                    <Lock size={18} />
+                  </div>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    name="password"
+                    placeholder="Enter your password"
+                    value={form.password}
+                    onChange={onChange}
+                    onFocus={() => setFocusedField("password")}
+                    onBlur={() => setFocusedField("")}
+                    autoComplete="current-password"
+                  />
                   <button
                     type="button"
-                    className="hqlogin-icon-btn"
-                    onClick={() => setShowPassword((v) => !v)}
-                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    className="login-password-toggle"
+                    onClick={() => setShowPassword((p) => !p)}
+                    aria-label="Toggle password visibility"
                   >
-                    {showPassword ? (
-                      <EyeOff className="h-[18px] w-[18px]" />
-                    ) : (
-                      <Eye className="h-[18px] w-[18px]" />
-                    )}
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
-                }
-              />
+                </div>
+              </label>
 
-              <div className="hqlogin-row">
-                <label className="hqlogin-check">
+              <div className="login-row">
+                <label className="login-checkbox">
                   <input
                     type="checkbox"
                     name="remember"
                     checked={form.remember}
                     onChange={onChange}
                   />
-                  <span className="hqlogin-check-ui">
-                    <Check className="h-[12px] w-[12px]" />
+                  <span className="login-checkbox-ui">
+                    <Check size={12} />
                   </span>
                   <span>Remember me</span>
                 </label>
 
-                <a href="/forgot-password" className="hqlogin-link">
+                <button type="button" className="login-link-btn">
                   Forgot password?
-                </a>
+                </button>
               </div>
 
-              {error ? <div className="hqlogin-error">{error}</div> : null}
+              {error ? <div className="login-error">{error}</div> : null}
 
-              <button type="submit" disabled={loading} className="hqlogin-submit">
-                <span className="hqlogin-submit-text">
-                  {loading ? "Signing in..." : "Enter workspace"}
-                </span>
-                <ArrowRight className="h-[18px] w-[18px]" />
+              <button type="submit" className="login-submit" disabled={loading}>
+                <span>{loading ? "Signing in..." : "Continue"}</span>
+                <ArrowRight size={18} />
               </button>
-
-              <div className="hqlogin-meta">
-                <span className="hqlogin-meta-item">
-                  <ShieldCheck className="h-[14px] w-[14px]" />
-                  Encrypted session
-                </span>
-                <span className="hqlogin-meta-sep" />
-                <span className="hqlogin-meta-item">
-                  Role-based access
-                  <ArrowUpRight className="h-[13px] w-[13px]" />
-                </span>
-              </div>
             </form>
-          </motion.div>
-        </motion.section>
+
+            <div className="login-divider">
+              <span>Protected enterprise access</span>
+            </div>
+
+            <div className="login-bottom-note">
+              <div className="login-bottom-chip">Zero-trust session</div>
+              <div className="login-bottom-chip">Encrypted</div>
+              <div className="login-bottom-chip">Premium UI</div>
+            </div>
+          </div>
+        </motion.div>
       </div>
     </div>
   );
-}
-
-function Field({
-  label,
-  name,
-  type = "text",
-  value,
-  onChange,
-  onFocus,
-  onBlur,
-  placeholder,
-  autoComplete,
-  icon: Icon,
-  trailing = null,
-  state = "idle",
-}) {
-  const inputId = `hqlogin-${name}`;
-
-  return (
-    <label htmlFor={inputId} className="hqlogin-field">
-      <span className="hqlogin-field-label">{label}</span>
-
-      <span className={`hqlogin-field-box is-${state}`}>
-        <span className={`hqlogin-field-icon is-${state}`} aria-hidden="true">
-          <Icon className="h-[18px] w-[18px]" />
-        </span>
-
-        <input
-          id={inputId}
-          className="hqlogin-input"
-          name={name}
-          type={type}
-          value={value}
-          onChange={onChange}
-          onFocus={onFocus}
-          onBlur={onBlur}
-          placeholder={placeholder}
-          autoComplete={autoComplete}
-        />
-
-        {trailing ? (
-          <span className="hqlogin-field-trailing">{trailing}</span>
-        ) : null}
-      </span>
-    </label>
-  );
-}
-
-function InfoTile({ label, value }) {
-  return (
-    <div className="hqlogin-info-tile">
-      <div className="hqlogin-info-label">{label}</div>
-      <div className="hqlogin-info-value">{value}</div>
-    </div>
-  );
-}
-
-function AIHQMark() {
-  return (
-    <div className="hqlogin-mark" aria-hidden="true">
-      <svg viewBox="0 0 92 72" className="hqlogin-mark-svg">
-        <defs>
-          <linearGradient id="hqlogin-logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#2d6df6" />
-            <stop offset="52%" stopColor="#35b8ff" />
-            <stop offset="100%" stopColor="#84e9ff" />
-          </linearGradient>
-        </defs>
-
-        <path
-          d="M10 58 L30 14 H48 L31 44 H57 L44 22 H61 L82 58 H10 Z"
-          fill="url(#hqlogin-logo-grad)"
-        />
-        <path d="M35 18 L53 18 L45 32 L27 32 Z" fill="#dbeafe" />
-      </svg>
-    </div>
-  );
-}
-
-function getFieldVisualState(name, focusedField, value) {
-  const filled = String(value || "").trim().length > 0;
-  if (focusedField === name) return "active";
-  if (filled) return "complete";
-  return "idle";
 }

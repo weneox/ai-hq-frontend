@@ -5,6 +5,7 @@ import {
   Check,
   Clock3,
   Copy,
+  ScanSearch,
   Send,
   Sparkles,
   X,
@@ -85,12 +86,43 @@ function panelTone(stage) {
   };
 }
 
+function normalizeAnalysis(pack) {
+  if (!pack || typeof pack !== "object") return null;
+  const a = pack.analysis || pack.qa || null;
+  return a && typeof a === "object" ? a : null;
+}
+
+function verdictTone(verdict) {
+  const v = String(verdict || "").trim().toLowerCase();
+
+  if (v === "publish_ready") return "success";
+  if (v === "strong_with_minor_improvements") return "neutral";
+  if (v === "needs_targeted_fixes") return "warning";
+  if (v === "needs_major_revision") return "danger";
+  return "neutral";
+}
+
+function verdictLabel(verdict) {
+  const v = String(verdict || "").trim().toLowerCase();
+
+  if (v === "publish_ready") return "Publish ready";
+  if (v === "strong_with_minor_improvements") return "Strong";
+  if (v === "needs_targeted_fixes") return "Fixes needed";
+  if (v === "needs_major_revision") return "Major revision";
+  return "No analysis";
+}
+
+function scoreDisplay(score) {
+  return typeof score === "number" ? `${score}/10` : "—";
+}
+
 export default function ProposalExpanded({
   item,
   onClose,
   onApprove,
   onReject,
   onPublish,
+  onAnalyze,
   onRequestChanges,
   busy,
 }) {
@@ -115,6 +147,7 @@ export default function ProposalExpanded({
   }, [item, fetchedDraftRaw]);
 
   const pack = resolvedDraft?.pack || null;
+  const analysis = useMemo(() => normalizeAnalysis(pack), [pack]);
 
   useEffect(() => {
     setFeedback("");
@@ -193,6 +226,11 @@ export default function ProposalExpanded({
     !isPublished &&
     !isRejected;
 
+  const canAnalyze =
+    Boolean(resolvedDraft?.id) &&
+    !isRejected &&
+    (isApproved || isPublished || isAssetReady);
+
   const effectiveBusy = Boolean(busy || fetchingDraft);
 
   const agent = item?.agent_key || item?.agentKey || item?.agent || "—";
@@ -244,9 +282,15 @@ export default function ProposalExpanded({
   };
 
   const doReject = async () => {
-    if (!resolvedDraft?.id || !onReject || !String(rejectReason || "").trim()) return;
+    if (!resolvedDraft?.id || !onReject || !String(rejectReason || "").trim())
+      return;
     await onReject(item, resolvedDraft, String(rejectReason || "").trim());
     setRejectReason("");
+  };
+
+  const doAnalyze = async () => {
+    if (!resolvedDraft?.id || !onAnalyze || !canAnalyze) return;
+    await onAnalyze(item, resolvedDraft);
   };
 
   const doPublish = async () => {
@@ -289,13 +333,25 @@ export default function ProposalExpanded({
               {postType ? <ToneBadge tone="neutral">{postType}</ToneBadge> : null}
 
               <ToneBadge
-                tone={String(resolvedDraft?.status || "").includes("ready") ? "success" : "neutral"}
+                tone={
+                  String(resolvedDraft?.status || "").includes("ready")
+                    ? "success"
+                    : "neutral"
+                }
               >
                 {resolvedDraft?.status || (fetchingDraft ? "loading…" : "no draft")}
-                {typeof resolvedDraft?.version === "number" ? ` · v${resolvedDraft.version}` : ""}
+                {typeof resolvedDraft?.version === "number"
+                  ? ` · v${resolvedDraft.version}`
+                  : ""}
               </ToneBadge>
 
               {isAssetReady ? <ToneBadge tone="success">asset ready</ToneBadge> : null}
+
+              {analysis ? (
+                <ToneBadge tone={verdictTone(analysis?.verdict)}>
+                  Analyze · {scoreDisplay(analysis?.score)}
+                </ToneBadge>
+              ) : null}
 
               <SurfacePill className="text-white/48">
                 PR-{shortId(item?.id).toUpperCase()}
@@ -325,7 +381,7 @@ export default function ProposalExpanded({
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 2xl:max-w-[420px] 2xl:justify-end">
+          <div className="flex flex-wrap items-center gap-2 2xl:max-w-[520px] 2xl:justify-end">
             <GlassButton size="lg" onClick={() => copy(String(item?.id || ""))}>
               <Copy className="h-4 w-4" />
               Copy ID
@@ -373,6 +429,27 @@ export default function ProposalExpanded({
             >
               <X className="h-4 w-4" />
               Reject
+            </GlassButton>
+
+            <GlassButton
+              size="lg"
+              onClick={doAnalyze}
+              disabled={effectiveBusy || !canAnalyze}
+              className="bg-white/[0.06]"
+              title={
+                effectiveBusy
+                  ? "Busy"
+                  : !resolvedDraft?.id
+                    ? "Content ID missing"
+                    : isRejected
+                      ? "Rejected"
+                      : !canAnalyze
+                        ? "Approved və ya asset.ready olmalıdır"
+                        : ""
+              }
+            >
+              <ScanSearch className="h-4 w-4" />
+              Analyze
             </GlassButton>
 
             <GlassButton
@@ -457,6 +534,103 @@ export default function ProposalExpanded({
                   </div>
                 ) : null}
               </DetailSection>
+
+              {analysis ? (
+                <DetailSection
+                  title="Analyze report"
+                  right={
+                    <div className="flex items-center gap-2">
+                      <ToneBadge tone={verdictTone(analysis?.verdict)}>
+                        {verdictLabel(analysis?.verdict)}
+                      </ToneBadge>
+                      <ToneBadge tone="neutral">{scoreDisplay(analysis?.score)}</ToneBadge>
+                    </div>
+                  }
+                >
+                  <div className="text-[13px] leading-7 text-white/76">
+                    {readString(analysis?.summary) || "—"}
+                  </div>
+
+                  <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    <div className="rounded-[18px] border border-white/[0.06] bg-white/[0.03] p-4">
+                      <div className="text-[11px] uppercase tracking-[0.18em] text-white/34">
+                        Strengths
+                      </div>
+                      <div className="mt-3 space-y-2">
+                        {Array.isArray(analysis?.strengths) && analysis.strengths.length ? (
+                          analysis.strengths.map((x, i) => (
+                            <div key={`${x}_${i}`} className="text-[12px] leading-6 text-white/72">
+                              • {x}
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-[12px] text-white/34">No strengths listed</div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="rounded-[18px] border border-white/[0.06] bg-white/[0.03] p-4">
+                      <div className="text-[11px] uppercase tracking-[0.18em] text-white/34">
+                        Issues
+                      </div>
+                      <div className="mt-3 space-y-3">
+                        {Array.isArray(analysis?.issues) && analysis.issues.length ? (
+                          analysis.issues.map((it, i) => (
+                            <div key={`${it?.code || "issue"}_${i}`} className="rounded-[14px] bg-black/10 p-3">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <ToneBadge tone="neutral">{it?.code || "issue"}</ToneBadge>
+                                <ToneBadge tone="neutral">{it?.severity || "—"}</ToneBadge>
+                                <ToneBadge tone="neutral">{it?.area || "—"}</ToneBadge>
+                              </div>
+                              <div className="mt-2 text-[12px] leading-6 text-white/72">
+                                {it?.message || "—"}
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-[12px] text-white/34">No issues listed</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 rounded-[18px] border border-white/[0.06] bg-white/[0.03] p-4">
+                    <div className="text-[11px] uppercase tracking-[0.18em] text-white/34">
+                      Recommended fixes
+                    </div>
+
+                    <div className="mt-3 space-y-3">
+                      {Array.isArray(analysis?.recommendedFixes) &&
+                      analysis.recommendedFixes.length ? (
+                        analysis.recommendedFixes.map((it, i) => (
+                          <div key={`${it?.target || "fix"}_${i}`} className="rounded-[14px] bg-black/10 p-3">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <ToneBadge tone="neutral">{it?.priority || "—"}</ToneBadge>
+                              <ToneBadge tone="neutral">{it?.target || "—"}</ToneBadge>
+                            </div>
+                            <div className="mt-2 text-[12px] leading-6 text-white/72">
+                              {it?.instruction || "—"}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-[12px] text-white/34">No fixes listed</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {analysis?.dimensionScores ? (
+                    <details className="mt-4">
+                      <summary className="cursor-pointer text-[11px] font-semibold text-white/42">
+                        Dimension scores
+                      </summary>
+                      <pre className="mt-2 whitespace-pre-wrap break-words text-[12px] leading-6 text-white/68">
+                        {pretty(analysis.dimensionScores)}
+                      </pre>
+                    </details>
+                  ) : null}
+                </DetailSection>
+              ) : null}
 
               <div className="rounded-[24px] border border-white/[0.06] bg-white/[0.025] p-2">
                 <div className="flex flex-wrap items-center gap-2">
@@ -561,7 +735,9 @@ export default function ProposalExpanded({
                           draft: resolvedDraft,
                           fetchedDraftRaw,
                           assetUrls,
+                          analysis,
                           canPublish,
+                          canAnalyze,
                           isAssetReady,
                         })}
                       </pre>
@@ -576,7 +752,7 @@ export default function ProposalExpanded({
                   right={<div className="text-[11px] text-white/34">Loop</div>}
                 >
                   <div className="text-[12px] leading-6 text-white/44">
-                    Request changes → revise → new draft → approve / reject / publish.
+                    Request changes → revise → new draft → approve / reject / analyze / publish.
                   </div>
 
                   <div className="mt-4 grid gap-4 lg:grid-cols-2">
@@ -664,6 +840,11 @@ export default function ProposalExpanded({
                     v={hasPublishableAsset ? `${assetUrls.length} linked` : "—"}
                   />
                   <MetaRow k="Publish ready" v={canPublish ? "yes" : "no"} />
+                  <MetaRow k="Analyze score" v={scoreDisplay(analysis?.score)} />
+                  <MetaRow
+                    k="Analyze verdict"
+                    v={analysis ? verdictLabel(analysis?.verdict) : "—"}
+                  />
                 </div>
 
                 <div className="mt-5">

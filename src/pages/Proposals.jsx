@@ -16,6 +16,7 @@ import {
   approveDraft,
   rejectDraft,
   publishDraft,
+  analyzeDraft,
 } from "../api/proposals.js";
 
 import { createWsClient } from "../lib/ws.js";
@@ -399,6 +400,29 @@ export default function ProposalsPage() {
     }
   };
 
+  const onAnalyze = async (proposalId, contentId) => {
+    setBusy(true);
+    setErr("");
+
+    try {
+      const res = await analyzeDraft(proposalId, contentId);
+      if (res?.ok === false) {
+        throw new Error(
+          res?.details?.replyText || res?.error || "analyze failed"
+        );
+      }
+
+      await refreshStats();
+      await refreshProposals("Analyze completed", {
+        status: statusRef.current,
+      });
+    } catch (e) {
+      setErr(String(e?.message || e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const onPublish = async (proposalId, contentId) => {
     setBusy(true);
     setErr("");
@@ -488,6 +512,22 @@ export default function ProposalsPage() {
       contentId,
       reasonText || "Rejected from canvas"
     );
+  };
+
+  const handleCanvasAnalyze = async (item, resolvedDraft) => {
+    if (busy) return;
+
+    const proposalId = String(item?.id || "");
+    const contentId = String(
+      resolvedDraft?.id || pickContentIdFromProposal(item) || ""
+    );
+
+    if (!proposalId || !contentId) {
+      setErr("Analyze üçün content ID tapılmadı.");
+      return;
+    }
+
+    await onAnalyze(proposalId, contentId);
   };
 
   const handleCanvasPublish = async (item, resolvedDraft) => {
@@ -600,6 +640,7 @@ export default function ProposalsPage() {
                 onApprove={handleCanvasApprove}
                 onReject={handleCanvasReject}
                 onPublish={handleCanvasPublish}
+                onAnalyze={handleCanvasAnalyze}
                 onRequestChanges={handleCanvasRequestChanges}
               />
             </div>

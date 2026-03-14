@@ -112,6 +112,7 @@ export default function ProposalCanvas({
   onApprove,
   onReject,
   onPublish,
+  onAnalyze,
   onRequestChanges,
   onRefresh,
   toast,
@@ -324,6 +325,7 @@ export default function ProposalCanvas({
               onApprove={onApprove}
               onReject={onReject}
               onPublish={onPublish}
+              onAnalyze={onAnalyze}
               onRequestChanges={onRequestChanges}
               busy={busy}
             />

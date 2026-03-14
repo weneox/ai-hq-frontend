@@ -1,5 +1,5 @@
 // src/api/proposals.js
-// FINAL v2.1 — FIXED publish/approve response handling + tolerant mapping
+// FINAL v2.2 — publish/approve/analyze support
 
 import { apiGet, apiPost } from "./client.js";
 
@@ -73,6 +73,20 @@ export async function rejectDraft(proposalId, _contentId, reason) {
     decision: "rejected",
     reason: r,
   });
+}
+
+export async function analyzeDraft(_proposalId, contentId) {
+  const did = encodeURIComponent(String(contentId));
+
+  const j = await apiPost(`/api/content/${did}/analyze`, {});
+
+  return {
+    ok: !!j?.ok,
+    content: j?.content || null,
+    analysis: j?.analysis || null,
+    error: j?.ok ? null : j?.error || "analyze failed",
+    details: j?.details || null,
+  };
 }
 
 export async function publishDraft(_proposalId, contentId) {
