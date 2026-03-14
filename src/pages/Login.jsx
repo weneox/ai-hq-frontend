@@ -1,16 +1,18 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import {
   ArrowRight,
   Eye,
   EyeOff,
-  ShieldCheck,
   Building2,
   Mail,
-  KeyRound,
   LockKeyhole,
+  Check,
+  ShieldCheck,
+  Sparkles,
+  ArrowUpRight,
 } from "lucide-react";
-import { motion, useReducedMotion } from "framer-motion";
 import { loginUser } from "../api/auth.js";
 
 export default function Login() {
@@ -21,16 +23,21 @@ export default function Login() {
     tenantKey: "",
     email: "",
     password: "",
+    remember: true,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [focusedField, setFocusedField] = useState("");
 
   const from = location.state?.from?.pathname || "/";
 
   function onChange(e) {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    setForm((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
   }
 
   async function onSubmit(e) {
@@ -38,7 +45,7 @@ export default function Login() {
     setError("");
 
     if (!form.tenantKey.trim()) {
-      setError("Company code is required");
+      setError("Workspace code is required");
       return;
     }
 
@@ -63,300 +70,316 @@ export default function Login() {
 
       navigate(from, { replace: true });
     } catch (err) {
-      setError(String(err?.message || err || "Unable to continue"));
+      setError(String(err?.message || err || "Unable to sign in"));
     } finally {
       setLoading(false);
     }
   }
 
+  const fieldState = useMemo(
+    () => ({
+      tenantKey: getFieldVisualState("tenantKey", focusedField, form.tenantKey),
+      email: getFieldVisualState("email", focusedField, form.email),
+      password: getFieldVisualState("password", focusedField, form.password),
+    }),
+    [focusedField, form]
+  );
+
   return (
-    <div className="authx-page">
-      <AuthBackdrop />
+    <div className="hqlogin-page">
+      <div className="hqlogin-bg" aria-hidden="true">
+        <div className="hqlogin-grid" />
+        <div className="hqlogin-glow glow-a" />
+        <div className="hqlogin-glow glow-b" />
+        <div className="hqlogin-glow glow-c" />
+        <div className="hqlogin-lightband band-a" />
+        <div className="hqlogin-lightband band-b" />
+      </div>
 
-      <div className="authx-shell">
-        <div className="authx-grid">
-          <HeroSide />
-
-          <motion.section
-            initial={{ opacity: 0, y: 22, scale: 0.985 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ duration: 0.72, ease: [0.22, 1, 0.36, 1], delay: 0.08 }}
-            className="authx-core-wrap"
-          >
-            <div className="authx-orbit authx-orbit-a" />
-            <div className="authx-orbit authx-orbit-b" />
-            <div className="authx-orbit authx-orbit-c" />
-            <div className="authx-beam authx-beam-a" />
-            <div className="authx-beam authx-beam-b" />
-            <div className="authx-float-tag authx-float-tag-a">Scoped tenant</div>
-            <div className="authx-float-tag authx-float-tag-b">Encrypted route</div>
-            <div className="authx-float-tag authx-float-tag-c">Zero-trust entry</div>
-
-            <div className="authx-frame">
-              <div className="authx-frame-grid" />
-              <div className="authx-corner authx-corner-tl" />
-              <div className="authx-corner authx-corner-tr" />
-              <div className="authx-corner authx-corner-bl" />
-              <div className="authx-corner authx-corner-br" />
-
-              <div className="authx-panel-top">
-                <div>
-                  <p className="authx-kicker">Authentication core</p>
-                  <h2 className="authx-panel-title">Workspace handshake</h2>
-                </div>
-
-                <div className="authx-shield">
-                  <ShieldCheck className="h-5 w-5" />
+      <div className="hqlogin-layout">
+        <motion.section
+          className="hqlogin-hero"
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.48, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <div className="hqlogin-topline">
+            <div className="hqlogin-brand">
+              <AIHQMark />
+              <div className="hqlogin-brand-copy">
+                <div className="hqlogin-brand-title">AI HQ</div>
+                <div className="hqlogin-brand-sub">
+                  orchestration for modern companies
                 </div>
               </div>
-
-              <p className="authx-panel-copy">
-                Tenant-bound access sequence for your private operational environment.
-              </p>
-
-              <form onSubmit={onSubmit} className="authx-form">
-                <DockField
-                  index="01"
-                  label="Company code"
-                  name="tenantKey"
-                  value={form.tenantKey}
-                  onChange={onChange}
-                  placeholder="e.g. neox"
-                  autoComplete="organization"
-                  icon={Building2}
-                />
-
-                <DockField
-                  index="02"
-                  label="Email address"
-                  name="email"
-                  type="email"
-                  value={form.email}
-                  onChange={onChange}
-                  placeholder="name@company.com"
-                  autoComplete="username"
-                  icon={Mail}
-                />
-
-                <DockField
-                  index="03"
-                  label="Password"
-                  name="password"
-                  type={showPassword ? "text" : "password"}
-                  value={form.password}
-                  onChange={onChange}
-                  placeholder="Enter your password"
-                  autoComplete="current-password"
-                  icon={KeyRound}
-                  trailing={
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword((v) => !v)}
-                      className="authx-icon-btn"
-                      aria-label={showPassword ? "Hide password" : "Show password"}
-                    >
-                      {showPassword ? (
-                        <EyeOff className="h-[18px] w-[18px]" />
-                      ) : (
-                        <Eye className="h-[18px] w-[18px]" />
-                      )}
-                    </button>
-                  }
-                />
-
-                {error ? <div className="authx-error">{error}</div> : null}
-
-                <button type="submit" disabled={loading} className="authx-submit">
-                  <span className="authx-submit-glow" />
-                  <span className="authx-submit-content">
-                    {loading ? "Establishing secure session..." : "Enter workspace"}
-                    <ArrowRight className="h-4 w-4" />
-                  </span>
-                </button>
-
-                <div className="authx-meta-row">
-                  <div className="authx-meta-pill">
-                    <LockKeyhole className="h-3.5 w-3.5" />
-                    Session is encrypted
-                  </div>
-
-                  <div className="authx-meta-dot" />
-
-                  <div className="authx-meta-text">Node / access-gateway</div>
-                </div>
-              </form>
             </div>
-          </motion.section>
-        </div>
+
+            <div className="hqlogin-mini-pill">
+              <Sparkles className="h-[14px] w-[14px]" />
+              Enterprise intelligence
+            </div>
+          </div>
+
+          <div className="hqlogin-copy-wrap">
+            <p className="hqlogin-kicker">Control your system</p>
+
+            <h1 className="hqlogin-title">
+              One place
+              <br />
+              for decisions,
+              <br />
+              automations
+              <br />
+              and execution.
+            </h1>
+
+            <p className="hqlogin-desc">
+              AI HQ brings your operations, approvals, workflows and intelligence
+              layer into one premium control surface.
+            </p>
+          </div>
+
+          <div className="hqlogin-stat-row">
+            <InfoTile label="Realtime" value="Live ops" />
+            <InfoTile label="Approval flow" value="Protected" />
+            <InfoTile label="Automation" value="24/7" />
+          </div>
+        </motion.section>
+
+        <motion.section
+          className="hqlogin-stage"
+          initial={{ opacity: 0, scale: 0.985 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.58, delay: 0.06, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <div className="hqlogin-stage-frame" />
+          <div className="hqlogin-stage-panel panel-a" />
+          <div className="hqlogin-stage-panel panel-b" />
+          <div className="hqlogin-stage-panel panel-c" />
+
+          <div className="hqlogin-stage-lines">
+            <span />
+            <span />
+            <span />
+          </div>
+
+          <div className="hqlogin-floating-note note-a">
+            <span className="dot" />
+            Smart governance
+          </div>
+
+          <div className="hqlogin-floating-note note-b">
+            <span className="dot" />
+            Connected workflows
+          </div>
+
+          <motion.div
+            className="hqlogin-auth"
+            initial={{ opacity: 0, x: 26, y: 18 }}
+            animate={{ opacity: 1, x: 0, y: 0 }}
+            transition={{ duration: 0.52, delay: 0.14, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <div className="hqlogin-auth-head">
+              <div>
+                <div className="hqlogin-auth-eyebrow">Secure access</div>
+                <h2 className="hqlogin-auth-title">Sign in</h2>
+              </div>
+
+              <div className="hqlogin-auth-badge">
+                <ShieldCheck className="h-[14px] w-[14px]" />
+                Verified
+              </div>
+            </div>
+
+            <form className="hqlogin-form" onSubmit={onSubmit} noValidate>
+              <Field
+                label="Workspace"
+                name="tenantKey"
+                value={form.tenantKey}
+                onChange={onChange}
+                onFocus={() => setFocusedField("tenantKey")}
+                onBlur={() =>
+                  setFocusedField((prev) => (prev === "tenantKey" ? "" : prev))
+                }
+                placeholder="company / tenant code"
+                autoComplete="organization"
+                icon={Building2}
+                state={fieldState.tenantKey}
+              />
+
+              <Field
+                label="Email"
+                name="email"
+                type="email"
+                value={form.email}
+                onChange={onChange}
+                onFocus={() => setFocusedField("email")}
+                onBlur={() =>
+                  setFocusedField((prev) => (prev === "email" ? "" : prev))
+                }
+                placeholder="Email address"
+                autoComplete="username"
+                icon={Mail}
+                state={fieldState.email}
+              />
+
+              <Field
+                label="Password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                value={form.password}
+                onChange={onChange}
+                onFocus={() => setFocusedField("password")}
+                onBlur={() =>
+                  setFocusedField((prev) => (prev === "password" ? "" : prev))
+                }
+                placeholder="Password"
+                autoComplete="current-password"
+                icon={LockKeyhole}
+                state={fieldState.password}
+                trailing={
+                  <button
+                    type="button"
+                    className="hqlogin-icon-btn"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-[18px] w-[18px]" />
+                    ) : (
+                      <Eye className="h-[18px] w-[18px]" />
+                    )}
+                  </button>
+                }
+              />
+
+              <div className="hqlogin-row">
+                <label className="hqlogin-check">
+                  <input
+                    type="checkbox"
+                    name="remember"
+                    checked={form.remember}
+                    onChange={onChange}
+                  />
+                  <span className="hqlogin-check-ui">
+                    <Check className="h-[12px] w-[12px]" />
+                  </span>
+                  <span>Remember me</span>
+                </label>
+
+                <a href="/forgot-password" className="hqlogin-link">
+                  Forgot password?
+                </a>
+              </div>
+
+              {error ? <div className="hqlogin-error">{error}</div> : null}
+
+              <button type="submit" disabled={loading} className="hqlogin-submit">
+                <span className="hqlogin-submit-text">
+                  {loading ? "Signing in..." : "Enter workspace"}
+                </span>
+                <ArrowRight className="h-[18px] w-[18px]" />
+              </button>
+
+              <div className="hqlogin-meta">
+                <span className="hqlogin-meta-item">
+                  <ShieldCheck className="h-[14px] w-[14px]" />
+                  Encrypted session
+                </span>
+                <span className="hqlogin-meta-sep" />
+                <span className="hqlogin-meta-item">
+                  Role-based access
+                  <ArrowUpRight className="h-[13px] w-[13px]" />
+                </span>
+              </div>
+            </form>
+          </motion.div>
+        </motion.section>
       </div>
     </div>
   );
 }
 
-function HeroSide() {
-  const reduceMotion = useReducedMotion();
-
-  return (
-    <motion.section
-      initial={{ opacity: 0, y: 18 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-      className="authx-hero"
-    >
-      <div className="authx-badge">
-        <span className="authx-badge-dot" />
-        <span className="authx-badge-text">AI HQ // ACCESS GRID</span>
-      </div>
-
-      <div className="authx-hero-copy">
-        <p className="authx-overline">Command-grade authentication</p>
-
-        <h1 className="authx-title">
-          Enter the
-          <br />
-          command mesh
-        </h1>
-
-        <p className="authx-copy">
-          A darker, sharper, neon-blue entry experience designed like a secure access node
-          instead of a generic login card.
-        </p>
-      </div>
-
-      <div className="authx-stats">
-        <div className="authx-stat">
-          <span className="authx-stat-label">Protocol</span>
-          <strong>Tenant scoped</strong>
-        </div>
-
-        <div className="authx-stat">
-          <span className="authx-stat-label">Layer</span>
-          <strong>Zero-trust gate</strong>
-        </div>
-
-        <div className="authx-stat">
-          <span className="authx-stat-label">Route</span>
-          <strong>Encrypted session</strong>
-        </div>
-      </div>
-
-      <div className="authx-help-line">
-        <span className="authx-help-track" />
-        <p>Need access? Contact your workspace admin for your tenant code.</p>
-      </div>
-
-      {!reduceMotion ? (
-        <>
-          <div className="authx-hero-glow authx-hero-glow-a" />
-          <div className="authx-hero-glow authx-hero-glow-b" />
-        </>
-      ) : null}
-    </motion.section>
-  );
-}
-
-function DockField({
-  index,
+function Field({
   label,
   name,
   type = "text",
   value,
   onChange,
+  onFocus,
+  onBlur,
   placeholder,
   autoComplete,
   icon: Icon,
   trailing = null,
+  state = "idle",
 }) {
-  return (
-    <div className="authx-field">
-      <div className="authx-field-meta">
-        <span className="authx-field-index">{index}</span>
-        <label className="authx-field-label">{label}</label>
-      </div>
+  const inputId = `hqlogin-${name}`;
 
-      <div className="authx-field-shell">
-        <div className="authx-field-icon">
+  return (
+    <label htmlFor={inputId} className="hqlogin-field">
+      <span className="hqlogin-field-label">{label}</span>
+
+      <span className={`hqlogin-field-box is-${state}`}>
+        <span className={`hqlogin-field-icon is-${state}`} aria-hidden="true">
           <Icon className="h-[18px] w-[18px]" />
-        </div>
+        </span>
 
         <input
-          className="authx-input"
+          id={inputId}
+          className="hqlogin-input"
           name={name}
           type={type}
           value={value}
           onChange={onChange}
+          onFocus={onFocus}
+          onBlur={onBlur}
           placeholder={placeholder}
           autoComplete={autoComplete}
         />
 
-        {trailing ? <div className="authx-field-trailing">{trailing}</div> : null}
-      </div>
+        {trailing ? (
+          <span className="hqlogin-field-trailing">{trailing}</span>
+        ) : null}
+      </span>
+    </label>
+  );
+}
+
+function InfoTile({ label, value }) {
+  return (
+    <div className="hqlogin-info-tile">
+      <div className="hqlogin-info-label">{label}</div>
+      <div className="hqlogin-info-value">{value}</div>
     </div>
   );
 }
 
-function AuthBackdrop() {
-  const reduceMotion = useReducedMotion();
-
-  const floatA = reduceMotion
-    ? {}
-    : {
-        animate: {
-          x: [0, 30, -14, 0],
-          y: [0, -22, 8, 0],
-          scale: [1, 1.04, 1],
-          opacity: [0.48, 0.72, 0.48],
-        },
-        transition: {
-          duration: 16,
-          repeat: Infinity,
-          ease: "easeInOut",
-        },
-      };
-
-  const floatB = reduceMotion
-    ? {}
-    : {
-        animate: {
-          x: [0, -18, 12, 0],
-          y: [0, 20, -10, 0],
-          scale: [1, 1.06, 1],
-          opacity: [0.38, 0.58, 0.38],
-        },
-        transition: {
-          duration: 20,
-          repeat: Infinity,
-          ease: "easeInOut",
-        },
-      };
-
-  const rotate = reduceMotion
-    ? {}
-    : {
-        animate: { rotate: [0, 360] },
-        transition: {
-          duration: 42,
-          repeat: Infinity,
-          ease: "linear",
-        },
-      };
-
+function AIHQMark() {
   return (
-    <div className="authx-backdrop">
-      <div className="authx-grid-bg" />
-      <div className="authx-scanlines" />
-      <div className="authx-vignette" />
+    <div className="hqlogin-mark" aria-hidden="true">
+      <svg viewBox="0 0 92 72" className="hqlogin-mark-svg">
+        <defs>
+          <linearGradient id="hqlogin-logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#2d6df6" />
+            <stop offset="52%" stopColor="#35b8ff" />
+            <stop offset="100%" stopColor="#84e9ff" />
+          </linearGradient>
+        </defs>
 
-      <motion.div className="authx-ambient authx-ambient-a" {...floatA} />
-      <motion.div className="authx-ambient authx-ambient-b" {...floatB} />
-      <motion.div className="authx-ambient authx-ambient-c" {...floatA} />
-
-      <motion.div className="authx-ring-field authx-ring-field-a" {...rotate} />
-      <motion.div className="authx-ring-field authx-ring-field-b" {...rotate} />
-      <div className="authx-vertical-line authx-vertical-line-a" />
-      <div className="authx-vertical-line authx-vertical-line-b" />
-      <div className="authx-horizon-line authx-horizon-line-a" />
-      <div className="authx-horizon-line authx-horizon-line-b" />
+        <path
+          d="M10 58 L30 14 H48 L31 44 H57 L44 22 H61 L82 58 H10 Z"
+          fill="url(#hqlogin-logo-grad)"
+        />
+        <path d="M35 18 L53 18 L45 32 L27 32 Z" fill="#dbeafe" />
+      </svg>
     </div>
   );
+}
+
+function getFieldVisualState(name, focusedField, value) {
+  const filled = String(value || "").trim().length > 0;
+  if (focusedField === name) return "active";
+  if (filled) return "complete";
+  return "idle";
 }
