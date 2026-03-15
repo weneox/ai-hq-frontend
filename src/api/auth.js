@@ -27,23 +27,15 @@ function pickErr(j, fallback) {
   return String(j?.error || j?.message || j?.raw || fallback);
 }
 
-const NO_CACHE_HEADERS = {
-  Accept: "application/json",
-  "Cache-Control": "no-cache, no-store, must-revalidate",
-  Pragma: "no-cache",
-  Expires: "0",
-};
-
 export async function loginUser({ email, password, tenantKey }) {
   assertConfigured();
 
   const r = await fetch(apiUrl("/api/auth/login"), {
     method: "POST",
     credentials: "include",
-    cache: "no-store",
     headers: {
-      ...NO_CACHE_HEADERS,
-      "Content-Type": "application/json; charset=utf-8",
+      "Content-Type": "application/json",
+      Accept: "application/json",
     },
     body: JSON.stringify({
       email,
@@ -67,8 +59,9 @@ export async function logoutUser() {
   const r = await fetch(apiUrl("/api/auth/logout"), {
     method: "POST",
     credentials: "include",
-    cache: "no-store",
-    headers: NO_CACHE_HEADERS,
+    headers: {
+      Accept: "application/json",
+    },
   });
 
   const j = await readJson(r);
@@ -86,13 +79,14 @@ export async function getAuthMe() {
   const r = await fetch(apiUrl("/api/auth/me"), {
     method: "GET",
     credentials: "include",
-    cache: "no-store",
-    headers: NO_CACHE_HEADERS,
+    headers: {
+      Accept: "application/json",
+    },
   });
 
   const j = await readJson(r);
 
-  if (!r.ok) {
+  if (!r.ok && r.status !== 401) {
     throw new Error(pickErr(j, `Auth check failed (${r.status})`));
   }
 
@@ -105,8 +99,9 @@ export async function getAdminAuthMe() {
   const r = await fetch(apiUrl("/api/admin-auth/me"), {
     method: "GET",
     credentials: "include",
-    cache: "no-store",
-    headers: NO_CACHE_HEADERS,
+    headers: {
+      Accept: "application/json",
+    },
   });
 
   const j = await readJson(r);
@@ -124,10 +119,9 @@ export async function loginAdminAuth(passcode) {
   const r = await fetch(apiUrl("/api/admin-auth/login"), {
     method: "POST",
     credentials: "include",
-    cache: "no-store",
     headers: {
-      ...NO_CACHE_HEADERS,
-      "Content-Type": "application/json; charset=utf-8",
+      "Content-Type": "application/json",
+      Accept: "application/json",
     },
     body: JSON.stringify({ passcode }),
   });
@@ -147,8 +141,9 @@ export async function logoutAdminAuth() {
   const r = await fetch(apiUrl("/api/admin-auth/logout"), {
     method: "POST",
     credentials: "include",
-    cache: "no-store",
-    headers: NO_CACHE_HEADERS,
+    headers: {
+      Accept: "application/json",
+    },
   });
 
   const j = await readJson(r);
