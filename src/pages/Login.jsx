@@ -50,7 +50,6 @@ function getTenantKeyFromHost() {
   if (typeof window === "undefined") return "";
 
   const host = String(window.location.hostname || "").trim().toLowerCase();
-
   if (!host) return "";
 
   if (host === "localhost" || host === "127.0.0.1") {
@@ -86,6 +85,13 @@ function formatWorkspaceName(key) {
     .join(" ");
 }
 
+function normalizeTenantKey(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-");
+}
+
 function AccessOption({ icon: Icon, children }) {
   return (
     <button type="button" className="login-sculpt__access-btn">
@@ -101,8 +107,8 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const tenantKey = useMemo(() => getTenantKeyFromHost(), []);
-  const workspaceName = useMemo(() => formatWorkspaceName(tenantKey), [tenantKey]);
+  const detectedTenantKey = useMemo(() => getTenantKeyFromHost(), []);
+  const redirectTo = location.state?.from?.pathname || "/";
 
   const [checking, setChecking] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
@@ -110,12 +116,21 @@ export default function Login() {
   const [error, setError] = useState("");
 
   const [form, setForm] = useState({
+    tenantKey: detectedTenantKey || "",
     email: "",
     password: "",
     remember: true,
   });
 
-  const redirectTo = location.state?.from?.pathname || "/";
+  const activeTenantKey = useMemo(
+    () => normalizeTenantKey(form.tenantKey),
+    [form.tenantKey]
+  );
+
+  const workspaceName = useMemo(
+    () => formatWorkspaceName(activeTenantKey),
+    [activeTenantKey]
+  );
 
   useEffect(() => {
     let alive = true;
@@ -145,7 +160,12 @@ export default function Login() {
 
     setForm((prev) => ({
       ...prev,
-      [name]: type === "checkbox" ? checked : value,
+      [name]:
+        type === "checkbox"
+          ? checked
+          : name === "tenantKey"
+          ? normalizeTenantKey(value)
+          : value,
     }));
 
     if (error) setError("");
@@ -155,11 +175,12 @@ export default function Login() {
     e.preventDefault();
     if (loading) return;
 
+    const tenantKey = normalizeTenantKey(form.tenantKey);
     const email = String(form.email || "").trim();
     const password = String(form.password || "");
 
     if (!tenantKey) {
-      setError("Workspace tapılmadı. Şirkət linki ilə daxil ol: company.weneox.com");
+      setError("Tenant key daxil et.");
       return;
     }
 
@@ -192,6 +213,7 @@ export default function Login() {
       <div className="login-sculpt__bg" aria-hidden="true">
         <div className="login-sculpt__glow login-sculpt__glow--left" />
         <div className="login-sculpt__glow login-sculpt__glow--top" />
+        <div className="login-sculpt__glow login-sculpt__glow--right" />
 
         <div className="login-sculpt__art">
           <span className="login-sculpt__plane login-sculpt__plane--ice" />
@@ -205,9 +227,9 @@ export default function Login() {
       <main className="login-sculpt__stage">
         <motion.section
           className="login-sculpt__card"
-          initial={{ opacity: 0, y: 22, scale: 0.992 }}
+          initial={{ opacity: 0, y: 20, scale: 0.992 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
         >
           <div className="login-sculpt__top">
             <div className="login-sculpt__brand">
@@ -222,25 +244,40 @@ export default function Login() {
           </div>
 
           <div className="login-sculpt__hero">
-            <h1 className="login-sculpt__title">Enter AIHQ</h1>
+            <h1 className="login-sculpt__title">Welcome back</h1>
             <p className="login-sculpt__subtitle">
-              {tenantKey
-                ? `Secure access to ${workspaceName || tenantKey} workspace.`
-                : "Secure access to your command workspace."}
+              {activeTenantKey
+                ? `Secure access to ${workspaceName || activeTenantKey} workspace.`
+                : "Secure access to your AIHQ workspace."}
             </p>
 
-            {tenantKey ? (
-              <div
-                className="login-sculpt__trust"
-                style={{ width: "fit-content", marginTop: 12 }}
-              >
+            {activeTenantKey ? (
+              <div className="login-sculpt__workspace">
                 <Building2 size={13} />
-                <span>{tenantKey}.weneox.com</span>
+                <span>{activeTenantKey}</span>
               </div>
             ) : null}
           </div>
 
           <form className="login-sculpt__form" onSubmit={onSubmit}>
+            <label className="login-sculpt__field">
+              <span className="login-sculpt__label">Tenant</span>
+              <div className="login-sculpt__input-wrap">
+                <span className="login-sculpt__input-icon">
+                  <Building2 size={17} />
+                </span>
+                <input
+                  type="text"
+                  name="tenantKey"
+                  placeholder="company-name"
+                  value={form.tenantKey}
+                  onChange={onChange}
+                  autoComplete="organization"
+                  spellCheck={false}
+                />
+              </div>
+            </label>
+
             <label className="login-sculpt__field">
               <span className="login-sculpt__label">Email</span>
               <div className="login-sculpt__input-wrap">
