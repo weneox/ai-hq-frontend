@@ -12,7 +12,7 @@ export default function UserRouteGuard({ children }) {
   useEffect(() => {
     let alive = true;
 
-    (async () => {
+    async function checkAuth() {
       try {
         const j = await getAuthMe();
         if (!alive) return;
@@ -29,16 +29,16 @@ export default function UserRouteGuard({ children }) {
           ok: false,
         });
       }
-    })();
+    }
+
+    checkAuth();
 
     return () => {
       alive = false;
     };
-  }, []);
+  }, [location.pathname]);
 
-  if (state.loading) {
-    return null;
-  }
+  if (state.loading) return null;
 
   if (!state.ok) {
     return <Navigate to="/login" replace state={{ from: location }} />;

@@ -1,4 +1,4 @@
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Canvas, useFrame } from "@react-three/fiber";
 import {
@@ -18,7 +18,7 @@ import {
   Check,
 } from "lucide-react";
 import * as THREE from "three";
-import { loginUser } from "../api/auth.js";
+import { getAuthMe, loginUser } from "../api/auth.js";
 
 function OrbCluster() {
   const group = useMemo(() => new THREE.Group(), []);
@@ -185,6 +185,7 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const [checking, setChecking] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [focusedField, setFocusedField] = useState("");
   const [loading, setLoading] = useState(false);
@@ -197,6 +198,29 @@ export default function Login() {
   });
 
   const redirectTo = location.state?.from?.pathname || "/";
+
+  useEffect(() => {
+    let alive = true;
+
+    (async () => {
+      try {
+        const j = await getAuthMe();
+        if (!alive) return;
+
+        if (j?.authenticated) {
+          navigate(redirectTo, { replace: true });
+          return;
+        }
+      } catch {}
+
+      if (!alive) return;
+      setChecking(false);
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [navigate, redirectTo]);
 
   function onChange(e) {
     const { name, value, type, checked } = e.target;
@@ -227,16 +251,16 @@ export default function Login() {
       await loginUser({
         email,
         password,
-        remember: !!form.remember,
       });
 
-      navigate(redirectTo, { replace: true });
+      window.location.replace(redirectTo);
     } catch (err) {
       setError(getErrorMessage(err));
-    } finally {
       setLoading(false);
     }
   }
+
+  if (checking) return null;
 
   return (
     <div className="login-page">
