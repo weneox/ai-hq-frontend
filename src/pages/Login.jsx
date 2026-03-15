@@ -1,12 +1,5 @@
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Canvas, useFrame } from "@react-three/fiber";
-import {
-  Float,
-  Environment,
-  MeshTransmissionMaterial,
-  PerspectiveCamera,
-} from "@react-three/drei";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
@@ -16,159 +9,32 @@ import {
   Lock,
   ShieldCheck,
   Check,
+  Chrome,
+  KeyRound,
+  Building2,
 } from "lucide-react";
-import * as THREE from "three";
 import { getAuthMe, loginUser } from "../api/auth.js";
 
-function OrbCluster() {
-  const group = useMemo(() => new THREE.Group(), []);
-
-  useFrame((state) => {
-    const t = state.clock.getElapsedTime();
-    group.rotation.y = t * 0.08;
-    group.rotation.x = Math.sin(t * 0.25) * 0.08;
-  });
-
-  return (
-    <primitive object={group}>
-      <Float speed={1.4} rotationIntensity={0.35} floatIntensity={0.7}>
-        <mesh position={[-1.8, 0.5, -0.3]}>
-          <icosahedronGeometry args={[1.25, 16]} />
-          <MeshTransmissionMaterial
-            thickness={0.8}
-            roughness={0.05}
-            transmission={1}
-            ior={1.2}
-            chromaticAberration={0.06}
-            backside
-          />
-        </mesh>
-      </Float>
-
-      <Float speed={1.7} rotationIntensity={0.5} floatIntensity={0.85}>
-        <mesh position={[1.9, -0.2, -0.6]}>
-          <octahedronGeometry args={[1.05, 0]} />
-          <meshStandardMaterial
-            metalness={1}
-            roughness={0.08}
-            color="#dcefff"
-            envMapIntensity={1.7}
-          />
-        </mesh>
-      </Float>
-
-      <Float speed={1.2} rotationIntensity={0.45} floatIntensity={0.65}>
-        <mesh position={[0.2, 1.45, -1.5]}>
-          <torusKnotGeometry args={[0.78, 0.2, 220, 32]} />
-          <meshStandardMaterial
-            color="#f8fbff"
-            metalness={0.95}
-            roughness={0.1}
-            envMapIntensity={1.5}
-          />
-        </mesh>
-      </Float>
-
-      <Float speed={1.5} rotationIntensity={0.4} floatIntensity={0.65}>
-        <mesh position={[0.1, -1.5, -1.2]}>
-          <sphereGeometry args={[0.75, 64, 64]} />
-          <MeshTransmissionMaterial
-            thickness={0.9}
-            roughness={0.03}
-            transmission={1}
-            ior={1.18}
-            chromaticAberration={0.03}
-            backside
-          />
-        </mesh>
-      </Float>
-    </primitive>
-  );
-}
-
-function ParticlesField() {
-  const points = useMemo(() => {
-    const count = 800;
-    const positions = new Float32Array(count * 3);
-
-    for (let i = 0; i < count; i++) {
-      positions[i * 3 + 0] = (Math.random() - 0.5) * 24;
-      positions[i * 3 + 1] = (Math.random() - 0.5) * 14;
-      positions[i * 3 + 2] = (Math.random() - 0.5) * 12;
-    }
-
-    return positions;
-  }, []);
-
-  const ref = useMemo(() => ({ current: null }), []);
-
-  useFrame((state) => {
-    if (!ref.current) return;
-    ref.current.rotation.y = state.clock.getElapsedTime() * 0.015;
-    ref.current.rotation.x = Math.sin(state.clock.getElapsedTime() * 0.08) * 0.04;
-  });
-
-  return (
-    <points ref={(el) => (ref.current = el)}>
-      <bufferGeometry>
-        <bufferAttribute
-          attach="attributes-position"
-          count={points.length / 3}
-          array={points}
-          itemSize={3}
-        />
-      </bufferGeometry>
-      <pointsMaterial size={0.03} color="#b9d9ff" transparent opacity={0.6} />
-    </points>
-  );
-}
-
-function SceneGlow() {
-  return (
-    <>
-      <mesh position={[-4.5, 2.4, -3]}>
-        <sphereGeometry args={[1.6, 32, 32]} />
-        <meshBasicMaterial color="#b9e4ff" transparent opacity={0.22} />
-      </mesh>
-
-      <mesh position={[4.8, -1.8, -4]}>
-        <sphereGeometry args={[2.1, 32, 32]} />
-        <meshBasicMaterial color="#d7c6ff" transparent opacity={0.16} />
-      </mesh>
-    </>
-  );
-}
-
-function LoginScene() {
-  return (
-    <Canvas dpr={[1, 2]} gl={{ antialias: true, alpha: true }}>
-      <PerspectiveCamera makeDefault position={[0, 0, 7]} fov={42} />
-      <color attach="background" args={["#f4f8fd"]} />
-      <fog attach="fog" args={["#f4f8fd", 8, 18]} />
-
-      <ambientLight intensity={1.2} />
-      <directionalLight position={[4, 4, 5]} intensity={2.4} color="#ffffff" />
-      <pointLight position={[-4, 2, 4]} intensity={2.2} color="#bfe3ff" />
-      <pointLight position={[4, -2, 3]} intensity={1.8} color="#e5d9ff" />
-
-      <Suspense fallback={null}>
-        <Environment preset="city" />
-        <SceneGlow />
-        <ParticlesField />
-        <OrbCluster />
-      </Suspense>
-    </Canvas>
-  );
-}
-
-function StatPill({ label, value }) {
-  return (
-    <div className="login-stat-pill">
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
-}
+const RESERVED_SUBDOMAINS = new Set([
+  "www",
+  "api",
+  "hq",
+  "mail",
+  "docs",
+  "status",
+  "admin",
+  "app",
+  "cdn",
+  "assets",
+  "blog",
+  "help",
+  "support",
+  "auth",
+  "m",
+  "dev",
+  "staging",
+  "demo",
+]);
 
 function getErrorMessage(error) {
   const message =
@@ -177,17 +43,69 @@ function getErrorMessage(error) {
     error?.message ||
     "Login failed.";
 
-  if (typeof message !== "string") return "Login failed.";
-  return message;
+  return typeof message === "string" ? message : "Login failed.";
+}
+
+function getTenantKeyFromHost() {
+  if (typeof window === "undefined") return "";
+
+  const host = String(window.location.hostname || "").trim().toLowerCase();
+
+  if (!host) return "";
+
+  if (host === "localhost" || host === "127.0.0.1") {
+    const url = new URL(window.location.href);
+    const qp =
+      url.searchParams.get("tenant") ||
+      url.searchParams.get("tenantKey") ||
+      url.searchParams.get("workspace") ||
+      "";
+    return String(qp).trim().toLowerCase();
+  }
+
+  if (host === "weneox.com" || host === "hq.weneox.com") {
+    return "";
+  }
+
+  if (host.endsWith(".weneox.com")) {
+    const sub = host.slice(0, -".weneox.com".length).trim().toLowerCase();
+    if (!sub || RESERVED_SUBDOMAINS.has(sub)) return "";
+    return sub;
+  }
+
+  return "";
+}
+
+function formatWorkspaceName(key) {
+  const clean = String(key || "").trim();
+  if (!clean) return "";
+  return clean
+    .split("-")
+    .filter(Boolean)
+    .map((x) => x.charAt(0).toUpperCase() + x.slice(1))
+    .join(" ");
+}
+
+function AccessOption({ icon: Icon, children }) {
+  return (
+    <button type="button" className="login-sculpt__access-btn">
+      <span className="login-sculpt__access-btn-icon">
+        <Icon size={16} />
+      </span>
+      <span>{children}</span>
+    </button>
+  );
 }
 
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const tenantKey = useMemo(() => getTenantKeyFromHost(), []);
+  const workspaceName = useMemo(() => formatWorkspaceName(tenantKey), [tenantKey]);
+
   const [checking, setChecking] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
-  const [focusedField, setFocusedField] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -224,10 +142,12 @@ export default function Login() {
 
   function onChange(e) {
     const { name, value, type, checked } = e.target;
+
     setForm((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
+
     if (error) setError("");
   }
 
@@ -235,10 +155,13 @@ export default function Login() {
     e.preventDefault();
     if (loading) return;
 
-    setError("");
-
     const email = String(form.email || "").trim();
     const password = String(form.password || "");
+
+    if (!tenantKey) {
+      setError("Workspace tapılmadı. Şirkət linki ilə daxil ol: company.weneox.com");
+      return;
+    }
 
     if (!email || !password) {
       setError("Email və şifrəni daxil et.");
@@ -247,10 +170,12 @@ export default function Login() {
 
     try {
       setLoading(true);
+      setError("");
 
       await loginUser({
         email,
         password,
+        tenantKey,
       });
 
       window.location.replace(redirectTo);
@@ -263,157 +188,149 @@ export default function Login() {
   if (checking) return null;
 
   return (
-    <div className="login-page">
-      <div className="login-bg-3d">
-        <LoginScene />
+    <div className="login-sculpt">
+      <div className="login-sculpt__bg" aria-hidden="true">
+        <div className="login-sculpt__glow login-sculpt__glow--left" />
+        <div className="login-sculpt__glow login-sculpt__glow--top" />
+
+        <div className="login-sculpt__art">
+          <span className="login-sculpt__plane login-sculpt__plane--ice" />
+          <span className="login-sculpt__plane login-sculpt__plane--mint" />
+          <span className="login-sculpt__plane login-sculpt__plane--violet" />
+          <span className="login-sculpt__plane login-sculpt__plane--line" />
+          <span className="login-sculpt__flare" />
+        </div>
       </div>
 
-      <div className="login-noise" />
-      <div className="login-grid-lines" />
-
-      <div className="login-shell">
-        <motion.div
-          className="login-left"
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-        >
-          <div className="login-badge">
-            <ShieldCheck size={16} />
-            <span>Secure access portal</span>
-          </div>
-
-          <h1 className="login-title">
-            Control your
-            <br />
-            next-generation
-            <br />
-            workspace
-          </h1>
-
-          <p className="login-subtitle">
-            Premium command access for teams, operations, analytics and AI-powered workflows.
-          </p>
-
-          <div className="login-stats">
-            <StatPill label="Latency" value="24ms" />
-            <StatPill label="Security" value="AES-256" />
-            <StatPill label="Sessions" value="Protected" />
-          </div>
-        </motion.div>
-
-        <motion.div
-          className="login-right"
-          initial={{ opacity: 0, y: 26, scale: 0.98 }}
+      <main className="login-sculpt__stage">
+        <motion.section
+          className="login-sculpt__card"
+          initial={{ opacity: 0, y: 22, scale: 0.992 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.8, delay: 0.12 }}
+          transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
         >
-          <div className="login-card">
-            <div className="login-card-top">
-              <div className="login-logo-wrap">
-                <div className="login-logo-core" />
-              </div>
-
-              <div>
-                <p className="login-kicker">Welcome back</p>
-                <h2 className="login-card-title">Sign in</h2>
-              </div>
+          <div className="login-sculpt__top">
+            <div className="login-sculpt__brand">
+              <span className="login-sculpt__brand-mark" />
+              <span className="login-sculpt__brand-text">AIHQ</span>
             </div>
 
-            <form className="login-form" onSubmit={onSubmit}>
-              <label className="login-field">
-                <span className="login-field-label">Email address</span>
-                <div
-                  className={`login-input-wrap ${
-                    focusedField === "email" ? "is-active" : ""
-                  }`}
+            <div className="login-sculpt__trust">
+              <ShieldCheck size={13} />
+              <span>Protected access</span>
+            </div>
+          </div>
+
+          <div className="login-sculpt__hero">
+            <h1 className="login-sculpt__title">Enter AIHQ</h1>
+            <p className="login-sculpt__subtitle">
+              {tenantKey
+                ? `Secure access to ${workspaceName || tenantKey} workspace.`
+                : "Secure access to your command workspace."}
+            </p>
+
+            {tenantKey ? (
+              <div
+                className="login-sculpt__trust"
+                style={{ width: "fit-content", marginTop: 12 }}
+              >
+                <Building2 size={13} />
+                <span>{tenantKey}.weneox.com</span>
+              </div>
+            ) : null}
+          </div>
+
+          <form className="login-sculpt__form" onSubmit={onSubmit}>
+            <label className="login-sculpt__field">
+              <span className="login-sculpt__label">Email</span>
+              <div className="login-sculpt__input-wrap">
+                <span className="login-sculpt__input-icon">
+                  <Mail size={17} />
+                </span>
+                <input
+                  type="email"
+                  name="email"
+                  placeholder="name@company.com"
+                  value={form.email}
+                  onChange={onChange}
+                  autoComplete="email"
+                />
+              </div>
+            </label>
+
+            <div className="login-sculpt__label-row">
+              <span className="login-sculpt__label">Password</span>
+              <button
+                type="button"
+                className="login-sculpt__text-btn"
+                aria-label="Forgot password"
+              >
+                Forgot password?
+              </button>
+            </div>
+
+            <label className="login-sculpt__field">
+              <div className="login-sculpt__input-wrap">
+                <span className="login-sculpt__input-icon">
+                  <Lock size={17} />
+                </span>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  name="password"
+                  placeholder="Enter your password"
+                  value={form.password}
+                  onChange={onChange}
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  className="login-sculpt__toggle"
+                  onClick={() => setShowPassword((p) => !p)}
+                  aria-label="Toggle password visibility"
                 >
-                  <div className="login-input-icon">
-                    <Mail size={18} />
-                  </div>
-                  <input
-                    type="email"
-                    name="email"
-                    placeholder="name@company.com"
-                    value={form.email}
-                    onChange={onChange}
-                    onFocus={() => setFocusedField("email")}
-                    onBlur={() => setFocusedField("")}
-                    autoComplete="email"
-                  />
-                </div>
-              </label>
-
-              <label className="login-field">
-                <span className="login-field-label">Password</span>
-                <div
-                  className={`login-input-wrap ${
-                    focusedField === "password" ? "is-active" : ""
-                  }`}
-                >
-                  <div className="login-input-icon">
-                    <Lock size={18} />
-                  </div>
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    name="password"
-                    placeholder="Enter your password"
-                    value={form.password}
-                    onChange={onChange}
-                    onFocus={() => setFocusedField("password")}
-                    onBlur={() => setFocusedField("")}
-                    autoComplete="current-password"
-                  />
-                  <button
-                    type="button"
-                    className="login-password-toggle"
-                    onClick={() => setShowPassword((p) => !p)}
-                    aria-label="Toggle password visibility"
-                  >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
-              </label>
-
-              <div className="login-row">
-                <label className="login-checkbox">
-                  <input
-                    type="checkbox"
-                    name="remember"
-                    checked={form.remember}
-                    onChange={onChange}
-                  />
-                  <span className="login-checkbox-ui">
-                    <Check size={12} />
-                  </span>
-                  <span>Remember me</span>
-                </label>
-
-                <button type="button" className="login-link-btn">
-                  Forgot password?
+                  {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
                 </button>
               </div>
+            </label>
 
-              {error ? <div className="login-error">{error}</div> : null}
-
-              <button type="submit" className="login-submit" disabled={loading}>
-                <span>{loading ? "Signing in..." : "Continue"}</span>
-                <ArrowRight size={18} />
-              </button>
-            </form>
-
-            <div className="login-divider">
-              <span>Protected enterprise access</span>
+            <div className="login-sculpt__row">
+              <label className="login-sculpt__checkbox">
+                <input
+                  type="checkbox"
+                  name="remember"
+                  checked={form.remember}
+                  onChange={onChange}
+                />
+                <span className="login-sculpt__checkbox-ui">
+                  <Check size={11} />
+                </span>
+                <span>Remember me</span>
+              </label>
             </div>
 
-            <div className="login-bottom-note">
-              <div className="login-bottom-chip">Zero-trust session</div>
-              <div className="login-bottom-chip">Encrypted</div>
-              <div className="login-bottom-chip">Premium UI</div>
-            </div>
+            {error ? <div className="login-sculpt__error">{error}</div> : null}
+
+            <button
+              type="submit"
+              className="login-sculpt__submit"
+              disabled={loading}
+            >
+              <span>{loading ? "Signing in..." : "Continue"}</span>
+              <ArrowRight size={17} />
+            </button>
+          </form>
+
+          <div className="login-sculpt__divider">
+            <span>Other methods</span>
           </div>
-        </motion.div>
-      </div>
+
+          <div className="login-sculpt__access">
+            <AccessOption icon={Chrome}>Google</AccessOption>
+            <AccessOption icon={KeyRound}>Passkey</AccessOption>
+            <AccessOption icon={Building2}>SSO</AccessOption>
+          </div>
+        </motion.section>
+      </main>
     </div>
   );
 }
