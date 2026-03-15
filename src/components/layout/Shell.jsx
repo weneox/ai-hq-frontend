@@ -64,11 +64,7 @@ async function safeApiGet(path, fallback = {}) {
     return await apiGet(path);
   } catch (e) {
     const status = Number(e?.status || 0);
-
-    if (status === 401 || status === 403) {
-      return fallback;
-    }
-
+    if (status === 401 || status === 403) return fallback;
     return fallback;
   }
 }
@@ -123,9 +119,7 @@ export default function Shell() {
 
     const threads = Array.isArray(inboxRes?.threads) ? inboxRes.threads : [];
     const leads = Array.isArray(leadsRes?.leads) ? leadsRes.leads : [];
-    const comments = Array.isArray(commentsRes?.comments)
-      ? commentsRes.comments
-      : [];
+    const comments = Array.isArray(commentsRes?.comments) ? commentsRes.comments : [];
     const voiceCalls = normalizeArray(voiceRes, "calls");
 
     const inboxUnread = threads.reduce(
@@ -155,8 +149,7 @@ export default function Shell() {
       leadsOpen,
       commentsCount,
       voiceLive,
-      notificationsUnread:
-        inboxUnread + leadsOpen + commentsCount + voiceLive,
+      notificationsUnread: inboxUnread + leadsOpen + commentsCount + voiceLive,
       dbDisabled: Boolean(
         inboxRes?.dbDisabled ||
           leadsRes?.dbDisabled ||
@@ -174,14 +167,22 @@ export default function Shell() {
   }
 
   useEffect(() => {
-    const prev = document.body.style.overflow;
+    const prevOverflow = document.body.style.overflow;
+    const prevOverflowX = document.body.style.overflowX;
+    const prevOverflowY = document.body.style.overflowY;
 
     if (mobileOpen) {
       document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+      document.body.style.overflowX = "hidden";
+      document.body.style.overflowY = "auto";
     }
 
     return () => {
-      document.body.style.overflow = prev;
+      document.body.style.overflow = prevOverflow;
+      document.body.style.overflowX = prevOverflowX;
+      document.body.style.overflowY = prevOverflowY;
     };
   }, [mobileOpen]);
 
@@ -257,7 +258,7 @@ export default function Shell() {
         shellStats={shellStats}
       />
 
-      <div className="relative z-10 min-h-screen md:pl-[var(--sidebar-rail-w)]">
+      <div className="relative z-10 md:pl-[var(--sidebar-rail-w)]">
         <div className="relative min-h-screen">
           <div className="pointer-events-none absolute inset-0">
             <div className="absolute inset-y-0 left-0 w-px bg-[linear-gradient(180deg,transparent,rgba(255,255,255,0.06),transparent)]" />
