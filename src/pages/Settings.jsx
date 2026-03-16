@@ -1,5 +1,5 @@
 // src/pages/Settings.jsx
-// PREMIUM v5.2 — final settings assembly + tenant business brain sections
+// PREMIUM v5.3 — final settings assembly + tenant business brain + source intelligence
 
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -15,6 +15,14 @@ import {
   BrainCircuit,
   Contact2,
   ListTree,
+  Database,
+  SearchCheck,
+  Globe2,
+  Instagram,
+  MessageCircle,
+  FileText,
+  Link2,
+  ShieldPlus,
 } from "lucide-react";
 
 import Card from "../components/ui/Card.jsx";
@@ -55,6 +63,14 @@ import {
   getTenantContacts,
   saveTenantContact,
   deleteTenantContact,
+  listSettingsSources,
+  createSettingsSource,
+  updateSettingsSource,
+  getSettingsSourceSyncRuns,
+  startSettingsSourceSync,
+  listKnowledgeReviewQueue,
+  approveKnowledgeCandidate,
+  rejectKnowledgeCandidate,
 } from "../api/settings.js";
 
 import { isSettingsDirty, buildSettingsDirtyMap } from "../lib/settingsState.js";
@@ -259,6 +275,726 @@ function EmptyState({ title, subtitle, actionLabel, onAction, disabled = false }
             <Button onClick={onAction} disabled={disabled}>
               {actionLabel}
             </Button>
+          </div>
+        ) : null}
+      </div>
+    </Card>
+  );
+}
+
+function getSourceTypeIcon(type) {
+  const x = String(type || "").toLowerCase();
+  if (x === "website") return Globe2;
+  if (x === "instagram") return Instagram;
+  if (x === "whatsapp_business" || x === "messenger") return MessageCircle;
+  if (["pdf", "document", "spreadsheet", "notion"].includes(x)) return FileText;
+  return Link2;
+}
+
+function SourceTypeBadge({ type }) {
+  const x = String(type || "other").toLowerCase();
+  return (
+    <Badge tone="info" variant="subtle" dot>
+      {x}
+    </Badge>
+  );
+}
+
+function SourceStatusBadge({ status }) {
+  const x = String(status || "pending").toLowerCase();
+  const tone =
+    x === "connected"
+      ? "success"
+      : x === "error" || x === "revoked"
+      ? "danger"
+      : x === "pending"
+      ? "warn"
+      : "neutral";
+
+  return (
+    <Badge tone={tone} variant="subtle" dot>
+      {x}
+    </Badge>
+  );
+}
+
+function SyncStatusBadge({ status }) {
+  const x = String(status || "idle").toLowerCase();
+  const tone =
+    x === "success"
+      ? "success"
+      : x === "running" || x === "queued"
+      ? "info"
+      : x === "partial"
+      ? "warn"
+      : x === "error" || x === "failed"
+      ? "danger"
+      : "neutral";
+
+  return (
+    <Badge tone={tone} variant="subtle" dot>
+      {x}
+    </Badge>
+  );
+}
+
+function ConfidenceBadge({ label, value }) {
+  const x = String(label || "low").toLowerCase();
+  const tone =
+    x === "very_high" || x === "high"
+      ? "success"
+      : x === "medium"
+      ? "warn"
+      : "neutral";
+
+  return (
+    <Badge tone={tone} variant="subtle" dot>
+      {x} {typeof value === "number" ? `· ${Math.round(value * 100)}%` : ""}
+    </Badge>
+  );
+}
+
+function createNewSource() {
+  return {
+    source_type: "website",
+    source_key: "",
+    display_name: "",
+    status: "pending",
+    auth_status: "not_required",
+    sync_status: "idle",
+    connection_mode: "manual",
+    access_scope: "public",
+    source_url: "",
+    external_account_id: "",
+    external_page_id: "",
+    external_username: "",
+    is_enabled: true,
+    is_primary: false,
+    permissions_json: {
+      allowProfileRead: true,
+      allowFutureSync: true,
+      allowBusinessInference: true,
+      requireApprovalForCriticalFacts: true,
+    },
+    settings_json: {},
+    metadata_json: {},
+  };
+}
+
+function SourcesPanel({
+  items,
+  canManage,
+  onCreate,
+  onSave,
+  onStartSync,
+  onViewSyncRuns,
+}) {
+  const [savingId, setSavingId] = useState("");
+  const [syncingId, setSyncingId] = useState("");
+
+  async function handleSave(item) {
+    setSavingId(String(item.id || item.source_key || "new"));
+    try {
+      await onSave(item);
+    } finally {
+      setSavingId("");
+    }
+  }
+
+  async function handleStartSync(item) {
+    if (!item?.id) return;
+    setSyncingId(String(item.id));
+    try {
+      await onStartSync(item);
+    } finally {
+      setSyncingId("");
+    }
+  }
+
+  const connectedCount = items.filter((x) => String(x.status).toLowerCase() === "connected").length;
+  const enabledCount = items.filter((x) => !!x.is_enabled).length;
+
+  return (
+    <SettingsSection
+      eyebrow="Source Intelligence"
+      title="Connected Sources"
+      subtitle="Website, Instagram, WhatsApp, docs və digər mənbələrdən AI business brain üçün məlumat topla."
+      tone="default"
+    >
+      <div className="space-y-6">
+        <div className="grid gap-4 md:grid-cols-3">
+          <StatTile
+            label="Total Sources"
+            value={items.length}
+            hint="Tenant üçün qeydiyyatlı source sayı"
+            tone="info"
+          />
+          <StatTile
+            label="Connected"
+            value={connectedCount}
+            hint="Aktiv qoşulmuş source-lar"
+            tone="success"
+          />
+          <StatTile
+            label="Enabled"
+            value={enabledCount}
+            hint="Runtime və sync üçün aktiv source-lar"
+            tone="neutral"
+          />
+        </div>
+
+        <div className="flex justify-end">
+          <Button
+            onClick={onCreate}
+            disabled={!canManage}
+            leftIcon={<Database className="h-4 w-4" />}
+          >
+            Add Source
+          </Button>
+        </div>
+
+        {!items.length ? (
+          <EmptyState
+            title="Hələ source yoxdur"
+            subtitle="Website, Instagram və digər mənbələri əlavə et ki AI şirkəti özü anlamağa başlasın."
+            actionLabel="Create First Source"
+            onAction={onCreate}
+            disabled={!canManage}
+          />
+        ) : (
+          <div className="space-y-4">
+            {items.map((item, idx) => (
+              <SourceCard
+                key={item.id || `${item.source_key || "source"}-${idx}`}
+                item={item}
+                canManage={canManage}
+                saving={savingId === String(item.id || item.source_key || "new")}
+                syncing={syncingId === String(item.id || "")}
+                onSave={handleSave}
+                onStartSync={handleStartSync}
+                onViewSyncRuns={onViewSyncRuns}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </SettingsSection>
+  );
+}
+
+function SourceCard({
+  item,
+  canManage,
+  onSave,
+  onStartSync,
+  onViewSyncRuns,
+  saving,
+  syncing,
+}) {
+  const [local, setLocal] = useState({
+    id: item?.id || "",
+    source_type: item?.source_type || "website",
+    source_key: item?.source_key || "",
+    display_name: item?.display_name || "",
+    status: item?.status || "pending",
+    auth_status: item?.auth_status || "not_required",
+    sync_status: item?.sync_status || "idle",
+    connection_mode: item?.connection_mode || "manual",
+    access_scope: item?.access_scope || "public",
+    source_url: item?.source_url || "",
+    external_account_id: item?.external_account_id || "",
+    external_page_id: item?.external_page_id || "",
+    external_username: item?.external_username || "",
+    is_enabled: typeof item?.is_enabled === "boolean" ? item.is_enabled : true,
+    is_primary: typeof item?.is_primary === "boolean" ? item.is_primary : false,
+    permissions_json:
+      item && typeof item.permissions_json === "object" && !Array.isArray(item.permissions_json)
+        ? item.permissions_json
+        : {
+            allowProfileRead: true,
+            allowFutureSync: true,
+            allowBusinessInference: true,
+            requireApprovalForCriticalFacts: true,
+          },
+  });
+
+  const Icon = getSourceTypeIcon(local.source_type);
+
+  function patch(key, value) {
+    setLocal((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function patchPermission(key, value) {
+    setLocal((prev) => ({
+      ...prev,
+      permissions_json: {
+        ...(prev.permissions_json || {}),
+        [key]: value,
+      },
+    }));
+  }
+
+  return (
+    <Card variant="surface" padded="lg" className="rounded-[28px]">
+      <div className="space-y-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex min-w-0 items-start gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] border border-slate-200/80 bg-white/90 text-slate-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-100">
+              <Icon className="h-5 w-5" />
+            </div>
+
+            <div className="min-w-0 space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <SourceTypeBadge type={local.source_type} />
+                <SourceStatusBadge status={local.status} />
+                <SyncStatusBadge status={local.sync_status} />
+                {local.is_primary ? (
+                  <Badge tone="success" variant="subtle" dot>
+                    primary
+                  </Badge>
+                ) : null}
+              </div>
+
+              <div className="text-lg font-semibold tracking-[-0.02em] text-slate-950 dark:text-white">
+                {local.display_name || local.source_url || local.source_key || "New Source"}
+              </div>
+
+              <div className="text-sm leading-6 text-slate-500 dark:text-slate-400">
+                Qoşulan source-dan AI profil, kontakt, xidmət, qayda və digər business kontekstini toplaya bilər.
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {local.id ? (
+              <>
+                <Button
+                  variant="secondary"
+                  onClick={() => onViewSyncRuns(local)}
+                >
+                  Sync Runs
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => onStartSync(local)}
+                  disabled={!canManage || syncing}
+                  leftIcon={<RefreshCw className="h-4 w-4" />}
+                >
+                  {syncing ? "Syncing..." : "Start Sync"}
+                </Button>
+              </>
+            ) : null}
+
+            <Button onClick={() => onSave(local)} disabled={!canManage || saving}>
+              {saving ? "Saving..." : local.id ? "Save Source" : "Create Source"}
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Field label="Source Type" hint="Website, Instagram, WhatsApp, document və s.">
+            <Select
+              value={local.source_type}
+              disabled={!canManage}
+              onChange={(e) => patch("source_type", e.target.value)}
+            >
+              <option value="website">website</option>
+              <option value="instagram">instagram</option>
+              <option value="facebook_page">facebook_page</option>
+              <option value="messenger">messenger</option>
+              <option value="whatsapp_business">whatsapp_business</option>
+              <option value="google_maps">google_maps</option>
+              <option value="pdf">pdf</option>
+              <option value="document">document</option>
+              <option value="spreadsheet">spreadsheet</option>
+              <option value="notion">notion</option>
+              <option value="crm">crm</option>
+              <option value="manual_note">manual_note</option>
+              <option value="other">other</option>
+            </Select>
+          </Field>
+
+          <Field label="Display Name" hint="Admin panel üçün source adı">
+            <Input
+              value={local.display_name}
+              disabled={!canManage}
+              onChange={(e) => patch("display_name", e.target.value)}
+              placeholder="Main Website"
+            />
+          </Field>
+
+          <Field label="Source Key" hint="Unikal daxili açar. Boş qalsa backend düzəldəcək">
+            <Input
+              value={local.source_key}
+              disabled={!canManage}
+              onChange={(e) => patch("source_key", e.target.value)}
+              placeholder="website:main"
+            />
+          </Field>
+
+          <Field label="Source URL" hint="Website, doc və ya public profile linki">
+            <Input
+              value={local.source_url}
+              disabled={!canManage}
+              onChange={(e) => patch("source_url", e.target.value)}
+              placeholder="https://example.com"
+            />
+          </Field>
+
+          <Field label="Connection Mode">
+            <Select
+              value={local.connection_mode}
+              disabled={!canManage}
+              onChange={(e) => patch("connection_mode", e.target.value)}
+            >
+              <option value="manual">manual</option>
+              <option value="oauth">oauth</option>
+              <option value="webhook">webhook</option>
+              <option value="crawler">crawler</option>
+              <option value="upload">upload</option>
+              <option value="import">import</option>
+              <option value="api_key">api_key</option>
+            </Select>
+          </Field>
+
+          <Field label="Access Scope">
+            <Select
+              value={local.access_scope}
+              disabled={!canManage}
+              onChange={(e) => patch("access_scope", e.target.value)}
+            >
+              <option value="public">public</option>
+              <option value="private">private</option>
+              <option value="hybrid">hybrid</option>
+            </Select>
+          </Field>
+
+          <Field label="External Username" hint="Instagram username və s.">
+            <Input
+              value={local.external_username}
+              disabled={!canManage}
+              onChange={(e) => patch("external_username", e.target.value)}
+              placeholder="neox.az"
+            />
+          </Field>
+
+          <Field label="External Account ID" hint="Meta və digər provider account id">
+            <Input
+              value={local.external_account_id}
+              disabled={!canManage}
+              onChange={(e) => patch("external_account_id", e.target.value)}
+              placeholder="1784147..."
+            />
+          </Field>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <FeatureToggleCard
+            title="Enabled"
+            subtitle="Source runtime üçün aktiv olsun"
+            checked={!!local.is_enabled}
+            onChange={(v) => patch("is_enabled", v)}
+            disabled={!canManage}
+          />
+          <FeatureToggleCard
+            title="Primary"
+            subtitle="Bu tip üçün əsas source"
+            checked={!!local.is_primary}
+            onChange={(v) => patch("is_primary", v)}
+            disabled={!canManage}
+          />
+          <FeatureToggleCard
+            title="Profile Read"
+            subtitle="Bio/profile/public metadata oxunsun"
+            checked={!!local.permissions_json?.allowProfileRead}
+            onChange={(v) => patchPermission("allowProfileRead", v)}
+            disabled={!canManage}
+          />
+          <FeatureToggleCard
+            title="Future Sync"
+            subtitle="Gələcək sync-lərə icazə ver"
+            checked={!!local.permissions_json?.allowFutureSync}
+            onChange={(v) => patchPermission("allowFutureSync", v)}
+            disabled={!canManage}
+          />
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2">
+          <FeatureToggleCard
+            title="Business Inference"
+            subtitle="AI bu source-dan xidmət, tone, contact və rules çıxarsın"
+            checked={!!local.permissions_json?.allowBusinessInference}
+            onChange={(v) => patchPermission("allowBusinessInference", v)}
+            disabled={!canManage}
+          />
+          <FeatureToggleCard
+            title="Critical Fact Approval"
+            subtitle="Kritik məlumatlar üçün manual approval tələb olunsun"
+            checked={!!local.permissions_json?.requireApprovalForCriticalFacts}
+            onChange={(v) => patchPermission("requireApprovalForCriticalFacts", v)}
+            disabled={!canManage}
+          />
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function SyncRunsModal({ open, source, items, onClose }) {
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4">
+      <div className="max-h-[85vh] w-full max-w-4xl overflow-hidden rounded-[32px] border border-slate-200/80 bg-white shadow-2xl dark:border-white/10 dark:bg-slate-950">
+        <div className="flex items-center justify-between border-b border-slate-200/80 px-6 py-5 dark:border-white/10">
+          <div className="space-y-1">
+            <div className="text-sm font-medium uppercase tracking-[0.18em] text-slate-400">
+              Source Sync Runs
+            </div>
+            <div className="text-xl font-semibold tracking-[-0.02em] text-slate-950 dark:text-white">
+              {source?.display_name || source?.source_url || source?.source_key || "Source"}
+            </div>
+          </div>
+          <Button variant="secondary" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+
+        <div className="max-h-[70vh] overflow-y-auto p-6">
+          {!items.length ? (
+            <EmptyState
+              title="Sync run yoxdur"
+              subtitle="Bu source üçün hələ heç bir sync işə düşməyib."
+            />
+          ) : (
+            <div className="space-y-4">
+              {items.map((run) => (
+                <Card key={run.id} variant="surface" padded="md" className="rounded-[24px]">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge tone="info" variant="subtle" dot>
+                          {run.run_type}
+                        </Badge>
+                        <Badge tone="neutral" variant="subtle" dot>
+                          {run.trigger_type}
+                        </Badge>
+                        <SyncStatusBadge status={run.status} />
+                      </div>
+                      <div className="text-sm text-slate-500 dark:text-slate-400">
+                        Started: {run.started_at || "—"} · Finished: {run.finished_at || "—"}
+                      </div>
+                    </div>
+
+                    <div className="grid min-w-[320px] gap-3 sm:grid-cols-3">
+                      <StatTile
+                        label="Candidates"
+                        value={run.candidates_created || 0}
+                        hint="çıxarılan knowledge"
+                        tone="info"
+                      />
+                      <StatTile
+                        label="Promoted"
+                        value={run.items_promoted || 0}
+                        hint="approved/trusted"
+                        tone="success"
+                      />
+                      <StatTile
+                        label="Conflicts"
+                        value={run.conflicts_found || 0}
+                        hint="review tələb edir"
+                        tone={run.conflicts_found > 0 ? "warn" : "neutral"}
+                      />
+                    </div>
+                  </div>
+
+                  {run.error_message ? (
+                    <div className="mt-4 rounded-[18px] border border-rose-200/80 bg-rose-50/90 px-4 py-3 text-sm text-rose-700 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-200">
+                      {run.error_message}
+                    </div>
+                  ) : null}
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function KnowledgeReviewPanel({
+  items,
+  canManage,
+  onApprove,
+  onReject,
+}) {
+  const [busyId, setBusyId] = useState("");
+  const [busyAction, setBusyAction] = useState("");
+
+  async function handleApprove(item) {
+    setBusyId(String(item.id || ""));
+    setBusyAction("approve");
+    try {
+      await onApprove(item);
+    } finally {
+      setBusyId("");
+      setBusyAction("");
+    }
+  }
+
+  async function handleReject(item) {
+    setBusyId(String(item.id || ""));
+    setBusyAction("reject");
+    try {
+      await onReject(item);
+    } finally {
+      setBusyId("");
+      setBusyAction("");
+    }
+  }
+
+  const conflictCount = items.filter((x) => String(x.status).toLowerCase() === "conflict").length;
+
+  return (
+    <SettingsSection
+      eyebrow="Source Intelligence"
+      title="Knowledge Review Queue"
+      subtitle="AI tərəfindən tapılmış, amma hələ review gözləyən contact, service, pricing və digər knowledge item-lər."
+      tone="default"
+    >
+      <div className="space-y-6">
+        <div className="grid gap-4 md:grid-cols-3">
+          <StatTile
+            label="Pending Items"
+            value={items.length}
+            hint="review gözləyən candidate"
+            tone="info"
+          />
+          <StatTile
+            label="Conflicts"
+            value={conflictCount}
+            hint="ziddiyyətli məlumat"
+            tone={conflictCount > 0 ? "warn" : "neutral"}
+          />
+          <StatTile
+            label="Approval Mode"
+            value="Human Review"
+            hint="kritik məlumat üçün təsdiq"
+            tone="success"
+          />
+        </div>
+
+        {!items.length ? (
+          <EmptyState
+            title="Review queue boşdur"
+            subtitle="Source-lardan candidate knowledge gəldikcə burada görünəcək."
+          />
+        ) : (
+          <div className="space-y-4">
+            {items.map((item) => (
+              <KnowledgeCandidateCard
+                key={item.id}
+                item={item}
+                canManage={canManage}
+                busyApprove={busyId === String(item.id) && busyAction === "approve"}
+                busyReject={busyId === String(item.id) && busyAction === "reject"}
+                onApprove={handleApprove}
+                onReject={handleReject}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </SettingsSection>
+  );
+}
+
+function KnowledgeCandidateCard({
+  item,
+  canManage,
+  busyApprove,
+  busyReject,
+  onApprove,
+  onReject,
+}) {
+  return (
+    <Card variant="surface" padded="lg" className="rounded-[28px]">
+      <div className="space-y-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone="info" variant="subtle" dot>
+                {item.category}
+              </Badge>
+              <Badge tone="neutral" variant="subtle" dot>
+                {item.item_key || "item"}
+              </Badge>
+              <ConfidenceBadge label={item.confidence_label} value={item.confidence} />
+              {item.source_type ? <SourceTypeBadge type={item.source_type} /> : null}
+              {item.status ? <SyncStatusBadge status={item.status} /> : null}
+            </div>
+
+            <div className="text-lg font-semibold tracking-[-0.02em] text-slate-950 dark:text-white">
+              {item.title || item.value_text || "Candidate"}
+            </div>
+
+            <div className="text-sm leading-6 text-slate-500 dark:text-slate-400">
+              Source: {item.source_display_name || item.source_type || "unknown"} · First seen:{" "}
+              {item.first_seen_at || "—"}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              onClick={() => onApprove(item)}
+              disabled={!canManage || busyApprove || busyReject}
+              leftIcon={<ShieldPlus className="h-4 w-4" />}
+            >
+              {busyApprove ? "Approving..." : "Approve"}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => onReject(item)}
+              disabled={!canManage || busyApprove || busyReject}
+            >
+              {busyReject ? "Rejecting..." : "Reject"}
+            </Button>
+          </div>
+        </div>
+
+        {item.value_text ? (
+          <div className="rounded-[22px] border border-slate-200/80 bg-slate-50/80 px-4 py-4 text-sm leading-6 text-slate-700 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300">
+            {item.value_text}
+          </div>
+        ) : null}
+
+        {Array.isArray(item.source_evidence_json) && item.source_evidence_json.length ? (
+          <div className="space-y-2">
+            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+              Source Evidence
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              {item.source_evidence_json.slice(0, 4).map((ev, idx) => (
+                <div
+                  key={`${item.id}-ev-${idx}`}
+                  className="rounded-[18px] border border-slate-200/80 bg-white/80 px-4 py-3 text-sm text-slate-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300"
+                >
+                  <div className="font-medium text-slate-800 dark:text-slate-100">
+                    {ev?.label || ev?.field || `Evidence ${idx + 1}`}
+                  </div>
+                  <div className="mt-1 break-words text-xs leading-5 text-slate-500 dark:text-slate-400">
+                    {typeof ev === "string" ? ev : ev?.value || ev?.text || JSON.stringify(ev)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {item.review_reason ? (
+          <div className="rounded-[18px] border border-amber-200/80 bg-amber-50/90 px-4 py-3 text-sm text-amber-800 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-200">
+            {item.review_reason}
           </div>
         ) : null}
       </div>
@@ -1588,6 +2324,8 @@ function normalizeWorkspace(raw) {
     channelPolicies: Array.isArray(raw?.channelPolicies) ? raw.channelPolicies : [],
     locations: Array.isArray(raw?.locations) ? raw.locations : [],
     contacts: Array.isArray(raw?.contacts) ? raw.contacts : [],
+    sources: Array.isArray(raw?.sources) ? raw.sources : [],
+    knowledgeReview: Array.isArray(raw?.knowledgeReview) ? raw.knowledgeReview : [],
   };
 }
 
@@ -1826,6 +2564,8 @@ export default function Settings() {
       channelPolicies: [],
       locations: [],
       contacts: [],
+      sources: [],
+      knowledgeReview: [],
     })
   );
   const [initialWorkspace, setInitialWorkspace] = useState(() =>
@@ -1839,6 +2579,8 @@ export default function Settings() {
       channelPolicies: [],
       locations: [],
       contacts: [],
+      sources: [],
+      knowledgeReview: [],
     })
   );
 
@@ -1849,12 +2591,18 @@ export default function Settings() {
   const [channelPolicies, setChannelPolicies] = useState([]);
   const [locations, setLocations] = useState([]);
   const [contacts, setContacts] = useState([]);
+  const [sources, setSources] = useState([]);
+  const [knowledgeReview, setKnowledgeReview] = useState([]);
 
   const [perm, setPerm] = useState("default");
   const [pushBusy, setPushBusy] = useState(false);
 
   const [message, setMessage] = useState("");
   const [pushMessage, setPushMessage] = useState("");
+
+  const [syncRunsOpen, setSyncRunsOpen] = useState(false);
+  const [syncRunsSource, setSyncRunsSource] = useState(null);
+  const [syncRunsItems, setSyncRunsItems] = useState([]);
 
   const env = useMemo(() => {
     const VAPID = String(import.meta.env?.VITE_VAPID_PUBLIC_KEY || "").trim();
@@ -1926,6 +2674,20 @@ export default function Settings() {
         icon: Contact2,
       },
       {
+        key: "sources",
+        label: "Sources",
+        description: "Connected data sources and sync intelligence",
+        dirty: !!dirtyMap.sources,
+        icon: Database,
+      },
+      {
+        key: "knowledge_review",
+        label: "Knowledge Review",
+        description: "Approve AI-discovered business knowledge",
+        dirty: !!dirtyMap.knowledge_review,
+        icon: SearchCheck,
+      },
+      {
         key: "channels",
         label: "Channels",
         description: "Instagram, WhatsApp, Messenger",
@@ -1983,6 +2745,8 @@ export default function Settings() {
           policies,
           locs,
           conts,
+          srcs,
+          review,
         ] = await Promise.all([
           getWorkspaceSettings(),
           getWorkspaceAgents().catch(() => []),
@@ -1990,6 +2754,8 @@ export default function Settings() {
           getTenantChannelPolicies().catch(() => []),
           getTenantLocations().catch(() => []),
           getTenantContacts().catch(() => []),
+          listSettingsSources().then((x) => x.items).catch(() => []),
+          listKnowledgeReviewQueue().then((x) => x.items).catch(() => []),
         ]);
 
         if (!mounted) return;
@@ -2001,6 +2767,8 @@ export default function Settings() {
           channelPolicies: Array.isArray(policies) ? policies : [],
           locations: Array.isArray(locs) ? locs : [],
           contacts: Array.isArray(conts) ? conts : [],
+          sources: Array.isArray(srcs) ? srcs : [],
+          knowledgeReview: Array.isArray(review) ? review : [],
         });
 
         setWorkspace(normalized);
@@ -2011,6 +2779,8 @@ export default function Settings() {
         setChannelPolicies(normalized.channelPolicies);
         setLocations(normalized.locations);
         setContacts(normalized.contacts);
+        setSources(normalized.sources);
+        setKnowledgeReview(normalized.knowledgeReview);
       } catch (e) {
         if (!mounted) return;
         setMessage(String(e?.message || e));
@@ -2071,6 +2841,8 @@ export default function Settings() {
         channelPolicies,
         locations,
         contacts,
+        sources,
+        knowledgeReview,
       });
 
       setWorkspace(normalized);
@@ -2090,6 +2862,8 @@ export default function Settings() {
     setChannelPolicies(Array.isArray(initialWorkspace?.channelPolicies) ? initialWorkspace.channelPolicies : []);
     setLocations(Array.isArray(initialWorkspace?.locations) ? initialWorkspace.locations : []);
     setContacts(Array.isArray(initialWorkspace?.contacts) ? initialWorkspace.contacts : []);
+    setSources(Array.isArray(initialWorkspace?.sources) ? initialWorkspace.sources : []);
+    setKnowledgeReview(Array.isArray(initialWorkspace?.knowledgeReview) ? initialWorkspace.knowledgeReview : []);
     setMessage("↩️ Dəyişikliklər geri qaytarıldı.");
   }
 
@@ -2149,6 +2923,25 @@ export default function Settings() {
     }));
   }
 
+  async function refreshSourceIntelligence() {
+    const [srcs, review] = await Promise.all([
+      listSettingsSources().then((x) => x.items).catch(() => []),
+      listKnowledgeReviewQueue().then((x) => x.items).catch(() => []),
+    ]);
+
+    const nextSources = Array.isArray(srcs) ? srcs : [];
+    const nextReview = Array.isArray(review) ? review : [];
+
+    setSources(nextSources);
+    setKnowledgeReview(nextReview);
+
+    setWorkspace((prev) => ({
+      ...prev,
+      sources: nextSources,
+      knowledgeReview: nextReview,
+    }));
+  }
+
   async function handleSaveBusinessFact(payload) {
     if (!canManageSettings) return;
     await saveTenantBusinessFact(payload);
@@ -2203,6 +2996,92 @@ export default function Settings() {
     await deleteTenantContact(id);
     await refreshBusinessBrain();
     setMessage("✅ Contact silindi.");
+  }
+
+  async function handleSaveSource(payload) {
+    if (!canManageSettings) return;
+
+    const cleanPayload = {
+      sourceType: payload?.source_type || "website",
+      sourceKey: payload?.source_key || "",
+      displayName: payload?.display_name || "",
+      status: payload?.status || "pending",
+      authStatus: payload?.auth_status || "not_required",
+      syncStatus: payload?.sync_status || "idle",
+      connectionMode: payload?.connection_mode || "manual",
+      accessScope: payload?.access_scope || "public",
+      sourceUrl: payload?.source_url || "",
+      externalAccountId: payload?.external_account_id || "",
+      externalPageId: payload?.external_page_id || "",
+      externalUsername: payload?.external_username || "",
+      isEnabled: !!payload?.is_enabled,
+      isPrimary: !!payload?.is_primary,
+      permissionsJson:
+        payload && typeof payload.permissions_json === "object" && !Array.isArray(payload.permissions_json)
+          ? payload.permissions_json
+          : {},
+      settingsJson:
+        payload && typeof payload.settings_json === "object" && !Array.isArray(payload.settings_json)
+          ? payload.settings_json
+          : {},
+      metadataJson:
+        payload && typeof payload.metadata_json === "object" && !Array.isArray(payload.metadata_json)
+          ? payload.metadata_json
+          : {},
+    };
+
+    if (payload?.id) {
+      await updateSettingsSource(payload.id, cleanPayload);
+      setMessage("✅ Source yeniləndi.");
+    } else {
+      await createSettingsSource(cleanPayload);
+      setMessage("✅ Source əlavə olundu.");
+    }
+
+    await refreshSourceIntelligence();
+  }
+
+  async function handleStartSourceSync(item) {
+    if (!canManageSettings || !item?.id) return;
+    await startSettingsSourceSync(item.id, {
+      runType: "sync",
+      triggerType: "manual",
+      runnerKey: "settings.manual",
+    });
+    await refreshSourceIntelligence();
+    setMessage("✅ Source sync başladıldı.");
+  }
+
+  async function handleViewSourceSyncRuns(item) {
+    if (!item?.id) return;
+
+    const res = await getSettingsSourceSyncRuns(item.id, { limit: 20 });
+    setSyncRunsSource(res?.source || item);
+    setSyncRunsItems(Array.isArray(res?.items) ? res.items : []);
+    setSyncRunsOpen(true);
+  }
+
+  async function handleApproveKnowledge(item) {
+    if (!canManageSettings || !item?.id) return;
+
+    await approveKnowledgeCandidate(item.id, {
+      reason: "Approved from Settings knowledge review",
+    });
+
+    await refreshSourceIntelligence();
+    await refreshBusinessBrain();
+    setMessage("✅ Knowledge candidate approve olundu.");
+  }
+
+  async function handleRejectKnowledge(item) {
+    if (!canManageSettings || !item?.id) return;
+
+    await rejectKnowledgeCandidate(item.id, {
+      reason: "Rejected from Settings knowledge review",
+    });
+
+    await refreshSourceIntelligence();
+    setMessage("✅ Knowledge candidate reject olundu.");
   }
 
   async function enableNotifications() {
@@ -2339,6 +3218,32 @@ export default function Settings() {
           />
         );
 
+      case "sources":
+        return (
+          <SourcesPanel
+            items={sources}
+            canManage={canManageSettings}
+            onCreate={() => {
+              const next = [createNewSource(), ...sources];
+              setSources(next);
+              setWorkspace((prev) => ({ ...prev, sources: next }));
+            }}
+            onSave={handleSaveSource}
+            onStartSync={handleStartSourceSync}
+            onViewSyncRuns={handleViewSourceSyncRuns}
+          />
+        );
+
+      case "knowledge_review":
+        return (
+          <KnowledgeReviewPanel
+            items={knowledgeReview}
+            canManage={canManageSettings}
+            onApprove={handleApproveKnowledge}
+            onReject={handleRejectKnowledge}
+          />
+        );
+
       case "channels":
         return <ChannelsPanel canManage={canManageSettings} />;
 
@@ -2372,69 +3277,82 @@ export default function Settings() {
   }
 
   return (
-    <SettingsShell
-      title="Settings"
-      subtitle="Workspace, brand, AI policy, business brain, team və integrations idarəsi."
-      items={navItems}
-      activeKey={activeSection}
-      onChange={setActiveSection}
-    >
-      <div className="space-y-5">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge
-              tone={canManageSettings ? "success" : "warn"}
-              variant="subtle"
-              dot={canManageSettings}
-            >
-              {canManageSettings ? "Owner / Admin Access" : "Read Only Access"}
-            </Badge>
+    <>
+      <SettingsShell
+        title="Settings"
+        subtitle="Workspace, brand, AI policy, business brain, team və integrations idarəsi."
+        items={navItems}
+        activeKey={activeSection}
+        onChange={setActiveSection}
+      >
+        <div className="space-y-5">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge
+                tone={canManageSettings ? "success" : "warn"}
+                variant="subtle"
+                dot={canManageSettings}
+              >
+                {canManageSettings ? "Owner / Admin Access" : "Read Only Access"}
+              </Badge>
 
-            <Badge tone={dirty ? "info" : "neutral"} variant="subtle" dot={dirty}>
-              {dirty ? "Unsaved Workspace Edits" : "Workspace Synced"}
-            </Badge>
+              <Badge tone={dirty ? "info" : "neutral"} variant="subtle" dot={dirty}>
+                {dirty ? "Unsaved Workspace Edits" : "Workspace Synced"}
+              </Badge>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                onClick={() => window.location.reload()}
+                leftIcon={<RefreshCw className="h-4 w-4" />}
+              >
+                Refresh
+              </Button>
+
+              <Button
+                onClick={onSaveWorkspace}
+                disabled={loading || saving || !canManageSettings}
+              >
+                {saving ? "Saving..." : "Save Workspace"}
+              </Button>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              onClick={() => window.location.reload()}
-              leftIcon={<RefreshCw className="h-4 w-4" />}
-            >
-              Refresh
-            </Button>
+          {!canManageSettings ? (
+            <div className="rounded-[24px] border border-amber-200/80 bg-amber-50/90 px-4 py-4 text-sm text-amber-800 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-200">
+              Bu workspace-də settings dəyişmək səlahiyyəti yalnız owner/admin üçündür.
+            </div>
+          ) : null}
 
-            <Button
-              onClick={onSaveWorkspace}
-              disabled={loading || saving || !canManageSettings}
-            >
-              {saving ? "Saving..." : "Save Workspace"}
-            </Button>
-          </div>
+          {message ? (
+            <div className="rounded-[24px] border border-slate-200/80 bg-white/80 px-4 py-4 text-sm text-slate-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300">
+              {message}
+            </div>
+          ) : null}
+
+          {renderSection()}
+
+          <SettingsSaveBar
+            dirty={dirty && canManageSettings}
+            saving={saving}
+            message={message}
+            onReset={onResetWorkspace}
+            onSave={onSaveWorkspace}
+          />
         </div>
+      </SettingsShell>
 
-        {!canManageSettings ? (
-          <div className="rounded-[24px] border border-amber-200/80 bg-amber-50/90 px-4 py-4 text-sm text-amber-800 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-200">
-            Bu workspace-də settings dəyişmək səlahiyyəti yalnız owner/admin üçündür.
-          </div>
-        ) : null}
-
-        {message ? (
-          <div className="rounded-[24px] border border-slate-200/80 bg-white/80 px-4 py-4 text-sm text-slate-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300">
-            {message}
-          </div>
-        ) : null}
-
-        {renderSection()}
-
-        <SettingsSaveBar
-          dirty={dirty && canManageSettings}
-          saving={saving}
-          message={message}
-          onReset={onResetWorkspace}
-          onSave={onSaveWorkspace}
-        />
-      </div>
-    </SettingsShell>
+      <SyncRunsModal
+        open={syncRunsOpen}
+        source={syncRunsSource}
+        items={syncRunsItems}
+        onClose={() => {
+          setSyncRunsOpen(false);
+          setSyncRunsSource(null);
+          setSyncRunsItems([]);
+        }}
+      />
+    </>
   );
 }

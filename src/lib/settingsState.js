@@ -1,5 +1,5 @@
 // src/lib/settingsState.js
-// FINAL v2.1 — settings dirty helpers aligned with tenant business brain sections
+// FINAL v2.2 — settings dirty helpers aligned with tenant business brain + source intelligence
 
 function stableSortObject(value) {
   if (Array.isArray(value)) {
@@ -72,6 +72,18 @@ export function buildSettingsDirtyMap(currentWorkspace, initialWorkspace) {
       initialWorkspace?.agents || []
     ),
 
+    // new source intelligence layer
+    sources: isSettingsDirty(
+      currentWorkspace?.sources || [],
+      initialWorkspace?.sources || []
+    ),
+
+    knowledge_review: isSettingsDirty(
+      currentWorkspace?.knowledgeReview || [],
+      initialWorkspace?.knowledgeReview || []
+    ),
+
+    // keep these false until full sync/save lifecycle is deliberately wired
     channels: false,
     team: false,
     notifications: false,
