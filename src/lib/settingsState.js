@@ -1,5 +1,5 @@
 // src/lib/settingsState.js
-// FINAL v2.0 — settings dirty helpers aligned with tenant business brain sections
+// FINAL v2.1 — settings dirty helpers aligned with tenant business brain sections
 
 function stableSortObject(value) {
   if (Array.isArray(value)) {
@@ -47,16 +47,6 @@ export function buildSettingsDirtyMap(currentWorkspace, initialWorkspace) {
       initialWorkspace?.aiPolicy || {}
     ),
 
-    channels: isSettingsDirty(
-      currentWorkspace?.channels || [],
-      initialWorkspace?.channels || []
-    ),
-
-    agents: isSettingsDirty(
-      currentWorkspace?.agents || [],
-      initialWorkspace?.agents || []
-    ),
-
     business_facts: isSettingsDirty(
       currentWorkspace?.businessFacts || [],
       initialWorkspace?.businessFacts || []
@@ -77,6 +67,12 @@ export function buildSettingsDirtyMap(currentWorkspace, initialWorkspace) {
       initialWorkspace?.contacts || []
     ),
 
+    agents: isSettingsDirty(
+      currentWorkspace?.agents || [],
+      initialWorkspace?.agents || []
+    ),
+
+    channels: false,
     team: false,
     notifications: false,
   };
