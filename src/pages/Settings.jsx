@@ -1,5 +1,5 @@
 // src/pages/Settings.jsx
-// PREMIUM v5.3 — final settings assembly + tenant business brain + source intelligence
+// PREMIUM v5.4 — final settings assembly + tenant business brain + source intelligence + stable dirty sync
 
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -411,7 +411,9 @@ function SourcesPanel({
     }
   }
 
-  const connectedCount = items.filter((x) => String(x.status).toLowerCase() === "connected").length;
+  const connectedCount = items.filter(
+    (x) => String(x.status).toLowerCase() === "connected"
+  ).length;
   const enabledCount = items.filter((x) => !!x.is_enabled).length;
 
   return (
@@ -508,7 +510,9 @@ function SourceCard({
     is_enabled: typeof item?.is_enabled === "boolean" ? item.is_enabled : true,
     is_primary: typeof item?.is_primary === "boolean" ? item.is_primary : false,
     permissions_json:
-      item && typeof item.permissions_json === "object" && !Array.isArray(item.permissions_json)
+      item &&
+      typeof item.permissions_json === "object" &&
+      !Array.isArray(item.permissions_json)
         ? item.permissions_json
         : {
             allowProfileRead: true,
@@ -516,7 +520,62 @@ function SourceCard({
             allowBusinessInference: true,
             requireApprovalForCriticalFacts: true,
           },
+    settings_json:
+      item &&
+      typeof item.settings_json === "object" &&
+      !Array.isArray(item.settings_json)
+        ? item.settings_json
+        : {},
+    metadata_json:
+      item &&
+      typeof item.metadata_json === "object" &&
+      !Array.isArray(item.metadata_json)
+        ? item.metadata_json
+        : {},
   });
+
+  useEffect(() => {
+    setLocal({
+      id: item?.id || "",
+      source_type: item?.source_type || "website",
+      source_key: item?.source_key || "",
+      display_name: item?.display_name || "",
+      status: item?.status || "pending",
+      auth_status: item?.auth_status || "not_required",
+      sync_status: item?.sync_status || "idle",
+      connection_mode: item?.connection_mode || "manual",
+      access_scope: item?.access_scope || "public",
+      source_url: item?.source_url || "",
+      external_account_id: item?.external_account_id || "",
+      external_page_id: item?.external_page_id || "",
+      external_username: item?.external_username || "",
+      is_enabled: typeof item?.is_enabled === "boolean" ? item.is_enabled : true,
+      is_primary: typeof item?.is_primary === "boolean" ? item.is_primary : false,
+      permissions_json:
+        item &&
+        typeof item.permissions_json === "object" &&
+        !Array.isArray(item.permissions_json)
+          ? item.permissions_json
+          : {
+              allowProfileRead: true,
+              allowFutureSync: true,
+              allowBusinessInference: true,
+              requireApprovalForCriticalFacts: true,
+            },
+      settings_json:
+        item &&
+        typeof item.settings_json === "object" &&
+        !Array.isArray(item.settings_json)
+          ? item.settings_json
+          : {},
+      metadata_json:
+        item &&
+        typeof item.metadata_json === "object" &&
+        !Array.isArray(item.metadata_json)
+          ? item.metadata_json
+          : {},
+    });
+  }, [item]);
 
   const Icon = getSourceTypeIcon(local.source_type);
 
@@ -568,10 +627,7 @@ function SourceCard({
           <div className="flex flex-wrap items-center gap-2">
             {local.id ? (
               <>
-                <Button
-                  variant="secondary"
-                  onClick={() => onViewSyncRuns(local)}
-                >
+                <Button variant="secondary" onClick={() => onViewSyncRuns(local)}>
                   Sync Runs
                 </Button>
                 <Button
@@ -854,7 +910,9 @@ function KnowledgeReviewPanel({
     }
   }
 
-  const conflictCount = items.filter((x) => String(x.status).toLowerCase() === "conflict").length;
+  const conflictCount = items.filter(
+    (x) => String(x.status).toLowerCase() === "conflict"
+  ).length;
 
   return (
     <SettingsSection
@@ -984,7 +1042,9 @@ function KnowledgeCandidateCard({
                     {ev?.label || ev?.field || `Evidence ${idx + 1}`}
                   </div>
                   <div className="mt-1 break-words text-xs leading-5 text-slate-500 dark:text-slate-400">
-                    {typeof ev === "string" ? ev : ev?.value || ev?.text || JSON.stringify(ev)}
+                    {typeof ev === "string"
+                      ? ev
+                      : ev?.value || ev?.text || JSON.stringify(ev)}
                   </div>
                 </div>
               ))}
@@ -1269,7 +1329,11 @@ function NotificationsPanel({
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
-                <Button onClick={enableNotifications} disabled={pushBusy} leftIcon={<BellRing className="h-4 w-4" />}>
+                <Button
+                  onClick={enableNotifications}
+                  disabled={pushBusy}
+                  leftIcon={<BellRing className="h-4 w-4" />}
+                >
                   {pushBusy ? "Aktiv edilir..." : "Enable Notifications"}
                 </Button>
               </div>
@@ -1390,6 +1454,20 @@ function BusinessFactCard({ item, canManage, onSave, onDelete, saving, deleting 
     enabled: typeof item?.enabled === "boolean" ? item.enabled : true,
     source_type: item?.source_type || "manual",
   });
+
+  useEffect(() => {
+    setLocal({
+      id: item?.id || "",
+      fact_key: item?.fact_key || "",
+      fact_group: item?.fact_group || "general",
+      title: item?.title || "",
+      value_text: item?.value_text || "",
+      language: item?.language || "az",
+      priority: item?.priority ?? 100,
+      enabled: typeof item?.enabled === "boolean" ? item.enabled : true,
+      source_type: item?.source_type || "manual",
+    });
+  }, [item]);
 
   function patch(key, value) {
     setLocal((prev) => ({ ...prev, [key]: value }));
@@ -1584,6 +1662,27 @@ function ChannelPolicyCard({ item, canManage, onSave, onDelete, saving, deleting
     reply_style: item?.reply_style || "",
     max_reply_sentences: item?.max_reply_sentences ?? 2,
   });
+
+  useEffect(() => {
+    setLocal({
+      id: item?.id || "",
+      channel: item?.channel || "instagram",
+      subchannel: item?.subchannel || "default",
+      enabled: typeof item?.enabled === "boolean" ? item.enabled : true,
+      auto_reply_enabled:
+        typeof item?.auto_reply_enabled === "boolean" ? item.auto_reply_enabled : true,
+      ai_reply_enabled:
+        typeof item?.ai_reply_enabled === "boolean" ? item.ai_reply_enabled : true,
+      human_handoff_enabled:
+        typeof item?.human_handoff_enabled === "boolean" ? item.human_handoff_enabled : true,
+      pricing_visibility: item?.pricing_visibility || "inherit",
+      public_reply_mode: item?.public_reply_mode || "inherit",
+      contact_capture_mode: item?.contact_capture_mode || "inherit",
+      escalation_mode: item?.escalation_mode || "inherit",
+      reply_style: item?.reply_style || "",
+      max_reply_sentences: item?.max_reply_sentences ?? 2,
+    });
+  }, [item]);
 
   function patch(key, value) {
     setLocal((prev) => ({ ...prev, [key]: value }));
@@ -1815,6 +1914,23 @@ function LocationCard({ item, canManage, onSave, onDelete, saving, deleting }) {
     sort_order: item?.sort_order ?? 0,
   });
 
+  useEffect(() => {
+    setLocal({
+      id: item?.id || "",
+      location_key: item?.location_key || "",
+      title: item?.title || "",
+      country_code: item?.country_code || "AZ",
+      city: item?.city || "",
+      address_line: item?.address_line || "",
+      map_url: item?.map_url || "",
+      phone: item?.phone || "",
+      email: item?.email || "",
+      is_primary: typeof item?.is_primary === "boolean" ? item.is_primary : false,
+      enabled: typeof item?.enabled === "boolean" ? item.enabled : true,
+      sort_order: item?.sort_order ?? 0,
+    });
+  }, [item]);
+
   function patch(key, value) {
     setLocal((prev) => ({ ...prev, [key]: value }));
   }
@@ -2021,6 +2137,23 @@ function ContactCard({ item, canManage, onSave, onDelete, saving, deleting }) {
     sort_order: item?.sort_order ?? 0,
   });
 
+  useEffect(() => {
+    setLocal({
+      id: item?.id || "",
+      contact_key: item?.contact_key || "",
+      channel: item?.channel || "phone",
+      label: item?.label || "",
+      value: item?.value || "",
+      is_primary: typeof item?.is_primary === "boolean" ? item.is_primary : false,
+      enabled: typeof item?.enabled === "boolean" ? item.enabled : true,
+      visible_public:
+        typeof item?.visible_public === "boolean" ? item.visible_public : true,
+      visible_in_ai:
+        typeof item?.visible_in_ai === "boolean" ? item.visible_in_ai : true,
+      sort_order: item?.sort_order ?? 0,
+    });
+  }, [item]);
+
   function patch(key, value) {
     setLocal((prev) => ({ ...prev, [key]: value }));
   }
@@ -2170,7 +2303,7 @@ function normalizeWorkspace(raw) {
   );
 
   return {
-    tenantKey: tenant?.tenant_key || "neox",
+    tenantKey: tenant?.tenant_key || raw?.tenantKey || "neox",
     viewerRole: String(raw?.viewerRole || raw?.role || "owner").trim().toLowerCase(),
 
     tenant: {
@@ -2247,45 +2380,31 @@ function normalizeWorkspace(raw) {
       quiet_hours_enabled:
         typeof ai?.quiet_hours_enabled === "boolean" ? ai.quiet_hours_enabled : false,
       quiet_hours:
-        ai &&
-        typeof ai.quiet_hours === "object" &&
-        !Array.isArray(ai.quiet_hours)
+        ai && typeof ai.quiet_hours === "object" && !Array.isArray(ai.quiet_hours)
           ? ai.quiet_hours
           : { startHour: 0, endHour: 0 },
       inbox_policy:
-        ai &&
-        typeof ai.inbox_policy === "object" &&
-        !Array.isArray(ai.inbox_policy)
+        ai && typeof ai.inbox_policy === "object" && !Array.isArray(ai.inbox_policy)
           ? ai.inbox_policy
           : {},
       comment_policy:
-        ai &&
-        typeof ai.comment_policy === "object" &&
-        !Array.isArray(ai.comment_policy)
+        ai && typeof ai.comment_policy === "object" && !Array.isArray(ai.comment_policy)
           ? ai.comment_policy
           : {},
       content_policy:
-        ai &&
-        typeof ai.content_policy === "object" &&
-        !Array.isArray(ai.content_policy)
+        ai && typeof ai.content_policy === "object" && !Array.isArray(ai.content_policy)
           ? ai.content_policy
           : {},
       escalation_rules:
-        ai &&
-        typeof ai.escalation_rules === "object" &&
-        !Array.isArray(ai.escalation_rules)
+        ai && typeof ai.escalation_rules === "object" && !Array.isArray(ai.escalation_rules)
           ? ai.escalation_rules
           : {},
       risk_rules:
-        ai &&
-        typeof ai.risk_rules === "object" &&
-        !Array.isArray(ai.risk_rules)
+        ai && typeof ai.risk_rules === "object" && !Array.isArray(ai.risk_rules)
           ? ai.risk_rules
           : {},
       lead_scoring_rules:
-        ai &&
-        typeof ai.lead_scoring_rules === "object" &&
-        !Array.isArray(ai.lead_scoring_rules)
+        ai && typeof ai.lead_scoring_rules === "object" && !Array.isArray(ai.lead_scoring_rules)
           ? ai.lead_scoring_rules
           : {},
       publish_policy: {
@@ -2338,7 +2457,9 @@ function buildSafeWorkspaceSavePayload(workspace) {
       : {};
 
   const schedule =
-    publishPolicy && typeof publishPolicy.schedule === "object" && !Array.isArray(publishPolicy.schedule)
+    publishPolicy &&
+    typeof publishPolicy.schedule === "object" &&
+    !Array.isArray(publishPolicy.schedule)
       ? publishPolicy.schedule
       : {};
 
@@ -2548,6 +2669,22 @@ function createNewContact() {
   };
 }
 
+function replaceWorkspaceSlice(prev, patch) {
+  return {
+    ...prev,
+    ...patch,
+  };
+}
+
+function syncWorkspaceAndInitial({
+  setWorkspace,
+  setInitialWorkspace,
+  patch,
+}) {
+  setWorkspace((prev) => replaceWorkspaceSlice(prev, patch));
+  setInitialWorkspace((prev) => replaceWorkspaceSlice(prev, patch));
+}
+
 export default function Settings() {
   const [activeSection, setActiveSection] = useState("general");
   const [loading, setLoading] = useState(true);
@@ -2568,6 +2705,7 @@ export default function Settings() {
       knowledgeReview: [],
     })
   );
+
   const [initialWorkspace, setInitialWorkspace] = useState(() =>
     normalizeWorkspace({
       tenant: { tenant_key: "neox" },
@@ -2621,6 +2759,7 @@ export default function Settings() {
 
   const viewerRole = String(workspace?.viewerRole || "owner").toLowerCase();
   const canManageSettings = viewerRole === "owner" || viewerRole === "admin";
+  const tenantKey = String(workspace?.tenantKey || initialWorkspace?.tenantKey || "neox").trim() || "neox";
 
   const navItems = useMemo(
     () => [
@@ -2738,8 +2877,13 @@ export default function Settings() {
       setMessage("");
 
       try {
+        const settings = await getWorkspaceSettings();
+        if (!mounted) return;
+
+        const detectedTenantKey =
+          String(settings?.tenant?.tenant_key || settings?.tenantKey || "neox").trim() || "neox";
+
         const [
-          settings,
           ag,
           facts,
           policies,
@@ -2748,20 +2892,20 @@ export default function Settings() {
           srcs,
           review,
         ] = await Promise.all([
-          getWorkspaceSettings(),
           getWorkspaceAgents().catch(() => []),
           getTenantBusinessFacts().catch(() => []),
           getTenantChannelPolicies().catch(() => []),
           getTenantLocations().catch(() => []),
           getTenantContacts().catch(() => []),
-          listSettingsSources().then((x) => x.items).catch(() => []),
-          listKnowledgeReviewQueue().then((x) => x.items).catch(() => []),
+          listSettingsSources({ tenantKey: detectedTenantKey }).then((x) => x.items).catch(() => []),
+          listKnowledgeReviewQueue({ tenantKey: detectedTenantKey }).then((x) => x.items).catch(() => []),
         ]);
 
         if (!mounted) return;
 
         const normalized = normalizeWorkspace({
           ...settings,
+          tenantKey: detectedTenantKey,
           agents: Array.isArray(ag) ? ag : [],
           businessFacts: Array.isArray(facts) ? facts : [],
           channelPolicies: Array.isArray(policies) ? policies : [],
@@ -2792,6 +2936,7 @@ export default function Settings() {
     }
 
     loadAll();
+
     return () => {
       mounted = false;
     };
@@ -2836,6 +2981,7 @@ export default function Settings() {
 
       const normalized = normalizeWorkspace({
         ...res,
+        tenantKey,
         agents,
         businessFacts,
         channelPolicies,
@@ -2856,14 +3002,16 @@ export default function Settings() {
   }
 
   function onResetWorkspace() {
-    setWorkspace(initialWorkspace);
-    setAgents(Array.isArray(initialWorkspace?.agents) ? initialWorkspace.agents : []);
-    setBusinessFacts(Array.isArray(initialWorkspace?.businessFacts) ? initialWorkspace.businessFacts : []);
-    setChannelPolicies(Array.isArray(initialWorkspace?.channelPolicies) ? initialWorkspace.channelPolicies : []);
-    setLocations(Array.isArray(initialWorkspace?.locations) ? initialWorkspace.locations : []);
-    setContacts(Array.isArray(initialWorkspace?.contacts) ? initialWorkspace.contacts : []);
-    setSources(Array.isArray(initialWorkspace?.sources) ? initialWorkspace.sources : []);
-    setKnowledgeReview(Array.isArray(initialWorkspace?.knowledgeReview) ? initialWorkspace.knowledgeReview : []);
+    const reset = initialWorkspace;
+
+    setWorkspace(reset);
+    setAgents(Array.isArray(reset?.agents) ? reset.agents : []);
+    setBusinessFacts(Array.isArray(reset?.businessFacts) ? reset.businessFacts : []);
+    setChannelPolicies(Array.isArray(reset?.channelPolicies) ? reset.channelPolicies : []);
+    setLocations(Array.isArray(reset?.locations) ? reset.locations : []);
+    setContacts(Array.isArray(reset?.contacts) ? reset.contacts : []);
+    setSources(Array.isArray(reset?.sources) ? reset.sources : []);
+    setKnowledgeReview(Array.isArray(reset?.knowledgeReview) ? reset.knowledgeReview : []);
     setMessage("↩️ Dəyişikliklər geri qaytarıldı.");
   }
 
@@ -2889,7 +3037,12 @@ export default function Settings() {
       const nextAgents = Array.isArray(ag) ? ag : [];
 
       setAgents(nextAgents);
-      setWorkspace((prev) => ({ ...prev, agents: nextAgents }));
+      syncWorkspaceAndInitial({
+        setWorkspace,
+        setInitialWorkspace,
+        patch: { agents: nextAgents },
+      });
+
       setMessage(`✅ ${agentKey} agent yeniləndi.`);
     } catch (e) {
       setMessage(String(e?.message || e));
@@ -2914,19 +3067,22 @@ export default function Settings() {
     setLocations(nextLocations);
     setContacts(nextContacts);
 
-    setWorkspace((prev) => ({
-      ...prev,
-      businessFacts: nextFacts,
-      channelPolicies: nextPolicies,
-      locations: nextLocations,
-      contacts: nextContacts,
-    }));
+    syncWorkspaceAndInitial({
+      setWorkspace,
+      setInitialWorkspace,
+      patch: {
+        businessFacts: nextFacts,
+        channelPolicies: nextPolicies,
+        locations: nextLocations,
+        contacts: nextContacts,
+      },
+    });
   }
 
   async function refreshSourceIntelligence() {
     const [srcs, review] = await Promise.all([
-      listSettingsSources().then((x) => x.items).catch(() => []),
-      listKnowledgeReviewQueue().then((x) => x.items).catch(() => []),
+      listSettingsSources({ tenantKey }).then((x) => x.items).catch(() => []),
+      listKnowledgeReviewQueue({ tenantKey }).then((x) => x.items).catch(() => []),
     ]);
 
     const nextSources = Array.isArray(srcs) ? srcs : [];
@@ -2935,11 +3091,14 @@ export default function Settings() {
     setSources(nextSources);
     setKnowledgeReview(nextReview);
 
-    setWorkspace((prev) => ({
-      ...prev,
-      sources: nextSources,
-      knowledgeReview: nextReview,
-    }));
+    syncWorkspaceAndInitial({
+      setWorkspace,
+      setInitialWorkspace,
+      patch: {
+        sources: nextSources,
+        knowledgeReview: nextReview,
+      },
+    });
   }
 
   async function handleSaveBusinessFact(payload) {
@@ -3002,6 +3161,7 @@ export default function Settings() {
     if (!canManageSettings) return;
 
     const cleanPayload = {
+      tenantKey,
       sourceType: payload?.source_type || "website",
       sourceKey: payload?.source_key || "",
       displayName: payload?.display_name || "",
@@ -3017,15 +3177,21 @@ export default function Settings() {
       isEnabled: !!payload?.is_enabled,
       isPrimary: !!payload?.is_primary,
       permissionsJson:
-        payload && typeof payload.permissions_json === "object" && !Array.isArray(payload.permissions_json)
+        payload &&
+        typeof payload.permissions_json === "object" &&
+        !Array.isArray(payload.permissions_json)
           ? payload.permissions_json
           : {},
       settingsJson:
-        payload && typeof payload.settings_json === "object" && !Array.isArray(payload.settings_json)
+        payload &&
+        typeof payload.settings_json === "object" &&
+        !Array.isArray(payload.settings_json)
           ? payload.settings_json
           : {},
       metadataJson:
-        payload && typeof payload.metadata_json === "object" && !Array.isArray(payload.metadata_json)
+        payload &&
+        typeof payload.metadata_json === "object" &&
+        !Array.isArray(payload.metadata_json)
           ? payload.metadata_json
           : {},
     };
@@ -3043,19 +3209,26 @@ export default function Settings() {
 
   async function handleStartSourceSync(item) {
     if (!canManageSettings || !item?.id) return;
+
     await startSettingsSourceSync(item.id, {
+      tenantKey,
       runType: "sync",
       triggerType: "manual",
       runnerKey: "settings.manual",
     });
+
     await refreshSourceIntelligence();
-    setMessage("✅ Source sync başladıldı.");
+    setMessage("✅ Source sync tamamlandı.");
   }
 
   async function handleViewSourceSyncRuns(item) {
     if (!item?.id) return;
 
-    const res = await getSettingsSourceSyncRuns(item.id, { limit: 20 });
+    const res = await getSettingsSourceSyncRuns(item.id, {
+      tenantKey,
+      limit: 20,
+    });
+
     setSyncRunsSource(res?.source || item);
     setSyncRunsItems(Array.isArray(res?.items) ? res.items : []);
     setSyncRunsOpen(true);
@@ -3065,6 +3238,7 @@ export default function Settings() {
     if (!canManageSettings || !item?.id) return;
 
     await approveKnowledgeCandidate(item.id, {
+      tenantKey,
       reason: "Approved from Settings knowledge review",
     });
 
@@ -3077,6 +3251,7 @@ export default function Settings() {
     if (!canManageSettings || !item?.id) return;
 
     await rejectKnowledgeCandidate(item.id, {
+      tenantKey,
       reason: "Rejected from Settings knowledge review",
     });
 
