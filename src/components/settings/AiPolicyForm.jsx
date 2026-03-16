@@ -1,5 +1,5 @@
 // src/components/settings/AiPolicyForm.jsx
-// PREMIUM v3.0 — editorial AI policy control surface
+// PREMIUM v3.1 — editorial AI policy control surface (schedule-safe)
 
 import {
   AlarmClock,
@@ -64,7 +64,7 @@ function Field({ label, hint, children }) {
   );
 }
 
-function Select({ value, onChange, children }) {
+function Select({ value, onChange, children, disabled = false }) {
   return (
     <div
       className={cx(
@@ -75,7 +75,8 @@ function Select({ value, onChange, children }) {
         "focus-within:border-sky-300/90 focus-within:shadow-[inset_0_1px_0_rgba(255,255,255,0.82),0_0_0_4px_rgba(56,189,248,0.08),0_16px_38px_rgba(15,23,42,0.08)]",
         "dark:border-white/10 dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.72),rgba(2,6,23,0.80))]",
         "dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_18px_44px_rgba(0,0,0,0.46)]",
-        "dark:focus-within:border-sky-400/30 dark:focus-within:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_0_0_4px_rgba(56,189,248,0.10),0_18px_46px_rgba(0,0,0,0.52)]"
+        "dark:focus-within:border-sky-400/30 dark:focus-within:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_0_0_4px_rgba(56,189,248,0.10),0_18px_46px_rgba(0,0,0,0.52)]",
+        disabled ? "opacity-70" : ""
       )}
     >
       <div
@@ -89,6 +90,7 @@ function Select({ value, onChange, children }) {
       <select
         value={value}
         onChange={onChange}
+        disabled={disabled}
         className="relative z-10 h-12 w-full appearance-none bg-transparent px-4 text-[14px] text-slate-900 outline-none dark:text-slate-100"
       >
         {children}
@@ -97,7 +99,7 @@ function Select({ value, onChange, children }) {
   );
 }
 
-function PolicyToggleCard({ icon, title, subtitle, checked, onChange }) {
+function PolicyToggleCard({ icon, title, subtitle, checked, onChange, disabled = false }) {
   const Icon = icon;
 
   return (
@@ -139,7 +141,7 @@ function PolicyToggleCard({ icon, title, subtitle, checked, onChange }) {
           </div>
         </div>
 
-        <Toggle checked={checked} onChange={onChange} />
+        <Toggle checked={checked} onChange={onChange} disabled={disabled} />
       </div>
     </Card>
   );
@@ -174,8 +176,33 @@ function countEnabled(values = []) {
   return values.filter(Boolean).length;
 }
 
-export default function AiPolicyForm({ aiPolicy = {}, patchAi }) {
-  const draftSchedule = aiPolicy?.publish_policy?.draftSchedule || {
+function clampHour(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return 10;
+  return Math.max(0, Math.min(23, n));
+}
+
+function clampMinute(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(59, n));
+}
+
+function toTimeString(hour, minute) {
+  return `${String(clampHour(hour)).padStart(2, "0")}:${String(clampMinute(minute)).padStart(2, "0")}`;
+}
+
+export default function AiPolicyForm({
+  aiPolicy = {},
+  patchAi,
+  canManage = true,
+}) {
+  const publishPolicy =
+    aiPolicy?.publish_policy && typeof aiPolicy.publish_policy === "object"
+      ? aiPolicy.publish_policy
+      : {};
+
+  const draftSchedule = publishPolicy?.draftSchedule || {
     enabled: false,
     hour: 10,
     minute: 0,
@@ -183,12 +210,36 @@ export default function AiPolicyForm({ aiPolicy = {}, patchAi }) {
     format: "image",
   };
 
+  const currentSchedule = publishPolicy?.schedule || {
+    enabled: !!draftSchedule.enabled,
+    time: toTimeString(draftSchedule.hour, draftSchedule.minute),
+    timezone: draftSchedule.timezone || "Asia/Baku",
+  };
+
   function patchDraftSchedule(key, value) {
+    const nextDraftSchedule = {
+      ...draftSchedule,
+      [key]: value,
+    };
+
+    const nextHour = clampHour(nextDraftSchedule.hour);
+    const nextMinute = clampMinute(nextDraftSchedule.minute);
+    const nextTimezone = String(nextDraftSchedule.timezone || "Asia/Baku").trim() || "Asia/Baku";
+    const nextEnabled = !!nextDraftSchedule.enabled;
+
     patchAi("publish_policy", {
-      ...(aiPolicy.publish_policy || {}),
+      ...publishPolicy,
       draftSchedule: {
-        ...draftSchedule,
-        [key]: value,
+        ...nextDraftSchedule,
+        hour: nextHour,
+        minute: nextMinute,
+        timezone: nextTimezone,
+      },
+      schedule: {
+        ...currentSchedule,
+        enabled: nextEnabled,
+        time: toTimeString(nextHour, nextMinute),
+        timezone: nextTimezone,
       },
     });
   }
@@ -391,6 +442,7 @@ export default function AiPolicyForm({ aiPolicy = {}, patchAi }) {
                     title={item.title}
                     subtitle={item.subtitle}
                     checked={item.checked}
+                    disabled={!canManage}
                     onChange={(v) => patchAi(item.key, v)}
                   />
                 ))}
@@ -423,6 +475,7 @@ export default function AiPolicyForm({ aiPolicy = {}, patchAi }) {
                     title={item.title}
                     subtitle={item.subtitle}
                     checked={item.checked}
+                    disabled={!canManage}
                     onChange={(v) => patchAi(item.key, v)}
                   />
                 ))}
@@ -454,6 +507,7 @@ export default function AiPolicyForm({ aiPolicy = {}, patchAi }) {
                 title="Enable Quiet Hours"
                 subtitle="Müəyyən vaxt pəncərəsində cavablar dayansın."
                 checked={quietHoursEnabled}
+                disabled={!canManage}
                 onChange={(v) => patchAi("quiet_hours_enabled", v)}
               />
 
@@ -466,6 +520,7 @@ export default function AiPolicyForm({ aiPolicy = {}, patchAi }) {
                     type="number"
                     min={0}
                     max={23}
+                    disabled={!canManage}
                     value={aiPolicy.quiet_hours?.startHour ?? 0}
                     onChange={(e) =>
                       patchAi("quiet_hours", {
@@ -487,6 +542,7 @@ export default function AiPolicyForm({ aiPolicy = {}, patchAi }) {
                     type="number"
                     min={0}
                     max={23}
+                    disabled={!canManage}
                     value={aiPolicy.quiet_hours?.endHour ?? 0}
                     onChange={(e) =>
                       patchAi("quiet_hours", {
@@ -525,6 +581,7 @@ export default function AiPolicyForm({ aiPolicy = {}, patchAi }) {
                 title="Enable Draft Schedule"
                 subtitle="Müəyyən saatda draft avtomatik yaradılsın."
                 checked={!!draftSchedule.enabled}
+                disabled={!canManage}
                 onChange={(v) => patchDraftSchedule("enabled", v)}
               />
 
@@ -534,12 +591,10 @@ export default function AiPolicyForm({ aiPolicy = {}, patchAi }) {
                     type="number"
                     min={0}
                     max={23}
+                    disabled={!canManage}
                     value={draftSchedule.hour ?? 10}
                     onChange={(e) =>
-                      patchDraftSchedule(
-                        "hour",
-                        Math.max(0, Math.min(23, Number(e.target.value || 0)))
-                      )
+                      patchDraftSchedule("hour", Number(e.target.value || 0))
                     }
                   />
                 </Field>
@@ -549,12 +604,10 @@ export default function AiPolicyForm({ aiPolicy = {}, patchAi }) {
                     type="number"
                     min={0}
                     max={59}
+                    disabled={!canManage}
                     value={draftSchedule.minute ?? 0}
                     onChange={(e) =>
-                      patchDraftSchedule(
-                        "minute",
-                        Math.max(0, Math.min(59, Number(e.target.value || 0)))
-                      )
+                      patchDraftSchedule("minute", Number(e.target.value || 0))
                     }
                   />
                 </Field>
@@ -562,6 +615,7 @@ export default function AiPolicyForm({ aiPolicy = {}, patchAi }) {
                 <Field label="Timezone" hint="Primary execution timezone.">
                   <Input
                     value={draftSchedule.timezone || "Asia/Baku"}
+                    disabled={!canManage}
                     onChange={(e) =>
                       patchDraftSchedule("timezone", e.target.value)
                     }
@@ -571,6 +625,7 @@ export default function AiPolicyForm({ aiPolicy = {}, patchAi }) {
                 <Field label="Format" hint="Generated content format.">
                   <Select
                     value={draftSchedule.format || "image"}
+                    disabled={!canManage}
                     onChange={(e) => patchDraftSchedule("format", e.target.value)}
                   >
                     <option value="image">image</option>

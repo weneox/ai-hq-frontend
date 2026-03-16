@@ -1,5 +1,5 @@
 // src/components/settings/BrandProfileForm.jsx
-// PREMIUM v3.0 — editorial brand profile form
+// PREMIUM v3.1 — editorial brand profile form (read-only aware)
 
 import {
   BadgeCheck,
@@ -43,6 +43,7 @@ function SurfaceTextArea({
   onChange,
   min = 120,
   placeholder = "",
+  disabled = false,
 }) {
   return (
     <div
@@ -54,7 +55,8 @@ function SurfaceTextArea({
         "focus-within:border-sky-300/90 focus-within:shadow-[inset_0_1px_0_rgba(255,255,255,0.82),0_0_0_4px_rgba(56,189,248,0.08),0_16px_38px_rgba(15,23,42,0.08)]",
         "dark:border-white/10 dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.72),rgba(2,6,23,0.80))]",
         "dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_18px_44px_rgba(0,0,0,0.46)]",
-        "dark:focus-within:border-sky-400/30 dark:focus-within:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_0_0_4px_rgba(56,189,248,0.10),0_18px_46px_rgba(0,0,0,0.52)]"
+        "dark:focus-within:border-sky-400/30 dark:focus-within:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_0_0_4px_rgba(56,189,248,0.10),0_18px_46px_rgba(0,0,0,0.52)]",
+        disabled ? "opacity-70" : ""
       )}
     >
       <div
@@ -69,6 +71,7 @@ function SurfaceTextArea({
         value={value || ""}
         onChange={onChange}
         placeholder={placeholder}
+        disabled={disabled}
         style={{ minHeight: min }}
         className={cx(
           "relative z-10 w-full resize-y bg-transparent px-4 py-3.5 text-[14px] outline-none",
@@ -118,7 +121,11 @@ function phraseCount(value) {
   return Array.isArray(value) ? value.length : 0;
 }
 
-export default function BrandProfileForm({ profile = {}, patchProfile }) {
+export default function BrandProfileForm({
+  profile = {},
+  patchProfile,
+  canManage = true,
+}) {
   const brandName = profile.brand_name || "Untitled Brand";
   const website = profile.website_url || "No website set";
   const bannedCount = phraseCount(profile.banned_phrases);
@@ -239,6 +246,7 @@ export default function BrandProfileForm({ profile = {}, patchProfile }) {
                   <Input
                     value={profile.brand_name || ""}
                     placeholder="Neox"
+                    disabled={!canManage}
                     onChange={(e) => patchProfile("brand_name", e.target.value)}
                   />
                 </Field>
@@ -247,6 +255,7 @@ export default function BrandProfileForm({ profile = {}, patchProfile }) {
                   <Input
                     value={profile.website_url || ""}
                     placeholder="https://example.com"
+                    disabled={!canManage}
                     onChange={(e) => patchProfile("website_url", e.target.value)}
                   />
                 </Field>
@@ -255,6 +264,7 @@ export default function BrandProfileForm({ profile = {}, patchProfile }) {
                   <Input
                     value={profile.public_email || ""}
                     placeholder="hello@example.com"
+                    disabled={!canManage}
                     onChange={(e) => patchProfile("public_email", e.target.value)}
                   />
                 </Field>
@@ -263,6 +273,7 @@ export default function BrandProfileForm({ profile = {}, patchProfile }) {
                   <Input
                     value={profile.public_phone || ""}
                     placeholder="+994 ..."
+                    disabled={!canManage}
                     onChange={(e) => patchProfile("public_phone", e.target.value)}
                   />
                 </Field>
@@ -295,6 +306,7 @@ export default function BrandProfileForm({ profile = {}, patchProfile }) {
                   <Input
                     value={profile.tone_of_voice || ""}
                     placeholder="premium, confident, clear"
+                    disabled={!canManage}
                     onChange={(e) =>
                       patchProfile("tone_of_voice", e.target.value)
                     }
@@ -308,6 +320,7 @@ export default function BrandProfileForm({ profile = {}, patchProfile }) {
                   <Input
                     value={profile.preferred_cta || ""}
                     placeholder="Book a strategy call"
+                    disabled={!canManage}
                     onChange={(e) =>
                       patchProfile("preferred_cta", e.target.value)
                     }
@@ -321,6 +334,7 @@ export default function BrandProfileForm({ profile = {}, patchProfile }) {
                   >
                     <SurfaceTextArea
                       min={120}
+                      disabled={!canManage}
                       value={profile.audience_summary || ""}
                       placeholder="Primary audience, buyer intent, expectations..."
                       onChange={(e) =>
@@ -359,6 +373,7 @@ export default function BrandProfileForm({ profile = {}, patchProfile }) {
                 >
                   <SurfaceTextArea
                     min={132}
+                    disabled={!canManage}
                     value={profile.services_summary || ""}
                     placeholder="What the company does, core services, delivery shape..."
                     onChange={(e) =>
@@ -373,6 +388,7 @@ export default function BrandProfileForm({ profile = {}, patchProfile }) {
                 >
                   <SurfaceTextArea
                     min={132}
+                    disabled={!canManage}
                     value={profile.value_proposition || ""}
                     placeholder="Why this brand matters, why buyers should choose it..."
                     onChange={(e) =>
@@ -408,6 +424,7 @@ export default function BrandProfileForm({ profile = {}, patchProfile }) {
                 >
                   <SurfaceTextArea
                     min={160}
+                    disabled={!canManage}
                     value={profile.brand_summary || ""}
                     placeholder="Brand story, positioning, worldview, authority..."
                     onChange={(e) =>
@@ -423,6 +440,7 @@ export default function BrandProfileForm({ profile = {}, patchProfile }) {
                   <Input
                     value={stringifyCsv(profile.banned_phrases)}
                     placeholder="cheap, guaranteed results, best in the world"
+                    disabled={!canManage}
                     onChange={(e) =>
                       patchProfile("banned_phrases", parseCsv(e.target.value))
                     }

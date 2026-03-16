@@ -1,5 +1,5 @@
 // src/components/settings/WorkspaceGeneralForm.jsx
-// PREMIUM v3.0 — editorial workspace general form
+// PREMIUM v3.1 — editorial workspace general form (read-only aware)
 
 import {
   Activity,
@@ -118,6 +118,7 @@ export default function WorkspaceGeneralForm({
   tenantKey,
   tenant = {},
   patchTenant,
+  canManage = true,
 }) {
   const companyName = tenant.company_name || "Untitled Workspace";
   const enabledLanguages = tenant.enabled_languages || [];
@@ -249,6 +250,7 @@ export default function WorkspaceGeneralForm({
                   <Input
                     value={tenant.company_name || ""}
                     placeholder="Neox Company"
+                    disabled={!canManage}
                     onChange={(e) => patchTenant("company_name", e.target.value)}
                   />
                 </Field>
@@ -260,6 +262,7 @@ export default function WorkspaceGeneralForm({
                   <Input
                     value={tenant.legal_name || ""}
                     placeholder="Neox Company LLC"
+                    disabled={!canManage}
                     onChange={(e) => patchTenant("legal_name", e.target.value)}
                   />
                 </Field>
@@ -271,6 +274,7 @@ export default function WorkspaceGeneralForm({
                   <Input
                     value={tenant.industry_key || ""}
                     placeholder="technology"
+                    disabled={!canManage}
                     onChange={(e) => patchTenant("industry_key", e.target.value)}
                   />
                 </Field>
@@ -310,6 +314,7 @@ export default function WorkspaceGeneralForm({
                   <Input
                     value={tenant.timezone || ""}
                     placeholder="Asia/Baku"
+                    disabled={!canManage}
                     onChange={(e) => patchTenant("timezone", e.target.value)}
                   />
                 </Field>
@@ -321,6 +326,7 @@ export default function WorkspaceGeneralForm({
                   <Input
                     value={tenant.default_language || ""}
                     placeholder="az"
+                    disabled={!canManage}
                     onChange={(e) =>
                       patchTenant("default_language", e.target.value)
                     }
@@ -334,6 +340,7 @@ export default function WorkspaceGeneralForm({
                   <Input
                     value={tenant.country_code || ""}
                     placeholder="AZ"
+                    disabled={!canManage}
                     onChange={(e) => patchTenant("country_code", e.target.value)}
                   />
                 </Field>
@@ -345,6 +352,7 @@ export default function WorkspaceGeneralForm({
                   <Input
                     value={tenant.market_region || ""}
                     placeholder="CIS"
+                    disabled={!canManage}
                     onChange={(e) => patchTenant("market_region", e.target.value)}
                   />
                 </Field>
@@ -357,6 +365,7 @@ export default function WorkspaceGeneralForm({
                     <Input
                       value={stringifyCsv(enabledLanguages)}
                       placeholder="az, en"
+                      disabled={!canManage}
                       onChange={(e) =>
                         patchTenant("enabled_languages", parseCsv(e.target.value))
                       }

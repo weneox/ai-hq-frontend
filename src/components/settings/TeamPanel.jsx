@@ -1,5 +1,5 @@
 // src/components/settings/TeamPanel.jsx
-// PREMIUM v3.0 — editorial team management panel
+// PREMIUM v4.0 — editorial team management panel (backend-aligned)
 
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -11,6 +11,7 @@ import {
   Trash2,
   UserPlus,
   Users,
+  KeyRound,
 } from "lucide-react";
 
 import {
@@ -33,6 +34,7 @@ const EMPTY_FORM = {
   full_name: "",
   role: "member",
   status: "invited",
+  password: "",
 };
 
 function Field({ label, hint, children }) {
@@ -133,6 +135,12 @@ function formatDate(v) {
   }
 }
 
+function normalizeTeamResponseUser(payload) {
+  if (!payload) return null;
+  if (payload?.user) return payload.user;
+  return payload;
+}
+
 export default function TeamPanel({ canManage = false }) {
   const [items, setItems] = useState([]);
   const [selectedId, setSelectedId] = useState("");
@@ -169,6 +177,7 @@ export default function TeamPanel({ canManage = false }) {
   const filtered = useMemo(() => {
     const q = String(query || "").trim().toLowerCase();
     if (!q) return items;
+
     return items.filter((u) => {
       const hay =
         `${u?.full_name || ""} ${u?.user_email || ""} ${u?.role || ""} ${u?.status || ""}`.toLowerCase();
@@ -191,44 +200,69 @@ export default function TeamPanel({ canManage = false }) {
         full_name: selected.full_name || "",
         role: selected.role || "member",
         status: selected.status || "invited",
+        password: "",
       });
-      return;
+    } else {
+      setForm(EMPTY_FORM);
     }
-    setForm(EMPTY_FORM);
   }, [selected?.id]);
 
   useEffect(() => {
-    if (!selectedId && filtered[0]?.id) {
-      setSelectedId(filtered[0].id);
+    if (selectedId && !items.some((x) => x.id === selectedId)) {
+      setSelectedId(filtered[0]?.id || "");
+      return;
     }
-    if (selectedId && !items.some((x) => x.id === selectedId) && filtered[0]?.id) {
+
+    if (!selectedId && filtered[0]?.id) {
       setSelectedId(filtered[0].id);
     }
   }, [filtered, items, selectedId]);
 
   const dirty = useMemo(() => {
-    if (!selected) return JSON.stringify(form) !== JSON.stringify(EMPTY_FORM);
+    if (!selected) {
+      return JSON.stringify(form) !== JSON.stringify(EMPTY_FORM);
+    }
+
     const base = {
       user_email: selected.user_email || "",
       full_name: selected.full_name || "",
       role: selected.role || "member",
       status: selected.status || "invited",
+      password: "",
     };
+
     return JSON.stringify(form) !== JSON.stringify(base);
   }, [form, selected]);
+
+  function resetCreateForm() {
+    setSelectedId("");
+    setForm(EMPTY_FORM);
+    setError("");
+    setSuccess("");
+  }
 
   async function handleCreate() {
     setCreating(true);
     setError("");
     setSuccess("");
+
     try {
-      const user = await createTeamUser({
+      const payload = {
         user_email: form.user_email,
         full_name: form.full_name,
         role: form.role,
         status: form.status,
-      });
+      };
+
+      if (String(form.password || "").trim()) {
+        payload.password = String(form.password || "").trim();
+      }
+
+      const res = await createTeamUser(payload);
+      const user = normalizeTeamResponseUser(res);
+
       if (!user?.id) throw new Error("User was not created");
+
       setSuccess("Team user yaradıldı");
       await load();
       setSelectedId(user.id);
@@ -241,17 +275,24 @@ export default function TeamPanel({ canManage = false }) {
 
   async function handleSave() {
     if (!selected?.id) return;
+
     setSaving(true);
     setError("");
     setSuccess("");
+
     try {
-      const user = await updateTeamUser(selected.id, {
+      const payload = {
         user_email: form.user_email,
         full_name: form.full_name,
         role: form.role,
         status: form.status,
-      });
+      };
+
+      const res = await updateTeamUser(selected.id, payload);
+      const user = normalizeTeamResponseUser(res);
+
       if (!user?.id) throw new Error("User was not updated");
+
       setSuccess("Team user yeniləndi");
       await load();
       setSelectedId(user.id);
@@ -264,12 +305,17 @@ export default function TeamPanel({ canManage = false }) {
 
   async function handleStatus(status) {
     if (!selected?.id) return;
+
     setSaving(true);
     setError("");
     setSuccess("");
+
     try {
-      const user = await setTeamUserStatus(selected.id, status);
+      const res = await setTeamUserStatus(selected.id, status);
+      const user = normalizeTeamResponseUser(res);
+
       if (!user?.id) throw new Error("Status was not updated");
+
       setSuccess("Status yeniləndi");
       await load();
       setSelectedId(user.id);
@@ -282,6 +328,7 @@ export default function TeamPanel({ canManage = false }) {
 
   async function handleDelete() {
     if (!selected?.id) return;
+
     const yes = window.confirm(
       `${selected.full_name || selected.user_email} silinsin?`
     );
@@ -290,9 +337,13 @@ export default function TeamPanel({ canManage = false }) {
     setSaving(true);
     setError("");
     setSuccess("");
+
     try {
-      const deleted = await deleteTeamUser(selected.id);
-      if (!deleted) throw new Error("Delete failed");
+      const res = await deleteTeamUser(selected.id);
+      const deletedOk = !!(res?.deleted || res?.ok || res === true);
+
+      if (!deletedOk) throw new Error("Delete failed");
+
       setSuccess("User silindi");
       setSelectedId("");
       await load();
@@ -426,9 +477,21 @@ export default function TeamPanel({ canManage = false }) {
                   </div>
                 </div>
 
-                <Badge tone="neutral" variant="subtle">
-                  {items.length} nəfər
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Badge tone="neutral" variant="subtle">
+                    {items.length} nəfər
+                  </Badge>
+
+                  {canManage ? (
+                    <Button
+                      variant="secondary"
+                      onClick={resetCreateForm}
+                      leftIcon={<UserPlus className="h-4 w-4" />}
+                    >
+                      New
+                    </Button>
+                  ) : null}
+                </div>
               </div>
 
               <div className="space-y-3">
@@ -592,6 +655,23 @@ export default function TeamPanel({ canManage = false }) {
                           />
                         </Field>
                       </div>
+
+                      {!selected ? (
+                        <div className="md:col-span-2">
+                          <Field label="Password" hint="İstəyə bağlıdır. Local login üçün təyin oluna bilər.">
+                            <Input
+                              type="password"
+                              value={form.password}
+                              onChange={(e) =>
+                                setForm((s) => ({ ...s, password: e.target.value }))
+                              }
+                              placeholder="••••••••"
+                              disabled={!canManage}
+                              leftIcon={<KeyRound className="h-4 w-4" />}
+                            />
+                          </Field>
+                        </div>
+                      ) : null}
 
                       <Field label="Role" hint="Assigned permission scope.">
                         <Select

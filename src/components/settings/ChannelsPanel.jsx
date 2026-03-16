@@ -1,3 +1,6 @@
+// src/components/settings/ChannelsPanel.jsx
+// PREMIUM v3.1 — branded Instagram connect panel (stable)
+
 import { useEffect, useState } from "react";
 import {
   CheckCircle2,
@@ -353,7 +356,11 @@ export default function ChannelsPanel({ canManage = true }) {
                         )
                       }
                     >
-                      {meta.connected ? "Reconnect Instagram" : "Connect Instagram"}
+                      {busy
+                        ? "Processing..."
+                        : meta.connected
+                        ? "Reconnect Instagram"
+                        : "Connect Instagram"}
                     </Button>
 
                     <Button

@@ -1,4 +1,5 @@
 // src/lib/settingsState.js
+// FINAL v2.0 — settings dirty helpers aligned with tenant business brain sections
 
 function stableSortObject(value) {
   if (Array.isArray(value)) {
@@ -31,11 +32,52 @@ export function isSettingsDirty(currentValue, initialValue) {
 
 export function buildSettingsDirtyMap(currentWorkspace, initialWorkspace) {
   return {
-    general: isSettingsDirty(currentWorkspace?.tenant || {}, initialWorkspace?.tenant || {}),
-    brand: isSettingsDirty(currentWorkspace?.profile || {}, initialWorkspace?.profile || {}),
-    ai_policy: isSettingsDirty(currentWorkspace?.aiPolicy || {}, initialWorkspace?.aiPolicy || {}),
-    channels: false,
-    agents: false,
+    general: isSettingsDirty(
+      currentWorkspace?.tenant || {},
+      initialWorkspace?.tenant || {}
+    ),
+
+    brand: isSettingsDirty(
+      currentWorkspace?.profile || {},
+      initialWorkspace?.profile || {}
+    ),
+
+    ai_policy: isSettingsDirty(
+      currentWorkspace?.aiPolicy || {},
+      initialWorkspace?.aiPolicy || {}
+    ),
+
+    channels: isSettingsDirty(
+      currentWorkspace?.channels || [],
+      initialWorkspace?.channels || []
+    ),
+
+    agents: isSettingsDirty(
+      currentWorkspace?.agents || [],
+      initialWorkspace?.agents || []
+    ),
+
+    business_facts: isSettingsDirty(
+      currentWorkspace?.businessFacts || [],
+      initialWorkspace?.businessFacts || []
+    ),
+
+    channel_policies: isSettingsDirty(
+      currentWorkspace?.channelPolicies || [],
+      initialWorkspace?.channelPolicies || []
+    ),
+
+    locations: isSettingsDirty(
+      currentWorkspace?.locations || [],
+      initialWorkspace?.locations || []
+    ),
+
+    contacts: isSettingsDirty(
+      currentWorkspace?.contacts || [],
+      initialWorkspace?.contacts || []
+    ),
+
+    team: false,
     notifications: false,
   };
 }

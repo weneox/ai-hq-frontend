@@ -1,16 +1,20 @@
 // src/pages/Settings.jsx
-// PREMIUM v4.1 — final settings assembly with branded channel connect flow
+// PREMIUM v5.2 — final settings assembly + tenant business brain sections
 
 import { useEffect, useMemo, useState } from "react";
 import {
   BellRing,
   Bot,
   Building2,
+  MapPin,
   RefreshCw,
   ShieldCheck,
   Sparkles,
   Users,
   Waypoints,
+  BrainCircuit,
+  Contact2,
+  ListTree,
 } from "lucide-react";
 
 import Card from "../components/ui/Card.jsx";
@@ -33,12 +37,26 @@ import {
   getNotificationPermission,
   subscribePush,
 } from "../lib/pushClient.js";
+
 import {
   getWorkspaceSettings,
   saveWorkspaceSettings,
   getWorkspaceAgents,
   saveWorkspaceAgent,
+  getTenantBusinessFacts,
+  saveTenantBusinessFact,
+  deleteTenantBusinessFact,
+  getTenantChannelPolicies,
+  saveTenantChannelPolicy,
+  deleteTenantChannelPolicy,
+  getTenantLocations,
+  saveTenantLocation,
+  deleteTenantLocation,
+  getTenantContacts,
+  saveTenantContact,
+  deleteTenantContact,
 } from "../api/settings.js";
+
 import { isSettingsDirty, buildSettingsDirtyMap } from "../lib/settingsState.js";
 import { cx } from "../lib/cx.js";
 
@@ -202,6 +220,47 @@ function FeatureToggleCard({
         </div>
 
         <Toggle checked={checked} onChange={onChange} disabled={disabled} />
+      </div>
+    </Card>
+  );
+}
+
+function RowActions({ onSave, onDelete, saving, deleting, canManage }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Button onClick={onSave} disabled={!canManage || saving}>
+        {saving ? "Saving..." : "Save"}
+      </Button>
+      <Button
+        variant="secondary"
+        onClick={onDelete}
+        disabled={!canManage || deleting}
+      >
+        {deleting ? "Deleting..." : "Delete"}
+      </Button>
+    </div>
+  );
+}
+
+function EmptyState({ title, subtitle, actionLabel, onAction, disabled = false }) {
+  return (
+    <Card variant="subtle" padded="lg" className="rounded-[28px]">
+      <div className="space-y-4">
+        <div>
+          <div className="text-base font-semibold text-slate-900 dark:text-white">
+            {title}
+          </div>
+          <div className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
+            {subtitle}
+          </div>
+        </div>
+        {actionLabel ? (
+          <div>
+            <Button onClick={onAction} disabled={disabled}>
+              {actionLabel}
+            </Button>
+          </div>
+        ) : null}
       </div>
     </Card>
   );
@@ -512,6 +571,818 @@ function NotificationsPanel({
   );
 }
 
+function BusinessFactsPanel({
+  items,
+  canManage,
+  onCreate,
+  onSave,
+  onDelete,
+}) {
+  const [savingId, setSavingId] = useState("");
+  const [deletingId, setDeletingId] = useState("");
+
+  async function handleSave(item) {
+    setSavingId(String(item.id || item.fact_key || "new"));
+    try {
+      await onSave(item);
+    } finally {
+      setSavingId("");
+    }
+  }
+
+  async function handleDelete(item) {
+    if (!item?.id) return;
+    setDeletingId(String(item.id));
+    try {
+      await onDelete(item.id);
+    } finally {
+      setDeletingId("");
+    }
+  }
+
+  return (
+    <SettingsSection
+      eyebrow="Business Brain"
+      title="Business Facts"
+      subtitle="Şirkətə aid əsas faktlar, qaydalar, pricing qaydaları, satış məntiqi və xüsusi cavab konteksti."
+      tone="default"
+    >
+      <div className="space-y-4">
+        <div className="flex justify-end">
+          <Button onClick={onCreate} disabled={!canManage} leftIcon={<BrainCircuit className="h-4 w-4" />}>
+            Add Fact
+          </Button>
+        </div>
+
+        {!items.length ? (
+          <EmptyState
+            title="Hələ business fact yoxdur"
+            subtitle="Qiymət qaydaları, çatdırılma qaydaları, xüsusi cavab qaydaları və s. buraya əlavə olunmalıdır."
+            actionLabel="Create First Fact"
+            onAction={onCreate}
+            disabled={!canManage}
+          />
+        ) : (
+          <div className="space-y-4">
+            {items.map((item, idx) => (
+              <BusinessFactCard
+                key={item.id || `${item.fact_key || "fact"}-${idx}`}
+                item={item}
+                canManage={canManage}
+                saving={savingId === String(item.id || item.fact_key || "new")}
+                deleting={deletingId === String(item.id || "")}
+                onSave={handleSave}
+                onDelete={handleDelete}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </SettingsSection>
+  );
+}
+
+function BusinessFactCard({ item, canManage, onSave, onDelete, saving, deleting }) {
+  const [local, setLocal] = useState({
+    id: item?.id || "",
+    fact_key: item?.fact_key || "",
+    fact_group: item?.fact_group || "general",
+    title: item?.title || "",
+    value_text: item?.value_text || "",
+    language: item?.language || "az",
+    priority: item?.priority ?? 100,
+    enabled: typeof item?.enabled === "boolean" ? item.enabled : true,
+    source_type: item?.source_type || "manual",
+  });
+
+  function patch(key, value) {
+    setLocal((prev) => ({ ...prev, [key]: value }));
+  }
+
+  return (
+    <Card variant="surface" padded="lg" className="rounded-[28px]">
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Field label="Fact Key" hint="Məs: pricing_policy, shipping_rule, service_scope">
+          <Input
+            value={local.fact_key}
+            disabled={!canManage}
+            onChange={(e) => patch("fact_key", e.target.value)}
+            placeholder="pricing_policy"
+          />
+        </Field>
+
+        <Field label="Group" hint="general, pricing, support, sales və s.">
+          <Input
+            value={local.fact_group}
+            disabled={!canManage}
+            onChange={(e) => patch("fact_group", e.target.value)}
+            placeholder="general"
+          />
+        </Field>
+
+        <Field label="Title" hint="UI və admin üçün qısa başlıq">
+          <Input
+            value={local.title}
+            disabled={!canManage}
+            onChange={(e) => patch("title", e.target.value)}
+            placeholder="Pricing Policy"
+          />
+        </Field>
+
+        <Field label="Language" hint="az / en / ru / tr">
+          <Input
+            value={local.language}
+            disabled={!canManage}
+            onChange={(e) => patch("language", e.target.value)}
+            placeholder="az"
+          />
+        </Field>
+
+        <Field label="Priority" hint="Kiçik rəqəm daha prioritetli olur">
+          <Input
+            type="number"
+            value={local.priority}
+            disabled={!canManage}
+            onChange={(e) => patch("priority", Number(e.target.value || 100))}
+            placeholder="100"
+          />
+        </Field>
+
+        <Field label="Source Type" hint="manual / imported / derived / system">
+          <Select
+            value={local.source_type}
+            disabled={!canManage}
+            onChange={(e) => patch("source_type", e.target.value)}
+          >
+            <option value="manual">manual</option>
+            <option value="imported">imported</option>
+            <option value="derived">derived</option>
+            <option value="system">system</option>
+          </Select>
+        </Field>
+
+        <div className="lg:col-span-2">
+          <Field label="Value Text" hint="AI burada əsas business konteksti kimi istifadə edəcək">
+            <textarea
+              value={local.value_text}
+              disabled={!canManage}
+              onChange={(e) => patch("value_text", e.target.value)}
+              placeholder="Qiymətlər avtomatik yazılmamalıdır. İstifadəçi qiymət soruşarsa əvvəl ehtiyacını dəqiqləşdir və sonra DM/contact capture et."
+              className="min-h-[140px] w-full rounded-[22px] border border-slate-200/80 bg-white/90 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-sky-300/90 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-100"
+            />
+          </Field>
+        </div>
+
+        <div className="lg:col-span-2 flex items-center justify-between gap-4 rounded-[22px] border border-slate-200/80 bg-slate-50/80 px-4 py-4 dark:border-white/10 dark:bg-white/[0.03]">
+          <div className="space-y-1">
+            <div className="text-sm font-semibold text-slate-900 dark:text-white">
+              Enabled
+            </div>
+            <div className="text-xs text-slate-500 dark:text-slate-400">
+              Bu fact AI tərəfindən istifadə olunsun.
+            </div>
+          </div>
+          <Toggle checked={!!local.enabled} onChange={(v) => patch("enabled", v)} disabled={!canManage} />
+        </div>
+
+        <div className="lg:col-span-2">
+          <RowActions
+            canManage={canManage}
+            saving={saving}
+            deleting={deleting}
+            onSave={() => onSave(local)}
+            onDelete={() => onDelete(local)}
+          />
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function ChannelPoliciesPanel({
+  items,
+  canManage,
+  onCreate,
+  onSave,
+  onDelete,
+}) {
+  const [savingId, setSavingId] = useState("");
+  const [deletingId, setDeletingId] = useState("");
+
+  async function handleSave(item) {
+    setSavingId(String(item.id || `${item.channel}:${item.subchannel}`));
+    try {
+      await onSave(item);
+    } finally {
+      setSavingId("");
+    }
+  }
+
+  async function handleDelete(id) {
+    setDeletingId(String(id || ""));
+    try {
+      await onDelete(id);
+    } finally {
+      setDeletingId("");
+    }
+  }
+
+  return (
+    <SettingsSection
+      eyebrow="Business Brain"
+      title="Channel Policies"
+      subtitle="Instagram DM, comments, WhatsApp və digər kanallar üzrə davranış qaydaları."
+      tone="default"
+    >
+      <div className="space-y-4">
+        <div className="flex justify-end">
+          <Button onClick={onCreate} disabled={!canManage} leftIcon={<ListTree className="h-4 w-4" />}>
+            Add Policy
+          </Button>
+        </div>
+
+        {!items.length ? (
+          <EmptyState
+            title="Hələ channel policy yoxdur"
+            subtitle="Məsələn Instagram commentdə qiymət public yazılsın ya yox, DM-də auto-reply aktiv olsun ya yox kimi qaydalar."
+            actionLabel="Create First Policy"
+            onAction={onCreate}
+            disabled={!canManage}
+          />
+        ) : (
+          <div className="space-y-4">
+            {items.map((item, idx) => (
+              <ChannelPolicyCard
+                key={item.id || `${item.channel || "channel"}-${idx}`}
+                item={item}
+                canManage={canManage}
+                saving={savingId === String(item.id || `${item.channel}:${item.subchannel}`)}
+                deleting={deletingId === String(item.id || "")}
+                onSave={handleSave}
+                onDelete={handleDelete}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </SettingsSection>
+  );
+}
+
+function ChannelPolicyCard({ item, canManage, onSave, onDelete, saving, deleting }) {
+  const [local, setLocal] = useState({
+    id: item?.id || "",
+    channel: item?.channel || "instagram",
+    subchannel: item?.subchannel || "default",
+    enabled: typeof item?.enabled === "boolean" ? item.enabled : true,
+    auto_reply_enabled:
+      typeof item?.auto_reply_enabled === "boolean" ? item.auto_reply_enabled : true,
+    ai_reply_enabled:
+      typeof item?.ai_reply_enabled === "boolean" ? item.ai_reply_enabled : true,
+    human_handoff_enabled:
+      typeof item?.human_handoff_enabled === "boolean" ? item.human_handoff_enabled : true,
+    pricing_visibility: item?.pricing_visibility || "inherit",
+    public_reply_mode: item?.public_reply_mode || "inherit",
+    contact_capture_mode: item?.contact_capture_mode || "inherit",
+    escalation_mode: item?.escalation_mode || "inherit",
+    reply_style: item?.reply_style || "",
+    max_reply_sentences: item?.max_reply_sentences ?? 2,
+  });
+
+  function patch(key, value) {
+    setLocal((prev) => ({ ...prev, [key]: value }));
+  }
+
+  return (
+    <Card variant="surface" padded="lg" className="rounded-[28px]">
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Field label="Channel" hint="instagram / whatsapp / facebook / comments">
+          <Input
+            value={local.channel}
+            disabled={!canManage}
+            onChange={(e) => patch("channel", e.target.value)}
+            placeholder="instagram"
+          />
+        </Field>
+
+        <Field label="Subchannel" hint="default, dm, comments və s.">
+          <Input
+            value={local.subchannel}
+            disabled={!canManage}
+            onChange={(e) => patch("subchannel", e.target.value)}
+            placeholder="default"
+          />
+        </Field>
+
+        <Field label="Pricing Visibility">
+          <Select
+            value={local.pricing_visibility}
+            disabled={!canManage}
+            onChange={(e) => patch("pricing_visibility", e.target.value)}
+          >
+            <option value="inherit">inherit</option>
+            <option value="hidden">hidden</option>
+            <option value="allowed">allowed</option>
+            <option value="redirect_to_dm">redirect_to_dm</option>
+            <option value="quote_only">quote_only</option>
+          </Select>
+        </Field>
+
+        <Field label="Public Reply Mode">
+          <Select
+            value={local.public_reply_mode}
+            disabled={!canManage}
+            onChange={(e) => patch("public_reply_mode", e.target.value)}
+          >
+            <option value="inherit">inherit</option>
+            <option value="disabled">disabled</option>
+            <option value="short_public">short_public</option>
+            <option value="dm_redirect">dm_redirect</option>
+            <option value="operator_only">operator_only</option>
+          </Select>
+        </Field>
+
+        <Field label="Contact Capture Mode">
+          <Select
+            value={local.contact_capture_mode}
+            disabled={!canManage}
+            onChange={(e) => patch("contact_capture_mode", e.target.value)}
+          >
+            <option value="inherit">inherit</option>
+            <option value="never">never</option>
+            <option value="optional">optional</option>
+            <option value="required_before_quote">required_before_quote</option>
+            <option value="required_before_handoff">required_before_handoff</option>
+          </Select>
+        </Field>
+
+        <Field label="Escalation Mode">
+          <Select
+            value={local.escalation_mode}
+            disabled={!canManage}
+            onChange={(e) => patch("escalation_mode", e.target.value)}
+          >
+            <option value="inherit">inherit</option>
+            <option value="manual">manual</option>
+            <option value="automatic">automatic</option>
+            <option value="operator_only">operator_only</option>
+          </Select>
+        </Field>
+
+        <Field label="Reply Style">
+          <Input
+            value={local.reply_style}
+            disabled={!canManage}
+            onChange={(e) => patch("reply_style", e.target.value)}
+            placeholder="short, warm, premium"
+          />
+        </Field>
+
+        <Field label="Max Reply Sentences">
+          <Input
+            type="number"
+            value={local.max_reply_sentences}
+            disabled={!canManage}
+            onChange={(e) => patch("max_reply_sentences", Number(e.target.value || 2))}
+            placeholder="2"
+          />
+        </Field>
+
+        <div className="lg:col-span-2 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <FeatureToggleCard
+            title="Enabled"
+            subtitle="Bu policy aktiv olsun"
+            checked={!!local.enabled}
+            onChange={(v) => patch("enabled", v)}
+            disabled={!canManage}
+          />
+          <FeatureToggleCard
+            title="Auto Reply"
+            subtitle="Kanal üzrə auto reply aktiv"
+            checked={!!local.auto_reply_enabled}
+            onChange={(v) => patch("auto_reply_enabled", v)}
+            disabled={!canManage}
+          />
+          <FeatureToggleCard
+            title="AI Reply"
+            subtitle="AI reply istifadə edilsin"
+            checked={!!local.ai_reply_enabled}
+            onChange={(v) => patch("ai_reply_enabled", v)}
+            disabled={!canManage}
+          />
+          <FeatureToggleCard
+            title="Human Handoff"
+            subtitle="Human escalation icazəli olsun"
+            checked={!!local.human_handoff_enabled}
+            onChange={(v) => patch("human_handoff_enabled", v)}
+            disabled={!canManage}
+          />
+        </div>
+
+        <div className="lg:col-span-2">
+          <RowActions
+            canManage={canManage}
+            saving={saving}
+            deleting={deleting}
+            onSave={() => onSave(local)}
+            onDelete={() => onDelete(local.id)}
+          />
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function LocationsPanel({
+  items,
+  canManage,
+  onCreate,
+  onSave,
+  onDelete,
+}) {
+  const [savingId, setSavingId] = useState("");
+  const [deletingId, setDeletingId] = useState("");
+
+  async function handleSave(item) {
+    setSavingId(String(item.id || item.location_key || "new"));
+    try {
+      await onSave(item);
+    } finally {
+      setSavingId("");
+    }
+  }
+
+  async function handleDelete(id) {
+    setDeletingId(String(id || ""));
+    try {
+      await onDelete(id);
+    } finally {
+      setDeletingId("");
+    }
+  }
+
+  return (
+    <SettingsSection
+      eyebrow="Business Brain"
+      title="Locations"
+      subtitle="Filiallar, address, working hours, map link və delivery area məlumatları."
+      tone="default"
+    >
+      <div className="space-y-4">
+        <div className="flex justify-end">
+          <Button onClick={onCreate} disabled={!canManage} leftIcon={<MapPin className="h-4 w-4" />}>
+            Add Location
+          </Button>
+        </div>
+
+        {!items.length ? (
+          <EmptyState
+            title="Hələ location yoxdur"
+            subtitle="Filial və ya ofis məlumatlarını əlavə et ki sistem branch/location əsaslı cavab verə bilsin."
+            actionLabel="Create First Location"
+            onAction={onCreate}
+            disabled={!canManage}
+          />
+        ) : (
+          <div className="space-y-4">
+            {items.map((item, idx) => (
+              <LocationCard
+                key={item.id || `${item.location_key || "location"}-${idx}`}
+                item={item}
+                canManage={canManage}
+                saving={savingId === String(item.id || item.location_key || "new")}
+                deleting={deletingId === String(item.id || "")}
+                onSave={handleSave}
+                onDelete={handleDelete}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </SettingsSection>
+  );
+}
+
+function LocationCard({ item, canManage, onSave, onDelete, saving, deleting }) {
+  const [local, setLocal] = useState({
+    id: item?.id || "",
+    location_key: item?.location_key || "",
+    title: item?.title || "",
+    country_code: item?.country_code || "AZ",
+    city: item?.city || "",
+    address_line: item?.address_line || "",
+    map_url: item?.map_url || "",
+    phone: item?.phone || "",
+    email: item?.email || "",
+    is_primary: typeof item?.is_primary === "boolean" ? item.is_primary : false,
+    enabled: typeof item?.enabled === "boolean" ? item.enabled : true,
+    sort_order: item?.sort_order ?? 0,
+  });
+
+  function patch(key, value) {
+    setLocal((prev) => ({ ...prev, [key]: value }));
+  }
+
+  return (
+    <Card variant="surface" padded="lg" className="rounded-[28px]">
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Field label="Location Key">
+          <Input
+            value={local.location_key}
+            disabled={!canManage}
+            onChange={(e) => patch("location_key", e.target.value)}
+            placeholder="main_office"
+          />
+        </Field>
+
+        <Field label="Title">
+          <Input
+            value={local.title}
+            disabled={!canManage}
+            onChange={(e) => patch("title", e.target.value)}
+            placeholder="Main Office"
+          />
+        </Field>
+
+        <Field label="Country Code">
+          <Input
+            value={local.country_code}
+            disabled={!canManage}
+            onChange={(e) => patch("country_code", e.target.value)}
+            placeholder="AZ"
+          />
+        </Field>
+
+        <Field label="City">
+          <Input
+            value={local.city}
+            disabled={!canManage}
+            onChange={(e) => patch("city", e.target.value)}
+            placeholder="Baku"
+          />
+        </Field>
+
+        <Field label="Address">
+          <Input
+            value={local.address_line}
+            disabled={!canManage}
+            onChange={(e) => patch("address_line", e.target.value)}
+            placeholder="Street, building, floor"
+          />
+        </Field>
+
+        <Field label="Map URL">
+          <Input
+            value={local.map_url}
+            disabled={!canManage}
+            onChange={(e) => patch("map_url", e.target.value)}
+            placeholder="https://maps..."
+          />
+        </Field>
+
+        <Field label="Phone">
+          <Input
+            value={local.phone}
+            disabled={!canManage}
+            onChange={(e) => patch("phone", e.target.value)}
+            placeholder="+994..."
+          />
+        </Field>
+
+        <Field label="Email">
+          <Input
+            value={local.email}
+            disabled={!canManage}
+            onChange={(e) => patch("email", e.target.value)}
+            placeholder="info@company.com"
+          />
+        </Field>
+
+        <Field label="Sort Order">
+          <Input
+            type="number"
+            value={local.sort_order}
+            disabled={!canManage}
+            onChange={(e) => patch("sort_order", Number(e.target.value || 0))}
+            placeholder="0"
+          />
+        </Field>
+
+        <div className="grid gap-3 md:grid-cols-2">
+          <FeatureToggleCard
+            title="Primary"
+            subtitle="Əsas location"
+            checked={!!local.is_primary}
+            onChange={(v) => patch("is_primary", v)}
+            disabled={!canManage}
+          />
+          <FeatureToggleCard
+            title="Enabled"
+            subtitle="Bu location aktiv olsun"
+            checked={!!local.enabled}
+            onChange={(v) => patch("enabled", v)}
+            disabled={!canManage}
+          />
+        </div>
+
+        <div className="lg:col-span-2">
+          <RowActions
+            canManage={canManage}
+            saving={saving}
+            deleting={deleting}
+            onSave={() => onSave(local)}
+            onDelete={() => onDelete(local.id)}
+          />
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function ContactsPanel({
+  items,
+  canManage,
+  onCreate,
+  onSave,
+  onDelete,
+}) {
+  const [savingId, setSavingId] = useState("");
+  const [deletingId, setDeletingId] = useState("");
+
+  async function handleSave(item) {
+    setSavingId(String(item.id || item.contact_key || "new"));
+    try {
+      await onSave(item);
+    } finally {
+      setSavingId("");
+    }
+  }
+
+  async function handleDelete(id) {
+    setDeletingId(String(id || ""));
+    try {
+      await onDelete(id);
+    } finally {
+      setDeletingId("");
+    }
+  }
+
+  return (
+    <SettingsSection
+      eyebrow="Business Brain"
+      title="Contacts"
+      subtitle="Telefon, email, WhatsApp, Instagram, support line və AI-visible əlaqə kanalları."
+      tone="default"
+    >
+      <div className="space-y-4">
+        <div className="flex justify-end">
+          <Button onClick={onCreate} disabled={!canManage} leftIcon={<Contact2 className="h-4 w-4" />}>
+            Add Contact
+          </Button>
+        </div>
+
+        {!items.length ? (
+          <EmptyState
+            title="Hələ contact yoxdur"
+            subtitle="AI düzgün əlaqə məlumatı verməsi üçün əsas contact record-lar buraya daxil edilməlidir."
+            actionLabel="Create First Contact"
+            onAction={onCreate}
+            disabled={!canManage}
+          />
+        ) : (
+          <div className="space-y-4">
+            {items.map((item, idx) => (
+              <ContactCard
+                key={item.id || `${item.contact_key || "contact"}-${idx}`}
+                item={item}
+                canManage={canManage}
+                saving={savingId === String(item.id || item.contact_key || "new")}
+                deleting={deletingId === String(item.id || "")}
+                onSave={handleSave}
+                onDelete={handleDelete}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </SettingsSection>
+  );
+}
+
+function ContactCard({ item, canManage, onSave, onDelete, saving, deleting }) {
+  const [local, setLocal] = useState({
+    id: item?.id || "",
+    contact_key: item?.contact_key || "",
+    channel: item?.channel || "phone",
+    label: item?.label || "",
+    value: item?.value || "",
+    is_primary: typeof item?.is_primary === "boolean" ? item.is_primary : false,
+    enabled: typeof item?.enabled === "boolean" ? item.enabled : true,
+    visible_public:
+      typeof item?.visible_public === "boolean" ? item.visible_public : true,
+    visible_in_ai:
+      typeof item?.visible_in_ai === "boolean" ? item.visible_in_ai : true,
+    sort_order: item?.sort_order ?? 0,
+  });
+
+  function patch(key, value) {
+    setLocal((prev) => ({ ...prev, [key]: value }));
+  }
+
+  return (
+    <Card variant="surface" padded="lg" className="rounded-[28px]">
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Field label="Contact Key">
+          <Input
+            value={local.contact_key}
+            disabled={!canManage}
+            onChange={(e) => patch("contact_key", e.target.value)}
+            placeholder="main_phone"
+          />
+        </Field>
+
+        <Field label="Channel">
+          <Input
+            value={local.channel}
+            disabled={!canManage}
+            onChange={(e) => patch("channel", e.target.value)}
+            placeholder="phone"
+          />
+        </Field>
+
+        <Field label="Label">
+          <Input
+            value={local.label}
+            disabled={!canManage}
+            onChange={(e) => patch("label", e.target.value)}
+            placeholder="Main Sales Line"
+          />
+        </Field>
+
+        <Field label="Value">
+          <Input
+            value={local.value}
+            disabled={!canManage}
+            onChange={(e) => patch("value", e.target.value)}
+            placeholder="+994..."
+          />
+        </Field>
+
+        <Field label="Sort Order">
+          <Input
+            type="number"
+            value={local.sort_order}
+            disabled={!canManage}
+            onChange={(e) => patch("sort_order", Number(e.target.value || 0))}
+            placeholder="0"
+          />
+        </Field>
+
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 lg:col-span-2">
+          <FeatureToggleCard
+            title="Primary"
+            subtitle="Əsas contact"
+            checked={!!local.is_primary}
+            onChange={(v) => patch("is_primary", v)}
+            disabled={!canManage}
+          />
+          <FeatureToggleCard
+            title="Enabled"
+            subtitle="Record aktiv olsun"
+            checked={!!local.enabled}
+            onChange={(v) => patch("enabled", v)}
+            disabled={!canManage}
+          />
+          <FeatureToggleCard
+            title="Visible Public"
+            subtitle="Public UI üçün görünə bilər"
+            checked={!!local.visible_public}
+            onChange={(v) => patch("visible_public", v)}
+            disabled={!canManage}
+          />
+          <FeatureToggleCard
+            title="Visible In AI"
+            subtitle="AI cavablarında istifadə olunsun"
+            checked={!!local.visible_in_ai}
+            onChange={(v) => patch("visible_in_ai", v)}
+            disabled={!canManage}
+          />
+        </div>
+
+        <div className="lg:col-span-2">
+          <RowActions
+            canManage={canManage}
+            saving={saving}
+            deleting={deleting}
+            onSave={() => onSave(local)}
+            onDelete={() => onDelete(local.id)}
+          />
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 function normalizeWorkspace(raw) {
   const tenant = raw?.tenant || {};
   const profile = raw?.profile || {};
@@ -711,6 +1582,12 @@ function normalizeWorkspace(raw) {
         },
       },
     },
+
+    agents: Array.isArray(raw?.agents) ? raw.agents : [],
+    businessFacts: Array.isArray(raw?.businessFacts) ? raw.businessFacts : [],
+    channelPolicies: Array.isArray(raw?.channelPolicies) ? raw.channelPolicies : [],
+    locations: Array.isArray(raw?.locations) ? raw.locations : [],
+    contacts: Array.isArray(raw?.contacts) ? raw.contacts : [],
   };
 }
 
@@ -873,6 +1750,66 @@ function buildSafeWorkspaceSavePayload(workspace) {
   };
 }
 
+function createNewBusinessFact() {
+  return {
+    fact_key: "",
+    fact_group: "general",
+    title: "",
+    value_text: "",
+    language: "az",
+    priority: 100,
+    enabled: true,
+    source_type: "manual",
+  };
+}
+
+function createNewChannelPolicy() {
+  return {
+    channel: "instagram",
+    subchannel: "default",
+    enabled: true,
+    auto_reply_enabled: true,
+    ai_reply_enabled: true,
+    human_handoff_enabled: true,
+    pricing_visibility: "inherit",
+    public_reply_mode: "inherit",
+    contact_capture_mode: "inherit",
+    escalation_mode: "inherit",
+    reply_style: "",
+    max_reply_sentences: 2,
+  };
+}
+
+function createNewLocation() {
+  return {
+    location_key: "",
+    title: "",
+    country_code: "AZ",
+    city: "",
+    address_line: "",
+    map_url: "",
+    phone: "",
+    email: "",
+    is_primary: false,
+    enabled: true,
+    sort_order: 0,
+  };
+}
+
+function createNewContact() {
+  return {
+    contact_key: "",
+    channel: "phone",
+    label: "",
+    value: "",
+    is_primary: false,
+    enabled: true,
+    visible_public: true,
+    visible_in_ai: true,
+    sort_order: 0,
+  };
+}
+
 export default function Settings() {
   const [activeSection, setActiveSection] = useState("general");
   const [loading, setLoading] = useState(true);
@@ -884,6 +1821,11 @@ export default function Settings() {
       profile: {},
       aiPolicy: {},
       viewerRole: "owner",
+      agents: [],
+      businessFacts: [],
+      channelPolicies: [],
+      locations: [],
+      contacts: [],
     })
   );
   const [initialWorkspace, setInitialWorkspace] = useState(() =>
@@ -892,11 +1834,21 @@ export default function Settings() {
       profile: {},
       aiPolicy: {},
       viewerRole: "owner",
+      agents: [],
+      businessFacts: [],
+      channelPolicies: [],
+      locations: [],
+      contacts: [],
     })
   );
 
   const [agents, setAgents] = useState([]);
   const [agentsLoading, setAgentsLoading] = useState(true);
+
+  const [businessFacts, setBusinessFacts] = useState([]);
+  const [channelPolicies, setChannelPolicies] = useState([]);
+  const [locations, setLocations] = useState([]);
+  const [contacts, setContacts] = useState([]);
 
   const [perm, setPerm] = useState("default");
   const [pushBusy, setPushBusy] = useState(false);
@@ -928,49 +1880,77 @@ export default function Settings() {
         key: "general",
         label: "General",
         description: "Workspace identity, region, language",
-        dirty: dirtyMap.general,
+        dirty: !!dirtyMap.general,
         icon: Building2,
       },
       {
         key: "brand",
         label: "Brand",
         description: "Voice, audience, services, CTA",
-        dirty: dirtyMap.brand,
+        dirty: !!dirtyMap.brand,
         icon: Sparkles,
       },
       {
         key: "ai_policy",
         label: "AI Policy",
         description: "Auto reply, approvals, quiet hours",
-        dirty: dirtyMap.ai_policy,
+        dirty: !!dirtyMap.ai_policy,
         icon: ShieldCheck,
+      },
+      {
+        key: "business_facts",
+        label: "Business Facts",
+        description: "Structured company facts for AI",
+        dirty: !!dirtyMap.business_facts,
+        icon: BrainCircuit,
+      },
+      {
+        key: "channel_policies",
+        label: "Channel Policies",
+        description: "Per-channel reply behavior rules",
+        dirty: !!dirtyMap.channel_policies,
+        icon: ListTree,
+      },
+      {
+        key: "locations",
+        label: "Locations",
+        description: "Branches, address, working hours",
+        dirty: !!dirtyMap.locations,
+        icon: MapPin,
+      },
+      {
+        key: "contacts",
+        label: "Contacts",
+        description: "Phone, email, WhatsApp, public lines",
+        dirty: !!dirtyMap.contacts,
+        icon: Contact2,
       },
       {
         key: "channels",
         label: "Channels",
         description: "Instagram, WhatsApp, Messenger",
-        dirty: dirtyMap.channels,
+        dirty: !!dirtyMap.channels,
         icon: Waypoints,
       },
       {
         key: "agents",
         label: "Agents",
         description: "Agent status, model, enable/disable",
-        dirty: dirtyMap.agents,
+        dirty: !!dirtyMap.agents,
         icon: Bot,
       },
       {
         key: "team",
         label: "Team",
         description: "Workspace users, roles, access",
-        dirty: false,
+        dirty: !!dirtyMap.team,
         icon: Users,
       },
       {
         key: "notifications",
         label: "Notifications",
         description: "Push subscription and browser status",
-        dirty: dirtyMap.notifications,
+        dirty: !!dirtyMap.notifications,
         icon: BellRing,
       },
     ],
@@ -996,17 +1976,41 @@ export default function Settings() {
       setMessage("");
 
       try {
-        const [settings, ag] = await Promise.all([
+        const [
+          settings,
+          ag,
+          facts,
+          policies,
+          locs,
+          conts,
+        ] = await Promise.all([
           getWorkspaceSettings(),
           getWorkspaceAgents().catch(() => []),
+          getTenantBusinessFacts().catch(() => []),
+          getTenantChannelPolicies().catch(() => []),
+          getTenantLocations().catch(() => []),
+          getTenantContacts().catch(() => []),
         ]);
 
         if (!mounted) return;
 
-        const normalized = normalizeWorkspace(settings);
+        const normalized = normalizeWorkspace({
+          ...settings,
+          agents: Array.isArray(ag) ? ag : [],
+          businessFacts: Array.isArray(facts) ? facts : [],
+          channelPolicies: Array.isArray(policies) ? policies : [],
+          locations: Array.isArray(locs) ? locs : [],
+          contacts: Array.isArray(conts) ? conts : [],
+        });
+
         setWorkspace(normalized);
         setInitialWorkspace(normalized);
-        setAgents(Array.isArray(ag) ? ag : []);
+
+        setAgents(normalized.agents);
+        setBusinessFacts(normalized.businessFacts);
+        setChannelPolicies(normalized.channelPolicies);
+        setLocations(normalized.locations);
+        setContacts(normalized.contacts);
       } catch (e) {
         if (!mounted) return;
         setMessage(String(e?.message || e));
@@ -1059,7 +2063,15 @@ export default function Settings() {
     try {
       const payload = buildSafeWorkspaceSavePayload(workspace);
       const res = await saveWorkspaceSettings(payload);
-      const normalized = normalizeWorkspace(res);
+
+      const normalized = normalizeWorkspace({
+        ...res,
+        agents,
+        businessFacts,
+        channelPolicies,
+        locations,
+        contacts,
+      });
 
       setWorkspace(normalized);
       setInitialWorkspace(normalized);
@@ -1073,6 +2085,11 @@ export default function Settings() {
 
   function onResetWorkspace() {
     setWorkspace(initialWorkspace);
+    setAgents(Array.isArray(initialWorkspace?.agents) ? initialWorkspace.agents : []);
+    setBusinessFacts(Array.isArray(initialWorkspace?.businessFacts) ? initialWorkspace.businessFacts : []);
+    setChannelPolicies(Array.isArray(initialWorkspace?.channelPolicies) ? initialWorkspace.channelPolicies : []);
+    setLocations(Array.isArray(initialWorkspace?.locations) ? initialWorkspace.locations : []);
+    setContacts(Array.isArray(initialWorkspace?.contacts) ? initialWorkspace.contacts : []);
     setMessage("↩️ Dəyişikliklər geri qaytarıldı.");
   }
 
@@ -1095,11 +2112,97 @@ export default function Settings() {
       });
 
       const ag = await getWorkspaceAgents();
-      setAgents(Array.isArray(ag) ? ag : []);
+      const nextAgents = Array.isArray(ag) ? ag : [];
+
+      setAgents(nextAgents);
+      setWorkspace((prev) => ({ ...prev, agents: nextAgents }));
       setMessage(`✅ ${agentKey} agent yeniləndi.`);
     } catch (e) {
       setMessage(String(e?.message || e));
     }
+  }
+
+  async function refreshBusinessBrain() {
+    const [facts, policies, locs, conts] = await Promise.all([
+      getTenantBusinessFacts().catch(() => []),
+      getTenantChannelPolicies().catch(() => []),
+      getTenantLocations().catch(() => []),
+      getTenantContacts().catch(() => []),
+    ]);
+
+    const nextFacts = Array.isArray(facts) ? facts : [];
+    const nextPolicies = Array.isArray(policies) ? policies : [];
+    const nextLocations = Array.isArray(locs) ? locs : [];
+    const nextContacts = Array.isArray(conts) ? conts : [];
+
+    setBusinessFacts(nextFacts);
+    setChannelPolicies(nextPolicies);
+    setLocations(nextLocations);
+    setContacts(nextContacts);
+
+    setWorkspace((prev) => ({
+      ...prev,
+      businessFacts: nextFacts,
+      channelPolicies: nextPolicies,
+      locations: nextLocations,
+      contacts: nextContacts,
+    }));
+  }
+
+  async function handleSaveBusinessFact(payload) {
+    if (!canManageSettings) return;
+    await saveTenantBusinessFact(payload);
+    await refreshBusinessBrain();
+    setMessage("✅ Business fact yadda saxlanıldı.");
+  }
+
+  async function handleDeleteBusinessFact(id) {
+    if (!canManageSettings || !id) return;
+    await deleteTenantBusinessFact(id);
+    await refreshBusinessBrain();
+    setMessage("✅ Business fact silindi.");
+  }
+
+  async function handleSaveChannelPolicy(payload) {
+    if (!canManageSettings) return;
+    await saveTenantChannelPolicy(payload);
+    await refreshBusinessBrain();
+    setMessage("✅ Channel policy yadda saxlanıldı.");
+  }
+
+  async function handleDeleteChannelPolicy(id) {
+    if (!canManageSettings || !id) return;
+    await deleteTenantChannelPolicy(id);
+    await refreshBusinessBrain();
+    setMessage("✅ Channel policy silindi.");
+  }
+
+  async function handleSaveLocation(payload) {
+    if (!canManageSettings) return;
+    await saveTenantLocation(payload);
+    await refreshBusinessBrain();
+    setMessage("✅ Location yadda saxlanıldı.");
+  }
+
+  async function handleDeleteLocation(id) {
+    if (!canManageSettings || !id) return;
+    await deleteTenantLocation(id);
+    await refreshBusinessBrain();
+    setMessage("✅ Location silindi.");
+  }
+
+  async function handleSaveContact(payload) {
+    if (!canManageSettings) return;
+    await saveTenantContact(payload);
+    await refreshBusinessBrain();
+    setMessage("✅ Contact yadda saxlanıldı.");
+  }
+
+  async function handleDeleteContact(id) {
+    if (!canManageSettings || !id) return;
+    await deleteTenantContact(id);
+    await refreshBusinessBrain();
+    setMessage("✅ Contact silindi.");
   }
 
   async function enableNotifications() {
@@ -1147,6 +2250,7 @@ export default function Settings() {
             tenantKey={workspace.tenantKey}
             tenant={workspace.tenant}
             patchTenant={patchTenant}
+            canManage={canManageSettings}
           />
         );
 
@@ -1155,19 +2259,84 @@ export default function Settings() {
           <BrandProfileForm
             profile={workspace.profile}
             patchProfile={patchProfile}
+            canManage={canManageSettings}
           />
         );
 
       case "ai_policy":
         return (
           <div className="space-y-6">
-            <AiPolicyForm aiPolicy={workspace.aiPolicy} patchAi={patchAi} />
+            <AiPolicyForm
+              aiPolicy={workspace.aiPolicy}
+              patchAi={patchAi}
+              canManage={canManageSettings}
+            />
             <AutoContentPanel
               aiPolicy={workspace.aiPolicy}
               patchAi={patchAi}
               canManage={canManageSettings}
             />
           </div>
+        );
+
+      case "business_facts":
+        return (
+          <BusinessFactsPanel
+            items={businessFacts}
+            canManage={canManageSettings}
+            onCreate={() => {
+              const next = [createNewBusinessFact(), ...businessFacts];
+              setBusinessFacts(next);
+              setWorkspace((prev) => ({ ...prev, businessFacts: next }));
+            }}
+            onSave={handleSaveBusinessFact}
+            onDelete={handleDeleteBusinessFact}
+          />
+        );
+
+      case "channel_policies":
+        return (
+          <ChannelPoliciesPanel
+            items={channelPolicies}
+            canManage={canManageSettings}
+            onCreate={() => {
+              const next = [createNewChannelPolicy(), ...channelPolicies];
+              setChannelPolicies(next);
+              setWorkspace((prev) => ({ ...prev, channelPolicies: next }));
+            }}
+            onSave={handleSaveChannelPolicy}
+            onDelete={handleDeleteChannelPolicy}
+          />
+        );
+
+      case "locations":
+        return (
+          <LocationsPanel
+            items={locations}
+            canManage={canManageSettings}
+            onCreate={() => {
+              const next = [createNewLocation(), ...locations];
+              setLocations(next);
+              setWorkspace((prev) => ({ ...prev, locations: next }));
+            }}
+            onSave={handleSaveLocation}
+            onDelete={handleDeleteLocation}
+          />
+        );
+
+      case "contacts":
+        return (
+          <ContactsPanel
+            items={contacts}
+            canManage={canManageSettings}
+            onCreate={() => {
+              const next = [createNewContact(), ...contacts];
+              setContacts(next);
+              setWorkspace((prev) => ({ ...prev, contacts: next }));
+            }}
+            onSave={handleSaveContact}
+            onDelete={handleDeleteContact}
+          />
         );
 
       case "channels":
@@ -1205,7 +2374,7 @@ export default function Settings() {
   return (
     <SettingsShell
       title="Settings"
-      subtitle="Workspace, brand, AI policy, team və integrations idarəsi."
+      subtitle="Workspace, brand, AI policy, business brain, team və integrations idarəsi."
       items={navItems}
       activeKey={activeSection}
       onChange={setActiveSection}

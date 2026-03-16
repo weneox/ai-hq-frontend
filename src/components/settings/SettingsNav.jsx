@@ -1,22 +1,24 @@
 // src/components/settings/SettingsNav.jsx
-// PREMIUM v2.0 — editorial vertical settings rail
+// PREMIUM v2.1 — editorial vertical settings rail (stable + accessible)
 
 import { ChevronRight } from "lucide-react";
 import { cx } from "../../lib/cx.js";
 
 export default function SettingsNav({ items = [], activeKey, onChange }) {
   return (
-    <nav className="space-y-1.5">
+    <nav className="space-y-1.5" aria-label="Settings navigation">
       {items.map((item, index) => {
-        const active = item.key === activeKey;
-        const dirty = !!item.dirty;
-        const Icon = item.icon;
+        const itemKey = item?.key || item?.id || item?.value || `item-${index}`;
+        const active = String(itemKey) === String(activeKey);
+        const dirty = !!item?.dirty;
+        const Icon = item?.icon;
 
         return (
           <button
-            key={item.key}
+            key={itemKey}
             type="button"
-            onClick={() => onChange(item.key)}
+            aria-current={active ? "page" : undefined}
+            onClick={() => onChange?.(itemKey)}
             className={cx(
               "group relative flex w-full items-center gap-3 overflow-hidden rounded-[22px] px-3.5 py-3.5 text-left transition-all duration-200",
               active
@@ -55,7 +57,7 @@ export default function SettingsNav({ items = [], activeKey, onChange }) {
             </div>
 
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 items-center gap-2">
                 <div
                   className={cx(
                     "truncate text-sm font-semibold tracking-[-0.01em]",
@@ -64,13 +66,13 @@ export default function SettingsNav({ items = [], activeKey, onChange }) {
                       : "text-slate-700 dark:text-slate-200"
                   )}
                 >
-                  {item.label}
+                  {item?.label || item?.title || item?.name || `Section ${index + 1}`}
                 </div>
 
                 {dirty ? (
                   <span
                     className={cx(
-                      "rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em]",
+                      "shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em]",
                       active
                         ? "border-blue-200/70 bg-blue-500/10 text-blue-700 dark:border-blue-400/20 dark:bg-blue-400/10 dark:text-blue-200"
                         : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-300"
@@ -81,10 +83,10 @@ export default function SettingsNav({ items = [], activeKey, onChange }) {
                 ) : null}
               </div>
 
-              {item.description ? (
+              {item?.description ? (
                 <div
                   className={cx(
-                    "mt-1 truncate text-[12px] leading-5",
+                    "mt-1 line-clamp-2 text-[12px] leading-5",
                     active
                       ? "text-slate-600 dark:text-slate-300"
                       : "text-slate-500 dark:text-slate-400"
