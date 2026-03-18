@@ -144,14 +144,7 @@ export default function SetupStudioScene({
 
   return (
     <div className="relative h-full overflow-hidden">
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute inset-x-[6%] top-[92px] h-px bg-gradient-to-r from-transparent via-slate-300/60 to-transparent" />
-        <div className="absolute inset-x-[18%] top-[54%] h-px bg-gradient-to-r from-transparent via-slate-300/50 to-transparent" />
-        <div className="absolute left-[9%] top-[18%] h-[180px] w-[180px] rounded-full border border-white/70" />
-        <div className="absolute right-[8%] top-[16%] h-[240px] w-[240px] rounded-full border border-white/70" />
-      </div>
-
-      <div className="mx-auto flex h-full max-w-[1360px] flex-col px-4 py-4 sm:px-6 lg:px-8 lg:py-6">
+      <div className="mx-auto flex h-full max-w-[1320px] flex-col px-4 py-4 sm:px-6 lg:px-8 lg:py-6">
         <SetupStudioHeader
           tone={tone}
           refreshing={refreshing}
@@ -159,79 +152,88 @@ export default function SetupStudioScene({
           statusLabel={discoveryModeLabel(importingWebsite ? "running" : discoveryState.mode)}
         />
 
-        <div className="relative mt-2">
-          <SetupStudioProgressDots items={miniProgress} />
-        </div>
+        <div className="relative min-h-0 flex-1 overflow-hidden rounded-[36px] border border-white/80 bg-white/44 shadow-[0_40px_140px_rgba(15,23,42,0.08)] backdrop-blur-2xl">
+          <div className="pointer-events-none absolute inset-x-0 top-[88px] h-px bg-gradient-to-r from-transparent via-slate-300/70 to-transparent" />
+          <div className="pointer-events-none absolute inset-x-[16%] top-[50%] h-px bg-gradient-to-r from-transparent via-slate-300/60 to-transparent" />
+          <div className="pointer-events-none absolute left-[10%] top-[18%] h-[180px] w-[180px] rounded-full border border-white/70" />
+          <div className="pointer-events-none absolute right-[8%] top-[16%] h-[240px] w-[240px] rounded-full border border-white/70" />
 
-        <div className="relative flex min-h-0 flex-1 items-center pt-8">
-          <AnimatePresence mode="wait">
-            {stage === "entry" ? (
-              <SetupStudioEntryStage
-                key="entry"
-                discoveryForm={discoveryForm}
-                error={error}
-                importingWebsite={importingWebsite}
-                onSetDiscoveryField={onSetDiscoveryField}
-                onScanBusiness={onScanBusiness}
-              />
-            ) : null}
+          <div className="relative flex h-full flex-col">
+            <div className="px-5 pt-5 sm:px-8 sm:pt-7">
+              <SetupStudioProgressDots items={miniProgress} />
+            </div>
 
-            {stage === "scanning" ? (
-              <SetupStudioScanningStage
-                key="scanning"
-                lastUrl={discoveryState.lastUrl}
-                scanLines={scanLines}
-                scanLineIndex={scanLineIndex}
-              />
-            ) : null}
+            <div className="relative flex min-h-0 flex-1 items-center px-5 pb-6 pt-4 sm:px-8 sm:pb-8">
+              <AnimatePresence mode="wait">
+                {stage === "entry" ? (
+                  <SetupStudioEntryStage
+                    key="entry"
+                    discoveryForm={discoveryForm}
+                    error={error}
+                    importingWebsite={importingWebsite}
+                    onSetDiscoveryField={onSetDiscoveryField}
+                    onScanBusiness={onScanBusiness}
+                  />
+                ) : null}
 
-            {stage === "identity" ? (
-              <SetupStudioIdentityStage
-                key="identity"
-                currentTitle={currentTitle}
-                currentDescription={currentDescription}
-                discoveryProfileRows={discoveryProfileRows}
-                onNext={goNextStage}
-                onToggleRefine={onToggleRefine}
-              />
-            ) : null}
+                {stage === "scanning" ? (
+                  <SetupStudioScanningStage
+                    key="scanning"
+                    lastUrl={discoveryState.lastUrl}
+                    scanLines={scanLines}
+                    scanLineIndex={scanLineIndex}
+                  />
+                ) : null}
 
-            {stage === "knowledge" ? (
-              <SetupStudioKnowledgeStage
-                key="knowledge"
-                knowledgePreview={knowledgePreview}
-                actingKnowledgeId={actingKnowledgeId}
-                onApproveKnowledge={onApproveKnowledge}
-                onRejectKnowledge={onRejectKnowledge}
-                onNext={goNextStage}
-                onToggleKnowledge={onToggleKnowledge}
-              />
-            ) : null}
+                {stage === "identity" ? (
+                  <SetupStudioIdentityStage
+                    key="identity"
+                    currentTitle={currentTitle}
+                    currentDescription={currentDescription}
+                    discoveryProfileRows={discoveryProfileRows}
+                    onNext={goNextStage}
+                    onToggleRefine={onToggleRefine}
+                  />
+                ) : null}
 
-            {stage === "service" ? (
-              <SetupStudioServiceStage
-                key="service"
-                serviceSuggestionTitle={serviceSuggestionTitle}
-                meta={meta}
-                services={services}
-                savingServiceSuggestion={savingServiceSuggestion}
-                onCreateSeed={handleCreateServiceAndNext}
-                onSkip={goNextStage}
-              />
-            ) : null}
+                {stage === "knowledge" ? (
+                  <SetupStudioKnowledgeStage
+                    key="knowledge"
+                    knowledgePreview={knowledgePreview}
+                    actingKnowledgeId={actingKnowledgeId}
+                    onApproveKnowledge={onApproveKnowledge}
+                    onRejectKnowledge={onRejectKnowledge}
+                    onNext={goNextStage}
+                    onToggleKnowledge={onToggleKnowledge}
+                  />
+                ) : null}
 
-            {stage === "ready" ? (
-              <SetupStudioReadyStage
-                key="ready"
-                meta={meta}
-                studioProgress={studioProgress}
-                hasKnowledge={hasKnowledge}
-                onToggleRefine={onToggleRefine}
-                onToggleKnowledge={onToggleKnowledge}
-                onOpenWorkspace={onOpenWorkspace}
-              />
-            ) : null}
-          </AnimatePresence>
+                {stage === "service" ? (
+                  <SetupStudioServiceStage
+                    key="service"
+                    serviceSuggestionTitle={serviceSuggestionTitle}
+                    meta={meta}
+                    services={services}
+                    savingServiceSuggestion={savingServiceSuggestion}
+                    onCreateSeed={handleCreateServiceAndNext}
+                    onSkip={goNextStage}
+                  />
+                ) : null}
+
+                {stage === "ready" ? (
+                  <SetupStudioReadyStage
+                    key="ready"
+                    meta={meta}
+                    studioProgress={studioProgress}
+                    hasKnowledge={hasKnowledge}
+                    onToggleRefine={onToggleRefine}
+                    onToggleKnowledge={onToggleKnowledge}
+                    onOpenWorkspace={onOpenWorkspace}
+                  />
+                ) : null}
+              </AnimatePresence>
+            </div>
+          </div>
         </div>
       </div>
 
