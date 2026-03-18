@@ -1,27 +1,35 @@
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowRight,
+  BadgeCheck,
+  Brain,
+  BriefcaseBusiness,
   Check,
   ChevronDown,
   ChevronUp,
   Clock3,
   Globe,
+  Layers3,
   Loader2,
+  Package2,
   RefreshCcw,
   ScanSearch,
-  Shield,
+  ScrollText,
+  ShieldCheck,
   Sparkles,
   Wand2,
-  Brain,
-  Package2,
-  BadgeCheck,
+  X,
 } from "lucide-react";
 
 function s(value, fallback = "") {
   return String(value ?? fallback).trim();
 }
 
-function fadeUp(delay = 0) {
+const CUT_EDGE = {
+  clipPath: "polygon(26px 0,100% 0,100% 100%,0 100%,0 26px)",
+};
+
+function fadeIn(delay = 0) {
   return {
     initial: { opacity: 0, y: 18 },
     animate: { opacity: 1, y: 0 },
@@ -29,15 +37,21 @@ function fadeUp(delay = 0) {
   };
 }
 
-function statusTone(mode = "", importingWebsite = false) {
+function truncateMiddle(value = "", start = 26, end = 16) {
+  const text = s(value);
+  if (!text || text.length <= start + end + 3) return text;
+  return `${text.slice(0, start)}...${text.slice(-end)}`;
+}
+
+function toneForMode(mode = "", importingWebsite = false) {
   const value = importingWebsite ? "running" : s(mode).toLowerCase();
 
   if (["success", "completed", "complete", "done"].includes(value)) {
     return {
       dot: "bg-emerald-500",
       text: "text-emerald-700",
-      chip: "bg-emerald-500/10 text-emerald-700 border-emerald-500/15",
-      bar: "from-emerald-400 via-cyan-400 to-blue-500",
+      chip: "border-emerald-500/15 bg-emerald-500/10 text-emerald-700",
+      accent: "from-emerald-400 via-cyan-400 to-blue-500",
     };
   }
 
@@ -45,8 +59,8 @@ function statusTone(mode = "", importingWebsite = false) {
     return {
       dot: "bg-rose-500",
       text: "text-rose-700",
-      chip: "bg-rose-500/10 text-rose-700 border-rose-500/15",
-      bar: "from-rose-400 via-orange-400 to-amber-400",
+      chip: "border-rose-500/15 bg-rose-500/10 text-rose-700",
+      accent: "from-rose-400 via-orange-400 to-amber-400",
     };
   }
 
@@ -54,76 +68,84 @@ function statusTone(mode = "", importingWebsite = false) {
     return {
       dot: "bg-cyan-500",
       text: "text-cyan-700",
-      chip: "bg-cyan-500/10 text-cyan-700 border-cyan-500/15",
-      bar: "from-cyan-400 via-sky-400 to-indigo-500",
+      chip: "border-cyan-500/15 bg-cyan-500/10 text-cyan-700",
+      accent: "from-cyan-400 via-sky-400 to-indigo-500",
     };
   }
 
   return {
     dot: "bg-slate-400",
     text: "text-slate-600",
-    chip: "bg-slate-900/5 text-slate-600 border-slate-900/8",
-    bar: "from-slate-300 via-slate-400 to-slate-500",
+    chip: "border-slate-900/8 bg-slate-900/5 text-slate-600",
+    accent: "from-slate-300 via-slate-400 to-slate-500",
   };
 }
 
-function truncateMiddle(value = "", start = 28, end = 16) {
-  const text = s(value);
-  if (!text || text.length <= start + end + 3) return text;
-  return `${text.slice(0, start)}...${text.slice(-end)}`;
+function laneTone(status = "idle") {
+  if (status === "ready") {
+    return {
+      chip: "border-emerald-500/15 bg-emerald-500/10 text-emerald-700",
+      bar: "from-emerald-400 to-cyan-500",
+    };
+  }
+
+  if (status === "active") {
+    return {
+      chip: "border-cyan-500/15 bg-cyan-500/10 text-cyan-700",
+      bar: "from-cyan-400 to-indigo-500",
+    };
+  }
+
+  if (status === "review") {
+    return {
+      chip: "border-amber-500/15 bg-amber-500/10 text-amber-700",
+      bar: "from-amber-400 to-orange-500",
+    };
+  }
+
+  return {
+    chip: "border-slate-900/8 bg-white/70 text-slate-500",
+    bar: "from-slate-300 to-slate-400",
+  };
 }
 
-function StepBadge({ done, label }) {
+function SmallTrack({ items = [] }) {
   return (
-    <div
-      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-medium tracking-[0.18em] uppercase ${
-        done
-          ? "border-emerald-500/15 bg-emerald-500/10 text-emerald-700"
-          : "border-slate-900/8 bg-white/60 text-slate-500"
-      }`}
-    >
-      <span className={`h-2 w-2 rounded-full ${done ? "bg-emerald-500" : "bg-slate-300"}`} />
-      {label}
+    <div className="flex flex-wrap items-center gap-3">
+      {items.map((item, index) => (
+        <div key={`${item.key}-${index}`} className="flex items-center gap-3">
+          <div className="inline-flex items-center gap-2">
+            <span
+              className={`h-2 w-2 rounded-full ${item.done ? "bg-emerald-500" : "bg-slate-300"}`}
+            />
+            <span
+              className={`text-[11px] font-medium uppercase tracking-[0.24em] ${
+                item.done ? "text-slate-700" : "text-slate-400"
+              }`}
+            >
+              {item.label}
+            </span>
+          </div>
+
+          {index < items.length - 1 ? (
+            <div className="h-px w-7 bg-slate-300/80" />
+          ) : null}
+        </div>
+      ))}
     </div>
   );
 }
 
-function MetricLine({ label, value }) {
-  return (
-    <div className="flex items-end gap-2">
-      <div className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">{value}</div>
-      <div className="pb-1 text-[11px] font-medium uppercase tracking-[0.22em] text-slate-400">
-        {label}
-      </div>
-    </div>
-  );
-}
-
-function FloatingSignal({ label, value, className = "" }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-      className={`pointer-events-none absolute hidden rounded-[22px] border border-white/70 bg-white/62 px-4 py-3 shadow-[0_22px_80px_rgba(15,23,42,0.08)] backdrop-blur-xl lg:block ${className}`}
-    >
-      <div className="text-[10px] uppercase tracking-[0.24em] text-slate-400">{label}</div>
-      <div className="mt-1 text-sm font-medium text-slate-700">{value}</div>
-    </motion.div>
-  );
-}
-
-function GhostButton({ children, onClick, icon: Icon, active = false, disabled = false }) {
+function QuietButton({ children, onClick, icon: Icon, active = false }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={disabled}
-      className={`inline-flex items-center justify-center gap-2 rounded-full border px-4 py-2.5 text-sm font-medium transition ${
+      className={`inline-flex items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-medium transition ${
         active
-          ? "border-slate-950/10 bg-slate-950 text-white shadow-[0_18px_60px_rgba(15,23,42,0.16)]"
-          : "border-slate-900/10 bg-white/72 text-slate-700 hover:bg-white"
-      } ${disabled ? "opacity-60" : ""}`}
+          ? "border-slate-950/10 bg-slate-950 text-white shadow-[0_18px_50px_rgba(15,23,42,0.16)]"
+          : "border-slate-900/10 bg-white/80 text-slate-700 hover:bg-white"
+      }`}
     >
       {Icon ? <Icon className="h-4 w-4" /> : null}
       {children}
@@ -131,40 +153,120 @@ function GhostButton({ children, onClick, icon: Icon, active = false, disabled =
   );
 }
 
-function SoftChip({ children }) {
+function TinyChip({ children }) {
   return (
-    <div className="rounded-full border border-slate-900/8 bg-white/72 px-3 py-1.5 text-xs text-slate-600">
+    <div className="rounded-full border border-slate-900/8 bg-white/80 px-3 py-1.5 text-xs text-slate-600">
       {children}
     </div>
   );
 }
 
-function KnowledgeRow({
-  item,
-  busy,
-  onApprove,
-  onReject,
-}) {
+function SurfaceLabel({ icon: Icon, children }) {
   return (
-    <div className="grid gap-5 py-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
-      <div className="min-w-0">
-        <div className="flex flex-wrap gap-2">
-          <SoftChip>{item.status || "pending"}</SoftChip>
-          <SoftChip>{item.category}</SoftChip>
-          {item.confidence ? <SoftChip>{item.confidence}</SoftChip> : null}
-          <SoftChip>{item.source}</SoftChip>
+    <div className="inline-flex items-center gap-2 rounded-full border border-slate-900/8 bg-white/80 px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.24em] text-slate-500">
+      {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
+      {children}
+    </div>
+  );
+}
+
+function StatusDot({ tone, children }) {
+  return (
+    <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs ${tone.chip}`}>
+      <span className={`h-2 w-2 rounded-full ${tone.dot}`} />
+      {children}
+    </div>
+  );
+}
+
+function RailLane({
+  index,
+  step,
+  title,
+  summary,
+  metaText,
+  count,
+  status,
+  icon: Icon,
+  offsetClass = "",
+}) {
+  const tone = laneTone(status);
+
+  return (
+    <motion.div
+      {...fadeIn(0.1 + index * 0.06)}
+      className={`relative ${offsetClass}`}
+    >
+      <div
+        style={CUT_EDGE}
+        className="relative overflow-hidden border border-slate-900/8 bg-white/72 px-4 py-4 shadow-[0_18px_60px_rgba(15,23,42,0.05)] backdrop-blur-xl sm:px-5"
+      >
+        <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent" />
+
+        <div className="grid gap-4 lg:grid-cols-[116px_minmax(0,1fr)_auto] lg:items-center">
+          <div className="flex items-center gap-3">
+            <div className="text-[10px] font-medium uppercase tracking-[0.28em] text-slate-400">
+              {step}
+            </div>
+
+            <div className="grid h-11 w-11 place-items-center rounded-2xl border border-slate-900/8 bg-white text-slate-700">
+              <Icon className="h-5 w-5" />
+            </div>
+          </div>
+
+          <div className="min-w-0">
+            <div className="text-lg font-semibold tracking-[-0.04em] text-slate-950">
+              {title}
+            </div>
+            <div className="mt-1 text-sm leading-7 text-slate-600">
+              {summary}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 lg:justify-end">
+            <div className={`rounded-full border px-3 py-1.5 text-xs font-medium uppercase tracking-[0.18em] ${tone.chip}`}>
+              {metaText}
+            </div>
+
+            {count ? (
+              <div className="text-2xl font-semibold tracking-[-0.04em] text-slate-900">
+                {count}
+              </div>
+            ) : null}
+          </div>
         </div>
 
-        <div className="mt-3 text-xl font-semibold tracking-[-0.03em] text-slate-950">
+        <div className="mt-4 h-1 w-full overflow-hidden rounded-full bg-slate-900/6">
+          <div className={`h-full w-[42%] rounded-full bg-gradient-to-r ${tone.bar}`} />
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function KnowledgeEntry({ item, busy, onApprove, onReject }) {
+  return (
+    <div className="grid gap-4 py-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+      <div className="min-w-0">
+        <div className="flex flex-wrap gap-2">
+          <TinyChip>{item.status || "pending"}</TinyChip>
+          <TinyChip>{item.category}</TinyChip>
+          {item.confidence ? <TinyChip>{item.confidence}</TinyChip> : null}
+          <TinyChip>{item.source}</TinyChip>
+        </div>
+
+        <div className="mt-3 text-lg font-semibold tracking-[-0.03em] text-slate-950">
           {item.title}
         </div>
 
-        <div className="mt-2 max-w-[840px] text-sm leading-7 text-slate-600">
+        <div className="mt-2 text-sm leading-7 text-slate-600">
           {item.value || "Preview yoxdur."}
         </div>
 
         {item.evidenceUrl ? (
-          <div className="mt-3 text-xs text-slate-400">{truncateMiddle(item.evidenceUrl, 52, 26)}</div>
+          <div className="mt-3 text-xs text-slate-400">
+            {truncateMiddle(item.evidenceUrl, 54, 28)}
+          </div>
         ) : null}
       </div>
 
@@ -173,7 +275,7 @@ function KnowledgeRow({
           type="button"
           disabled={busy}
           onClick={onApprove}
-          className="inline-flex min-w-[128px] items-center justify-center rounded-full bg-slate-950 px-4 py-2.5 text-sm font-medium text-white shadow-[0_18px_60px_rgba(15,23,42,0.16)] disabled:opacity-60"
+          className="inline-flex min-w-[128px] items-center justify-center rounded-full bg-slate-950 px-4 py-2.5 text-sm font-medium text-white shadow-[0_18px_50px_rgba(15,23,42,0.16)] disabled:opacity-60"
         >
           {busy ? "Working..." : "Approve"}
         </button>
@@ -182,7 +284,7 @@ function KnowledgeRow({
           type="button"
           disabled={busy}
           onClick={onReject}
-          className="inline-flex min-w-[128px] items-center justify-center rounded-full border border-slate-900/10 bg-white/72 px-4 py-2.5 text-sm font-medium text-slate-700 disabled:opacity-60"
+          className="inline-flex min-w-[128px] items-center justify-center rounded-full border border-slate-900/10 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 disabled:opacity-60"
         >
           Reject
         </button>
@@ -191,15 +293,16 @@ function KnowledgeRow({
   );
 }
 
-function BackgroundGlow() {
+function BackgroundMarks() {
   return (
     <>
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(186,230,253,0.55),transparent_28%),radial-gradient(circle_at_top_right,rgba(224,231,255,0.62),transparent_34%),radial-gradient(circle_at_50%_18%,rgba(255,255,255,0.92),transparent_36%),linear-gradient(180deg,#f8fafc_0%,#eef4fb_100%)]" />
-      <div className="pointer-events-none absolute inset-x-[12%] top-0 h-[320px] rounded-full bg-white/70 blur-[120px]" />
-      <div className="pointer-events-none absolute -left-20 top-24 h-[280px] w-[280px] rounded-full bg-cyan-200/35 blur-[90px]" />
-      <div className="pointer-events-none absolute -right-20 top-12 h-[320px] w-[320px] rounded-full bg-indigo-200/35 blur-[110px]" />
-      <div className="pointer-events-none absolute inset-x-0 top-[180px] h-px bg-gradient-to-r from-transparent via-slate-300/60 to-transparent" />
-      <div className="pointer-events-none absolute inset-x-0 top-[55%] h-px bg-gradient-to-r from-transparent via-white/90 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 top-[110px] h-px bg-gradient-to-r from-transparent via-slate-300/70 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-[8%] top-[280px] h-px bg-gradient-to-r from-transparent via-slate-300/60 to-transparent" />
+      <div className="pointer-events-none absolute left-[6%] top-[21%] h-[180px] w-[180px] rounded-full border border-white/70" />
+      <div className="pointer-events-none absolute right-[7%] top-[15%] h-[220px] w-[220px] rounded-full border border-white/70" />
+      <div className="pointer-events-none absolute left-[17%] top-[48%] h-px w-[24%] bg-gradient-to-r from-transparent via-slate-300/80 to-transparent" />
+      <div className="pointer-events-none absolute right-[10%] top-[64%] h-px w-[20%] bg-gradient-to-r from-transparent via-slate-300/80 to-transparent" />
+      <div className="pointer-events-none absolute left-[49%] top-[30%] h-[260px] w-px bg-gradient-to-b from-transparent via-slate-300/50 to-transparent" />
     </>
   );
 }
@@ -219,8 +322,6 @@ export default function SetupStudioScene({
   discoveryState,
   meta,
   heroSteps,
-  metrics,
-  liveSignals,
   discoveryProfileRows,
   knowledgePreview,
   serviceSuggestionTitle,
@@ -240,23 +341,96 @@ export default function SetupStudioScene({
   onToggleKnowledge,
   discoveryModeLabel,
 }) {
-  const tone = statusTone(discoveryState.mode, importingWebsite);
+  const overlayOpen = showRefine || showKnowledge;
+  const tone = toneForMode(discoveryState.mode, importingWebsite);
 
-  const floatingSlots = [
-    "left-[-12px] top-10",
-    "right-[-8px] top-4",
-    "left-[5%] bottom-10",
-    "right-[9%] bottom-12",
-    "left-[20%] -bottom-4",
-    "right-[20%] -top-3",
+  const stepsMap = Object.fromEntries(heroSteps.map((item) => [item.key, item.done]));
+
+  const lanes = [
+    {
+      key: "business",
+      step: "01",
+      icon: Brain,
+      title: s(businessForm.companyName) || "Business identity",
+      summary:
+        s(businessForm.description) ||
+        "Brand direction, positioning, timezone və language draft burada formalaşır.",
+      metaText: stepsMap.businessprofile ? "ready" : "draft",
+      count: stepsMap.businessprofile ? null : "—",
+      status: importingWebsite ? "active" : stepsMap.businessprofile ? "ready" : "idle",
+      offsetClass: "lg:mr-24",
+    },
+    {
+      key: "knowledge",
+      step: "02",
+      icon: ScrollText,
+      title: meta.pendingCandidateCount
+        ? `${meta.pendingCandidateCount} pending discovery`
+        : meta.approvedKnowledgeCount
+          ? `${meta.approvedKnowledgeCount} approved knowledge`
+          : "Knowledge intake",
+      summary:
+        meta.pendingCandidateCount > 0
+          ? "Studio review üçün çıxardıqlarını burada toplayır. Dəyərliləri içəri salırsan."
+          : "Hələ review növbəsi görünmür. Scan bitəndə axın bura düşəcək.",
+      metaText: meta.pendingCandidateCount > 0 ? "review" : stepsMap.knowledge ? "ready" : "waiting",
+      count: meta.pendingCandidateCount > 0 ? String(meta.pendingCandidateCount) : null,
+      status: importingWebsite ? "active" : meta.pendingCandidateCount > 0 ? "review" : stepsMap.knowledge ? "ready" : "idle",
+      offsetClass: "lg:ml-10 lg:mr-12",
+    },
+    {
+      key: "services",
+      step: "03",
+      icon: BriefcaseBusiness,
+      title:
+        meta.serviceCount > 0
+          ? `${meta.serviceCount} service live`
+          : serviceSuggestionTitle || "Service layer seed",
+      summary:
+        meta.serviceCount > 0
+          ? "Service skeleti hazırdır. Pricing və packaging sonra dərinləşdirilə bilər."
+          : "Qısa fokus qeydindən service seed yaradılıb sonradan refine edilə bilər.",
+      metaText: meta.serviceCount > 0 ? "live" : "seed",
+      count: meta.serviceCount > 0 ? String(meta.serviceCount) : null,
+      status: meta.serviceCount > 0 ? "ready" : importingWebsite ? "active" : "idle",
+      offsetClass: "lg:ml-24 lg:mr-6",
+    },
+    {
+      key: "playbooks",
+      step: "04",
+      icon: Layers3,
+      title: meta.playbookCount > 0 ? `${meta.playbookCount} playbook detected` : "Playbook assembly",
+      summary:
+        meta.playbookCount > 0
+          ? "Operational flows artıq görünür."
+          : "Conversation flows və operational logic bu mərhələdə formalaşacaq.",
+      metaText: meta.playbookCount > 0 ? "ready" : "pending",
+      count: meta.playbookCount > 0 ? String(meta.playbookCount) : null,
+      status: meta.playbookCount > 0 ? "ready" : "idle",
+      offsetClass: "lg:ml-12 lg:mr-20",
+    },
+    {
+      key: "policies",
+      step: "05",
+      icon: ShieldCheck,
+      title: stepsMap.policies ? "Policy layer aligned" : "Policy layer pending",
+      summary:
+        stepsMap.policies
+          ? "Tone, rules və guardrails artıq daxil olunub."
+          : "Launch-dan əvvəl policy və rules hissəsi də buradan tamamlanacaq.",
+      metaText: stepsMap.policies ? "ready" : "pending",
+      count: null,
+      status: stepsMap.policies ? "ready" : "idle",
+      offsetClass: "lg:ml-28",
+    },
   ];
 
   if (loading) {
     return (
-      <div className="relative min-h-[88vh] overflow-hidden">
-        <BackgroundGlow />
-        <div className="relative mx-auto flex min-h-[88vh] max-w-[1200px] items-center justify-center px-4 py-8">
-          <div className="inline-flex items-center gap-3 rounded-full border border-white/70 bg-white/72 px-5 py-3 text-sm text-slate-600 shadow-[0_24px_80px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+      <div className="relative min-h-screen overflow-hidden">
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,#f7fafc_0%,#edf3f8_100%)]" />
+        <div className="relative mx-auto flex min-h-screen max-w-[1320px] items-center justify-center px-4 py-8">
+          <div className="inline-flex items-center gap-3 rounded-full border border-white/80 bg-white/80 px-5 py-3 text-sm text-slate-600 shadow-[0_24px_80px_rgba(15,23,42,0.08)] backdrop-blur-xl">
             <Loader2 className="h-4 w-4 animate-spin" />
             Setup studio hazırlanır...
           </div>
@@ -267,116 +441,208 @@ export default function SetupStudioScene({
 
   return (
     <div className="relative min-h-screen overflow-hidden">
-      <BackgroundGlow />
-
-      <section className="relative mx-auto max-w-[1220px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+      <section className="relative mx-auto max-w-[1380px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
         <motion.div
-          {...fadeUp(0)}
+          {...fadeIn(0)}
           className="mb-6 flex items-center justify-between gap-4"
         >
-          <div className="inline-flex items-center gap-2 rounded-full border border-slate-900/8 bg-white/68 px-4 py-2 text-[11px] font-medium uppercase tracking-[0.26em] text-slate-500 shadow-[0_14px_40px_rgba(15,23,42,0.05)] backdrop-blur-xl">
-            <Sparkles className="h-3.5 w-3.5 text-cyan-600" />
-            AI Setup Studio
-          </div>
+          <SurfaceLabel icon={Sparkles}>AI Setup Studio</SurfaceLabel>
 
-          <button
-            type="button"
-            onClick={onRefresh}
-            className="inline-flex items-center gap-2 rounded-full border border-slate-900/8 bg-white/68 px-4 py-2.5 text-sm text-slate-600 shadow-[0_14px_40px_rgba(15,23,42,0.05)] backdrop-blur-xl"
-          >
-            <RefreshCcw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-            {refreshing ? "Refreshing..." : "Refresh"}
-          </button>
+          <div className="flex items-center gap-3">
+            <StatusDot tone={tone}>
+              {discoveryModeLabel(importingWebsite ? "running" : discoveryState.mode)}
+            </StatusDot>
+
+            <button
+              type="button"
+              onClick={onRefresh}
+              className="inline-flex items-center gap-2 rounded-full border border-slate-900/8 bg-white/80 px-4 py-2.5 text-sm text-slate-600 shadow-[0_14px_40px_rgba(15,23,42,0.05)] backdrop-blur-xl"
+            >
+              <RefreshCcw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+              {refreshing ? "Refreshing..." : "Refresh"}
+            </button>
+          </div>
         </motion.div>
 
-        <motion.div
-          {...fadeUp(0.05)}
-          className="relative overflow-hidden rounded-[42px] border border-white/70 bg-white/56 shadow-[0_40px_140px_rgba(15,23,42,0.09)] backdrop-blur-2xl"
-        >
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-[220px] bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.98),transparent_72%)]" />
-          <div className="pointer-events-none absolute inset-x-[12%] top-[160px] h-px bg-gradient-to-r from-transparent via-slate-300/80 to-transparent" />
-          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.42)_0%,rgba(255,255,255,0.18)_100%)]" />
+        <div className="relative overflow-hidden rounded-[44px] border border-white/80 bg-white/52 shadow-[0_42px_140px_rgba(15,23,42,0.08)] backdrop-blur-2xl">
+          <BackgroundMarks />
 
-          <div className="relative px-5 py-8 sm:px-8 sm:py-10 lg:px-12 lg:py-12">
-            <motion.div {...fadeUp(0.08)} className="mx-auto max-w-[900px] text-center">
-              <div className="mx-auto flex max-w-max flex-wrap items-center justify-center gap-2">
-                {heroSteps.map((item) => (
-                  <StepBadge key={item.key} done={item.done} label={item.label} />
-                ))}
+          <motion.div
+            animate={
+              overlayOpen
+                ? { scale: 0.985, y: -10, opacity: 0.5 }
+                : { scale: 1, y: 0, opacity: 1 }
+            }
+            transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1] }}
+            className={overlayOpen ? "pointer-events-none" : ""}
+          >
+            <div className="relative px-5 py-6 sm:px-8 sm:py-8 lg:px-12 lg:py-10">
+              <div className="grid gap-10 lg:grid-cols-[1.18fr_0.82fr]">
+                <motion.div {...fadeIn(0.04)}>
+                  <div className="text-[11px] uppercase tracking-[0.32em] text-slate-400">
+                    Studio orchestration
+                  </div>
+
+                  <h1 className="mt-5 max-w-[780px] text-5xl font-semibold leading-[0.92] tracking-[-0.08em] text-slate-950 sm:text-6xl lg:text-7xl xl:text-[88px]">
+                    Give it a website.
+                    <br />
+                    <span className="text-slate-400">Watch the studio</span>
+                    <br />
+                    assemble itself.
+                  </h1>
+
+                  <p className="mt-6 max-w-[580px] text-base leading-8 text-slate-600 sm:text-lg">
+                    {narrative ||
+                      "Website daxil et. Sistem identity, service layer, knowledge və operational rules istiqamətini özü qursun."}
+                  </p>
+
+                  <div className="mt-8">
+                    <SmallTrack items={heroSteps} />
+                  </div>
+                </motion.div>
+
+                <motion.div {...fadeIn(0.08)} className="lg:pl-10">
+                  <div className="border-l border-slate-300/80 pl-6">
+                    <div className="text-[11px] uppercase tracking-[0.28em] text-slate-400">
+                      Studio state
+                    </div>
+
+                    <div className="mt-6 flex items-start justify-between gap-5">
+                      <div>
+                        <div className="text-[72px] font-semibold leading-none tracking-[-0.08em] text-slate-950 sm:text-[92px]">
+                          {meta.readinessScore}%
+                        </div>
+                        <div className="mt-2 text-[11px] uppercase tracking-[0.28em] text-slate-400">
+                          readiness
+                        </div>
+                      </div>
+
+                      <div className="mt-2 h-24 w-24 rounded-full border border-slate-200 bg-white/70 p-2">
+                        <div className="grid h-full place-items-center rounded-full border border-slate-200 bg-white text-center text-[10px] font-medium uppercase tracking-[0.22em] text-slate-500">
+                          <div>
+                            <div className="text-xl font-semibold tracking-[-0.04em] text-slate-900">
+                              {studioProgress}%
+                            </div>
+                            progress
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-8 grid grid-cols-2 gap-4 text-sm text-slate-600">
+                      <div>
+                        <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">
+                          pending
+                        </div>
+                        <div className="mt-1 text-xl font-semibold tracking-[-0.03em] text-slate-950">
+                          {meta.pendingCandidateCount}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">
+                          approved
+                        </div>
+                        <div className="mt-1 text-xl font-semibold tracking-[-0.03em] text-slate-950">
+                          {meta.approvedKnowledgeCount}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">
+                          services
+                        </div>
+                        <div className="mt-1 text-xl font-semibold tracking-[-0.03em] text-slate-950">
+                          {meta.serviceCount}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">
+                          playbooks
+                        </div>
+                        <div className="mt-1 text-xl font-semibold tracking-[-0.03em] text-slate-950">
+                          {meta.playbookCount}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-8 rounded-[22px] border border-slate-900/8 bg-white/72 px-4 py-4 text-sm leading-7 text-slate-600">
+                      {s(discoveryState.message) || "Studio hazırdır. Scan başlayanda axın burada canlı dəyişəcək."}
+                    </div>
+
+                    {s(discoveryState.lastUrl) ? (
+                      <div className="mt-4 text-xs uppercase tracking-[0.2em] text-slate-400">
+                        {truncateMiddle(discoveryState.lastUrl, 28, 18)}
+                      </div>
+                    ) : null}
+                  </div>
+                </motion.div>
               </div>
 
-              <h1 className="mx-auto mt-7 max-w-[920px] text-4xl font-semibold tracking-[-0.06em] text-slate-950 sm:text-5xl lg:text-7xl">
-                Turn your website into a business twin that feels alive.
-              </h1>
-
-              <p className="mx-auto mt-5 max-w-[780px] text-base leading-8 text-slate-600 sm:text-lg">
-                Website-i ver. Studio identity, service layer, knowledge və operational siqnalları
-                çıxarsın. Sən isə sadəcə doğru olanları yönləndir.
-              </p>
-            </motion.div>
-
-            <motion.div {...fadeUp(0.12)} className="relative mx-auto mt-10 max-w-[920px]">
-              {liveSignals.slice(0, 6).map((item, index) => (
-                <FloatingSignal
-                  key={`${item.label}-${index}`}
-                  label={item.label}
-                  value={item.value}
-                  className={floatingSlots[index] || floatingSlots[0]}
-                />
-              ))}
-
-              <form
+              <motion.form
+                {...fadeIn(0.12)}
                 onSubmit={onScanBusiness}
-                className="relative overflow-hidden rounded-[34px] border border-slate-900/8 bg-white/72 p-4 shadow-[0_30px_120px_rgba(15,23,42,0.08)] backdrop-blur-2xl sm:p-5"
+                className="mt-12 grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]"
               >
-                <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent" />
+                <div
+                  style={CUT_EDGE}
+                  className="relative overflow-hidden border border-slate-900/8 bg-white/76 p-5 shadow-[0_22px_80px_rgba(15,23,42,0.06)]"
+                >
+                  <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent" />
 
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-slate-900/8 bg-slate-950/[0.03] px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.24em] text-slate-500">
-                    <ScanSearch className="h-3.5 w-3.5" />
-                    Studio scan
-                  </div>
+                  <SurfaceLabel icon={Globe}>Website input</SurfaceLabel>
 
-                  <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs ${tone.chip}`}>
-                    <span className={`h-2 w-2 rounded-full ${tone.dot}`} />
-                    {discoveryModeLabel(importingWebsite ? "running" : discoveryState.mode)}
-                  </div>
-                </div>
+                  <div className="mt-5 flex items-center gap-3 border-b border-slate-200/90 pb-4">
+                    <div className="grid h-11 w-11 place-items-center rounded-2xl border border-slate-900/8 bg-white text-slate-500">
+                      <Globe className="h-5 w-5" />
+                    </div>
 
-                <div className="overflow-hidden rounded-[28px] border border-slate-900/8 bg-white/76">
-                  <div className="flex items-center gap-3 px-4 py-4 sm:px-5">
-                    <Globe className="h-5 w-5 shrink-0 text-slate-400" />
                     <input
                       value={discoveryForm.websiteUrl}
                       onChange={(e) => onSetDiscoveryField("websiteUrl", e.target.value)}
-                      className="w-full bg-transparent text-base text-slate-900 outline-none placeholder:text-slate-400"
+                      className="w-full bg-transparent text-[20px] font-medium tracking-[-0.03em] text-slate-950 outline-none placeholder:text-slate-400 sm:text-[24px]"
                       placeholder="https://yourbusiness.com"
                     />
                   </div>
 
-                  <div className="h-px bg-slate-900/8" />
-
-                  <div className="px-4 py-4 sm:px-5">
+                  <div className="mt-4">
                     <textarea
                       value={discoveryForm.note}
                       onChange={(e) => onSetDiscoveryField("note", e.target.value)}
-                      className="min-h-[96px] w-full resize-none bg-transparent text-sm leading-7 text-slate-700 outline-none placeholder:text-slate-400"
-                      placeholder="Qısa fokus qeydini yaz: məsələn əsas fokusumuz Instagram DM automation və lead qualification-dır."
+                      className="min-h-[96px] w-full resize-none bg-transparent text-sm leading-7 text-slate-600 outline-none placeholder:text-slate-400"
+                      placeholder="Fokusunu yaz: məsələn əsas istiqamətimiz Instagram DM automation və lead qualification-dır."
                     />
                   </div>
                 </div>
 
-                <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="flex flex-wrap gap-2">
-                    <SoftChip>Detects services</SoftChip>
-                    <SoftChip>Extracts knowledge</SoftChip>
-                    <SoftChip>Prepares runtime</SoftChip>
+                <div
+                  style={CUT_EDGE}
+                  className="relative overflow-hidden border border-slate-900/8 bg-slate-950 px-5 py-5 text-white shadow-[0_28px_90px_rgba(15,23,42,0.18)]"
+                >
+                  <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+
+                  <SurfaceLabel icon={ScanSearch}>Command</SurfaceLabel>
+
+                  <div className="mt-5">
+                    <div className="text-[11px] uppercase tracking-[0.26em] text-white/45">
+                      status
+                    </div>
+                    <div className="mt-2 text-2xl font-semibold tracking-[-0.04em]">
+                      {discoveryModeLabel(importingWebsite ? "running" : discoveryState.mode)}
+                    </div>
+                  </div>
+
+                  <div className="mt-6 space-y-2 text-sm text-white/70">
+                    <div>Detects service directions</div>
+                    <div>Extracts knowledge candidates</div>
+                    <div>Prepares runtime signals</div>
                   </div>
 
                   <button
                     type="submit"
                     disabled={importingWebsite}
-                    className="inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-6 py-3 text-sm font-medium text-white shadow-[0_20px_60px_rgba(15,23,42,0.18)] disabled:opacity-60"
+                    className="mt-8 inline-flex w-full items-center justify-center gap-2 rounded-full bg-white px-5 py-3.5 text-sm font-medium text-slate-950 shadow-[0_18px_50px_rgba(255,255,255,0.12)] disabled:opacity-60"
                   >
                     {importingWebsite ? (
                       <>
@@ -391,298 +657,251 @@ export default function SetupStudioScene({
                     )}
                   </button>
                 </div>
-              </form>
-            </motion.div>
+              </motion.form>
 
-            <motion.div
-              {...fadeUp(0.16)}
-              className="mx-auto mt-8 max-w-[980px]"
-            >
-              <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3">
-                {metrics.map((item) => (
-                  <MetricLine key={item.label} label={item.label} value={item.value} />
-                ))}
-              </div>
-            </motion.div>
-
-            <motion.div
-              {...fadeUp(0.2)}
-              className="mx-auto mt-8 max-w-[1020px] overflow-hidden rounded-[28px] border border-slate-900/8 bg-white/52 px-4 py-4 shadow-[0_20px_80px_rgba(15,23,42,0.05)] backdrop-blur-xl sm:px-5"
-            >
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:gap-5">
-                <div className="min-w-0 lg:w-[320px]">
-                  <div className="flex items-center gap-2">
-                    <span className={`h-2.5 w-2.5 rounded-full ${tone.dot}`} />
-                    <div className={`text-sm font-medium ${tone.text}`}>
-                      {discoveryModeLabel(importingWebsite ? "running" : discoveryState.mode)}
-                    </div>
-                  </div>
-
-                  <div className="mt-2 text-sm leading-7 text-slate-600">
-                    {s(discoveryState.message) || narrative}
-                  </div>
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-3 text-xs text-slate-400">
-                    <span>Studio progress</span>
-                    <span>{studioProgress}%</span>
-                  </div>
-
-                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-900/7">
-                    <div
-                      className={`h-full rounded-full bg-gradient-to-r ${tone.bar} shadow-[0_8px_30px_rgba(56,189,248,0.35)]`}
-                      style={{ width: `${Math.max(6, Math.min(100, studioProgress))}%` }}
-                    />
-                  </div>
-
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <SoftChip>discoveries {Number(discoveryState.candidateCount || 0)}</SoftChip>
-                    {s(discoveryState.lastUrl) ? (
-                      <SoftChip>{truncateMiddle(discoveryState.lastUrl, 30, 18)}</SoftChip>
-                    ) : null}
-                    {discoveryState.profileApplied ? <SoftChip>profile draft updated</SoftChip> : null}
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-
-            {error ? (
-              <motion.div
-                {...fadeUp(0.22)}
-                className="mx-auto mt-5 max-w-[1020px] rounded-[22px] border border-rose-200 bg-rose-50/90 px-4 py-3 text-sm text-rose-700"
-              >
-                {error}
-              </motion.div>
-            ) : null}
-
-            <motion.div
-              {...fadeUp(0.24)}
-              className="mx-auto mt-8 max-w-[1020px] flex flex-wrap items-center justify-center gap-3"
-            >
-              <GhostButton
-                onClick={onToggleRefine}
-                icon={showRefine ? ChevronUp : ChevronDown}
-              >
-                {showRefine ? "Hide details" : "Refine details"}
-              </GhostButton>
-
-              {knowledgePreview.length ? (
-                <GhostButton
-                  onClick={onToggleKnowledge}
-                  icon={showKnowledge ? ChevronUp : ChevronDown}
+              {error ? (
+                <motion.div
+                  {...fadeIn(0.15)}
+                  className="mt-5 rounded-[20px] border border-rose-200 bg-rose-50/90 px-4 py-3 text-sm text-rose-700"
                 >
-                  {showKnowledge ? "Hide discoveries" : "Review discoveries"}
-                </GhostButton>
+                  {error}
+                </motion.div>
               ) : null}
 
-              <GhostButton onClick={onOpenWorkspace} icon={ArrowRight} active>
-                Open workspace
-              </GhostButton>
-            </motion.div>
-          </div>
-        </motion.div>
+              <div className="relative mt-12">
+                <div className="pointer-events-none absolute left-[4%] right-[4%] top-[26px] hidden h-px bg-gradient-to-r from-transparent via-slate-300/90 to-transparent lg:block" />
 
-        <AnimatePresence initial={false}>
-          {showRefine ? (
-            <motion.section
-              key="refine"
-              initial={{ opacity: 0, y: 18, height: 0 }}
-              animate={{ opacity: 1, y: 0, height: "auto" }}
-              exit={{ opacity: 0, y: -8, height: 0 }}
-              transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-              className="mt-8 overflow-hidden rounded-[36px] border border-white/70 bg-white/58 shadow-[0_30px_100px_rgba(15,23,42,0.06)] backdrop-blur-2xl"
-            >
-              <div className="grid lg:grid-cols-[1.08fr_0.92fr]">
-                <div className="p-6 sm:p-8">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-slate-900/8 bg-white/70 px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">
-                    <Brain className="h-3.5 w-3.5" />
-                    Refine business twin
-                  </div>
-
-                  <h2 className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-slate-950">
-                    Keep only the essentials editable
-                  </h2>
-
-                  <p className="mt-3 max-w-[600px] text-sm leading-7 text-slate-600">
-                    Burada böyük onboarding formu yoxdur. Studio nə çıxarıbsa onun ən vacib hissələrini
-                    düzəldə bilərsən.
-                  </p>
-
-                  <form onSubmit={onSaveBusiness} className="mt-7">
-                    <div className="grid gap-4">
-                      <input
-                        value={businessForm.companyName}
-                        onChange={(e) => onSetBusinessField("companyName", e.target.value)}
-                        className="rounded-[22px] border border-slate-900/8 bg-white/74 px-4 py-3.5 text-slate-900 outline-none placeholder:text-slate-400"
-                        placeholder="Company name"
-                      />
-
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <input
-                          value={businessForm.timezone}
-                          onChange={(e) => onSetBusinessField("timezone", e.target.value)}
-                          className="rounded-[22px] border border-slate-900/8 bg-white/74 px-4 py-3.5 text-slate-900 outline-none placeholder:text-slate-400"
-                          placeholder="Timezone"
-                        />
-
-                        <select
-                          value={businessForm.language}
-                          onChange={(e) => onSetBusinessField("language", e.target.value)}
-                          className="rounded-[22px] border border-slate-900/8 bg-white/74 px-4 py-3.5 text-slate-900 outline-none"
-                        >
-                          <option value="az">Azerbaijani</option>
-                          <option value="en">English</option>
-                          <option value="tr">Turkish</option>
-                          <option value="ru">Russian</option>
-                        </select>
-                      </div>
-
-                      <textarea
-                        value={businessForm.description}
-                        onChange={(e) => onSetBusinessField("description", e.target.value)}
-                        className="min-h-[148px] rounded-[22px] border border-slate-900/8 bg-white/74 px-4 py-4 text-slate-900 outline-none placeholder:text-slate-400"
-                        placeholder="Business description"
-                      />
-                    </div>
-
-                    <div className="mt-6 flex flex-wrap gap-3">
-                      <button
-                        type="submit"
-                        disabled={savingBusiness}
-                        className="inline-flex items-center justify-center rounded-full bg-slate-950 px-5 py-3 text-sm font-medium text-white shadow-[0_18px_60px_rgba(15,23,42,0.16)] disabled:opacity-60"
-                      >
-                        {savingBusiness ? "Saving..." : "Save business twin"}
-                      </button>
-
-                      <GhostButton onClick={onRefresh} icon={RefreshCcw}>
-                        Sync from backend
-                      </GhostButton>
-                    </div>
-                  </form>
+                <div className="space-y-4">
+                  {lanes.map((lane, index) => (
+                    <RailLane key={lane.key} index={index} {...lane} />
+                  ))}
                 </div>
+              </div>
 
-                <div className="border-t border-slate-900/8 p-6 sm:p-8 lg:border-l lg:border-t-0">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-slate-900/8 bg-white/70 px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">
-                    <Package2 className="h-3.5 w-3.5" />
-                    Service seed
-                  </div>
+              <motion.div
+                {...fadeIn(0.2)}
+                className="mt-10 flex flex-wrap items-center gap-3"
+              >
+                <QuietButton
+                  onClick={onToggleRefine}
+                  icon={showRefine ? ChevronUp : ChevronDown}
+                >
+                  {showRefine ? "Hide refine" : "Refine draft"}
+                </QuietButton>
 
-                  <h2 className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-slate-950">
-                    Create a tiny service layer seed
-                  </h2>
+                {knowledgePreview.length ? (
+                  <QuietButton
+                    onClick={onToggleKnowledge}
+                    icon={showKnowledge ? ChevronUp : ChevronDown}
+                  >
+                    {showKnowledge ? "Hide intake" : "Review intake"}
+                  </QuietButton>
+                ) : null}
 
-                  <p className="mt-3 text-sm leading-7 text-slate-600">
-                    Burada yalnız bir başlanğıc service yarat. Pricing, positioning və refine işini
-                    sonradan workspace-də daha rahat edərsən.
-                  </p>
+                <QuietButton onClick={onOpenWorkspace} icon={ArrowRight} active>
+                  Enter workspace
+                </QuietButton>
 
-                  <div className="mt-7 rounded-[26px] border border-slate-900/8 bg-white/74 p-5">
-                    <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">
-                      Suggested title
+                <div className="ml-auto text-sm text-slate-500">
+                  {meta.missingSteps.length
+                    ? `Remaining: ${meta.missingSteps.join(" · ")}`
+                    : "Core onboarding is ready."}
+                </div>
+              </motion.div>
+            </div>
+          </motion.div>
+
+          <AnimatePresence>
+            {showRefine ? (
+              <motion.aside
+                key="refine-panel"
+                initial={{ x: 560, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                exit={{ x: 560, opacity: 0 }}
+                transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+                className="absolute inset-y-0 right-0 z-30 w-full border-l border-slate-900/8 bg-white/90 shadow-[-30px_0_90px_rgba(15,23,42,0.08)] backdrop-blur-2xl lg:w-[520px]"
+              >
+                <div className="flex h-full flex-col">
+                  <div className="flex items-start justify-between gap-4 border-b border-slate-900/8 px-5 py-5 sm:px-6">
+                    <div>
+                      <SurfaceLabel icon={Brain}>Refine draft</SurfaceLabel>
+                      <h2 className="mt-4 text-3xl font-semibold tracking-[-0.05em] text-slate-950">
+                        Shape the twin, don’t fill a form
+                      </h2>
                     </div>
-                    <div className="mt-2 text-xl font-semibold tracking-[-0.03em] text-slate-950">
-                      {serviceSuggestionTitle || "Use the focus note above to generate a service seed"}
-                    </div>
 
-                    <div className="mt-5 flex flex-wrap gap-2">
-                      <SoftChip>current services {services.length}</SoftChip>
-                      {serviceSuggestionTitle ? <SoftChip>seed ready</SoftChip> : <SoftChip>awaiting focus note</SoftChip>}
-                    </div>
-                  </div>
-
-                  <div className="mt-6 flex flex-wrap gap-3">
                     <button
                       type="button"
-                      disabled={!!savingServiceSuggestion}
-                      onClick={onCreateSuggestedService}
-                      className="inline-flex items-center justify-center rounded-full bg-slate-950 px-5 py-3 text-sm font-medium text-white shadow-[0_18px_60px_rgba(15,23,42,0.16)] disabled:opacity-60"
+                      onClick={onToggleRefine}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-900/10 bg-white text-slate-600"
                     >
-                      {savingServiceSuggestion ? "Creating..." : "Create suggested service"}
+                      <X className="h-4 w-4" />
                     </button>
                   </div>
 
-                  {discoveryProfileRows.length ? (
-                    <div className="mt-8">
-                      <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">
-                        Extracted profile snapshot
+                  <div className="flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+                    <form onSubmit={onSaveBusiness}>
+                      <div className="grid gap-4">
+                        <input
+                          value={businessForm.companyName}
+                          onChange={(e) => onSetBusinessField("companyName", e.target.value)}
+                          className="rounded-[22px] border border-slate-900/8 bg-white px-4 py-3.5 text-slate-900 outline-none placeholder:text-slate-400"
+                          placeholder="Company name"
+                        />
+
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <input
+                            value={businessForm.timezone}
+                            onChange={(e) => onSetBusinessField("timezone", e.target.value)}
+                            className="rounded-[22px] border border-slate-900/8 bg-white px-4 py-3.5 text-slate-900 outline-none placeholder:text-slate-400"
+                            placeholder="Timezone"
+                          />
+
+                          <select
+                            value={businessForm.language}
+                            onChange={(e) => onSetBusinessField("language", e.target.value)}
+                            className="rounded-[22px] border border-slate-900/8 bg-white px-4 py-3.5 text-slate-900 outline-none"
+                          >
+                            <option value="az">Azerbaijani</option>
+                            <option value="en">English</option>
+                            <option value="tr">Turkish</option>
+                            <option value="ru">Russian</option>
+                          </select>
+                        </div>
+
+                        <textarea
+                          value={businessForm.description}
+                          onChange={(e) => onSetBusinessField("description", e.target.value)}
+                          className="min-h-[150px] rounded-[22px] border border-slate-900/8 bg-white px-4 py-4 text-slate-900 outline-none placeholder:text-slate-400"
+                          placeholder="Business description"
+                        />
                       </div>
 
-                      <div className="mt-4 divide-y divide-slate-900/8 overflow-hidden rounded-[24px] border border-slate-900/8 bg-white/74">
-                        {discoveryProfileRows.map(([label, value]) => (
-                          <div key={label} className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{label}</div>
-                            <div className="text-sm text-slate-700 sm:max-w-[64%] sm:text-right">{value}</div>
-                          </div>
-                        ))}
+                      <div className="mt-6 flex flex-wrap gap-3">
+                        <button
+                          type="submit"
+                          disabled={savingBusiness}
+                          className="inline-flex items-center justify-center rounded-full bg-slate-950 px-5 py-3 text-sm font-medium text-white shadow-[0_18px_50px_rgba(15,23,42,0.16)] disabled:opacity-60"
+                        >
+                          {savingBusiness ? "Saving..." : "Save business twin"}
+                        </button>
+
+                        <QuietButton onClick={onRefresh} icon={RefreshCcw}>
+                          Sync backend
+                        </QuietButton>
                       </div>
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            </motion.section>
-          ) : null}
-        </AnimatePresence>
+                    </form>
 
-        <AnimatePresence initial={false}>
-          {showKnowledge && knowledgePreview.length ? (
-            <motion.section
-              key="knowledge"
-              initial={{ opacity: 0, y: 18, height: 0 }}
-              animate={{ opacity: 1, y: 0, height: "auto" }}
-              exit={{ opacity: 0, y: -8, height: 0 }}
-              transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-              className="mt-8 overflow-hidden rounded-[36px] border border-white/70 bg-white/58 shadow-[0_30px_100px_rgba(15,23,42,0.06)] backdrop-blur-2xl"
-            >
-              <div className="p-6 sm:p-8">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                  <div>
-                    <div className="inline-flex items-center gap-2 rounded-full border border-slate-900/8 bg-white/70 px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">
-                      <BadgeCheck className="h-3.5 w-3.5" />
-                      Review discoveries
+                    <div className="mt-10 border-t border-slate-900/8 pt-8">
+                      <SurfaceLabel icon={Package2}>Service seed</SurfaceLabel>
+
+                      <div className="mt-4 text-xl font-semibold tracking-[-0.04em] text-slate-950">
+                        {serviceSuggestionTitle || "Use the focus note to generate a service seed"}
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <TinyChip>services {services.length}</TinyChip>
+                        {serviceSuggestionTitle ? <TinyChip>seed ready</TinyChip> : <TinyChip>awaiting note</TinyChip>}
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={!!savingServiceSuggestion}
+                        onClick={onCreateSuggestedService}
+                        className="mt-6 inline-flex items-center justify-center rounded-full bg-slate-950 px-5 py-3 text-sm font-medium text-white shadow-[0_18px_50px_rgba(15,23,42,0.16)] disabled:opacity-60"
+                      >
+                        {savingServiceSuggestion ? "Creating..." : "Create suggested service"}
+                      </button>
                     </div>
 
-                    <h2 className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-slate-950">
-                      Approve only what deserves to enter the twin
-                    </h2>
+                    {discoveryProfileRows.length ? (
+                      <div className="mt-10 border-t border-slate-900/8 pt-8">
+                        <SurfaceLabel icon={BadgeCheck}>Extracted snapshot</SurfaceLabel>
 
-                    <p className="mt-3 max-w-[760px] text-sm leading-7 text-slate-600">
-                      Card grid yox. Sadəcə tapılan siqnalların axını. Dəyərli olanları approve et,
-                      qalanları çıxart.
-                    </p>
-                  </div>
-
-                  <div className="inline-flex items-center gap-2 rounded-full border border-slate-900/8 bg-white/72 px-4 py-2 text-sm text-slate-600">
-                    <Clock3 className="h-4 w-4" />
-                    Pending {knowledgePreview.length}
+                        <div className="mt-5 divide-y divide-slate-900/8 overflow-hidden rounded-[24px] border border-slate-900/8 bg-white">
+                          {discoveryProfileRows.map(([label, value]) => (
+                            <div
+                              key={label}
+                              className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                            >
+                              <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
+                                {label}
+                              </div>
+                              <div className="text-sm text-slate-700 sm:max-w-[64%] sm:text-right">
+                                {value}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
+              </motion.aside>
+            ) : null}
+          </AnimatePresence>
 
-                <div className="mt-7 divide-y divide-slate-900/8">
-                  {knowledgePreview.map((item) => (
-                    <KnowledgeRow
-                      key={item.id || item.title}
-                      item={item}
-                      busy={actingKnowledgeId === item.id}
-                      onApprove={() => onApproveKnowledge({ id: item.id })}
-                      onReject={() => onRejectKnowledge({ id: item.id })}
-                    />
-                  ))}
-                </div>
+          <AnimatePresence>
+            {showKnowledge && knowledgePreview.length ? (
+              <motion.div
+                key="knowledge-sheet"
+                initial={{ y: "100%", opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: "100%", opacity: 0 }}
+                transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+                className="absolute inset-x-0 bottom-0 z-40 h-[72vh] border-t border-slate-900/8 bg-white/94 shadow-[0_-24px_90px_rgba(15,23,42,0.08)] backdrop-blur-2xl"
+              >
+                <div className="flex h-full flex-col">
+                  <div className="flex items-start justify-between gap-4 border-b border-slate-900/8 px-5 py-5 sm:px-6">
+                    <div>
+                      <SurfaceLabel icon={BadgeCheck}>Knowledge intake</SurfaceLabel>
+                      <h2 className="mt-4 text-3xl font-semibold tracking-[-0.05em] text-slate-950">
+                        Review what deserves to enter the twin
+                      </h2>
+                    </div>
 
-                {meta.pendingCandidateCount > knowledgePreview.length ? (
-                  <div className="mt-4 text-sm text-slate-500">
-                    Daha çox discovery var. Qalanlarını da sonra review edə bilərsən.
+                    <button
+                      type="button"
+                      onClick={onToggleKnowledge}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-900/10 bg-white text-slate-600"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
                   </div>
-                ) : null}
-              </div>
-            </motion.section>
-          ) : null}
-        </AnimatePresence>
+
+                  <div className="flex items-center justify-between gap-4 px-5 py-4 sm:px-6">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-slate-900/8 bg-white px-4 py-2 text-sm text-slate-600">
+                      <Clock3 className="h-4 w-4" />
+                      Pending {knowledgePreview.length}
+                    </div>
+
+                    <div className="text-sm text-slate-500">
+                      Approve useful items, reject noise.
+                    </div>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto px-5 pb-5 sm:px-6">
+                    <div className="divide-y divide-slate-900/8">
+                      {knowledgePreview.map((item) => (
+                        <KnowledgeEntry
+                          key={item.id || item.title}
+                          item={item}
+                          busy={actingKnowledgeId === item.id}
+                          onApprove={() => onApproveKnowledge({ id: item.id })}
+                          onReject={() => onRejectKnowledge({ id: item.id })}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
+        </div>
 
         <motion.div
-          {...fadeUp(0.18)}
-          className="mt-8 flex flex-col items-center justify-center gap-4"
+          {...fadeIn(0.24)}
+          className="mx-auto mt-8 flex max-w-[1380px] items-center justify-center"
         >
           <button
             type="button"
@@ -692,7 +911,12 @@ export default function SetupStudioScene({
             Continue to workspace
             <ArrowRight className="h-4 w-4" />
           </button>
+        </motion.div>
 
+        <motion.div
+          {...fadeIn(0.26)}
+          className="mt-5 flex items-center justify-center"
+        >
           {meta.missingSteps.length ? (
             <div className="text-center text-sm text-slate-500">
               Remaining: {meta.missingSteps.join(" · ")}
