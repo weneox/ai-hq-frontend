@@ -1,6 +1,6 @@
 // src/api/setup.js
 
-import { apiGet, apiPut } from "./client.js";
+import { apiGet, apiPost, apiPut } from "./client.js";
 
 export function getSetupStatus() {
   return apiGet("/api/setup/status");
@@ -12,4 +12,8 @@ export function getSetupOverview() {
 
 export function saveBusinessProfile(payload) {
   return apiPut("/api/setup/business-profile", payload);
+}
+
+export function importWebsiteForSetup(payload) {
+  return apiPost("/api/setup/import/website", payload);
 }

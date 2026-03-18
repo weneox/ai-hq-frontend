@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getAppBootstrap } from "../api/app.js";
-import { saveBusinessProfile } from "../api/setup.js";
+import { importWebsiteForSetup, saveBusinessProfile } from "../api/setup.js";
 import {
   approveKnowledgeCandidate,
   getKnowledgeCandidates,
@@ -135,7 +135,9 @@ function formatReason(reason = "") {
 }
 
 function knowledgeTone(item = {}) {
-  const status = s(item.status || item.review_status || item.state || "pending").toLowerCase();
+  const status = s(
+    item.status || item.review_status || item.state || "pending"
+  ).toLowerCase();
 
   if (status === "conflict") {
     return "border-amber-400/20 bg-amber-500/10 text-amber-200";
@@ -233,6 +235,87 @@ function StepBadge({ done, label }) {
   );
 }
 
+function discoveryTone(mode = "") {
+  const value = s(mode).toLowerCase();
+
+  if (["running", "queued", "processing", "syncing"].includes(value)) {
+    return "border-sky-400/20 bg-sky-500/10 text-sky-200";
+  }
+
+  if (["success", "completed", "complete", "done"].includes(value)) {
+    return "border-emerald-400/20 bg-emerald-500/10 text-emerald-200";
+  }
+
+  if (["error", "failed"].includes(value)) {
+    return "border-red-400/20 bg-red-500/10 text-red-200";
+  }
+
+  return "border-white/10 bg-white/5 text-white/75";
+}
+
+function profilePatchFromDiscovery(profile = {}) {
+  const p = obj(profile);
+  const languages = arr(p.languages);
+  return {
+    companyName: s(
+      p.companyName || p.businessName || p.name || p.title || p.brandName
+    ),
+    description: s(
+      p.description || p.summary || p.businessDescription || p.about
+    ),
+    timezone: s(p.timezone || p.timeZone),
+    language: s(p.language || languages[0]),
+  };
+}
+
+function mergeBusinessForm(prev, patch = {}) {
+  const next = { ...prev };
+
+  if (s(patch.companyName) && !s(prev.companyName)) {
+    next.companyName = s(patch.companyName);
+  }
+
+  if (s(patch.description) && !s(prev.description)) {
+    next.description = s(patch.description);
+  }
+
+  if (s(patch.timezone) && (!s(prev.timezone) || s(prev.timezone) === "Asia/Baku")) {
+    next.timezone = s(patch.timezone);
+  }
+
+  if (s(patch.language) && (!s(prev.language) || s(prev.language) === "az")) {
+    next.language = s(patch.language);
+  }
+
+  return next;
+}
+
+function profilePreviewRows(profile = {}) {
+  const p = obj(profile);
+
+  return [
+    ["Name", s(p.companyName || p.businessName || p.name || p.title || p.brandName)],
+    ["Description", s(p.description || p.summary || p.businessDescription || p.about)],
+    ["Timezone", s(p.timezone || p.timeZone)],
+    ["Language", s(p.language || arr(p.languages)[0])],
+    ["Website", s(p.website || p.url || p.siteUrl)],
+  ].filter(([, value]) => value);
+}
+
+function signalPreviewRows(signals = {}) {
+  return Object.entries(obj(signals))
+    .filter(([, value]) => {
+      if (value == null) return false;
+      if (typeof value === "string" && !s(value)) return false;
+      if (Array.isArray(value) && !value.length) return false;
+      if (typeof value === "object" && !Array.isArray(value) && !Object.keys(value).length) {
+        return false;
+      }
+      return true;
+    })
+    .slice(0, 6);
+}
+
 export default function SetupStudio() {
   const navigate = useNavigate();
 
@@ -240,6 +323,7 @@ export default function SetupStudio() {
   const [refreshing, setRefreshing] = useState(false);
 
   const [savingBusiness, setSavingBusiness] = useState(false);
+  const [importingWebsite, setImportingWebsite] = useState(false);
   const [actingKnowledgeId, setActingKnowledgeId] = useState("");
   const [savingService, setSavingService] = useState(false);
   const [deletingServiceId, setDeletingServiceId] = useState("");
@@ -252,6 +336,23 @@ export default function SetupStudio() {
     description: "",
     timezone: "Asia/Baku",
     language: "az",
+  });
+
+  const [discoveryForm, setDiscoveryForm] = useState({
+    websiteUrl: "",
+    note: "",
+  });
+
+  const [discoveryState, setDiscoveryState] = useState({
+    mode: "idle",
+    lastUrl: "",
+    message: "",
+    candidateCount: 0,
+    profileApplied: false,
+    profile: {},
+    signals: {},
+    source: {},
+    run: {},
   });
 
   const [knowledgeCandidates, setKnowledgeCandidates] = useState([]);
@@ -271,7 +372,7 @@ export default function SetupStudio() {
     playbookCount: 0,
   });
 
-  async function loadData({ silent = false } = {}) {
+  async function loadData({ silent = false, preserveBusinessForm = false } = {}) {
     try {
       if (silent) {
         setRefreshing(true);
@@ -305,7 +406,9 @@ export default function SetupStudio() {
           s(workspace?.initialRoute) ||
           "/setup/studio",
         setupCompleted: !!workspace?.setupCompleted,
-        pendingCandidateCount: Number(knowledge?.pendingCandidateCount || pendingKnowledge.length || 0),
+        pendingCandidateCount: Number(
+          knowledge?.pendingCandidateCount || pendingKnowledge.length || 0
+        ),
         approvedKnowledgeCount: Number(knowledge?.approvedKnowledgeCount || 0),
         approvedCandidateCount: Number(knowledge?.approvedCandidateCount || 0),
         rejectedCandidateCount: Number(knowledge?.rejectedCandidateCount || 0),
@@ -313,12 +416,14 @@ export default function SetupStudio() {
         playbookCount: Number(catalog?.playbookCount || 0),
       });
 
-      setBusinessForm({
-        companyName: s(profile?.companyName),
-        description: s(profile?.description),
-        timezone: s(profile?.timezone || "Asia/Baku"),
-        language: firstLanguage(profile),
-      });
+      if (!preserveBusinessForm) {
+        setBusinessForm({
+          companyName: s(profile?.companyName),
+          description: s(profile?.description),
+          timezone: s(profile?.timezone || "Asia/Baku"),
+          language: firstLanguage(profile),
+        });
+      }
 
       setKnowledgeCandidates(pendingKnowledge);
       setServices(serviceItems);
@@ -377,6 +482,13 @@ export default function SetupStudio() {
     }));
   }
 
+  function setDiscoveryField(key, value) {
+    setDiscoveryForm((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
+  }
+
   function setServiceField(key, value) {
     setServiceForm((prev) => ({
       ...prev,
@@ -395,7 +507,7 @@ export default function SetupStudio() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  async function refreshAndMaybeRouteHome() {
+  async function refreshAndMaybeRouteHome({ preserveBusinessForm = false } = {}) {
     const boot = await getAppBootstrap();
     const workspace = obj(boot?.workspace);
 
@@ -404,8 +516,76 @@ export default function SetupStudio() {
       return true;
     }
 
-    await loadData({ silent: true });
+    await loadData({ silent: true, preserveBusinessForm });
     return false;
+  }
+
+  async function onScanBusiness(e) {
+    e.preventDefault();
+
+    const websiteUrl = s(discoveryForm.websiteUrl);
+    if (!websiteUrl) {
+      setError("Website URL boş ola bilməz.");
+      return;
+    }
+
+    try {
+      setImportingWebsite(true);
+      setError("");
+      setDiscoveryState((prev) => ({
+        ...prev,
+        mode: "running",
+        lastUrl: websiteUrl,
+        message: "Website scan başlayıb...",
+      }));
+
+      const result = await importWebsiteForSetup({
+        url: websiteUrl,
+        sourceUrl: websiteUrl,
+        note: discoveryForm.note,
+        businessNote: discoveryForm.note,
+      });
+
+      const discoveredProfile = obj(result?.profile);
+      const patch = profilePatchFromDiscovery(discoveredProfile);
+      const mergedForm = mergeBusinessForm(businessForm, patch);
+      const profileApplied =
+        JSON.stringify(mergedForm) !== JSON.stringify(businessForm);
+
+      if (profileApplied) {
+        setBusinessForm(mergedForm);
+      }
+
+      setDiscoveryState({
+        mode:
+          s(result?.mode) ||
+          s(result?.run?.status) ||
+          s(result?.source?.sync_status) ||
+          "success",
+        lastUrl: websiteUrl,
+        message:
+          Number(result?.candidateCount || 0) > 0
+            ? `${Number(result?.candidateCount || 0)} knowledge candidate yaradıldı.`
+            : "Website import tamamlandı.",
+        candidateCount: Number(result?.candidateCount || 0),
+        profileApplied,
+        profile: discoveredProfile,
+        signals: obj(result?.signals),
+        source: obj(result?.source),
+        run: obj(result?.run),
+      });
+
+      await refreshAndMaybeRouteHome({ preserveBusinessForm: true });
+    } catch (e2) {
+      setDiscoveryState((prev) => ({
+        ...prev,
+        mode: "error",
+        message: String(e2?.message || e2 || "Website scan alınmadı."),
+      }));
+      setError(String(e2?.message || e2 || "Website scan alınmadı."));
+    } finally {
+      setImportingWebsite(false);
+    }
   }
 
   async function onSaveBusiness(e) {
@@ -423,7 +603,7 @@ export default function SetupStudio() {
         languages: businessForm.language ? [businessForm.language] : [],
       });
 
-      await refreshAndMaybeRouteHome();
+      await refreshAndMaybeRouteHome({ preserveBusinessForm: false });
     } catch (e2) {
       setError(String(e2?.message || e2 || "Business profile could not be saved."));
     } finally {
@@ -440,7 +620,7 @@ export default function SetupStudio() {
       setError("");
 
       await approveKnowledgeCandidate(id, {});
-      await refreshAndMaybeRouteHome();
+      await refreshAndMaybeRouteHome({ preserveBusinessForm: true });
     } catch (e) {
       setError(String(e?.message || e || "Candidate could not be approved."));
     } finally {
@@ -457,7 +637,7 @@ export default function SetupStudio() {
       setError("");
 
       await rejectKnowledgeCandidate(id, {});
-      await refreshAndMaybeRouteHome();
+      await refreshAndMaybeRouteHome({ preserveBusinessForm: true });
     } catch (e) {
       setError(String(e?.message || e || "Candidate could not be rejected."));
     } finally {
@@ -484,14 +664,14 @@ export default function SetupStudio() {
       }
 
       if (refreshStudioAfterSave) {
-        const routed = await refreshAndMaybeRouteHome();
+        const routed = await refreshAndMaybeRouteHome({ preserveBusinessForm: true });
         if (!routed) {
           resetServiceForm();
         }
         return;
       }
 
-      await loadData({ silent: true });
+      await loadData({ silent: true, preserveBusinessForm: true });
       resetServiceForm();
     } catch (e) {
       setError(String(e?.message || e || "Service could not be saved."));
@@ -514,7 +694,7 @@ export default function SetupStudio() {
         resetServiceForm();
       }
 
-      await loadData({ silent: true });
+      await loadData({ silent: true, preserveBusinessForm: true });
     } catch (e) {
       setError(String(e?.message || e || "Service could not be deleted."));
     } finally {
@@ -534,7 +714,7 @@ export default function SetupStudio() {
         return;
       }
 
-      await loadData({ silent: true });
+      await loadData({ silent: true, preserveBusinessForm: true });
       setError("Setup hələ tamamlanmayıb. Qalan blokları tamamlayıb yenə yoxla.");
     } catch (e) {
       setError(String(e?.message || e || "Workspace status could not be checked."));
@@ -564,7 +744,7 @@ export default function SetupStudio() {
 
             <p className="mt-4 max-w-3xl text-base leading-7 text-white/70">
               Burda klassik step-by-step form yox, sənin biznesinin əsas bloklarını
-              bir ekranda toplayırıq: business identity, knowledge discoveries,
+              bir ekranda toplayırıq: business identity, discovery, knowledge,
               services və readiness. Məqsəd budur ki runtime üçün lazım olan əsas
               şeylər bir yerdə formalaşsın.
             </p>
@@ -606,7 +786,7 @@ export default function SetupStudio() {
             <div className="mt-6 flex flex-wrap gap-3">
               <button
                 type="button"
-                onClick={() => loadData({ silent: true })}
+                onClick={() => loadData({ silent: true, preserveBusinessForm: true })}
                 className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white"
               >
                 {refreshing ? "Refreshing..." : "Refresh studio"}
@@ -623,6 +803,218 @@ export default function SetupStudio() {
           </div>
         </div>
       </div>
+
+      <section className="mb-8 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+        <form
+          onSubmit={onScanBusiness}
+          className="rounded-[32px] border border-white/10 bg-white/5 p-6"
+        >
+          <div className="mb-6">
+            <div className="mb-3 inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.2em] text-white/65">
+              Business discovery
+            </div>
+
+            <h2 className="text-3xl font-semibold tracking-tight">
+              Scan your business from the website
+            </h2>
+
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-white/60">
+              Website URL ver, sistem source yaratsın, scan etsin, knowledge
+              candidate çıxarsın və business twin üçün ilkin siqnalları toplasın.
+            </p>
+          </div>
+
+          <div className="grid gap-5">
+            <label className="block">
+              <div className="mb-2 text-sm text-white/70">Website URL</div>
+              <input
+                value={discoveryForm.websiteUrl}
+                onChange={(e) => setDiscoveryField("websiteUrl", e.target.value)}
+                className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none"
+                placeholder="https://yourbusiness.com"
+              />
+            </label>
+
+            <label className="block">
+              <div className="mb-2 text-sm text-white/70">Optional note</div>
+              <textarea
+                value={discoveryForm.note}
+                onChange={(e) => setDiscoveryField("note", e.target.value)}
+                className="min-h-[120px] w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none"
+                placeholder="Məsələn: əsas fokusumuz Instagram DM automation və lead qualification-dır."
+              />
+            </label>
+          </div>
+
+          <div className="mt-6 flex flex-wrap gap-3">
+            <button
+              type="submit"
+              disabled={importingWebsite}
+              className="rounded-2xl border border-white/10 bg-white px-5 py-3 text-sm font-medium text-black disabled:opacity-60"
+            >
+              {importingWebsite ? "Scanning..." : "Scan business"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => loadData({ silent: true, preserveBusinessForm: true })}
+              className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm text-white"
+            >
+              Refresh studio
+            </button>
+          </div>
+
+          <div className="mt-6 rounded-[28px] border border-white/10 bg-black/20 p-5">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <span
+                className={`rounded-full border px-3 py-1 text-xs ${discoveryTone(
+                  importingWebsite ? "running" : discoveryState.mode
+                )}`}
+              >
+                {importingWebsite
+                  ? "running"
+                  : s(discoveryState.mode || "idle") || "idle"}
+              </span>
+
+              {s(discoveryState.lastUrl) ? (
+                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/75">
+                  {discoveryState.lastUrl}
+                </span>
+              ) : null}
+            </div>
+
+            <h3 className="text-2xl font-semibold tracking-tight">
+              Discovery status
+            </h3>
+
+            <p className="mt-3 text-sm leading-6 text-white/65">
+              {s(discoveryState.message) ||
+                "Hələ website discovery run edilməyib."}
+            </p>
+
+            <div className="mt-4 grid gap-4 md:grid-cols-3">
+              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                <div className="text-xs uppercase tracking-[0.2em] text-white/45">
+                  New candidates
+                </div>
+                <div className="mt-2 text-2xl font-semibold">
+                  {Number(discoveryState.candidateCount || 0)}
+                </div>
+              </div>
+
+              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                <div className="text-xs uppercase tracking-[0.2em] text-white/45">
+                  Source status
+                </div>
+                <div className="mt-2 text-lg font-medium">
+                  {s(
+                    discoveryState.source?.sync_status ||
+                      discoveryState.source?.status ||
+                      "idle"
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                <div className="text-xs uppercase tracking-[0.2em] text-white/45">
+                  Run status
+                </div>
+                <div className="mt-2 text-lg font-medium">
+                  {s(
+                    discoveryState.run?.status ||
+                      discoveryState.run?.run_status ||
+                      "idle"
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {discoveryState.profileApplied ? (
+              <div className="mt-4 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+                Discovered profile məlumatları boş business field-lərə prefilling edildi.
+                Aşağıdakı business twin hissəsindən yoxlayıb save edə bilərsən.
+              </div>
+            ) : null}
+          </div>
+        </form>
+
+        <div className="rounded-[32px] border border-white/10 bg-white/5 p-6">
+          <div className="mb-6">
+            <div className="mb-3 inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.2em] text-white/65">
+              Discovery output
+            </div>
+
+            <h2 className="text-3xl font-semibold tracking-tight">
+              What the scan found
+            </h2>
+
+            <p className="mt-3 text-sm leading-6 text-white/60">
+              İlk versiyada burada website import nəticəsindən gələn profile və
+              signal-ları göstəririk. Sonra bunu daha premium review flow-a çevirəcəyik.
+            </p>
+          </div>
+
+          <div className="grid gap-4">
+            <div className="rounded-[28px] border border-white/10 bg-black/20 p-5">
+              <div className="mb-3 text-xs uppercase tracking-[0.2em] text-white/45">
+                Discovered profile
+              </div>
+
+              {profilePreviewRows(discoveryState.profile).length ? (
+                <div className="grid gap-3">
+                  {profilePreviewRows(discoveryState.profile).map(([label, value]) => (
+                    <div
+                      key={label}
+                      className="rounded-2xl border border-white/10 bg-white/5 p-3"
+                    >
+                      <div className="text-xs uppercase tracking-[0.2em] text-white/45">
+                        {label}
+                      </div>
+                      <div className="mt-2 text-sm leading-6 text-white/80">
+                        {value}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-white/55">
+                  Hələ discovered profile preview yoxdur.
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-[28px] border border-white/10 bg-black/20 p-5">
+              <div className="mb-3 text-xs uppercase tracking-[0.2em] text-white/45">
+                Signals preview
+              </div>
+
+              {signalPreviewRows(discoveryState.signals).length ? (
+                <div className="grid gap-3">
+                  {signalPreviewRows(discoveryState.signals).map(([key, value]) => (
+                    <div
+                      key={key}
+                      className="rounded-2xl border border-white/10 bg-white/5 p-3"
+                    >
+                      <div className="text-xs uppercase tracking-[0.2em] text-white/45">
+                        {key}
+                      </div>
+                      <div className="mt-2 text-sm leading-6 text-white/80 break-words">
+                        {typeof value === "object"
+                          ? JSON.stringify(value)
+                          : String(value)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-white/55">
+                  Hələ signals preview yoxdur.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
 
       <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {summaryCards.map((item) => (
@@ -746,7 +1138,7 @@ export default function SetupStudio() {
 
               <button
                 type="button"
-                onClick={() => loadData({ silent: true })}
+                onClick={() => loadData({ silent: true, preserveBusinessForm: true })}
                 className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm text-white"
               >
                 Sync from backend
@@ -798,7 +1190,8 @@ export default function SetupStudio() {
                   Runtime summary
                 </div>
                 <div className="mt-2 text-sm leading-7 text-white/75">
-                  {s(businessForm.description) || "Hələ business summary daxil edilməyib."}
+                  {s(businessForm.description) ||
+                    "Hələ business summary daxil edilməyib."}
                 </div>
               </div>
             </div>
@@ -966,7 +1359,7 @@ export default function SetupStudio() {
               <div className="mt-5">
                 <button
                   type="button"
-                  onClick={() => loadData({ silent: true })}
+                  onClick={() => loadData({ silent: true, preserveBusinessForm: true })}
                   className="rounded-2xl border border-white/10 bg-white px-5 py-3 text-sm font-medium text-black"
                 >
                   Refresh discoveries
@@ -1145,7 +1538,7 @@ export default function SetupStudio() {
 
                 <button
                   type="button"
-                  onClick={() => loadData({ silent: true })}
+                  onClick={() => loadData({ silent: true, preserveBusinessForm: true })}
                   className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm text-white"
                 >
                   Refresh
