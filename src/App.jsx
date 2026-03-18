@@ -19,6 +19,7 @@ import Voice from "./pages/Voice.jsx";
 import Login from "./pages/Login.jsx";
 import SetupBusiness from "./pages/SetupBusiness.jsx";
 import SetupKnowledge from "./pages/SetupKnowledge.jsx";
+import SetupServices from "./pages/SetupServices.jsx";
 import SetupPlaceholder from "./pages/SetupPlaceholder.jsx";
 
 import AdminLogin from "./pages/AdminLogin.jsx";
@@ -67,7 +68,7 @@ export default function App() {
           <Route path="setup/business" element={<SetupBusiness />} />
           <Route path="setup/channels" element={<SetupPlaceholder />} />
           <Route path="setup/knowledge" element={<SetupKnowledge />} />
-          <Route path="setup/services" element={<SetupPlaceholder />} />
+          <Route path="setup/services" element={<SetupServices />} />
           <Route path="setup/playbooks" element={<SetupPlaceholder />} />
           <Route path="setup/runtime" element={<SetupPlaceholder />} />
 
