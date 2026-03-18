@@ -4,7 +4,6 @@ import AdminShell from "./components/admin/AdminShell.jsx";
 import AdminRouteGuard from "./components/admin/AdminRouteGuard.jsx";
 import UserRouteGuard from "./components/auth/UserRouteGuard.jsx";
 import GuestRouteGuard from "./components/guards/GuestRouteGuard.jsx";
-import SetupStudioShell from "./components/layout/SetupStudioShell.jsx";
 
 import CommandPage from "./pages/CommandPage.jsx";
 import Proposals from "./pages/Proposals.jsx";
@@ -18,12 +17,13 @@ import Leads from "./pages/Leads.jsx";
 import Comments from "./pages/Comments.jsx";
 import Voice from "./pages/Voice.jsx";
 import Login from "./pages/Login.jsx";
-import SetupStudio from "./pages/SetupStudio.jsx";
 
 import AdminLogin from "./pages/AdminLogin.jsx";
 import AdminTenants from "./pages/AdminTenants.jsx";
 import AdminTeam from "./pages/AdminTeam.jsx";
 import AdminSecrets from "./pages/AdminSecrets.jsx";
+
+import SetupStudioRoute from "./features/setup-studio/index.jsx";
 
 export default function App() {
   return (
@@ -58,9 +58,7 @@ export default function App() {
           path="/setup/studio"
           element={
             <UserRouteGuard>
-              <SetupStudioShell>
-                <SetupStudio />
-              </SetupStudioShell>
+              <SetupStudioRoute />
             </UserRouteGuard>
           }
         />
