@@ -17,10 +17,7 @@ import Leads from "./pages/Leads.jsx";
 import Comments from "./pages/Comments.jsx";
 import Voice from "./pages/Voice.jsx";
 import Login from "./pages/Login.jsx";
-import SetupBusiness from "./pages/SetupBusiness.jsx";
-import SetupKnowledge from "./pages/SetupKnowledge.jsx";
-import SetupServices from "./pages/SetupServices.jsx";
-import SetupPlaceholder from "./pages/SetupPlaceholder.jsx";
+import SetupStudio from "./pages/SetupStudio.jsx";
 
 import AdminLogin from "./pages/AdminLogin.jsx";
 import AdminTenants from "./pages/AdminTenants.jsx";
@@ -64,13 +61,24 @@ export default function App() {
             </UserRouteGuard>
           }
         >
-          <Route path="setup" element={<Navigate to="/setup/business" replace />} />
-          <Route path="setup/business" element={<SetupBusiness />} />
-          <Route path="setup/channels" element={<SetupPlaceholder />} />
-          <Route path="setup/knowledge" element={<SetupKnowledge />} />
-          <Route path="setup/services" element={<SetupServices />} />
-          <Route path="setup/playbooks" element={<SetupPlaceholder />} />
-          <Route path="setup/runtime" element={<SetupPlaceholder />} />
+          <Route path="setup" element={<Navigate to="/setup/studio" replace />} />
+          <Route path="setup/studio" element={<SetupStudio />} />
+
+          {/*
+            Backend hələ klassik nextSetupRoute qaytara bilər:
+            /setup/business
+            /setup/knowledge
+            /setup/services
+            və s.
+            Ona görə bunların hamısını studio-ya redirect edirik ki
+            backend dəyişmədən yeni onboarding işləsin.
+          */}
+          <Route path="setup/business" element={<Navigate to="/setup/studio" replace />} />
+          <Route path="setup/channels" element={<Navigate to="/setup/studio" replace />} />
+          <Route path="setup/knowledge" element={<Navigate to="/setup/studio" replace />} />
+          <Route path="setup/services" element={<Navigate to="/setup/studio" replace />} />
+          <Route path="setup/playbooks" element={<Navigate to="/setup/studio" replace />} />
+          <Route path="setup/runtime" element={<Navigate to="/setup/studio" replace />} />
 
           <Route index element={<CommandPage />} />
           <Route path="analytics" element={<Analytics />} />
