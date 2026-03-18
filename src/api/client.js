@@ -24,7 +24,7 @@ async function readJson(r) {
 function assertConfigured() {
   if (!API_BASE) {
     throw new Error(
-      "VITE_API_BASE is not set. (Example: https://ai-hq-backend-production.up.railway.app)"
+      "VITE_API_BASE is not set. (Example: https://api.hq.weneox.com)"
     );
   }
 }
@@ -81,6 +81,34 @@ export async function apiPost(path, body) {
 
   if (!r.ok) {
     throw new Error(pickErr(j, `POST ${path} failed (${r.status})`));
+  }
+
+  return j;
+}
+
+export async function apiPut(path, body) {
+  assertConfigured();
+  const url = `${API_BASE}${path}`;
+
+  let r;
+  try {
+    r = await fetch(url, {
+      method: "PUT",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(body ?? {}),
+    });
+  } catch (e) {
+    throw new Error(`Network error (PUT ${path}): ${String(e?.message || e)}`);
+  }
+
+  const j = await readJson(r);
+
+  if (!r.ok) {
+    throw new Error(pickErr(j, `PUT ${path} failed (${r.status})`));
   }
 
   return j;

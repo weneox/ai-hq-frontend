@@ -17,6 +17,7 @@ import Leads from "./pages/Leads.jsx";
 import Comments from "./pages/Comments.jsx";
 import Voice from "./pages/Voice.jsx";
 import Login from "./pages/Login.jsx";
+import SetupBusiness from "./pages/SetupBusiness.jsx";
 
 import AdminLogin from "./pages/AdminLogin.jsx";
 import AdminTenants from "./pages/AdminTenants.jsx";
@@ -60,6 +61,9 @@ export default function App() {
             </UserRouteGuard>
           }
         >
+          <Route path="setup" element={<Navigate to="/setup/business" replace />} />
+          <Route path="setup/business" element={<SetupBusiness />} />
+
           <Route index element={<CommandPage />} />
           <Route path="analytics" element={<Analytics />} />
           <Route path="proposals" element={<Proposals />} />

@@ -1,0 +1,15 @@
+// src/api/setup.js
+
+import { apiGet, apiPut } from "./client.js";
+
+export function getSetupStatus() {
+  return apiGet("/api/setup/status");
+}
+
+export function getSetupOverview() {
+  return apiGet("/api/setup/overview");
+}
+
+export function saveBusinessProfile(payload) {
+  return apiPut("/api/setup/business-profile", payload);
+}
