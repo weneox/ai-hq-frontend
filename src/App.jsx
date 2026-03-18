@@ -4,6 +4,7 @@ import AdminShell from "./components/admin/AdminShell.jsx";
 import AdminRouteGuard from "./components/admin/AdminRouteGuard.jsx";
 import UserRouteGuard from "./components/auth/UserRouteGuard.jsx";
 import GuestRouteGuard from "./components/guards/GuestRouteGuard.jsx";
+import SetupStudioShell from "./components/layout/SetupStudioShell.jsx";
 
 import CommandPage from "./pages/CommandPage.jsx";
 import Proposals from "./pages/Proposals.jsx";
@@ -54,6 +55,80 @@ export default function App() {
         </Route>
 
         <Route
+          path="/setup/studio"
+          element={
+            <UserRouteGuard>
+              <SetupStudioShell>
+                <SetupStudio />
+              </SetupStudioShell>
+            </UserRouteGuard>
+          }
+        />
+
+        <Route
+          path="/setup"
+          element={
+            <UserRouteGuard>
+              <Navigate to="/setup/studio" replace />
+            </UserRouteGuard>
+          }
+        />
+
+        <Route
+          path="/setup/business"
+          element={
+            <UserRouteGuard>
+              <Navigate to="/setup/studio" replace />
+            </UserRouteGuard>
+          }
+        />
+
+        <Route
+          path="/setup/channels"
+          element={
+            <UserRouteGuard>
+              <Navigate to="/setup/studio" replace />
+            </UserRouteGuard>
+          }
+        />
+
+        <Route
+          path="/setup/knowledge"
+          element={
+            <UserRouteGuard>
+              <Navigate to="/setup/studio" replace />
+            </UserRouteGuard>
+          }
+        />
+
+        <Route
+          path="/setup/services"
+          element={
+            <UserRouteGuard>
+              <Navigate to="/setup/studio" replace />
+            </UserRouteGuard>
+          }
+        />
+
+        <Route
+          path="/setup/playbooks"
+          element={
+            <UserRouteGuard>
+              <Navigate to="/setup/studio" replace />
+            </UserRouteGuard>
+          }
+        />
+
+        <Route
+          path="/setup/runtime"
+          element={
+            <UserRouteGuard>
+              <Navigate to="/setup/studio" replace />
+            </UserRouteGuard>
+          }
+        />
+
+        <Route
           path="/"
           element={
             <UserRouteGuard>
@@ -61,25 +136,6 @@ export default function App() {
             </UserRouteGuard>
           }
         >
-          <Route path="setup" element={<Navigate to="/setup/studio" replace />} />
-          <Route path="setup/studio" element={<SetupStudio />} />
-
-          {/*
-            Backend hələ klassik nextSetupRoute qaytara bilər:
-            /setup/business
-            /setup/knowledge
-            /setup/services
-            və s.
-            Ona görə bunların hamısını studio-ya redirect edirik ki
-            backend dəyişmədən yeni onboarding işləsin.
-          */}
-          <Route path="setup/business" element={<Navigate to="/setup/studio" replace />} />
-          <Route path="setup/channels" element={<Navigate to="/setup/studio" replace />} />
-          <Route path="setup/knowledge" element={<Navigate to="/setup/studio" replace />} />
-          <Route path="setup/services" element={<Navigate to="/setup/studio" replace />} />
-          <Route path="setup/playbooks" element={<Navigate to="/setup/studio" replace />} />
-          <Route path="setup/runtime" element={<Navigate to="/setup/studio" replace />} />
-
           <Route index element={<CommandPage />} />
           <Route path="analytics" element={<Analytics />} />
           <Route path="proposals" element={<Proposals />} />

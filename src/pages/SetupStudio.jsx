@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { ArrowRight, Check, Globe, Loader2, Sparkles, Wand2 } from "lucide-react";
 import { getAppBootstrap } from "../api/app.js";
 import { importWebsiteForSetup, saveBusinessProfile } from "../api/setup.js";
 import {
@@ -9,9 +10,7 @@ import {
 } from "../api/knowledge.js";
 import {
   createSetupService,
-  deleteSetupService,
   getSetupServices,
-  updateSetupService,
 } from "../api/services.js";
 
 function arr(value) {
@@ -87,7 +86,7 @@ function candidateTitle(item = {}) {
     s(item.title) ||
     s(item.item_key) ||
     s(item.canonical_key) ||
-    "Untitled knowledge candidate"
+    "Untitled discovery"
   );
 }
 
@@ -127,135 +126,13 @@ function candidateConfidence(item = {}) {
 }
 
 function evidenceList(item = {}) {
-  return parseJsonArray(item.source_evidence_json).slice(0, 3);
-}
-
-function formatReason(reason = "") {
-  return s(reason) || "No review note";
-}
-
-function knowledgeTone(item = {}) {
-  const status = s(
-    item.status || item.review_status || item.state || "pending"
-  ).toLowerCase();
-
-  if (status === "conflict") {
-    return "border-amber-400/20 bg-amber-500/10 text-amber-200";
-  }
-
-  if (status === "needs_review") {
-    return "border-sky-400/20 bg-sky-500/10 text-sky-200";
-  }
-
-  return "border-white/10 bg-white/5 text-white/80";
-}
-
-function formatMoney(value, currency = "AZN") {
-  if (value == null || value === "") return "Custom quote";
-  const n = Number(value);
-  if (!Number.isFinite(n)) return "Custom quote";
-  return `${n} ${currency}`;
-}
-
-function blankServiceForm() {
-  return {
-    title: "",
-    description: "",
-    category: "general",
-    priceFrom: "",
-    currency: "AZN",
-    pricingModel: "custom_quote",
-    durationMinutes: "",
-    sortOrder: 0,
-    highlightsText: "",
-    isActive: true,
-  };
-}
-
-function normalizeServiceForForm(item = {}) {
-  const highlights =
-    arr(item.highlights).length
-      ? arr(item.highlights)
-      : parseJsonArray(item.highlights_json);
-
-  return {
-    title: s(item.title),
-    description: s(item.description),
-    category: s(item.category || "general"),
-    priceFrom:
-      item.priceFrom == null || item.priceFrom === "" ? "" : String(item.priceFrom),
-    currency: s(item.currency || "AZN"),
-    pricingModel: s(item.pricingModel || "custom_quote"),
-    durationMinutes:
-      item.durationMinutes == null || item.durationMinutes === ""
-        ? ""
-        : String(item.durationMinutes),
-    sortOrder: Number(item.sortOrder || 0),
-    highlightsText: highlights.join("\n"),
-    isActive: item.isActive !== false,
-  };
-}
-
-function servicePayloadFromForm(form) {
-  return {
-    title: s(form.title),
-    description: s(form.description),
-    category: s(form.category || "general"),
-    priceFrom: s(form.priceFrom),
-    currency: s(form.currency || "AZN"),
-    pricingModel: s(form.pricingModel || "custom_quote"),
-    durationMinutes: s(form.durationMinutes),
-    sortOrder: Number(form.sortOrder || 0),
-    highlightsText: s(form.highlightsText),
-    isActive: !!form.isActive,
-  };
-}
-
-function studioStepState(meta, key) {
-  const missing = arr(meta.missingSteps).map((x) => s(x).toLowerCase());
-  return !missing.includes(String(key).toLowerCase());
-}
-
-function StepBadge({ done, label }) {
-  return (
-    <div
-      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs ${
-        done
-          ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-200"
-          : "border-white/10 bg-white/5 text-white/70"
-      }`}
-    >
-      <span
-        className={`h-2 w-2 rounded-full ${
-          done ? "bg-emerald-300" : "bg-white/30"
-        }`}
-      />
-      {label}
-    </div>
-  );
-}
-
-function discoveryTone(mode = "") {
-  const value = s(mode).toLowerCase();
-
-  if (["running", "queued", "processing", "syncing"].includes(value)) {
-    return "border-sky-400/20 bg-sky-500/10 text-sky-200";
-  }
-
-  if (["success", "completed", "complete", "done"].includes(value)) {
-    return "border-emerald-400/20 bg-emerald-500/10 text-emerald-200";
-  }
-
-  if (["error", "failed"].includes(value)) {
-    return "border-red-400/20 bg-red-500/10 text-red-200";
-  }
-
-  return "border-white/10 bg-white/5 text-white/75";
+  return parseJsonArray(item.source_evidence_json).slice(0, 2);
 }
 
 function profilePatchFromDiscovery(profile = {}) {
   const p = obj(profile);
   const languages = arr(p.languages);
+
   return {
     companyName: s(
       p.companyName || p.businessName || p.name || p.title || p.brandName
@@ -302,18 +179,64 @@ function profilePreviewRows(profile = {}) {
   ].filter(([, value]) => value);
 }
 
-function signalPreviewRows(signals = {}) {
-  return Object.entries(obj(signals))
-    .filter(([, value]) => {
-      if (value == null) return false;
-      if (typeof value === "string" && !s(value)) return false;
-      if (Array.isArray(value) && !value.length) return false;
-      if (typeof value === "object" && !Array.isArray(value) && !Object.keys(value).length) {
-        return false;
-      }
-      return true;
-    })
-    .slice(0, 6);
+function discoveryModeLabel(mode = "") {
+  const value = s(mode).toLowerCase();
+
+  if (!value || value === "idle") return "Ready to scan";
+  if (["running", "queued", "processing", "syncing"].includes(value)) return "AI is scanning";
+  if (["success", "completed", "complete", "done"].includes(value)) return "Scan completed";
+  if (["error", "failed"].includes(value)) return "Scan failed";
+
+  return value;
+}
+
+function stepDone(meta, key) {
+  const missing = arr(meta.missingSteps).map((x) => s(x).toLowerCase());
+  return !missing.includes(String(key).toLowerCase());
+}
+
+function CompactStep({ done, label }) {
+  return (
+    <div
+      className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs ${
+        done ? "bg-emerald-500/10 text-emerald-700" : "bg-slate-900/5 text-slate-500"
+      }`}
+    >
+      <span
+        className={`h-2 w-2 rounded-full ${done ? "bg-emerald-500" : "bg-slate-300"}`}
+      />
+      {label}
+    </div>
+  );
+}
+
+function StatMini({ label, value }) {
+  return (
+    <div className="rounded-3xl border border-slate-900/8 bg-white/70 p-4 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+      <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">
+        {label}
+      </div>
+      <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function DiscoveryCard({ title, value, meta }) {
+  return (
+    <div className="rounded-[28px] border border-slate-900/8 bg-white/78 p-5 shadow-[0_18px_60px_rgba(15,23,42,0.05)]">
+      <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">
+        {meta}
+      </div>
+      <div className="mt-3 text-xl font-semibold tracking-tight text-slate-900">
+        {title}
+      </div>
+      <div className="mt-3 text-sm leading-7 text-slate-600">
+        {value}
+      </div>
+    </div>
+  );
 }
 
 export default function SetupStudio() {
@@ -322,12 +245,13 @@ export default function SetupStudio() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const [savingBusiness, setSavingBusiness] = useState(false);
   const [importingWebsite, setImportingWebsite] = useState(false);
+  const [savingBusiness, setSavingBusiness] = useState(false);
   const [actingKnowledgeId, setActingKnowledgeId] = useState("");
-  const [savingService, setSavingService] = useState(false);
-  const [deletingServiceId, setDeletingServiceId] = useState("");
-  const [editingServiceId, setEditingServiceId] = useState("");
+  const [savingServiceSuggestion, setSavingServiceSuggestion] = useState("");
+
+  const [showRefine, setShowRefine] = useState(false);
+  const [showKnowledge, setShowKnowledge] = useState(false);
 
   const [error, setError] = useState("");
 
@@ -351,23 +275,17 @@ export default function SetupStudio() {
     profileApplied: false,
     profile: {},
     signals: {},
-    source: {},
-    run: {},
   });
 
   const [knowledgeCandidates, setKnowledgeCandidates] = useState([]);
   const [services, setServices] = useState([]);
-  const [serviceForm, setServiceForm] = useState(blankServiceForm());
 
   const [meta, setMeta] = useState({
     readinessScore: 0,
     missingSteps: [],
-    nextSetupRoute: "/setup/studio",
     setupCompleted: false,
     pendingCandidateCount: 0,
     approvedKnowledgeCount: 0,
-    approvedCandidateCount: 0,
-    rejectedCandidateCount: 0,
     serviceCount: 0,
     playbookCount: 0,
   });
@@ -401,17 +319,11 @@ export default function SetupStudio() {
       setMeta({
         readinessScore: Number(workspace?.readinessScore || 0),
         missingSteps: arr(workspace?.missingSteps),
-        nextSetupRoute:
-          s(workspace?.nextSetupRoute) ||
-          s(workspace?.initialRoute) ||
-          "/setup/studio",
         setupCompleted: !!workspace?.setupCompleted,
         pendingCandidateCount: Number(
           knowledge?.pendingCandidateCount || pendingKnowledge.length || 0
         ),
         approvedKnowledgeCount: Number(knowledge?.approvedKnowledgeCount || 0),
-        approvedCandidateCount: Number(knowledge?.approvedCandidateCount || 0),
-        rejectedCandidateCount: Number(knowledge?.rejectedCandidateCount || 0),
         serviceCount: Number(catalog?.serviceCount || serviceItems.length || 0),
         playbookCount: Number(catalog?.playbookCount || 0),
       });
@@ -439,41 +351,18 @@ export default function SetupStudio() {
     loadData();
   }, []);
 
-  const summaryCards = useMemo(() => {
-    return [
-      {
-        key: "readiness",
-        label: "Readiness",
-        value: `${meta.readinessScore}%`,
-        hint: "Workspace nə qədər tamamlanıb",
-      },
-      {
-        key: "knowledge",
-        label: "Approved knowledge",
-        value: String(meta.approvedKnowledgeCount),
-        hint: "Runtime üçün qəbul olunan bilik",
-      },
-      {
-        key: "services",
-        label: "Services",
-        value: String(meta.serviceCount),
-        hint: "Satdığın xidmətlərin sayı",
-      },
-      {
-        key: "playbooks",
-        label: "Playbooks",
-        value: String(meta.playbookCount),
-        hint: "Response playbook sayı",
-      },
-    ];
-  }, [meta]);
+  async function refreshAndMaybeRouteHome({ preserveBusinessForm = false } = {}) {
+    const boot = await getAppBootstrap();
+    const workspace = obj(boot?.workspace);
 
-  const stepBusinessDone = studioStepState(meta, "businessprofile");
-  const stepKnowledgeDone = studioStepState(meta, "knowledge");
-  const stepServicesDone = studioStepState(meta, "services");
-  const stepPlaybooksDone = studioStepState(meta, "playbooks");
-  const stepPoliciesDone = studioStepState(meta, "policies");
-  const stepChannelsDone = studioStepState(meta, "channels");
+    if (workspace?.setupCompleted) {
+      navigate("/", { replace: true });
+      return true;
+    }
+
+    await loadData({ silent: true, preserveBusinessForm });
+    return false;
+  }
 
   function setBusinessField(key, value) {
     setBusinessForm((prev) => ({
@@ -489,37 +378,6 @@ export default function SetupStudio() {
     }));
   }
 
-  function setServiceField(key, value) {
-    setServiceForm((prev) => ({
-      ...prev,
-      [key]: value,
-    }));
-  }
-
-  function resetServiceForm() {
-    setEditingServiceId("");
-    setServiceForm(blankServiceForm());
-  }
-
-  function onEditService(item) {
-    setEditingServiceId(s(item.id));
-    setServiceForm(normalizeServiceForForm(item));
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
-  async function refreshAndMaybeRouteHome({ preserveBusinessForm = false } = {}) {
-    const boot = await getAppBootstrap();
-    const workspace = obj(boot?.workspace);
-
-    if (workspace?.setupCompleted) {
-      navigate("/", { replace: true });
-      return true;
-    }
-
-    await loadData({ silent: true, preserveBusinessForm });
-    return false;
-  }
-
   async function onScanBusiness(e) {
     e.preventDefault();
 
@@ -532,11 +390,12 @@ export default function SetupStudio() {
     try {
       setImportingWebsite(true);
       setError("");
+
       setDiscoveryState((prev) => ({
         ...prev,
         mode: "running",
         lastUrl: websiteUrl,
-        message: "Website scan başlayıb...",
+        message: "Website scan başladı...",
       }));
 
       const result = await importWebsiteForSetup({
@@ -557,24 +416,19 @@ export default function SetupStudio() {
       }
 
       setDiscoveryState({
-        mode:
-          s(result?.mode) ||
-          s(result?.run?.status) ||
-          s(result?.source?.sync_status) ||
-          "success",
+        mode: s(result?.mode) || "success",
         lastUrl: websiteUrl,
         message:
           Number(result?.candidateCount || 0) > 0
-            ? `${Number(result?.candidateCount || 0)} knowledge candidate yaradıldı.`
+            ? `${Number(result?.candidateCount || 0)} discovery hazırlandı.`
             : "Website import tamamlandı.",
         candidateCount: Number(result?.candidateCount || 0),
         profileApplied,
         profile: discoveredProfile,
         signals: obj(result?.signals),
-        source: obj(result?.source),
-        run: obj(result?.run),
       });
 
+      setShowKnowledge(true);
       await refreshAndMaybeRouteHome({ preserveBusinessForm: true });
     } catch (e2) {
       setDiscoveryState((prev) => ({
@@ -645,60 +499,34 @@ export default function SetupStudio() {
     }
   }
 
-  async function onSaveService({ refreshStudioAfterSave = false } = {}) {
+  async function onCreateSuggestedService() {
     try {
-      if (!s(serviceForm.title)) {
-        setError("Service title boş ola bilməz.");
+      if (!s(discoveryForm.note)) {
+        setError("Suggested service yaratmaq üçün description yaz.");
         return;
       }
 
-      setSavingService(true);
+      setSavingServiceSuggestion("creating");
       setError("");
 
-      const payload = servicePayloadFromForm(serviceForm);
+      await createSetupService({
+        title: s(discoveryForm.note.split(".")[0] || "Discovered service"),
+        description: s(discoveryForm.note),
+        category: "general",
+        priceFrom: "",
+        currency: "AZN",
+        pricingModel: "custom_quote",
+        durationMinutes: "",
+        sortOrder: 0,
+        highlightsText: "",
+        isActive: true,
+      });
 
-      if (editingServiceId) {
-        await updateSetupService(editingServiceId, payload);
-      } else {
-        await createSetupService(payload);
-      }
-
-      if (refreshStudioAfterSave) {
-        const routed = await refreshAndMaybeRouteHome({ preserveBusinessForm: true });
-        if (!routed) {
-          resetServiceForm();
-        }
-        return;
-      }
-
-      await loadData({ silent: true, preserveBusinessForm: true });
-      resetServiceForm();
+      await refreshAndMaybeRouteHome({ preserveBusinessForm: true });
     } catch (e) {
-      setError(String(e?.message || e || "Service could not be saved."));
+      setError(String(e?.message || e || "Suggested service could not be created."));
     } finally {
-      setSavingService(false);
-    }
-  }
-
-  async function onDeleteService(item) {
-    const id = s(item.id);
-    if (!id) return;
-
-    try {
-      setDeletingServiceId(id);
-      setError("");
-
-      await deleteSetupService(id);
-
-      if (editingServiceId === id) {
-        resetServiceForm();
-      }
-
-      await loadData({ silent: true, preserveBusinessForm: true });
-    } catch (e) {
-      setError(String(e?.message || e || "Service could not be deleted."));
-    } finally {
-      setDeletingServiceId("");
+      setSavingServiceSuggestion("");
     }
   }
 
@@ -715,929 +543,487 @@ export default function SetupStudio() {
       }
 
       await loadData({ silent: true, preserveBusinessForm: true });
-      setError("Setup hələ tamamlanmayıb. Qalan blokları tamamlayıb yenə yoxla.");
+      setError("Hələ bir neçə step qalır. Onları tamamlayıb yenə yoxla.");
     } catch (e) {
       setError(String(e?.message || e || "Workspace status could not be checked."));
     }
   }
 
+  const discoveryProfileRows = useMemo(
+    () => profilePreviewRows(discoveryState.profile),
+    [discoveryState.profile]
+  );
+
+  const serviceSuggestionTitle = useMemo(() => {
+    const note = s(discoveryForm.note);
+    if (!note) return "";
+    return note.split(".")[0]?.trim() || "";
+  }, [discoveryForm.note]);
+
+  const heroSteps = [
+    { key: "businessprofile", label: "Business" },
+    { key: "knowledge", label: "Knowledge" },
+    { key: "services", label: "Services" },
+    { key: "playbooks", label: "Playbooks" },
+    { key: "policies", label: "Policies" },
+  ];
+
   if (loading) {
     return (
-      <div className="mx-auto max-w-7xl px-6 py-10 text-white">
-        Setup studio yüklənir...
+      <div className="flex min-h-[70vh] items-center justify-center">
+        <div className="inline-flex items-center gap-3 rounded-full bg-white/80 px-5 py-3 text-sm text-slate-600 shadow-[0_16px_50px_rgba(15,23,42,0.08)]">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Setup studio hazırlanır...
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-6 py-8 text-white">
-      <div className="mb-8 rounded-[32px] border border-white/10 bg-white/5 p-6 md:p-8">
-        <div className="mb-4 inline-flex rounded-full border border-cyan-400/20 bg-cyan-500/10 px-4 py-2 text-xs uppercase tracking-[0.25em] text-cyan-200">
-          Setup Studio
-        </div>
-
-        <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-          <div>
-            <h1 className="text-4xl font-semibold tracking-tight md:text-5xl">
-              Business Twin onboarding
-            </h1>
-
-            <p className="mt-4 max-w-3xl text-base leading-7 text-white/70">
-              Burda klassik step-by-step form yox, sənin biznesinin əsas bloklarını
-              bir ekranda toplayırıq: business identity, discovery, knowledge,
-              services və readiness. Məqsəd budur ki runtime üçün lazım olan əsas
-              şeylər bir yerdə formalaşsın.
-            </p>
-
-            <div className="mt-6 flex flex-wrap gap-2">
-              <StepBadge done={stepBusinessDone} label="Business profile" />
-              <StepBadge done={stepChannelsDone} label="Channels" />
-              <StepBadge done={stepKnowledgeDone} label="Knowledge" />
-              <StepBadge done={stepServicesDone} label="Services" />
-              <StepBadge done={stepPlaybooksDone} label="Playbooks" />
-              <StepBadge done={stepPoliciesDone} label="Policies" />
+    <div className="relative">
+      <section className="mx-auto flex min-h-[88vh] max-w-[1160px] flex-col justify-center py-6">
+        <div className="mx-auto w-full max-w-[980px]">
+          <div className="mb-6 flex items-center justify-between gap-4">
+            <div className="inline-flex items-center gap-2 rounded-full border border-slate-900/8 bg-white/70 px-4 py-2 text-[11px] font-medium uppercase tracking-[0.24em] text-slate-500 shadow-[0_14px_40px_rgba(15,23,42,0.05)]">
+              <Sparkles className="h-3.5 w-3.5 text-cyan-600" />
+              AI Setup Studio
             </div>
-          </div>
-
-          <div className="rounded-[28px] border border-white/10 bg-black/20 p-5">
-            <div className="text-xs uppercase tracking-[0.2em] text-white/45">
-              Studio status
-            </div>
-
-            <div className="mt-4 text-5xl font-semibold">{meta.readinessScore}%</div>
-
-            <div className="mt-2 text-sm text-white/60">
-              Current readiness score
-            </div>
-
-            <div className="mt-6">
-              <div className="mb-2 flex items-center justify-between text-xs text-white/45">
-                <span>Progress</span>
-                <span>{meta.readinessScore}%</span>
-              </div>
-              <div className="h-2 overflow-hidden rounded-full bg-white/10">
-                <div
-                  className="h-full rounded-full bg-white"
-                  style={{ width: `${Math.max(0, Math.min(100, meta.readinessScore))}%` }}
-                />
-              </div>
-            </div>
-
-            <div className="mt-6 flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={() => loadData({ silent: true, preserveBusinessForm: true })}
-                className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white"
-              >
-                {refreshing ? "Refreshing..." : "Refresh studio"}
-              </button>
-
-              <button
-                type="button"
-                onClick={onOpenWorkspace}
-                className="rounded-2xl border border-white/10 bg-white px-4 py-2.5 text-sm font-medium text-black"
-              >
-                Open workspace
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <section className="mb-8 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <form
-          onSubmit={onScanBusiness}
-          className="rounded-[32px] border border-white/10 bg-white/5 p-6"
-        >
-          <div className="mb-6">
-            <div className="mb-3 inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.2em] text-white/65">
-              Business discovery
-            </div>
-
-            <h2 className="text-3xl font-semibold tracking-tight">
-              Scan your business from the website
-            </h2>
-
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-white/60">
-              Website URL ver, sistem source yaratsın, scan etsin, knowledge
-              candidate çıxarsın və business twin üçün ilkin siqnalları toplasın.
-            </p>
-          </div>
-
-          <div className="grid gap-5">
-            <label className="block">
-              <div className="mb-2 text-sm text-white/70">Website URL</div>
-              <input
-                value={discoveryForm.websiteUrl}
-                onChange={(e) => setDiscoveryField("websiteUrl", e.target.value)}
-                className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none"
-                placeholder="https://yourbusiness.com"
-              />
-            </label>
-
-            <label className="block">
-              <div className="mb-2 text-sm text-white/70">Optional note</div>
-              <textarea
-                value={discoveryForm.note}
-                onChange={(e) => setDiscoveryField("note", e.target.value)}
-                className="min-h-[120px] w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none"
-                placeholder="Məsələn: əsas fokusumuz Instagram DM automation və lead qualification-dır."
-              />
-            </label>
-          </div>
-
-          <div className="mt-6 flex flex-wrap gap-3">
-            <button
-              type="submit"
-              disabled={importingWebsite}
-              className="rounded-2xl border border-white/10 bg-white px-5 py-3 text-sm font-medium text-black disabled:opacity-60"
-            >
-              {importingWebsite ? "Scanning..." : "Scan business"}
-            </button>
 
             <button
               type="button"
               onClick={() => loadData({ silent: true, preserveBusinessForm: true })}
-              className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm text-white"
+              className="inline-flex items-center rounded-full border border-slate-900/8 bg-white/70 px-4 py-2 text-sm text-slate-600 shadow-[0_14px_40px_rgba(15,23,42,0.05)]"
             >
-              Refresh studio
+              {refreshing ? "Refreshing..." : "Refresh"}
             </button>
           </div>
 
-          <div className="mt-6 rounded-[28px] border border-white/10 bg-black/20 p-5">
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <span
-                className={`rounded-full border px-3 py-1 text-xs ${discoveryTone(
-                  importingWebsite ? "running" : discoveryState.mode
-                )}`}
-              >
-                {importingWebsite
-                  ? "running"
-                  : s(discoveryState.mode || "idle") || "idle"}
-              </span>
+          <div className="rounded-[40px] border border-white/70 bg-white/70 p-6 shadow-[0_30px_120px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:p-8 lg:p-10">
+            <div className="mx-auto max-w-[760px] text-center">
+              <h1 className="text-5xl font-semibold tracking-[-0.04em] text-slate-950 sm:text-6xl">
+                Turn your website into a ready business twin.
+              </h1>
 
-              {s(discoveryState.lastUrl) ? (
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/75">
-                  {discoveryState.lastUrl}
-                </span>
-              ) : null}
-            </div>
+              <p className="mx-auto mt-5 max-w-[700px] text-lg leading-8 text-slate-600">
+                Bir website ver. Sistem business identity-ni çıxarsın, knowledge
+                hazırlasın və onboarding-i sənin yerinə başlatsın.
+              </p>
 
-            <h3 className="text-2xl font-semibold tracking-tight">
-              Discovery status
-            </h3>
-
-            <p className="mt-3 text-sm leading-6 text-white/65">
-              {s(discoveryState.message) ||
-                "Hələ website discovery run edilməyib."}
-            </p>
-
-            <div className="mt-4 grid gap-4 md:grid-cols-3">
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                <div className="text-xs uppercase tracking-[0.2em] text-white/45">
-                  New candidates
-                </div>
-                <div className="mt-2 text-2xl font-semibold">
-                  {Number(discoveryState.candidateCount || 0)}
-                </div>
-              </div>
-
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                <div className="text-xs uppercase tracking-[0.2em] text-white/45">
-                  Source status
-                </div>
-                <div className="mt-2 text-lg font-medium">
-                  {s(
-                    discoveryState.source?.sync_status ||
-                      discoveryState.source?.status ||
-                      "idle"
-                  )}
-                </div>
-              </div>
-
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                <div className="text-xs uppercase tracking-[0.2em] text-white/45">
-                  Run status
-                </div>
-                <div className="mt-2 text-lg font-medium">
-                  {s(
-                    discoveryState.run?.status ||
-                      discoveryState.run?.run_status ||
-                      "idle"
-                  )}
-                </div>
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+                {heroSteps.map((item) => (
+                  <CompactStep
+                    key={item.key}
+                    done={stepDone(meta, item.key)}
+                    label={item.label}
+                  />
+                ))}
               </div>
             </div>
 
-            {discoveryState.profileApplied ? (
-              <div className="mt-4 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
-                Discovered profile məlumatları boş business field-lərə prefilling edildi.
-                Aşağıdakı business twin hissəsindən yoxlayıb save edə bilərsən.
+            <form onSubmit={onScanBusiness} className="mx-auto mt-10 max-w-[820px]">
+              <div className="rounded-[32px] border border-slate-900/8 bg-[#fbfcfe] p-4 shadow-[0_18px_60px_rgba(15,23,42,0.05)] sm:p-5">
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-center gap-3 rounded-[24px] border border-slate-900/8 bg-white px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+                    <Globe className="h-5 w-5 text-slate-400" />
+                    <input
+                      value={discoveryForm.websiteUrl}
+                      onChange={(e) => setDiscoveryField("websiteUrl", e.target.value)}
+                      className="w-full bg-transparent text-base text-slate-900 outline-none placeholder:text-slate-400"
+                      placeholder="https://yourbusiness.com"
+                    />
+                  </div>
+
+                  <textarea
+                    value={discoveryForm.note}
+                    onChange={(e) => setDiscoveryField("note", e.target.value)}
+                    className="min-h-[104px] rounded-[24px] border border-slate-900/8 bg-white px-4 py-4 text-sm leading-7 text-slate-700 outline-none placeholder:text-slate-400"
+                    placeholder="İstəsən qısa qeyd yaz: məsələn əsas fokusumuz Instagram DM automation və lead qualification-dır."
+                  />
+
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-wrap gap-2 text-xs text-slate-500">
+                      <span className="rounded-full bg-slate-900/5 px-3 py-1.5">
+                        Detects services
+                      </span>
+                      <span className="rounded-full bg-slate-900/5 px-3 py-1.5">
+                        Extracts knowledge
+                      </span>
+                      <span className="rounded-full bg-slate-900/5 px-3 py-1.5">
+                        Prepares runtime
+                      </span>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={importingWebsite}
+                      className="inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-6 py-3.5 text-sm font-medium text-white shadow-[0_18px_50px_rgba(15,23,42,0.18)] disabled:opacity-60"
+                    >
+                      {importingWebsite ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Scanning business
+                        </>
+                      ) : (
+                        <>
+                          <Wand2 className="h-4 w-4" />
+                          Scan business
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </form>
+
+            <div className="mx-auto mt-8 max-w-[980px]">
+              <div className="grid gap-4 md:grid-cols-3">
+                <StatMini label="Readiness" value={`${meta.readinessScore}%`} />
+                <StatMini label="Knowledge" value={String(meta.approvedKnowledgeCount)} />
+                <StatMini label="Services" value={String(meta.serviceCount)} />
+              </div>
+            </div>
+
+            <div className="mx-auto mt-8 max-w-[980px] rounded-[32px] border border-slate-900/8 bg-[#fbfcfe] p-5 shadow-[0_18px_60px_rgba(15,23,42,0.05)] sm:p-6">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">
+                    Discovery status
+                  </div>
+                  <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                    {discoveryModeLabel(importingWebsite ? "running" : discoveryState.mode)}
+                  </div>
+                  <div className="mt-2 text-sm leading-7 text-slate-600">
+                    {s(discoveryState.message) || "Hələ scan edilməyib."}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                  <div className="rounded-2xl bg-slate-900/5 px-4 py-3 text-sm text-slate-600">
+                    New discoveries: {Number(discoveryState.candidateCount || 0)}
+                  </div>
+                  {s(discoveryState.lastUrl) ? (
+                    <div className="rounded-2xl bg-slate-900/5 px-4 py-3 text-sm text-slate-600">
+                      {discoveryState.lastUrl}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+
+            {error ? (
+              <div className="mx-auto mt-6 max-w-[980px] rounded-[24px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {error}
               </div>
             ) : null}
-          </div>
-        </form>
 
-        <div className="rounded-[32px] border border-white/10 bg-white/5 p-6">
-          <div className="mb-6">
-            <div className="mb-3 inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.2em] text-white/65">
-              Discovery output
-            </div>
-
-            <h2 className="text-3xl font-semibold tracking-tight">
-              What the scan found
-            </h2>
-
-            <p className="mt-3 text-sm leading-6 text-white/60">
-              İlk versiyada burada website import nəticəsindən gələn profile və
-              signal-ları göstəririk. Sonra bunu daha premium review flow-a çevirəcəyik.
-            </p>
-          </div>
-
-          <div className="grid gap-4">
-            <div className="rounded-[28px] border border-white/10 bg-black/20 p-5">
-              <div className="mb-3 text-xs uppercase tracking-[0.2em] text-white/45">
-                Discovered profile
-              </div>
-
-              {profilePreviewRows(discoveryState.profile).length ? (
-                <div className="grid gap-3">
-                  {profilePreviewRows(discoveryState.profile).map(([label, value]) => (
-                    <div
-                      key={label}
-                      className="rounded-2xl border border-white/10 bg-white/5 p-3"
-                    >
-                      <div className="text-xs uppercase tracking-[0.2em] text-white/45">
-                        {label}
-                      </div>
-                      <div className="mt-2 text-sm leading-6 text-white/80">
-                        {value}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-sm text-white/55">
-                  Hələ discovered profile preview yoxdur.
-                </div>
-              )}
-            </div>
-
-            <div className="rounded-[28px] border border-white/10 bg-black/20 p-5">
-              <div className="mb-3 text-xs uppercase tracking-[0.2em] text-white/45">
-                Signals preview
-              </div>
-
-              {signalPreviewRows(discoveryState.signals).length ? (
-                <div className="grid gap-3">
-                  {signalPreviewRows(discoveryState.signals).map(([key, value]) => (
-                    <div
-                      key={key}
-                      className="rounded-2xl border border-white/10 bg-white/5 p-3"
-                    >
-                      <div className="text-xs uppercase tracking-[0.2em] text-white/45">
-                        {key}
-                      </div>
-                      <div className="mt-2 text-sm leading-6 text-white/80 break-words">
-                        {typeof value === "object"
-                          ? JSON.stringify(value)
-                          : String(value)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-sm text-white/55">
-                  Hələ signals preview yoxdur.
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {summaryCards.map((item) => (
-          <div
-            key={item.key}
-            className="rounded-[28px] border border-white/10 bg-white/5 p-5"
-          >
-            <div className="text-xs uppercase tracking-[0.2em] text-white/45">
-              {item.label}
-            </div>
-            <div className="mt-3 text-3xl font-semibold">{item.value}</div>
-            <div className="mt-2 text-sm text-white/50">{item.hint}</div>
-          </div>
-        ))}
-      </div>
-
-      <div className="mb-8 rounded-[28px] border border-white/10 bg-white/5 p-5">
-        <div className="text-xs uppercase tracking-[0.2em] text-white/45">
-          Missing steps
-        </div>
-
-        <div className="mt-3 flex flex-wrap gap-2">
-          {meta.missingSteps.length ? (
-            meta.missingSteps.map((item) => (
-              <span
-                key={item}
-                className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-sm text-white/80"
-              >
-                {item}
-              </span>
-            ))
-          ) : (
-            <span className="text-sm text-emerald-200">
-              Heç bir missing step görünmür.
-            </span>
-          )}
-        </div>
-      </div>
-
-      {error ? (
-        <div className="mb-8 rounded-2xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-          {error}
-        </div>
-      ) : null}
-
-      <div className="grid gap-8">
-        <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-          <form
-            onSubmit={onSaveBusiness}
-            className="rounded-[32px] border border-white/10 bg-white/5 p-6"
-          >
-            <div className="mb-6">
-              <div className="mb-3 inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.2em] text-white/65">
-                Business identity
-              </div>
-
-              <h2 className="text-3xl font-semibold tracking-tight">
-                Shape the business twin
-              </h2>
-
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-white/60">
-                Bu hissə runtime-a biznesin kim olduğunu, nə etdiyini və hansı
-                dildə işlədiyini anlatmaq üçündür.
-              </p>
-            </div>
-
-            <div className="grid gap-5 md:grid-cols-2">
-              <label className="block md:col-span-2">
-                <div className="mb-2 text-sm text-white/70">Company name</div>
-                <input
-                  value={businessForm.companyName}
-                  onChange={(e) => setBusinessField("companyName", e.target.value)}
-                  className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none"
-                  placeholder="Weneox"
+            {(discoveryProfileRows.length || meta.pendingCandidateCount || meta.serviceCount) ? (
+              <div className="mx-auto mt-8 max-w-[980px] grid gap-4 lg:grid-cols-3">
+                <DiscoveryCard
+                  meta="Business identity"
+                  title={
+                    discoveryProfileRows.find(([label]) => label === "Name")?.[1] ||
+                    s(businessForm.companyName) ||
+                    "Business identity"
+                  }
+                  value={
+                    discoveryProfileRows.find(([label]) => label === "Description")?.[1] ||
+                    s(businessForm.description) ||
+                    "Scan completed. You can refine the business twin before entering the workspace."
+                  }
                 />
-              </label>
 
-              <label className="block">
-                <div className="mb-2 text-sm text-white/70">Timezone</div>
-                <input
-                  value={businessForm.timezone}
-                  onChange={(e) => setBusinessField("timezone", e.target.value)}
-                  className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none"
-                  placeholder="Asia/Baku"
+                <DiscoveryCard
+                  meta="Knowledge findings"
+                  title={`${meta.pendingCandidateCount} pending discoveries`}
+                  value={
+                    meta.pendingCandidateCount
+                      ? "AI artıq review üçün knowledge çıxarıb. İstəsən indi baxıb approve edə bilərsən."
+                      : "Pending discovery yoxdur. Approved knowledge artıq runtime-a bağlanıb."
+                  }
                 />
-              </label>
 
-              <label className="block">
-                <div className="mb-2 text-sm text-white/70">Primary language</div>
-                <select
-                  value={businessForm.language}
-                  onChange={(e) => setBusinessField("language", e.target.value)}
-                  className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none"
-                >
-                  <option value="az">Azerbaijani</option>
-                  <option value="en">English</option>
-                  <option value="tr">Turkish</option>
-                  <option value="ru">Russian</option>
-                </select>
-              </label>
-
-              <label className="block md:col-span-2">
-                <div className="mb-2 text-sm text-white/70">Description</div>
-                <textarea
-                  value={businessForm.description}
-                  onChange={(e) => setBusinessField("description", e.target.value)}
-                  className="min-h-[160px] w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none"
-                  placeholder="Biznes, xidmətlər, ideal müştəri və AI sistemin nə üçün istifadə olunacağını qısa yaz."
+                <DiscoveryCard
+                  meta="Service layer"
+                  title={
+                    meta.serviceCount
+                      ? `${meta.serviceCount} service ready`
+                      : serviceSuggestionTitle || "No service yet"
+                  }
+                  value={
+                    meta.serviceCount
+                      ? "Service layer formalaşmağa başlayıb. İndi refine edib pricing və positioning əlavə edə bilərsən."
+                      : "İstəsən aşağıdan suggested service yarada və sonra refine edə bilərsən."
+                  }
                 />
-              </label>
-            </div>
+              </div>
+            ) : null}
 
-            <div className="mt-6 flex flex-wrap gap-3">
+            <div className="mx-auto mt-8 flex max-w-[980px] flex-col gap-3 sm:flex-row sm:items-center sm:justify-center">
               <button
-                type="submit"
-                disabled={savingBusiness}
-                className="rounded-2xl border border-white/10 bg-white px-5 py-3 text-sm font-medium text-black disabled:opacity-60"
+                type="button"
+                onClick={() => setShowRefine((prev) => !prev)}
+                className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-900/10 bg-white px-5 py-3 text-sm font-medium text-slate-700 shadow-[0_14px_40px_rgba(15,23,42,0.05)]"
               >
-                {savingBusiness ? "Saving..." : "Save business twin"}
+                {showRefine ? "Hide details" : "Refine details"}
               </button>
+
+              {(meta.pendingCandidateCount > 0 || knowledgeCandidates.length > 0) ? (
+                <button
+                  type="button"
+                  onClick={() => setShowKnowledge((prev) => !prev)}
+                  className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-900/10 bg-white px-5 py-3 text-sm font-medium text-slate-700 shadow-[0_14px_40px_rgba(15,23,42,0.05)]"
+                >
+                  {showKnowledge ? "Hide discoveries" : "Review discoveries"}
+                </button>
+              ) : null}
 
               <button
                 type="button"
-                onClick={() => loadData({ silent: true, preserveBusinessForm: true })}
-                className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm text-white"
+                onClick={onOpenWorkspace}
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-5 py-3 text-sm font-medium text-white shadow-[0_18px_50px_rgba(15,23,42,0.18)]"
               >
-                Sync from backend
+                Open workspace
+                <ArrowRight className="h-4 w-4" />
               </button>
             </div>
-          </form>
-
-          <div className="rounded-[32px] border border-white/10 bg-white/5 p-6">
-            <div className="mb-3 inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.2em] text-white/65">
-              Twin snapshot
-            </div>
-
-            <h2 className="text-3xl font-semibold tracking-tight">
-              Current model view
-            </h2>
-
-            <div className="mt-6 grid gap-4">
-              <div className="rounded-3xl border border-white/10 bg-black/20 p-4">
-                <div className="text-xs uppercase tracking-[0.2em] text-white/45">
-                  Brand
-                </div>
-                <div className="mt-2 text-xl font-semibold">
-                  {s(businessForm.companyName) || "Not defined yet"}
-                </div>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-3xl border border-white/10 bg-black/20 p-4">
-                  <div className="text-xs uppercase tracking-[0.2em] text-white/45">
-                    Timezone
-                  </div>
-                  <div className="mt-2 text-lg font-medium">
-                    {s(businessForm.timezone) || "Not defined"}
-                  </div>
-                </div>
-
-                <div className="rounded-3xl border border-white/10 bg-black/20 p-4">
-                  <div className="text-xs uppercase tracking-[0.2em] text-white/45">
-                    Language
-                  </div>
-                  <div className="mt-2 text-lg font-medium">
-                    {s(businessForm.language) || "Not defined"}
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-3xl border border-white/10 bg-black/20 p-4">
-                <div className="text-xs uppercase tracking-[0.2em] text-white/45">
-                  Runtime summary
-                </div>
-                <div className="mt-2 text-sm leading-7 text-white/75">
-                  {s(businessForm.description) ||
-                    "Hələ business summary daxil edilməyib."}
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="rounded-[32px] border border-white/10 bg-white/5 p-6">
-          <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <div className="mb-3 inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.2em] text-white/65">
-                Knowledge discoveries
-              </div>
-
-              <h2 className="text-3xl font-semibold tracking-tight">
-                Review what AI discovered
-              </h2>
-
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-white/60">
-                Source-lardan çıxan knowledge candidate-ləri burda approve və
-                reject edirsən. Approved knowledge runtime üçün birbaşa dəyər yaradır.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/75">
-                Pending: {meta.pendingCandidateCount}
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/75">
-                Approved: {meta.approvedKnowledgeCount}
-              </div>
-            </div>
           </div>
 
-          {knowledgeCandidates.length ? (
-            <div className="grid gap-4">
-              {knowledgeCandidates.map((item) => {
-                const id = s(item.id);
-                const value = candidateValue(item);
-                const evidence = evidenceList(item);
-                const busy = actingKnowledgeId === id;
-
-                return (
-                  <div
-                    key={id || candidateTitle(item)}
-                    className="rounded-[28px] border border-white/10 bg-black/20 p-5"
-                  >
-                    <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-                      <div className="min-w-0 flex-1">
-                        <div className="mb-3 flex flex-wrap gap-2">
-                          <span
-                            className={`rounded-full border px-3 py-1 text-xs ${knowledgeTone(
-                              item
-                            )}`}
-                          >
-                            {s(item.status || item.review_status || item.state || "pending")}
-                          </span>
-
-                          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/75">
-                            {candidateCategory(item)}
-                          </span>
-
-                          {candidateConfidence(item) ? (
-                            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/75">
-                              confidence {candidateConfidence(item)}
-                            </span>
-                          ) : null}
-
-                          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/75">
-                            source: {candidateSource(item)}
-                          </span>
-                        </div>
-
-                        <h3 className="text-2xl font-semibold tracking-tight">
-                          {candidateTitle(item)}
-                        </h3>
-
-                        {value ? (
-                          <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/80">
-                            <pre className="whitespace-pre-wrap break-words font-sans">
-                              {value}
-                            </pre>
-                          </div>
-                        ) : (
-                          <div className="mt-3 text-sm text-white/50">
-                            Bu candidate üçün text preview yoxdur.
-                          </div>
-                        )}
-
-                        {s(item.review_reason) ? (
-                          <div className="mt-3 rounded-2xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-                            {formatReason(item.review_reason)}
-                          </div>
-                        ) : null}
-
-                        {evidence.length ? (
-                          <div className="mt-4">
-                            <div className="mb-2 text-xs uppercase tracking-[0.2em] text-white/45">
-                              Evidence
-                            </div>
-
-                            <div className="grid gap-2">
-                              {evidence.map((ev, index) => {
-                                const sourceUrl =
-                                  s(ev.url) || s(ev.source_url) || s(ev.link);
-                                const snippet =
-                                  s(ev.snippet) ||
-                                  s(ev.text) ||
-                                  s(ev.summary) ||
-                                  s(ev.title);
-
-                                return (
-                                  <div
-                                    key={`${id}-evidence-${index}`}
-                                    className="rounded-2xl border border-white/10 bg-white/5 p-3 text-sm text-white/75"
-                                  >
-                                    {snippet ? <div>{snippet}</div> : null}
-                                    {sourceUrl ? (
-                                      <div className="mt-1 break-all text-xs text-white/45">
-                                        {sourceUrl}
-                                      </div>
-                                    ) : null}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        ) : null}
-                      </div>
-
-                      <div className="flex w-full shrink-0 flex-col gap-3 xl:w-[220px]">
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => onApproveKnowledge(item)}
-                          className="rounded-2xl border border-white/10 bg-white px-5 py-3 text-sm font-medium text-black disabled:opacity-60"
-                        >
-                          {busy ? "Processing..." : "Approve"}
-                        </button>
-
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => onRejectKnowledge(item)}
-                          className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm text-white disabled:opacity-60"
-                        >
-                          Reject
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="rounded-[28px] border border-white/10 bg-black/20 p-6">
-              <h3 className="text-2xl font-semibold tracking-tight">
-                No pending discoveries
-              </h3>
-
-              <p className="mt-3 max-w-2xl text-white/65">
-                Hazırda review gözləyən knowledge candidate görünmür. Approved
-                knowledge artıq varsa readiness buna uyğun yenilənəcək.
-              </p>
-
-              <div className="mt-5">
-                <button
-                  type="button"
-                  onClick={() => loadData({ silent: true, preserveBusinessForm: true })}
-                  className="rounded-2xl border border-white/10 bg-white px-5 py-3 text-sm font-medium text-black"
-                >
-                  Refresh discoveries
-                </button>
-              </div>
-            </div>
-          )}
-        </section>
-
-        <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-          <div className="rounded-[32px] border border-white/10 bg-white/5 p-6">
-            <div className="mb-6 flex items-start justify-between gap-4">
-              <div>
-                <div className="mb-3 inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.2em] text-white/65">
-                  Service catalog
+          {showRefine ? (
+            <div className="mt-8 grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
+              <form
+                onSubmit={onSaveBusiness}
+                className="rounded-[32px] border border-white/70 bg-white/78 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.06)]"
+              >
+                <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">
+                  Refine business twin
                 </div>
 
-                <h2 className="text-3xl font-semibold tracking-tight">
-                  Define what you sell
+                <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+                  Adjust only what matters
                 </h2>
 
-                <p className="mt-3 max-w-2xl text-sm leading-6 text-white/60">
-                  Title və description minimum kifayətdir. Daha sonra service
-                  playbooks və pricing hissəsini dərinləşdirərik.
+                <p className="mt-3 max-w-[520px] text-sm leading-7 text-slate-600">
+                  Burada yalnız əsas şeylər qalır. AI nə çıxarıbsa sən onu qısa şəkildə
+                  düzəldə bilərsən.
                 </p>
+
+                <div className="mt-6 grid gap-4">
+                  <input
+                    value={businessForm.companyName}
+                    onChange={(e) => setBusinessField("companyName", e.target.value)}
+                    className="rounded-[22px] border border-slate-900/8 bg-[#fbfcfe] px-4 py-3.5 text-slate-900 outline-none placeholder:text-slate-400"
+                    placeholder="Company name"
+                  />
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <input
+                      value={businessForm.timezone}
+                      onChange={(e) => setBusinessField("timezone", e.target.value)}
+                      className="rounded-[22px] border border-slate-900/8 bg-[#fbfcfe] px-4 py-3.5 text-slate-900 outline-none placeholder:text-slate-400"
+                      placeholder="Timezone"
+                    />
+
+                    <select
+                      value={businessForm.language}
+                      onChange={(e) => setBusinessField("language", e.target.value)}
+                      className="rounded-[22px] border border-slate-900/8 bg-[#fbfcfe] px-4 py-3.5 text-slate-900 outline-none"
+                    >
+                      <option value="az">Azerbaijani</option>
+                      <option value="en">English</option>
+                      <option value="tr">Turkish</option>
+                      <option value="ru">Russian</option>
+                    </select>
+                  </div>
+
+                  <textarea
+                    value={businessForm.description}
+                    onChange={(e) => setBusinessField("description", e.target.value)}
+                    className="min-h-[140px] rounded-[22px] border border-slate-900/8 bg-[#fbfcfe] px-4 py-4 text-slate-900 outline-none placeholder:text-slate-400"
+                    placeholder="Business description"
+                  />
+                </div>
+
+                <div className="mt-6 flex flex-wrap gap-3">
+                  <button
+                    type="submit"
+                    disabled={savingBusiness}
+                    className="rounded-full bg-slate-950 px-5 py-3 text-sm font-medium text-white disabled:opacity-60"
+                  >
+                    {savingBusiness ? "Saving..." : "Save business twin"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => loadData({ silent: true, preserveBusinessForm: true })}
+                    className="rounded-full border border-slate-900/10 bg-white px-5 py-3 text-sm text-slate-700"
+                  >
+                    Sync from backend
+                  </button>
+                </div>
+              </form>
+
+              <div className="rounded-[32px] border border-white/70 bg-white/78 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.06)]">
+                <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">
+                  Suggested service
+                </div>
+
+                <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+                  Keep service setup tiny
+                </h2>
+
+                <p className="mt-3 text-sm leading-7 text-slate-600">
+                  Böyük form yox. Bir suggested service yarat, sonra workspace içində
+                  təkmilləşdir.
+                </p>
+
+                <div className="mt-6 rounded-[24px] border border-slate-900/8 bg-[#fbfcfe] p-4">
+                  <div className="text-sm text-slate-500">Suggested title</div>
+                  <div className="mt-2 text-lg font-semibold text-slate-900">
+                    {serviceSuggestionTitle || "Use the note above to generate a service seed"}
+                  </div>
+                </div>
+
+                <div className="mt-6 flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    disabled={!!savingServiceSuggestion}
+                    onClick={onCreateSuggestedService}
+                    className="rounded-full bg-slate-950 px-5 py-3 text-sm font-medium text-white disabled:opacity-60"
+                  >
+                    {savingServiceSuggestion ? "Creating..." : "Create suggested service"}
+                  </button>
+
+                  <div className="rounded-full bg-slate-900/5 px-4 py-3 text-sm text-slate-600">
+                    Current services: {services.length}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {showKnowledge && knowledgeCandidates.length ? (
+            <div className="mt-8 rounded-[36px] border border-white/70 bg-white/78 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.06)]">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">
+                    Review discoveries
+                  </div>
+                  <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+                    Approve only the useful ones
+                  </h2>
+                </div>
+
+                <div className="rounded-full bg-slate-900/5 px-4 py-2.5 text-sm text-slate-600">
+                  Pending: {knowledgeCandidates.length}
+                </div>
               </div>
 
-              {editingServiceId ? (
-                <button
-                  type="button"
-                  onClick={resetServiceForm}
-                  className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white"
-                >
-                  Cancel edit
-                </button>
+              <div className="mt-6 grid gap-4">
+                {knowledgeCandidates.slice(0, 4).map((item) => {
+                  const id = s(item.id);
+                  const busy = actingKnowledgeId === id;
+                  const title = candidateTitle(item);
+                  const value = candidateValue(item);
+                  const evidence = evidenceList(item);
+
+                  return (
+                    <div
+                      key={id || title}
+                      className="rounded-[28px] border border-slate-900/8 bg-[#fbfcfe] p-5"
+                    >
+                      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="min-w-0 flex-1">
+                          <div className="mb-3 flex flex-wrap gap-2">
+                            <span className="rounded-full bg-slate-900/5 px-3 py-1 text-xs text-slate-500">
+                              {s(item.status || "pending")}
+                            </span>
+
+                            <span className="rounded-full bg-slate-900/5 px-3 py-1 text-xs text-slate-500">
+                              {candidateCategory(item)}
+                            </span>
+
+                            {candidateConfidence(item) ? (
+                              <span className="rounded-full bg-slate-900/5 px-3 py-1 text-xs text-slate-500">
+                                {candidateConfidence(item)}
+                              </span>
+                            ) : null}
+
+                            <span className="rounded-full bg-slate-900/5 px-3 py-1 text-xs text-slate-500">
+                              {candidateSource(item)}
+                            </span>
+                          </div>
+
+                          <div className="text-2xl font-semibold tracking-tight text-slate-950">
+                            {title}
+                          </div>
+
+                          <div className="mt-3 rounded-[20px] border border-slate-900/8 bg-white px-4 py-3 text-sm leading-7 text-slate-700">
+                            {value || "Preview yoxdur."}
+                          </div>
+
+                          {evidence.length ? (
+                            <div className="mt-3 text-sm text-slate-500">
+                              {s(evidence[0]?.url || evidence[0]?.source_url || evidence[0]?.link)}
+                            </div>
+                          ) : null}
+                        </div>
+
+                        <div className="flex w-full shrink-0 flex-col gap-3 lg:w-[190px]">
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => onApproveKnowledge(item)}
+                            className="rounded-full bg-slate-950 px-5 py-3 text-sm font-medium text-white disabled:opacity-60"
+                          >
+                            {busy ? "Working..." : "Approve"}
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => onRejectKnowledge(item)}
+                            className="rounded-full border border-slate-900/10 bg-white px-5 py-3 text-sm text-slate-700 disabled:opacity-60"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {knowledgeCandidates.length > 4 ? (
+                <div className="mt-5 text-sm text-slate-500">
+                  Daha çox discovery var. Qalanlarını bu axından sonra da review edə bilərsən.
+                </div>
               ) : null}
             </div>
+          ) : null}
 
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                onSaveService({ refreshStudioAfterSave: false });
-              }}
+          <div className="mt-8 flex justify-center">
+            <button
+              type="button"
+              onClick={onOpenWorkspace}
+              className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-6 py-3.5 text-sm font-medium text-white shadow-[0_18px_50px_rgba(15,23,42,0.18)]"
             >
-              <div className="grid gap-5 md:grid-cols-2">
-                <label className="block md:col-span-2">
-                  <div className="mb-2 text-sm text-white/70">Service title</div>
-                  <input
-                    value={serviceForm.title}
-                    onChange={(e) => setServiceField("title", e.target.value)}
-                    className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none"
-                    placeholder="Instagram DM automation"
-                  />
-                </label>
-
-                <label className="block md:col-span-2">
-                  <div className="mb-2 text-sm text-white/70">Description</div>
-                  <textarea
-                    value={serviceForm.description}
-                    onChange={(e) => setServiceField("description", e.target.value)}
-                    className="min-h-[130px] w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none"
-                    placeholder="Service nə edir, kim üçündür, hansı nəticəni verir."
-                  />
-                </label>
-
-                <label className="block">
-                  <div className="mb-2 text-sm text-white/70">Category</div>
-                  <input
-                    value={serviceForm.category}
-                    onChange={(e) => setServiceField("category", e.target.value)}
-                    className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none"
-                    placeholder="automation"
-                  />
-                </label>
-
-                <label className="block">
-                  <div className="mb-2 text-sm text-white/70">Pricing model</div>
-                  <select
-                    value={serviceForm.pricingModel}
-                    onChange={(e) => setServiceField("pricingModel", e.target.value)}
-                    className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none"
-                  >
-                    <option value="custom_quote">Custom quote</option>
-                    <option value="fixed">Fixed</option>
-                    <option value="starting_from">Starting from</option>
-                    <option value="hourly">Hourly</option>
-                    <option value="package">Package</option>
-                    <option value="free">Free</option>
-                    <option value="contact">Contact</option>
-                  </select>
-                </label>
-
-                <label className="block">
-                  <div className="mb-2 text-sm text-white/70">Price from</div>
-                  <input
-                    value={serviceForm.priceFrom}
-                    onChange={(e) => setServiceField("priceFrom", e.target.value)}
-                    className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none"
-                    placeholder="500"
-                  />
-                </label>
-
-                <label className="block">
-                  <div className="mb-2 text-sm text-white/70">Currency</div>
-                  <input
-                    value={serviceForm.currency}
-                    onChange={(e) => setServiceField("currency", e.target.value)}
-                    className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none"
-                    placeholder="AZN"
-                  />
-                </label>
-
-                <label className="block">
-                  <div className="mb-2 text-sm text-white/70">Duration (minutes)</div>
-                  <input
-                    value={serviceForm.durationMinutes}
-                    onChange={(e) => setServiceField("durationMinutes", e.target.value)}
-                    className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none"
-                    placeholder="60"
-                  />
-                </label>
-
-                <label className="block">
-                  <div className="mb-2 text-sm text-white/70">Sort order</div>
-                  <input
-                    value={serviceForm.sortOrder}
-                    onChange={(e) => setServiceField("sortOrder", e.target.value)}
-                    className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none"
-                    placeholder="0"
-                  />
-                </label>
-
-                <label className="block md:col-span-2">
-                  <div className="mb-2 text-sm text-white/70">
-                    Highlights (one per line)
-                  </div>
-                  <textarea
-                    value={serviceForm.highlightsText}
-                    onChange={(e) => setServiceField("highlightsText", e.target.value)}
-                    className="min-h-[120px] w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none"
-                    placeholder={"Fast setup\nLead capture\nHuman handoff"}
-                  />
-                </label>
-
-                <label className="flex items-center gap-3 md:col-span-2">
-                  <input
-                    type="checkbox"
-                    checked={!!serviceForm.isActive}
-                    onChange={(e) => setServiceField("isActive", e.target.checked)}
-                  />
-                  <span className="text-sm text-white/75">Service is active</span>
-                </label>
-              </div>
-
-              <div className="mt-6 flex flex-wrap gap-3">
-                <button
-                  type="submit"
-                  disabled={savingService}
-                  className="rounded-2xl border border-white/10 bg-white px-5 py-3 text-sm font-medium text-black disabled:opacity-60"
-                >
-                  {savingService
-                    ? "Saving..."
-                    : editingServiceId
-                    ? "Update service"
-                    : "Save service"}
-                </button>
-
-                <button
-                  type="button"
-                  disabled={savingService}
-                  onClick={() => onSaveService({ refreshStudioAfterSave: true })}
-                  className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm text-white disabled:opacity-60"
-                >
-                  Save and sync studio
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => loadData({ silent: true, preserveBusinessForm: true })}
-                  className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm text-white"
-                >
-                  Refresh
-                </button>
-              </div>
-            </form>
+              Continue to workspace
+              <ArrowRight className="h-4 w-4" />
+            </button>
           </div>
 
-          <div className="rounded-[32px] border border-white/10 bg-white/5 p-6">
-            <div className="mb-5">
-              <h2 className="text-3xl font-semibold tracking-tight">
-                Current services
-              </h2>
-
-              <p className="mt-3 text-sm leading-6 text-white/60">
-                Mövcud service-lər burada görünür. Edit və delete edə bilərsən.
-              </p>
+          {meta.missingSteps.length ? (
+            <div className="mt-6 text-center text-sm text-slate-500">
+              Remaining: {meta.missingSteps.join(" · ")}
             </div>
-
-            {services.length ? (
-              <div className="grid gap-4">
-                {services.map((item) => (
-                  <div
-                    key={item.id}
-                    className="rounded-[28px] border border-white/10 bg-black/20 p-4"
-                  >
-                    <div className="mb-3 flex flex-wrap items-center gap-2">
-                      <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/75">
-                        {s(item.category || "general")}
-                      </span>
-
-                      <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/75">
-                        {s(item.pricingModel || "custom_quote")}
-                      </span>
-
-                      <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/75">
-                        {item.isActive ? "active" : "inactive"}
-                      </span>
-                    </div>
-
-                    <h3 className="text-xl font-semibold">
-                      {s(item.title) || "Untitled service"}
-                    </h3>
-
-                    {s(item.description) ? (
-                      <p className="mt-2 text-sm leading-6 text-white/70">
-                        {s(item.description)}
-                      </p>
-                    ) : null}
-
-                    <div className="mt-3 flex flex-wrap gap-2 text-xs text-white/55">
-                      <span>{formatMoney(item.priceFrom, item.currency)}</span>
-                      {item.durationMinutes != null && item.durationMinutes !== "" ? (
-                        <span>• {item.durationMinutes} min</span>
-                      ) : null}
-                    </div>
-
-                    {arr(item.highlights).length ? (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {arr(item.highlights).map((hl, idx) => (
-                          <span
-                            key={`${item.id}-hl-${idx}`}
-                            className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/75"
-                          >
-                            {s(hl)}
-                          </span>
-                        ))}
-                      </div>
-                    ) : null}
-
-                    <div className="mt-4 flex flex-wrap gap-3">
-                      <button
-                        type="button"
-                        onClick={() => onEditService(item)}
-                        className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white"
-                      >
-                        Edit
-                      </button>
-
-                      <button
-                        type="button"
-                        disabled={deletingServiceId === item.id}
-                        onClick={() => onDeleteService(item)}
-                        className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white disabled:opacity-60"
-                      >
-                        {deletingServiceId === item.id ? "Deleting..." : "Delete"}
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-[28px] border border-white/10 bg-black/20 p-5 text-sm text-white/60">
-                Hələ service əlavə olunmayıb.
-              </div>
-            )}
-          </div>
-        </section>
-      </div>
+          ) : (
+            <div className="mt-6 flex items-center justify-center gap-2 text-sm text-emerald-700">
+              <Check className="h-4 w-4" />
+              Core onboarding is ready.
+            </div>
+          )}
+        </div>
+      </section>
     </div>
   );
 }
