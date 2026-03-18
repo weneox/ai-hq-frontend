@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Check, Globe, Loader2, Sparkles, Wand2 } from "lucide-react";
 import { getAppBootstrap } from "../api/app.js";
 import { importWebsiteForSetup, saveBusinessProfile } from "../api/setup.js";
 import {
@@ -8,10 +7,8 @@ import {
   getKnowledgeCandidates,
   rejectKnowledgeCandidate,
 } from "../api/knowledge.js";
-import {
-  createSetupService,
-  getSetupServices,
-} from "../api/services.js";
+import { createSetupService, getSetupServices } from "../api/services.js";
+import SetupStudioScene from "../components/setup-studio/SetupStudioScene.jsx";
 
 function arr(value) {
   return Array.isArray(value) ? value : [];
@@ -68,26 +65,37 @@ function parseJsonArray(value) {
   return [];
 }
 
+function compactValue(value) {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => s(item))
+      .filter(Boolean)
+      .slice(0, 3)
+      .join(" · ");
+  }
+
+  if (value && typeof value === "object") {
+    return Object.values(value)
+      .map((item) => s(item))
+      .filter(Boolean)
+      .slice(0, 3)
+      .join(" · ");
+  }
+
+  return s(value);
+}
+
 function isPendingKnowledge(item = {}) {
   const status = s(item.status || item.review_status || item.state).toLowerCase();
   if (!status) return true;
 
-  return [
-    "pending",
-    "needs_review",
-    "conflict",
-    "review",
-    "awaiting_review",
-  ].includes(status);
+  return ["pending", "needs_review", "conflict", "review", "awaiting_review"].includes(
+    status
+  );
 }
 
 function candidateTitle(item = {}) {
-  return (
-    s(item.title) ||
-    s(item.item_key) ||
-    s(item.canonical_key) ||
-    "Untitled discovery"
-  );
+  return s(item.title) || s(item.item_key) || s(item.canonical_key) || "Untitled discovery";
 }
 
 function candidateCategory(item = {}) {
@@ -195,48 +203,21 @@ function stepDone(meta, key) {
   return !missing.includes(String(key).toLowerCase());
 }
 
-function CompactStep({ done, label }) {
-  return (
-    <div
-      className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs ${
-        done ? "bg-emerald-500/10 text-emerald-700" : "bg-slate-900/5 text-slate-500"
-      }`}
-    >
-      <span
-        className={`h-2 w-2 rounded-full ${done ? "bg-emerald-500" : "bg-slate-300"}`}
-      />
-      {label}
-    </div>
-  );
-}
+function deriveStudioProgress({ importingWebsite, discoveryState, meta }) {
+  if (meta?.setupCompleted) return 100;
+  if (importingWebsite) return Math.max(24, Math.min(76, 36 + Number(meta?.pendingCandidateCount || 0) * 4));
 
-function StatMini({ label, value }) {
-  return (
-    <div className="rounded-3xl border border-slate-900/8 bg-white/70 p-4 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-      <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">
-        {label}
-      </div>
-      <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
-        {value}
-      </div>
-    </div>
-  );
-}
+  const mode = s(discoveryState?.mode).toLowerCase();
 
-function DiscoveryCard({ title, value, meta }) {
-  return (
-    <div className="rounded-[28px] border border-slate-900/8 bg-white/78 p-5 shadow-[0_18px_60px_rgba(15,23,42,0.05)]">
-      <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">
-        {meta}
-      </div>
-      <div className="mt-3 text-xl font-semibold tracking-tight text-slate-900">
-        {title}
-      </div>
-      <div className="mt-3 text-sm leading-7 text-slate-600">
-        {value}
-      </div>
-    </div>
-  );
+  if (["success", "completed", "complete", "done"].includes(mode)) {
+    return Math.max(Number(meta?.readinessScore || 0), 72);
+  }
+
+  if (["error", "failed"].includes(mode)) {
+    return Math.max(12, Number(meta?.readinessScore || 0));
+  }
+
+  return Math.max(8, Number(meta?.readinessScore || 0));
 }
 
 export default function SetupStudio() {
@@ -292,11 +273,8 @@ export default function SetupStudio() {
 
   async function loadData({ silent = false, preserveBusinessForm = false } = {}) {
     try {
-      if (silent) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
+      if (silent) setRefreshing(true);
+      else setLoading(true);
 
       setError("");
 
@@ -549,6 +527,21 @@ export default function SetupStudio() {
     }
   }
 
+  const heroSteps = useMemo(
+    () =>
+      [
+        { key: "businessprofile", label: "Business" },
+        { key: "knowledge", label: "Knowledge" },
+        { key: "services", label: "Services" },
+        { key: "playbooks", label: "Playbooks" },
+        { key: "policies", label: "Policies" },
+      ].map((item) => ({
+        ...item,
+        done: stepDone(meta, item.key),
+      })),
+    [meta]
+  );
+
   const discoveryProfileRows = useMemo(
     () => profilePreviewRows(discoveryState.profile),
     [discoveryState.profile]
@@ -560,470 +553,159 @@ export default function SetupStudio() {
     return note.split(".")[0]?.trim() || "";
   }, [discoveryForm.note]);
 
-  const heroSteps = [
-    { key: "businessprofile", label: "Business" },
-    { key: "knowledge", label: "Knowledge" },
-    { key: "services", label: "Services" },
-    { key: "playbooks", label: "Playbooks" },
-    { key: "policies", label: "Policies" },
-  ];
+  const liveSignals = useMemo(() => {
+    const items = [];
 
-  if (loading) {
-    return (
-      <div className="flex min-h-[70vh] items-center justify-center">
-        <div className="inline-flex items-center gap-3 rounded-full bg-white/80 px-5 py-3 text-sm text-slate-600 shadow-[0_16px_50px_rgba(15,23,42,0.08)]">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Setup studio hazırlanır...
-        </div>
-      </div>
-    );
-  }
+    if (s(businessForm.companyName)) {
+      items.push({
+        label: "Identity",
+        value: s(businessForm.companyName),
+      });
+    }
+
+    if (meta.pendingCandidateCount > 0) {
+      items.push({
+        label: "Knowledge",
+        value: `${meta.pendingCandidateCount} pending discovery`,
+      });
+    }
+
+    if (meta.serviceCount > 0) {
+      items.push({
+        label: "Services",
+        value: `${meta.serviceCount} service ready`,
+      });
+    }
+
+    if (meta.playbookCount > 0) {
+      items.push({
+        label: "Playbooks",
+        value: `${meta.playbookCount} playbook detected`,
+      });
+    }
+
+    const signalEntries = Object.entries(obj(discoveryState.signals))
+      .map(([key, value]) => ({
+        label: key
+          .replace(/([A-Z])/g, " $1")
+          .replace(/[_-]+/g, " ")
+          .trim(),
+        value: compactValue(value),
+      }))
+      .filter((item) => s(item.value));
+
+    for (const item of signalEntries) {
+      if (items.length >= 6) break;
+      items.push(item);
+    }
+
+    if (!items.length && s(discoveryForm.note)) {
+      items.push({
+        label: "Focus note",
+        value: s(discoveryForm.note).slice(0, 72),
+      });
+    }
+
+    return items.slice(0, 6);
+  }, [
+    businessForm.companyName,
+    discoveryForm.note,
+    discoveryState.signals,
+    meta.pendingCandidateCount,
+    meta.playbookCount,
+    meta.serviceCount,
+  ]);
+
+  const metrics = useMemo(
+    () => [
+      { label: "Readiness", value: `${meta.readinessScore}%` },
+      { label: "Approved knowledge", value: String(meta.approvedKnowledgeCount) },
+      { label: "Service layer", value: String(meta.serviceCount) },
+      { label: "Playbooks", value: String(meta.playbookCount) },
+    ],
+    [meta]
+  );
+
+  const studioProgress = useMemo(
+    () => deriveStudioProgress({ importingWebsite, discoveryState, meta }),
+    [importingWebsite, discoveryState, meta]
+  );
+
+  const narrative = useMemo(() => {
+    if (meta.setupCompleted) {
+      return "Core onboarding hazırdır. Workspace-ə keçə bilərsən.";
+    }
+
+    if (importingWebsite) {
+      return "System pages-i oxuyur, intent çıxarır və ilk operational twin qatını hazırlayır.";
+    }
+
+    if (["success", "completed", "complete", "done"].includes(s(discoveryState.mode).toLowerCase())) {
+      return "İlk siqnallar çıxarıldı. İndi refine et, discovery-ləri review et və workspace-ə keç.";
+    }
+
+    if (["error", "failed"].includes(s(discoveryState.mode).toLowerCase())) {
+      return "Scan alınmadı. URL və qeydini yeniləyib bir də yoxla.";
+    }
+
+    return "Əsas website-i ver. Studio business identity, service layer, knowledge və tone istiqamətlərini çıxarsın.";
+  }, [discoveryState.mode, importingWebsite, meta.setupCompleted]);
+
+  const knowledgePreview = useMemo(
+    () =>
+      knowledgeCandidates.slice(0, 6).map((item) => ({
+        id: s(item.id),
+        title: candidateTitle(item),
+        value: candidateValue(item),
+        category: candidateCategory(item),
+        source: candidateSource(item),
+        confidence: candidateConfidence(item),
+        status: s(item.status || "pending"),
+        evidenceUrl: s(
+          evidenceList(item)[0]?.url ||
+            evidenceList(item)[0]?.source_url ||
+            evidenceList(item)[0]?.link
+        ),
+      })),
+    [knowledgeCandidates]
+  );
 
   return (
-    <div className="relative">
-      <section className="mx-auto flex min-h-[88vh] max-w-[1160px] flex-col justify-center py-6">
-        <div className="mx-auto w-full max-w-[980px]">
-          <div className="mb-6 flex items-center justify-between gap-4">
-            <div className="inline-flex items-center gap-2 rounded-full border border-slate-900/8 bg-white/70 px-4 py-2 text-[11px] font-medium uppercase tracking-[0.24em] text-slate-500 shadow-[0_14px_40px_rgba(15,23,42,0.05)]">
-              <Sparkles className="h-3.5 w-3.5 text-cyan-600" />
-              AI Setup Studio
-            </div>
-
-            <button
-              type="button"
-              onClick={() => loadData({ silent: true, preserveBusinessForm: true })}
-              className="inline-flex items-center rounded-full border border-slate-900/8 bg-white/70 px-4 py-2 text-sm text-slate-600 shadow-[0_14px_40px_rgba(15,23,42,0.05)]"
-            >
-              {refreshing ? "Refreshing..." : "Refresh"}
-            </button>
-          </div>
-
-          <div className="rounded-[40px] border border-white/70 bg-white/70 p-6 shadow-[0_30px_120px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:p-8 lg:p-10">
-            <div className="mx-auto max-w-[760px] text-center">
-              <h1 className="text-5xl font-semibold tracking-[-0.04em] text-slate-950 sm:text-6xl">
-                Turn your website into a ready business twin.
-              </h1>
-
-              <p className="mx-auto mt-5 max-w-[700px] text-lg leading-8 text-slate-600">
-                Bir website ver. Sistem business identity-ni çıxarsın, knowledge
-                hazırlasın və onboarding-i sənin yerinə başlatsın.
-              </p>
-
-              <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
-                {heroSteps.map((item) => (
-                  <CompactStep
-                    key={item.key}
-                    done={stepDone(meta, item.key)}
-                    label={item.label}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <form onSubmit={onScanBusiness} className="mx-auto mt-10 max-w-[820px]">
-              <div className="rounded-[32px] border border-slate-900/8 bg-[#fbfcfe] p-4 shadow-[0_18px_60px_rgba(15,23,42,0.05)] sm:p-5">
-                <div className="flex flex-col gap-4">
-                  <div className="flex items-center gap-3 rounded-[24px] border border-slate-900/8 bg-white px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
-                    <Globe className="h-5 w-5 text-slate-400" />
-                    <input
-                      value={discoveryForm.websiteUrl}
-                      onChange={(e) => setDiscoveryField("websiteUrl", e.target.value)}
-                      className="w-full bg-transparent text-base text-slate-900 outline-none placeholder:text-slate-400"
-                      placeholder="https://yourbusiness.com"
-                    />
-                  </div>
-
-                  <textarea
-                    value={discoveryForm.note}
-                    onChange={(e) => setDiscoveryField("note", e.target.value)}
-                    className="min-h-[104px] rounded-[24px] border border-slate-900/8 bg-white px-4 py-4 text-sm leading-7 text-slate-700 outline-none placeholder:text-slate-400"
-                    placeholder="İstəsən qısa qeyd yaz: məsələn əsas fokusumuz Instagram DM automation və lead qualification-dır."
-                  />
-
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex flex-wrap gap-2 text-xs text-slate-500">
-                      <span className="rounded-full bg-slate-900/5 px-3 py-1.5">
-                        Detects services
-                      </span>
-                      <span className="rounded-full bg-slate-900/5 px-3 py-1.5">
-                        Extracts knowledge
-                      </span>
-                      <span className="rounded-full bg-slate-900/5 px-3 py-1.5">
-                        Prepares runtime
-                      </span>
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={importingWebsite}
-                      className="inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-6 py-3.5 text-sm font-medium text-white shadow-[0_18px_50px_rgba(15,23,42,0.18)] disabled:opacity-60"
-                    >
-                      {importingWebsite ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Scanning business
-                        </>
-                      ) : (
-                        <>
-                          <Wand2 className="h-4 w-4" />
-                          Scan business
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </form>
-
-            <div className="mx-auto mt-8 max-w-[980px]">
-              <div className="grid gap-4 md:grid-cols-3">
-                <StatMini label="Readiness" value={`${meta.readinessScore}%`} />
-                <StatMini label="Knowledge" value={String(meta.approvedKnowledgeCount)} />
-                <StatMini label="Services" value={String(meta.serviceCount)} />
-              </div>
-            </div>
-
-            <div className="mx-auto mt-8 max-w-[980px] rounded-[32px] border border-slate-900/8 bg-[#fbfcfe] p-5 shadow-[0_18px_60px_rgba(15,23,42,0.05)] sm:p-6">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">
-                    Discovery status
-                  </div>
-                  <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-                    {discoveryModeLabel(importingWebsite ? "running" : discoveryState.mode)}
-                  </div>
-                  <div className="mt-2 text-sm leading-7 text-slate-600">
-                    {s(discoveryState.message) || "Hələ scan edilməyib."}
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-3">
-                  <div className="rounded-2xl bg-slate-900/5 px-4 py-3 text-sm text-slate-600">
-                    New discoveries: {Number(discoveryState.candidateCount || 0)}
-                  </div>
-                  {s(discoveryState.lastUrl) ? (
-                    <div className="rounded-2xl bg-slate-900/5 px-4 py-3 text-sm text-slate-600">
-                      {discoveryState.lastUrl}
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            </div>
-
-            {error ? (
-              <div className="mx-auto mt-6 max-w-[980px] rounded-[24px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {error}
-              </div>
-            ) : null}
-
-            {(discoveryProfileRows.length || meta.pendingCandidateCount || meta.serviceCount) ? (
-              <div className="mx-auto mt-8 max-w-[980px] grid gap-4 lg:grid-cols-3">
-                <DiscoveryCard
-                  meta="Business identity"
-                  title={
-                    discoveryProfileRows.find(([label]) => label === "Name")?.[1] ||
-                    s(businessForm.companyName) ||
-                    "Business identity"
-                  }
-                  value={
-                    discoveryProfileRows.find(([label]) => label === "Description")?.[1] ||
-                    s(businessForm.description) ||
-                    "Scan completed. You can refine the business twin before entering the workspace."
-                  }
-                />
-
-                <DiscoveryCard
-                  meta="Knowledge findings"
-                  title={`${meta.pendingCandidateCount} pending discoveries`}
-                  value={
-                    meta.pendingCandidateCount
-                      ? "AI artıq review üçün knowledge çıxarıb. İstəsən indi baxıb approve edə bilərsən."
-                      : "Pending discovery yoxdur. Approved knowledge artıq runtime-a bağlanıb."
-                  }
-                />
-
-                <DiscoveryCard
-                  meta="Service layer"
-                  title={
-                    meta.serviceCount
-                      ? `${meta.serviceCount} service ready`
-                      : serviceSuggestionTitle || "No service yet"
-                  }
-                  value={
-                    meta.serviceCount
-                      ? "Service layer formalaşmağa başlayıb. İndi refine edib pricing və positioning əlavə edə bilərsən."
-                      : "İstəsən aşağıdan suggested service yarada və sonra refine edə bilərsən."
-                  }
-                />
-              </div>
-            ) : null}
-
-            <div className="mx-auto mt-8 flex max-w-[980px] flex-col gap-3 sm:flex-row sm:items-center sm:justify-center">
-              <button
-                type="button"
-                onClick={() => setShowRefine((prev) => !prev)}
-                className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-900/10 bg-white px-5 py-3 text-sm font-medium text-slate-700 shadow-[0_14px_40px_rgba(15,23,42,0.05)]"
-              >
-                {showRefine ? "Hide details" : "Refine details"}
-              </button>
-
-              {(meta.pendingCandidateCount > 0 || knowledgeCandidates.length > 0) ? (
-                <button
-                  type="button"
-                  onClick={() => setShowKnowledge((prev) => !prev)}
-                  className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-900/10 bg-white px-5 py-3 text-sm font-medium text-slate-700 shadow-[0_14px_40px_rgba(15,23,42,0.05)]"
-                >
-                  {showKnowledge ? "Hide discoveries" : "Review discoveries"}
-                </button>
-              ) : null}
-
-              <button
-                type="button"
-                onClick={onOpenWorkspace}
-                className="inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-5 py-3 text-sm font-medium text-white shadow-[0_18px_50px_rgba(15,23,42,0.18)]"
-              >
-                Open workspace
-                <ArrowRight className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-
-          {showRefine ? (
-            <div className="mt-8 grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
-              <form
-                onSubmit={onSaveBusiness}
-                className="rounded-[32px] border border-white/70 bg-white/78 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.06)]"
-              >
-                <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">
-                  Refine business twin
-                </div>
-
-                <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-                  Adjust only what matters
-                </h2>
-
-                <p className="mt-3 max-w-[520px] text-sm leading-7 text-slate-600">
-                  Burada yalnız əsas şeylər qalır. AI nə çıxarıbsa sən onu qısa şəkildə
-                  düzəldə bilərsən.
-                </p>
-
-                <div className="mt-6 grid gap-4">
-                  <input
-                    value={businessForm.companyName}
-                    onChange={(e) => setBusinessField("companyName", e.target.value)}
-                    className="rounded-[22px] border border-slate-900/8 bg-[#fbfcfe] px-4 py-3.5 text-slate-900 outline-none placeholder:text-slate-400"
-                    placeholder="Company name"
-                  />
-
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <input
-                      value={businessForm.timezone}
-                      onChange={(e) => setBusinessField("timezone", e.target.value)}
-                      className="rounded-[22px] border border-slate-900/8 bg-[#fbfcfe] px-4 py-3.5 text-slate-900 outline-none placeholder:text-slate-400"
-                      placeholder="Timezone"
-                    />
-
-                    <select
-                      value={businessForm.language}
-                      onChange={(e) => setBusinessField("language", e.target.value)}
-                      className="rounded-[22px] border border-slate-900/8 bg-[#fbfcfe] px-4 py-3.5 text-slate-900 outline-none"
-                    >
-                      <option value="az">Azerbaijani</option>
-                      <option value="en">English</option>
-                      <option value="tr">Turkish</option>
-                      <option value="ru">Russian</option>
-                    </select>
-                  </div>
-
-                  <textarea
-                    value={businessForm.description}
-                    onChange={(e) => setBusinessField("description", e.target.value)}
-                    className="min-h-[140px] rounded-[22px] border border-slate-900/8 bg-[#fbfcfe] px-4 py-4 text-slate-900 outline-none placeholder:text-slate-400"
-                    placeholder="Business description"
-                  />
-                </div>
-
-                <div className="mt-6 flex flex-wrap gap-3">
-                  <button
-                    type="submit"
-                    disabled={savingBusiness}
-                    className="rounded-full bg-slate-950 px-5 py-3 text-sm font-medium text-white disabled:opacity-60"
-                  >
-                    {savingBusiness ? "Saving..." : "Save business twin"}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => loadData({ silent: true, preserveBusinessForm: true })}
-                    className="rounded-full border border-slate-900/10 bg-white px-5 py-3 text-sm text-slate-700"
-                  >
-                    Sync from backend
-                  </button>
-                </div>
-              </form>
-
-              <div className="rounded-[32px] border border-white/70 bg-white/78 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.06)]">
-                <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">
-                  Suggested service
-                </div>
-
-                <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-                  Keep service setup tiny
-                </h2>
-
-                <p className="mt-3 text-sm leading-7 text-slate-600">
-                  Böyük form yox. Bir suggested service yarat, sonra workspace içində
-                  təkmilləşdir.
-                </p>
-
-                <div className="mt-6 rounded-[24px] border border-slate-900/8 bg-[#fbfcfe] p-4">
-                  <div className="text-sm text-slate-500">Suggested title</div>
-                  <div className="mt-2 text-lg font-semibold text-slate-900">
-                    {serviceSuggestionTitle || "Use the note above to generate a service seed"}
-                  </div>
-                </div>
-
-                <div className="mt-6 flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    disabled={!!savingServiceSuggestion}
-                    onClick={onCreateSuggestedService}
-                    className="rounded-full bg-slate-950 px-5 py-3 text-sm font-medium text-white disabled:opacity-60"
-                  >
-                    {savingServiceSuggestion ? "Creating..." : "Create suggested service"}
-                  </button>
-
-                  <div className="rounded-full bg-slate-900/5 px-4 py-3 text-sm text-slate-600">
-                    Current services: {services.length}
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : null}
-
-          {showKnowledge && knowledgeCandidates.length ? (
-            <div className="mt-8 rounded-[36px] border border-white/70 bg-white/78 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.06)]">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                  <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">
-                    Review discoveries
-                  </div>
-                  <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-                    Approve only the useful ones
-                  </h2>
-                </div>
-
-                <div className="rounded-full bg-slate-900/5 px-4 py-2.5 text-sm text-slate-600">
-                  Pending: {knowledgeCandidates.length}
-                </div>
-              </div>
-
-              <div className="mt-6 grid gap-4">
-                {knowledgeCandidates.slice(0, 4).map((item) => {
-                  const id = s(item.id);
-                  const busy = actingKnowledgeId === id;
-                  const title = candidateTitle(item);
-                  const value = candidateValue(item);
-                  const evidence = evidenceList(item);
-
-                  return (
-                    <div
-                      key={id || title}
-                      className="rounded-[28px] border border-slate-900/8 bg-[#fbfcfe] p-5"
-                    >
-                      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-                        <div className="min-w-0 flex-1">
-                          <div className="mb-3 flex flex-wrap gap-2">
-                            <span className="rounded-full bg-slate-900/5 px-3 py-1 text-xs text-slate-500">
-                              {s(item.status || "pending")}
-                            </span>
-
-                            <span className="rounded-full bg-slate-900/5 px-3 py-1 text-xs text-slate-500">
-                              {candidateCategory(item)}
-                            </span>
-
-                            {candidateConfidence(item) ? (
-                              <span className="rounded-full bg-slate-900/5 px-3 py-1 text-xs text-slate-500">
-                                {candidateConfidence(item)}
-                              </span>
-                            ) : null}
-
-                            <span className="rounded-full bg-slate-900/5 px-3 py-1 text-xs text-slate-500">
-                              {candidateSource(item)}
-                            </span>
-                          </div>
-
-                          <div className="text-2xl font-semibold tracking-tight text-slate-950">
-                            {title}
-                          </div>
-
-                          <div className="mt-3 rounded-[20px] border border-slate-900/8 bg-white px-4 py-3 text-sm leading-7 text-slate-700">
-                            {value || "Preview yoxdur."}
-                          </div>
-
-                          {evidence.length ? (
-                            <div className="mt-3 text-sm text-slate-500">
-                              {s(evidence[0]?.url || evidence[0]?.source_url || evidence[0]?.link)}
-                            </div>
-                          ) : null}
-                        </div>
-
-                        <div className="flex w-full shrink-0 flex-col gap-3 lg:w-[190px]">
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => onApproveKnowledge(item)}
-                            className="rounded-full bg-slate-950 px-5 py-3 text-sm font-medium text-white disabled:opacity-60"
-                          >
-                            {busy ? "Working..." : "Approve"}
-                          </button>
-
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => onRejectKnowledge(item)}
-                            className="rounded-full border border-slate-900/10 bg-white px-5 py-3 text-sm text-slate-700 disabled:opacity-60"
-                          >
-                            Reject
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {knowledgeCandidates.length > 4 ? (
-                <div className="mt-5 text-sm text-slate-500">
-                  Daha çox discovery var. Qalanlarını bu axından sonra da review edə bilərsən.
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-
-          <div className="mt-8 flex justify-center">
-            <button
-              type="button"
-              onClick={onOpenWorkspace}
-              className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-6 py-3.5 text-sm font-medium text-white shadow-[0_18px_50px_rgba(15,23,42,0.18)]"
-            >
-              Continue to workspace
-              <ArrowRight className="h-4 w-4" />
-            </button>
-          </div>
-
-          {meta.missingSteps.length ? (
-            <div className="mt-6 text-center text-sm text-slate-500">
-              Remaining: {meta.missingSteps.join(" · ")}
-            </div>
-          ) : (
-            <div className="mt-6 flex items-center justify-center gap-2 text-sm text-emerald-700">
-              <Check className="h-4 w-4" />
-              Core onboarding is ready.
-            </div>
-          )}
-        </div>
-      </section>
-    </div>
+    <SetupStudioScene
+      loading={loading}
+      refreshing={refreshing}
+      importingWebsite={importingWebsite}
+      savingBusiness={savingBusiness}
+      actingKnowledgeId={actingKnowledgeId}
+      savingServiceSuggestion={savingServiceSuggestion}
+      showRefine={showRefine}
+      showKnowledge={showKnowledge}
+      error={error}
+      businessForm={businessForm}
+      discoveryForm={discoveryForm}
+      discoveryState={discoveryState}
+      meta={meta}
+      heroSteps={heroSteps}
+      metrics={metrics}
+      liveSignals={liveSignals}
+      discoveryProfileRows={discoveryProfileRows}
+      knowledgePreview={knowledgePreview}
+      serviceSuggestionTitle={serviceSuggestionTitle}
+      studioProgress={studioProgress}
+      narrative={narrative}
+      services={services}
+      onSetBusinessField={setBusinessField}
+      onSetDiscoveryField={setDiscoveryField}
+      onScanBusiness={onScanBusiness}
+      onSaveBusiness={onSaveBusiness}
+      onApproveKnowledge={onApproveKnowledge}
+      onRejectKnowledge={onRejectKnowledge}
+      onCreateSuggestedService={onCreateSuggestedService}
+      onOpenWorkspace={onOpenWorkspace}
+      onRefresh={() => loadData({ silent: true, preserveBusinessForm: true })}
+      onToggleRefine={() => setShowRefine((prev) => !prev)}
+      onToggleKnowledge={() => setShowKnowledge((prev) => !prev)}
+      discoveryModeLabel={discoveryModeLabel}
+    />
   );
 }
