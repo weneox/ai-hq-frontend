@@ -7,6 +7,16 @@ function isSetupPath(pathname = "") {
   return pathname === "/setup" || pathname.startsWith("/setup/");
 }
 
+function normalizeSetupRoute(target = "") {
+  const value = String(target || "").trim();
+
+  if (!value) return "/setup/studio";
+  if (value === "/setup") return "/setup/studio";
+  if (value.startsWith("/setup/")) return "/setup/studio";
+
+  return value;
+}
+
 export default function UserRouteGuard({ children }) {
   const location = useLocation();
 
@@ -39,20 +49,30 @@ export default function UserRouteGuard({ children }) {
           const boot = await getAppBootstrap();
           const workspace = boot?.workspace || {};
           const setupCompleted = !!workspace.setupCompleted;
-          const setupTarget =
-            workspace.nextSetupRoute ||
-            workspace.initialRoute ||
-            "/setup/business";
-
           const onSetup = isSetupPath(location.pathname);
 
-          if (!setupCompleted && !onSetup) {
-            redirectTo = setupTarget;
-          } else if (setupCompleted && onSetup) {
+          if (!setupCompleted) {
+            const requestedSetupTarget = normalizeSetupRoute(
+              workspace.nextSetupRoute ||
+                workspace.initialRoute ||
+                "/setup/studio"
+            );
+
+            if (!onSetup) {
+              redirectTo = requestedSetupTarget;
+            } else if (location.pathname !== "/setup/studio") {
+              redirectTo = "/setup/studio";
+            }
+          } else if (onSetup) {
             redirectTo = "/";
           }
         } catch {
-          redirectTo = "";
+          const onSetup = isSetupPath(location.pathname);
+          if (onSetup && location.pathname !== "/setup/studio") {
+            redirectTo = "/setup/studio";
+          } else {
+            redirectTo = "";
+          }
         }
 
         if (!alive) return;
