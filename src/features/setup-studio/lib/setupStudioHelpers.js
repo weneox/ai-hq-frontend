@@ -1,3 +1,6 @@
+// src/features/setup-studio/lib/setupStudioHelpers.js
+// FINAL v1.2
+
 export function arr(value) {
   return Array.isArray(value) ? value : [];
 }
@@ -48,14 +51,22 @@ export function extractItems(payload) {
 
 export function parseJsonArray(value) {
   if (Array.isArray(value)) return value;
+
+  if (value && typeof value === "object") {
+    return [value];
+  }
+
   if (typeof value === "string") {
     try {
       const parsed = JSON.parse(value);
-      return Array.isArray(parsed) ? parsed : [];
+      if (Array.isArray(parsed)) return parsed;
+      if (parsed && typeof parsed === "object") return [parsed];
+      return [];
     } catch {
       return [];
     }
   }
+
   return [];
 }
 
@@ -101,8 +112,29 @@ export function candidateValue(item = {}) {
   if (text) return text;
 
   const valueJson = obj(item.value_json);
-  const keys = Object.keys(valueJson);
-  if (!keys.length) return "";
+
+  const combined =
+    s(valueJson.question) && s(valueJson.answer)
+      ? `${s(valueJson.question)} — ${s(valueJson.answer)}`
+      : s(
+          valueJson.summary ||
+            valueJson.text ||
+            valueJson.description ||
+            valueJson.service ||
+            valueJson.product ||
+            valueJson.policy ||
+            valueJson.address ||
+            valueJson.hours ||
+            valueJson.email ||
+            valueJson.phone ||
+            valueJson.url ||
+            valueJson.title
+        );
+
+  if (combined) return combined;
+
+  const compact = compactValue(valueJson);
+  if (compact) return compact;
 
   try {
     return JSON.stringify(valueJson, null, 2);
@@ -112,11 +144,15 @@ export function candidateValue(item = {}) {
 }
 
 export function candidateSource(item = {}) {
+  const evidence = evidenceList(item)[0] || {};
+
   return (
     s(item.source_display_name) ||
     s(item.display_name) ||
     s(item.source_type) ||
     s(item.source_key) ||
+    s(evidence.type) ||
+    s(evidence.source_type) ||
     "Unknown source"
   );
 }
@@ -124,7 +160,9 @@ export function candidateSource(item = {}) {
 export function candidateConfidence(item = {}) {
   const n = Number(item.confidence);
   if (!Number.isFinite(n)) return "";
-  return `${Math.round(n * 100)}%`;
+
+  const percent = n <= 1 ? n * 100 : n;
+  return `${Math.round(percent)}%`;
 }
 
 export function evidenceList(item = {}) {
@@ -137,10 +175,21 @@ export function profilePatchFromDiscovery(profile = {}) {
 
   return {
     companyName: s(
-      p.companyName || p.businessName || p.name || p.title || p.brandName
+      p.companyName ||
+        p.businessName ||
+        p.name ||
+        p.title ||
+        p.brandName ||
+        p.companyTitle
     ),
     description: s(
-      p.description || p.summary || p.businessDescription || p.about
+      p.description ||
+        p.summary ||
+        p.businessDescription ||
+        p.about ||
+        p.companySummaryShort ||
+        p.companySummaryLong ||
+        p.aboutSection
     ),
     timezone: s(p.timezone || p.timeZone),
     language: s(p.language || languages[0]),
@@ -172,12 +221,36 @@ export function mergeBusinessForm(prev, patch = {}) {
 export function profilePreviewRows(profile = {}) {
   const p = obj(profile);
 
+  const services = arr(p.services).filter(Boolean).slice(0, 4).join(", ");
+
   return [
-    ["Name", s(p.companyName || p.businessName || p.name || p.title || p.brandName)],
-    ["Description", s(p.description || p.summary || p.businessDescription || p.about)],
+    [
+      "Name",
+      s(
+        p.companyName ||
+          p.businessName ||
+          p.name ||
+          p.title ||
+          p.brandName ||
+          p.companyTitle
+      ),
+    ],
+    [
+      "Description",
+      s(
+        p.description ||
+          p.summary ||
+          p.businessDescription ||
+          p.about ||
+          p.companySummaryShort ||
+          p.companySummaryLong ||
+          p.aboutSection
+      ),
+    ],
     ["Timezone", s(p.timezone || p.timeZone)],
     ["Language", s(p.language || arr(p.languages)[0])],
     ["Website", s(p.website || p.url || p.siteUrl)],
+    ["Services", services],
   ].filter(([, value]) => value);
 }
 
@@ -193,27 +266,50 @@ export function discoveryModeLabel(mode = "") {
 }
 
 export function stepDone(meta, key) {
-  const missing = arr(meta.missingSteps).map((x) => s(x).toLowerCase());
+  const missing = arr(meta?.missingSteps).map((x) => s(x).toLowerCase());
   return !missing.includes(String(key).toLowerCase());
 }
 
 export function deriveStudioProgress({ importingWebsite, discoveryState, meta }) {
-  if (meta?.setupCompleted) return 100;
-  if (importingWebsite) {
-    return Math.max(24, Math.min(76, 36 + Number(meta?.pendingCandidateCount || 0) * 4));
+  const readinessScore = Number(meta?.readinessScore || 0);
+  const setupCompleted = !!meta?.setupCompleted;
+  const missingSteps = arr(meta?.missingSteps);
+  const primaryMissingStep = s(meta?.primaryMissingStep);
+  const nextRoute = s(meta?.nextRoute || "/");
+  const nextSetupRoute = s(meta?.nextSetupRoute || "/setup");
+  const readinessLabel = s(meta?.readinessLabel);
+
+  let progressPercent = readinessScore;
+
+  if (setupCompleted) {
+    progressPercent = 100;
+  } else if (importingWebsite) {
+    progressPercent = Math.max(
+      24,
+      Math.min(76, 36 + Number(meta?.pendingCandidateCount || 0) * 4)
+    );
+  } else {
+    const mode = s(discoveryState?.mode).toLowerCase();
+
+    if (["success", "completed", "complete", "done"].includes(mode)) {
+      progressPercent = Math.max(readinessScore, 72);
+    } else if (["error", "failed"].includes(mode)) {
+      progressPercent = Math.max(12, readinessScore);
+    } else {
+      progressPercent = Math.max(8, readinessScore);
+    }
   }
 
-  const mode = s(discoveryState?.mode).toLowerCase();
-
-  if (["success", "completed", "complete", "done"].includes(mode)) {
-    return Math.max(Number(meta?.readinessScore || 0), 72);
-  }
-
-  if (["error", "failed"].includes(mode)) {
-    return Math.max(12, Number(meta?.readinessScore || 0));
-  }
-
-  return Math.max(8, Number(meta?.readinessScore || 0));
+  return {
+    progressPercent,
+    readinessScore,
+    readinessLabel,
+    missingSteps,
+    primaryMissingStep,
+    nextRoute,
+    nextSetupRoute,
+    setupCompleted,
+  };
 }
 
 export function isSuccessMode(mode = "") {

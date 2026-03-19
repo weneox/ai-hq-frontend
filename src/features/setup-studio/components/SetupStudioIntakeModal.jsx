@@ -1,15 +1,19 @@
+// src/features/setup-studio/components/SetupStudioIntakeModal.jsx
+
 import { motion } from "framer-motion";
 import { BadgeCheck, X } from "lucide-react";
 import { TinyLabel } from "./SetupStudioUi.jsx";
 import SetupStudioKnowledgeLine from "./SetupStudioKnowledgeLine.jsx";
 
 export default function SetupStudioIntakeModal({
-  knowledgePreview,
+  knowledgeItems,
   actingKnowledgeId,
   onApproveKnowledge,
   onRejectKnowledge,
   onClose,
 }) {
+  const items = Array.isArray(knowledgeItems) ? knowledgeItems : [];
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.96, y: 18 }}
@@ -40,15 +44,21 @@ export default function SetupStudioIntakeModal({
       </div>
 
       <div className="max-h-[62vh] overflow-y-auto px-5 pb-5 sm:px-6">
-        {knowledgePreview.map((item, index) => (
-          <SetupStudioKnowledgeLine
-            key={item.id || item.title}
-            item={{ ...item, index: String(index + 1).padStart(2, "0") }}
-            busy={actingKnowledgeId === item.id}
-            onApprove={() => onApproveKnowledge({ id: item.id })}
-            onReject={() => onRejectKnowledge({ id: item.id })}
-          />
-        ))}
+        {items.length ? (
+          items.map((item, index) => (
+            <SetupStudioKnowledgeLine
+              key={item.id || item.title || index}
+              item={{ ...item, index: String(index + 1).padStart(2, "0") }}
+              busy={actingKnowledgeId === item.id}
+              onApprove={() => onApproveKnowledge(item)}
+              onReject={() => onRejectKnowledge(item)}
+            />
+          ))
+        ) : (
+          <div className="py-8 text-sm text-slate-500">
+            Review üçün knowledge item yoxdur.
+          </div>
+        )}
       </div>
     </motion.div>
   );

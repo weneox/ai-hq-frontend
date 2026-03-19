@@ -1,3 +1,5 @@
+// src/features/setup-studio/components/SetupStudioRefineModal.jsx
+
 import { motion } from "framer-motion";
 import { BadgeCheck, Brain, X } from "lucide-react";
 import { TinyLabel } from "./SetupStudioUi.jsx";
@@ -10,6 +12,8 @@ export default function SetupStudioRefineModal({
   onSaveBusiness,
   onClose,
 }) {
+  const rows = Array.isArray(discoveryProfileRows) ? discoveryProfileRows : [];
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.96, y: 18 }}
@@ -33,7 +37,8 @@ export default function SetupStudioRefineModal({
         <button
           type="button"
           onClick={onClose}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-900/10 bg-white text-slate-600"
+          disabled={savingBusiness}
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-900/10 bg-white text-slate-600 disabled:opacity-50"
         >
           <X className="h-4 w-4" />
         </button>
@@ -46,6 +51,7 @@ export default function SetupStudioRefineModal({
             onChange={(e) => onSetBusinessField("companyName", e.target.value)}
             className="w-full rounded-[22px] border border-slate-900/8 bg-white px-4 py-3.5 text-slate-900 outline-none placeholder:text-slate-400"
             placeholder="Company name"
+            autoComplete="off"
           />
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -54,6 +60,7 @@ export default function SetupStudioRefineModal({
               onChange={(e) => onSetBusinessField("timezone", e.target.value)}
               className="w-full rounded-[22px] border border-slate-900/8 bg-white px-4 py-3.5 text-slate-900 outline-none placeholder:text-slate-400"
               placeholder="Timezone"
+              autoComplete="off"
             />
 
             <select
@@ -91,10 +98,10 @@ export default function SetupStudioRefineModal({
           </TinyLabel>
 
           <div className="mt-5 divide-y divide-slate-900/8 overflow-hidden rounded-[24px] border border-slate-900/8 bg-white">
-            {discoveryProfileRows.length ? (
-              discoveryProfileRows.map(([label, value]) => (
+            {rows.length ? (
+              rows.map(([label, value], index) => (
                 <div
-                  key={label}
+                  key={`${label}-${index}`}
                   className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="text-xs uppercase tracking-[0.18em] text-slate-400">

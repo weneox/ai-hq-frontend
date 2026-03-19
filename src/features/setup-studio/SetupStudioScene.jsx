@@ -21,6 +21,41 @@ const STEP_LABELS = {
   ready: "Launch",
 };
 
+function findProfileRowValue(rows = [], wantedKeys = []) {
+  const normalizedWanted = wantedKeys.map((x) => s(x).toLowerCase());
+
+  const match = rows.find(([label]) =>
+    normalizedWanted.includes(s(label).toLowerCase())
+  );
+
+  return s(match?.[1]);
+}
+
+function buildRecoveredStage({
+  importingWebsite,
+  scanSucceeded,
+  hasKnowledge,
+  services,
+  studioProgress,
+}) {
+  if (importingWebsite) return "scanning";
+  if (!scanSucceeded) return "entry";
+
+  if (studioProgress?.setupCompleted) {
+    return "ready";
+  }
+
+  if (hasKnowledge) {
+    return "knowledge";
+  }
+
+  if (Array.isArray(services) && services.length > 0) {
+    return "ready";
+  }
+
+  return "identity";
+}
+
 export default function SetupStudioScene({
   loading,
   refreshing,
@@ -37,6 +72,7 @@ export default function SetupStudioScene({
   meta,
   discoveryProfileRows,
   knowledgePreview,
+  knowledgeItems,
   serviceSuggestionTitle,
   studioProgress,
   services,
@@ -54,8 +90,14 @@ export default function SetupStudioScene({
 }) {
   const navigate = useNavigate();
 
-  const scanDone = isSuccessMode(discoveryState.mode) || !!s(discoveryState.lastUrl);
+  const scanSucceeded = isSuccessMode(discoveryState.mode);
+  const hasScannedUrl = !!s(discoveryState.lastUrl);
   const hasKnowledge = knowledgePreview.length > 0;
+  const intakeItems =
+    Array.isArray(knowledgeItems) && knowledgeItems.length
+      ? knowledgeItems
+      : knowledgePreview;
+  const hasServices = Array.isArray(services) && services.length > 0;
 
   const stageSequence = useMemo(() => {
     const list = ["identity"];
@@ -71,7 +113,15 @@ export default function SetupStudioScene({
     return list;
   }, [hasKnowledge]);
 
-  const [stage, setStage] = useState("entry");
+  const [stage, setStage] = useState(() =>
+    buildRecoveredStage({
+      importingWebsite,
+      scanSucceeded,
+      hasKnowledge,
+      services,
+      studioProgress,
+    })
+  );
   const [scanLineIndex, setScanLineIndex] = useState(0);
 
   const scanLines = [
@@ -92,15 +142,44 @@ export default function SetupStudioScene({
   }, []);
 
   useEffect(() => {
+    const recovered = buildRecoveredStage({
+      importingWebsite,
+      scanSucceeded,
+      hasKnowledge,
+      services,
+      studioProgress,
+    });
+
     if (importingWebsite) {
       setStage("scanning");
       return;
     }
 
-    if (scanDone && (stage === "entry" || stage === "scanning")) {
-      setStage("identity");
+    if (stage === "entry" || stage === "scanning") {
+      setStage(recovered);
+      return;
     }
-  }, [importingWebsite, scanDone, stage]);
+
+    if (studioProgress?.setupCompleted && stage !== "ready") {
+      setStage("ready");
+      return;
+    }
+
+    if (hasKnowledge && stage === "identity") {
+      return;
+    }
+
+    if (!hasKnowledge && stage === "knowledge") {
+      setStage("service");
+    }
+  }, [
+    importingWebsite,
+    scanSucceeded,
+    hasKnowledge,
+    services,
+    studioProgress,
+    stage,
+  ]);
 
   useEffect(() => {
     if (!importingWebsite) {
@@ -123,26 +202,51 @@ export default function SetupStudioScene({
   }
 
   async function handleCreateServiceAndNext() {
-    await onCreateSuggestedService();
-    setStage("ready");
+    const result = await onCreateSuggestedService?.();
+    const failed = result?.ok === false || result?.error || result?.reason;
+
+    if (!failed) {
+      setStage("ready");
+    }
   }
 
   function handleOpenWorkspace() {
-    navigate("/", { replace: true });
+    const target =
+      s(studioProgress?.nextRoute) ||
+      s(studioProgress?.progress?.nextRoute) ||
+      "/";
+    navigate(target, { replace: true });
   }
 
+  const discoveredTitle =
+    findProfileRowValue(discoveryProfileRows, [
+      "name",
+      "business name",
+      "company name",
+      "title",
+    ]) || s(meta?.companyName);
+
+  const discoveredDescription =
+    findProfileRowValue(discoveryProfileRows, [
+      "description",
+      "summary",
+      "about",
+      "business description",
+    ]) || s(meta?.companySummaryShort || meta?.description);
+
   const currentTitle =
-    s(businessForm.companyName) ||
-    discoveryProfileRows?.find?.(([label]) => label === "Name")?.[1] ||
-    "Business identity";
+    s(businessForm.companyName) || discoveredTitle || "Business identity";
 
   const currentDescription =
     s(businessForm.description) ||
-    discoveryProfileRows?.find?.(([label]) => label === "Description")?.[1] ||
+    discoveredDescription ||
     "We extracted a first draft of the business direction from the source signals.";
 
-  const progressCurrentStage = importingWebsite ? "entry" : stage;
-  const progressCurrentIndex = Math.max(0, progressSteps.indexOf(progressCurrentStage));
+  const progressCurrentStage = importingWebsite ? "identity" : stage;
+  const progressCurrentIndex = Math.max(
+    0,
+    progressSteps.indexOf(progressCurrentStage)
+  );
   const isEntryStage = stage === "entry";
 
   const statusLabel = importingWebsite
@@ -163,6 +267,7 @@ export default function SetupStudioScene({
     <div
       className={`setup-studio-scene ${isEntryStage ? "is-entry-stage" : ""}`}
       data-stage={stage}
+      data-scan-url={hasScannedUrl ? "yes" : "no"}
     >
       <header className="setup-studio-scene__topbar">
         <div className="setup-studio-scene__brand">
@@ -187,7 +292,9 @@ export default function SetupStudioScene({
                   .join(" ")}
               >
                 <span className="setup-studio-scene__progress-dot" />
-                <span className="setup-studio-scene__progress-label">{STEP_LABELS[item]}</span>
+                <span className="setup-studio-scene__progress-label">
+                  {STEP_LABELS[item]}
+                </span>
               </div>
             );
           })}
@@ -314,7 +421,7 @@ export default function SetupStudioScene({
         {showKnowledge ? (
           <div className="setup-studio-overlay setup-studio-overlay--deep">
             <SetupStudioIntakeModal
-              knowledgePreview={knowledgePreview}
+              knowledgeItems={intakeItems}
               actingKnowledgeId={actingKnowledgeId}
               onApproveKnowledge={onApproveKnowledge}
               onRejectKnowledge={onRejectKnowledge}

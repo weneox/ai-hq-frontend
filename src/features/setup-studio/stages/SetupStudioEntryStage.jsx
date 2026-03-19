@@ -462,6 +462,9 @@ export default function SetupStudioEntryStage({
 
   const primarySource = addedSources[0] || null;
 
+  const websiteSubmitUrl = s(normalizedMap.website);
+  const canAnalyze = !!websiteSubmitUrl && !importingWebsite;
+
   const composedNote = useMemo(() => {
     const parts = [];
     const sourceLines = addedSources.map((item) => `${item.key}: ${item.url}`);
@@ -473,9 +476,25 @@ export default function SetupStudioEntryStage({
   }, [addedSources, plainNote]);
 
   useEffect(() => {
-    onSetDiscoveryField("websiteUrl", primarySource?.url || "");
-    onSetDiscoveryField("note", composedNote);
-  }, [primarySource?.url, composedNote, onSetDiscoveryField]);
+    const nextWebsiteUrl = websiteSubmitUrl;
+    const nextNote = composedNote;
+    const currentWebsiteUrl = s(discoveryForm?.websiteUrl);
+    const currentNote = s(discoveryForm?.note);
+
+    if (currentWebsiteUrl !== nextWebsiteUrl) {
+      onSetDiscoveryField("websiteUrl", nextWebsiteUrl);
+    }
+
+    if (currentNote !== nextNote) {
+      onSetDiscoveryField("note", nextNote);
+    }
+  }, [
+    websiteSubmitUrl,
+    composedNote,
+    discoveryForm?.websiteUrl,
+    discoveryForm?.note,
+    onSetDiscoveryField,
+  ]);
 
   const activeSource =
     SOURCE_OPTIONS.find((item) => item.key === activeKey) || SOURCE_OPTIONS[0];
@@ -516,7 +535,7 @@ export default function SetupStudioEntryStage({
 
   function handleSubmit(e) {
     e.preventDefault();
-    if (!primarySource?.url || importingWebsite) return;
+    if (!canAnalyze) return;
     onScanBusiness?.(e);
   }
 
@@ -725,7 +744,7 @@ export default function SetupStudioEntryStage({
 
           <button
             type="submit"
-            disabled={importingWebsite || !primarySource?.url}
+            disabled={!canAnalyze}
             className="setup-studio-intake__submit"
           >
             {importingWebsite ? (
@@ -740,6 +759,12 @@ export default function SetupStudioEntryStage({
               </>
             )}
           </button>
+        </div>
+
+        <div className="setup-studio-intake__dock-note">
+          {websiteSubmitUrl
+            ? "Website will be used for the first scan. Other connected sources are attached as context."
+            : "Add a website to start the first scan. Other sources can still be attached now as context."}
         </div>
       </motion.div>
 

@@ -26,9 +26,101 @@ import {
   mergeBusinessForm,
   profilePreviewRows,
   discoveryModeLabel,
-  stepDone,
   deriveStudioProgress,
 } from "./lib/setupStudioHelpers.js";
+
+function pickSetupProfile(setup = {}, workspace = {}) {
+  return obj(
+    setup?.tenantProfile ||
+      setup?.businessProfile ||
+      workspace?.tenantProfile ||
+      workspace?.businessProfile
+  );
+}
+
+function normalizeBootMeta(boot = {}, pendingKnowledge = [], serviceItems = []) {
+  const workspace = obj(boot?.workspace);
+  const setup = obj(boot?.setup);
+  const knowledge = obj(setup?.knowledge || workspace?.knowledge);
+  const catalog = obj(setup?.catalog || workspace?.catalog);
+  const progress = obj(setup?.progress || workspace?.progress || workspace);
+
+  return {
+    readinessScore: Number(
+      progress?.readinessScore || workspace?.readinessScore || 0
+    ),
+    readinessLabel: s(
+      progress?.readinessLabel || workspace?.readinessLabel || ""
+    ),
+    missingSteps: arr(progress?.missingSteps || workspace?.missingSteps),
+    primaryMissingStep: s(
+      progress?.primaryMissingStep || workspace?.primaryMissingStep || ""
+    ),
+    nextRoute: s(progress?.nextRoute || workspace?.nextRoute || "/"),
+    nextSetupRoute: s(
+      progress?.nextSetupRoute || workspace?.nextSetupRoute || "/setup"
+    ),
+    setupCompleted: !!(
+      progress?.setupCompleted ?? workspace?.setupCompleted ?? false
+    ),
+    pendingCandidateCount: Number(
+      knowledge?.pendingCandidateCount || pendingKnowledge.length || 0
+    ),
+    approvedKnowledgeCount: Number(knowledge?.approvedKnowledgeCount || 0),
+    serviceCount: Number(catalog?.serviceCount || serviceItems.length || 0),
+    playbookCount: Number(catalog?.playbookCount || 0),
+  };
+}
+
+function deriveSuggestedServicePayload({
+  discoveryForm,
+  discoveryState,
+  knowledgeCandidates,
+}) {
+  const serviceCandidate = knowledgeCandidates.find((item) => {
+    const category = s(candidateCategory(item)).toLowerCase();
+    return category === "service" || category === "product";
+  });
+
+  const discoveredServices = arr(
+    discoveryState?.profile?.services ||
+      discoveryState?.signals?.offerings?.services
+  );
+
+  const fallbackTitle =
+    s(candidateTitle(serviceCandidate)) ||
+    s(discoveredServices[0]) ||
+    s(discoveryForm.note.split(".")[0]) ||
+    "Discovered service";
+
+  const fallbackDescription =
+    s(candidateValue(serviceCandidate)) ||
+    s(discoveryForm.note) ||
+    s(
+      discoveryState?.profile?.companySummaryShort ||
+        discoveryState?.profile?.description
+    ) ||
+    `Service discovered from ${s(discoveryState?.lastUrl || "website import")}.`;
+
+  const category = (() => {
+    const raw = s(candidateCategory(serviceCandidate)).toLowerCase();
+    if (raw === "service" || raw === "product") return raw;
+    return "general";
+  })();
+
+  return {
+    title: fallbackTitle,
+    description: fallbackDescription,
+    category,
+    priceFrom: "",
+    currency: "AZN",
+    pricingModel: "custom_quote",
+    durationMinutes: "",
+    sortOrder: 0,
+    highlightsText: "",
+    isActive: true,
+  };
+}
 
 export default function SetupStudioScreen() {
   const navigate = useNavigate();
@@ -73,7 +165,11 @@ export default function SetupStudioScreen() {
 
   const [meta, setMeta] = useState({
     readinessScore: 0,
+    readinessLabel: "",
     missingSteps: [],
+    primaryMissingStep: "",
+    nextRoute: "/",
+    nextSetupRoute: "/setup",
     setupCompleted: false,
     pendingCandidateCount: 0,
     approvedKnowledgeCount: 0,
@@ -96,25 +192,15 @@ export default function SetupStudioScreen() {
 
       const workspace = obj(boot?.workspace);
       const setup = obj(boot?.setup);
-      const profile = obj(setup?.businessProfile);
-      const knowledge = obj(setup?.knowledge);
-      const catalog = obj(setup?.catalog);
+      const profile = pickSetupProfile(setup, workspace);
 
       const rawKnowledge = extractItems(knowledgePayload);
       const pendingKnowledge = rawKnowledge.filter(isPendingKnowledge);
       const serviceItems = extractItems(servicesPayload);
 
-      setMeta({
-        readinessScore: Number(workspace?.readinessScore || 0),
-        missingSteps: arr(workspace?.missingSteps),
-        setupCompleted: !!workspace?.setupCompleted,
-        pendingCandidateCount: Number(
-          knowledge?.pendingCandidateCount || pendingKnowledge.length || 0
-        ),
-        approvedKnowledgeCount: Number(knowledge?.approvedKnowledgeCount || 0),
-        serviceCount: Number(catalog?.serviceCount || serviceItems.length || 0),
-        playbookCount: Number(catalog?.playbookCount || 0),
-      });
+      const nextMeta = normalizeBootMeta(boot, pendingKnowledge, serviceItems);
+
+      setMeta(nextMeta);
 
       if (!preserveBusinessForm) {
         setBusinessForm({
@@ -127,8 +213,31 @@ export default function SetupStudioScreen() {
 
       setKnowledgeCandidates(pendingKnowledge);
       setServices(serviceItems);
+
+      return {
+        boot,
+        workspace,
+        setup,
+        profile,
+        pendingKnowledge,
+        serviceItems,
+        meta: nextMeta,
+      };
     } catch (e) {
-      setError(String(e?.message || e || "Setup studio data could not be loaded."));
+      const message = String(
+        e?.message || e || "Setup studio data could not be loaded."
+      );
+      setError(message);
+      return {
+        boot: {},
+        workspace: {},
+        setup: {},
+        profile: {},
+        pendingKnowledge: [],
+        serviceItems: [],
+        meta: {},
+        error: message,
+      };
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -140,15 +249,18 @@ export default function SetupStudioScreen() {
   }, []);
 
   async function refreshAndMaybeRouteHome({ preserveBusinessForm = false } = {}) {
-    const boot = await getAppBootstrap();
-    const workspace = obj(boot?.workspace);
+    const snapshot = await loadData({
+      silent: true,
+      preserveBusinessForm,
+    });
 
-    if (workspace?.setupCompleted) {
-      navigate("/", { replace: true });
+    const nextMeta = obj(snapshot?.meta);
+
+    if (nextMeta.setupCompleted) {
+      navigate(s(nextMeta.nextRoute || "/"), { replace: true });
       return true;
     }
 
-    await loadData({ silent: true, preserveBusinessForm });
     return false;
   }
 
@@ -216,15 +328,25 @@ export default function SetupStudioScreen() {
         signals: obj(result?.signals),
       });
 
-      setShowKnowledge(true);
-      await refreshAndMaybeRouteHome({ preserveBusinessForm: true });
+      const routed = await refreshAndMaybeRouteHome({
+        preserveBusinessForm: true,
+      });
+
+      if (!routed) {
+        const shouldOpenKnowledge =
+          Number(result?.candidateCount || 0) > 0 ||
+          knowledgeCandidates.length > 0;
+
+        setShowKnowledge(shouldOpenKnowledge);
+      }
     } catch (e2) {
+      const message = String(e2?.message || e2 || "Website scan alınmadı.");
       setDiscoveryState((prev) => ({
         ...prev,
         mode: "error",
-        message: String(e2?.message || e2 || "Website scan alınmadı."),
+        message,
       }));
-      setError(String(e2?.message || e2 || "Website scan alınmadı."));
+      setError(message);
     } finally {
       setImportingWebsite(false);
     }
@@ -246,8 +368,10 @@ export default function SetupStudioScreen() {
       });
 
       await refreshAndMaybeRouteHome({ preserveBusinessForm: false });
+      return { ok: true };
     } catch (e2) {
       setError(String(e2?.message || e2 || "Business profile could not be saved."));
+      return { ok: false };
     } finally {
       setSavingBusiness(false);
     }
@@ -255,7 +379,7 @@ export default function SetupStudioScreen() {
 
   async function onApproveKnowledge(item) {
     const id = s(item.id);
-    if (!id) return;
+    if (!id) return { ok: false };
 
     try {
       setActingKnowledgeId(id);
@@ -263,8 +387,10 @@ export default function SetupStudioScreen() {
 
       await approveKnowledgeCandidate(id, {});
       await refreshAndMaybeRouteHome({ preserveBusinessForm: true });
+      return { ok: true };
     } catch (e) {
       setError(String(e?.message || e || "Candidate could not be approved."));
+      return { ok: false };
     } finally {
       setActingKnowledgeId("");
     }
@@ -272,7 +398,7 @@ export default function SetupStudioScreen() {
 
   async function onRejectKnowledge(item) {
     const id = s(item.id);
-    if (!id) return;
+    if (!id) return { ok: false };
 
     try {
       setActingKnowledgeId(id);
@@ -280,8 +406,10 @@ export default function SetupStudioScreen() {
 
       await rejectKnowledgeCandidate(id, {});
       await refreshAndMaybeRouteHome({ preserveBusinessForm: true });
+      return { ok: true };
     } catch (e) {
       setError(String(e?.message || e || "Candidate could not be rejected."));
+      return { ok: false };
     } finally {
       setActingKnowledgeId("");
     }
@@ -289,30 +417,22 @@ export default function SetupStudioScreen() {
 
   async function onCreateSuggestedService() {
     try {
-      if (!s(discoveryForm.note)) {
-        setError("Suggested service yaratmaq üçün description yaz.");
-        return;
-      }
-
       setSavingServiceSuggestion("creating");
       setError("");
 
-      await createSetupService({
-        title: s(discoveryForm.note.split(".")[0] || "Discovered service"),
-        description: s(discoveryForm.note),
-        category: "general",
-        priceFrom: "",
-        currency: "AZN",
-        pricingModel: "custom_quote",
-        durationMinutes: "",
-        sortOrder: 0,
-        highlightsText: "",
-        isActive: true,
+      const payload = deriveSuggestedServicePayload({
+        discoveryForm,
+        discoveryState,
+        knowledgeCandidates,
       });
 
+      await createSetupService(payload);
       await refreshAndMaybeRouteHome({ preserveBusinessForm: true });
+
+      return { ok: true };
     } catch (e) {
       setError(String(e?.message || e || "Suggested service could not be created."));
+      return { ok: false, error: String(e?.message || e || "") };
     } finally {
       setSavingServiceSuggestion("");
     }
@@ -322,33 +442,19 @@ export default function SetupStudioScreen() {
     try {
       setError("");
 
-      const boot = await getAppBootstrap();
-      const workspace = obj(boot?.workspace);
+      const snapshot = await loadData({ silent: true, preserveBusinessForm: true });
+      const nextMeta = obj(snapshot?.meta);
 
-      if (workspace?.setupCompleted) {
-        navigate("/", { replace: true });
+      if (nextMeta.setupCompleted) {
+        navigate(s(nextMeta.nextRoute || "/"), { replace: true });
         return;
       }
 
-      await loadData({ silent: true, preserveBusinessForm: true });
       setError("Hələ bir neçə step qalır. Onları tamamlayıb yenə yoxla.");
     } catch (e) {
       setError(String(e?.message || e || "Workspace status could not be checked."));
     }
   }
-
-  const heroSteps = useMemo(
-    () =>
-      [
-        { key: "entry", label: "start" },
-        { key: "scanning", label: "scan" },
-        { key: "identity", label: "identity" },
-        { key: "knowledge", label: "knowledge" },
-        { key: "service", label: "service" },
-        { key: "ready", label: "ready" },
-      ],
-    []
-  );
 
   const discoveryProfileRows = useMemo(
     () => profilePreviewRows(discoveryState.profile),
@@ -356,15 +462,30 @@ export default function SetupStudioScreen() {
   );
 
   const serviceSuggestionTitle = useMemo(() => {
-    const note = s(discoveryForm.note);
-    if (!note) return "";
-    return note.split(".")[0]?.trim() || "";
-  }, [discoveryForm.note]);
+    const derived = deriveSuggestedServicePayload({
+      discoveryForm,
+      discoveryState,
+      knowledgeCandidates,
+    });
+    return s(derived.title);
+  }, [discoveryForm, discoveryState, knowledgeCandidates]);
 
-  const studioProgress = useMemo(
-    () => deriveStudioProgress({ importingWebsite, discoveryState, meta }),
-    [importingWebsite, discoveryState, meta]
-  );
+  const studioProgress = useMemo(() => {
+    const derived = obj(deriveStudioProgress({ importingWebsite, discoveryState, meta }));
+
+    return {
+      ...derived,
+      readinessScore: Number(meta.readinessScore || derived.readinessScore || 0),
+      readinessLabel: s(meta.readinessLabel || derived.readinessLabel),
+      missingSteps: arr(meta.missingSteps).length
+        ? arr(meta.missingSteps)
+        : arr(derived.missingSteps),
+      primaryMissingStep: s(meta.primaryMissingStep || derived.primaryMissingStep),
+      nextRoute: s(meta.nextRoute || derived.nextRoute || "/"),
+      nextSetupRoute: s(meta.nextSetupRoute || derived.nextSetupRoute || "/setup"),
+      setupCompleted: !!(meta.setupCompleted ?? derived.setupCompleted),
+    };
+  }, [importingWebsite, discoveryState, meta]);
 
   const knowledgePreview = useMemo(
     () =>
@@ -400,7 +521,6 @@ export default function SetupStudioScreen() {
       discoveryForm={discoveryForm}
       discoveryState={discoveryState}
       meta={meta}
-      heroSteps={heroSteps}
       discoveryProfileRows={discoveryProfileRows}
       knowledgePreview={knowledgePreview}
       serviceSuggestionTitle={serviceSuggestionTitle}
