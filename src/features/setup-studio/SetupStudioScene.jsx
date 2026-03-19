@@ -142,7 +142,7 @@ export default function SetupStudioScene({
   const statusLabel = importingWebsite
     ? "Analyzing"
     : isEntryStage
-      ? "Ready to analyze"
+      ? "Ready"
       : discoveryModeLabel(discoveryState.mode);
 
   if (loading) {
@@ -188,13 +188,15 @@ export default function SetupStudioScene({
         </div>
 
         <div className="setup-studio-scene__topbar-actions">
-          <div
-            className="setup-studio-scene__status"
-            data-mode={importingWebsite ? "running" : s(discoveryState.mode || "idle")}
-          >
-            <span className="setup-studio-scene__status-dot" />
-            <span>{statusLabel}</span>
-          </div>
+          {!isEntryStage ? (
+            <div
+              className="setup-studio-scene__status"
+              data-mode={importingWebsite ? "running" : s(discoveryState.mode || "idle")}
+            >
+              <span className="setup-studio-scene__status-dot" />
+              <span>{statusLabel}</span>
+            </div>
+          ) : null}
 
           <button
             type="button"

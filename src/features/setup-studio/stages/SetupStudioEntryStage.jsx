@@ -3,13 +3,12 @@ import { motion } from "framer-motion";
 import {
   ArrowRight,
   FileText,
-  Globe,
   Loader2,
-  MoreHorizontal,
   Plus,
   X,
 } from "lucide-react";
 
+import websiteIcon from "../../../assets/setup-studio/channels/weblink.webp";
 import instagramIcon from "../../../assets/setup-studio/channels/instagram.svg";
 import facebookIcon from "../../../assets/setup-studio/channels/facebook.svg";
 import googleMapsIcon from "../../../assets/setup-studio/channels/google-maps.svg";
@@ -24,7 +23,7 @@ const SOURCE_OPTIONS = [
     key: "website",
     label: "Website",
     placeholder: "yourbusiness.com",
-    imageType: "globe",
+    imageSrc: websiteIcon,
     theme: "website",
     priority: "primary",
   },
@@ -53,19 +52,19 @@ const SOURCE_OPTIONS = [
     priority: "primary",
   },
   {
+    key: "whatsapp",
+    label: "WhatsApp",
+    placeholder: "+994 50 000 00 00",
+    imageSrc: whatsappIcon,
+    theme: "whatsapp",
+    priority: "primary",
+  },
+  {
     key: "linkedin",
     label: "LinkedIn",
     placeholder: "linkedin.com/company/yourbrand",
     imageSrc: linkedinIcon,
     theme: "linkedin",
-    priority: "primary",
-  },
-  {
-    key: "github",
-    label: "GitHub",
-    placeholder: "github.com/yourbrand",
-    imageSrc: githubIcon,
-    theme: "github",
     priority: "secondary",
   },
   {
@@ -77,14 +76,6 @@ const SOURCE_OPTIONS = [
     priority: "secondary",
   },
   {
-    key: "whatsapp",
-    label: "WhatsApp",
-    placeholder: "+994 50 000 00 00",
-    imageSrc: whatsappIcon,
-    theme: "whatsapp",
-    priority: "secondary",
-  },
-  {
     key: "youtube",
     label: "YouTube",
     placeholder: "@yourbrand",
@@ -93,9 +84,17 @@ const SOURCE_OPTIONS = [
     priority: "secondary",
   },
   {
+    key: "github",
+    label: "GitHub",
+    placeholder: "github.com/yourbrand",
+    imageSrc: githubIcon,
+    theme: "github",
+    priority: "secondary",
+  },
+  {
     key: "note",
     label: "Short note",
-    placeholder: "We mainly get orders from Instagram and WhatsApp.",
+    placeholder: "We mainly get leads from Instagram and WhatsApp.",
     icon: FileText,
     theme: "note",
     multiline: true,
@@ -103,17 +102,7 @@ const SOURCE_OPTIONS = [
   },
 ];
 
-const PRIMARY_ORDER = [
-  "website",
-  "instagram",
-  "facebook",
-  "googleMaps",
-  "linkedin",
-  "github",
-  "tiktok",
-  "whatsapp",
-  "youtube",
-];
+const SOURCE_URL_KEYS = SOURCE_OPTIONS.filter((item) => item.key !== "note").map((item) => item.key);
 
 function s(v) {
   return String(v ?? "").trim();
@@ -314,6 +303,34 @@ function seedSourcesFromPrimary(primary) {
   };
 }
 
+function detectPrimaryKey(raw) {
+  const url = s(raw).toLowerCase();
+  if (!url) return "";
+
+  if (url.includes("instagram.com")) return "instagram";
+  if (url.includes("facebook.com") || url.includes("fb.com")) return "facebook";
+  if (url.includes("google.com/maps") || url.includes("maps.app.goo.gl") || url.includes("g.co/kgs")) {
+    return "googleMaps";
+  }
+  if (url.includes("linkedin.com")) return "linkedin";
+  if (url.includes("github.com")) return "github";
+  if (url.includes("tiktok.com")) return "tiktok";
+  if (url.includes("wa.me") || url.includes("whatsapp")) return "whatsapp";
+  if (url.includes("youtube.com") || url.includes("youtu.be")) return "youtube";
+
+  return "website";
+}
+
+function buildInitialSourceOrder(values, primaryUrl) {
+  const filled = SOURCE_URL_KEYS.filter((key) => s(values[key]));
+  if (!filled.length) return [];
+
+  const primaryKey = detectPrimaryKey(primaryUrl);
+  if (!primaryKey || !filled.includes(primaryKey)) return filled;
+
+  return [primaryKey, ...filled.filter((key) => key !== primaryKey)];
+}
+
 function formatSourceValue(key, raw) {
   const x = s(raw);
   if (!x) return "";
@@ -350,17 +367,20 @@ function formatSourceValue(key, raw) {
   return x.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
 }
 
-function SourceMark({ item }) {
-  if (item.imageType === "globe") {
-    return <Globe className="setup-studio-entry__mark-icon" strokeWidth={1.9} />;
-  }
-
+function SourceMark({ item, className = "" }) {
   if (item.imageSrc) {
-    return <img src={item.imageSrc} alt="" aria-hidden="true" className="setup-studio-entry__mark-image" />;
+    return (
+      <img
+        src={item.imageSrc}
+        alt=""
+        aria-hidden="true"
+        className={className || "setup-studio-entry__source-logo-image"}
+      />
+    );
   }
 
-  const Icon = item.icon;
-  return <Icon className="setup-studio-entry__mark-icon" strokeWidth={1.9} />;
+  const Icon = item.icon || FileText;
+  return <Icon className={className || "setup-studio-entry__source-logo-icon"} strokeWidth={1.9} />;
 }
 
 export default function SetupStudioEntryStage({
@@ -416,16 +436,24 @@ export default function SetupStudioEntryStage({
     ]
   );
 
+  const initialOrder = useMemo(
+    () => buildInitialSourceOrder(initialValues, discoveryForm?.websiteUrl),
+    [initialValues, discoveryForm?.websiteUrl]
+  );
+
   const [activeKey, setActiveKey] = useState("website");
   const [secondaryOpen, setSecondaryOpen] = useState(false);
   const [drafts, setDrafts] = useState(initialValues);
   const [sources, setSources] = useState(initialValues);
+  const [sourceOrder, setSourceOrder] = useState(initialOrder);
 
   useEffect(() => {
     setDrafts(initialValues);
     setSources(initialValues);
+    setSourceOrder(initialOrder);
 
     const firstFilled =
+      initialOrder[0] ||
       SOURCE_OPTIONS.find((item) => item.key !== "note" && s(initialValues[item.key]))?.key ||
       (s(initialValues.note) ? "note" : "website");
 
@@ -433,7 +461,7 @@ export default function SetupStudioEntryStage({
     setSecondaryOpen(
       SOURCE_OPTIONS.some((item) => item.priority === "secondary" && s(initialValues[item.key]))
     );
-  }, [initialValues]);
+  }, [initialValues, initialOrder]);
 
   const normalizedMap = useMemo(
     () => ({
@@ -450,30 +478,36 @@ export default function SetupStudioEntryStage({
     [sources]
   );
 
+  const addedSourceKeys = useMemo(() => {
+    const ordered = [...sourceOrder, ...SOURCE_URL_KEYS];
+
+    return [...new Set(ordered)].filter((key) => s(normalizedMap[key]));
+  }, [sourceOrder, normalizedMap]);
+
   const addedSources = useMemo(() => {
-    return PRIMARY_ORDER.map((key) => {
-      const item = SOURCE_OPTIONS.find((entry) => entry.key === key);
-      const url = normalizedMap[key];
+    return addedSourceKeys
+      .map((key) => {
+        const item = SOURCE_OPTIONS.find((entry) => entry.key === key);
+        if (!item) return null;
 
-      if (!item || !url) return null;
-
-      return {
-        ...item,
-        url,
-        value: formatSourceValue(key, sources[key]),
-      };
-    }).filter(Boolean);
-  }, [normalizedMap, sources]);
+        return {
+          ...item,
+          url: normalizedMap[key],
+          value: formatSourceValue(key, sources[key]),
+        };
+      })
+      .filter(Boolean);
+  }, [addedSourceKeys, normalizedMap, sources]);
 
   const primarySource = addedSources[0] || null;
 
-  const chips = useMemo(() => {
+  const selectedItems = useMemo(() => {
     const out = addedSources.map((item) => ({
       key: item.key,
       label: item.label,
       value: item.value,
       imageSrc: item.imageSrc,
-      imageType: item.imageType,
+      icon: item.icon,
       theme: item.theme,
     }));
 
@@ -481,7 +515,7 @@ export default function SetupStudioEntryStage({
       out.push({
         key: "note",
         label: "Note",
-        value: s(sources.note).slice(0, 72),
+        value: s(sources.note).slice(0, 84),
         icon: FileText,
         theme: "note",
       });
@@ -509,8 +543,12 @@ export default function SetupStudioEntryStage({
     SOURCE_OPTIONS.find((item) => item.key === activeKey) || SOURCE_OPTIONS[0];
 
   const activeDraft = drafts[activeKey] || "";
-  const primaryPills = SOURCE_OPTIONS.filter((item) => item.priority === "primary");
-  const secondaryPills = SOURCE_OPTIONS.filter((item) => item.priority === "secondary");
+  const primarySources = SOURCE_OPTIONS.filter((item) => item.priority === "primary");
+  const secondarySources = SOURCE_OPTIONS.filter((item) => item.priority === "secondary");
+
+  function handlePickSource(key) {
+    setActiveKey(key);
+  }
 
   function handleDraftChange(value) {
     setDrafts((prev) => ({ ...prev, [activeKey]: value }));
@@ -524,11 +562,19 @@ export default function SetupStudioEntryStage({
       ...prev,
       [activeKey]: value,
     }));
+
+    if (activeKey !== "note") {
+      setSourceOrder((prev) => (prev.includes(activeKey) ? prev : [...prev, activeKey]));
+    }
   }
 
   function handleRemoveSource(key) {
     setSources((prev) => ({ ...prev, [key]: "" }));
     setDrafts((prev) => ({ ...prev, [key]: "" }));
+
+    if (key !== "note") {
+      setSourceOrder((prev) => prev.filter((item) => item !== key));
+    }
 
     if (activeKey === key) {
       setActiveKey("website");
@@ -544,6 +590,7 @@ export default function SetupStudioEntryStage({
 
   function handleInputKeyDown(e) {
     if (activeSource.multiline) return;
+
     if (e.key === "Enter") {
       e.preventDefault();
       handleAddSource();
@@ -565,99 +612,93 @@ export default function SetupStudioEntryStage({
       className="setup-studio-entry"
     >
       <div className="setup-studio-entry__hero">
-        <h1 className="setup-studio-entry__title">Add your business sources.</h1>
-
-        <p className="setup-studio-entry__subtitle">
-          Mention places where your business already exists. We’ll use the first valid source as the
-          main one and build the rest in as context.
-        </p>
+        <h1 className="setup-studio-entry__title">Start with one source</h1>
+        <p className="setup-studio-entry__subtitle">We’ll build the rest from there.</p>
       </div>
 
-      <div className="setup-studio-entry__pill-rail">
-        {primaryPills.map((item) => (
+      <div className="setup-studio-entry__sources">
+        {primarySources.map((item) => (
           <button
             key={item.key}
             type="button"
             className={[
-              "setup-studio-entry__pill",
+              "setup-studio-entry__source",
               `theme-${item.theme}`,
               activeKey === item.key ? "is-active" : "",
             ]
               .filter(Boolean)
               .join(" ")}
-            onClick={() => setActiveKey(item.key)}
+            onClick={() => handlePickSource(item.key)}
           >
-            <span className="setup-studio-entry__pill-mark">
+            <span className="setup-studio-entry__source-logo">
               <SourceMark item={item} />
             </span>
-            <span>{item.label}</span>
+            <span className="setup-studio-entry__source-label">{item.label}</span>
           </button>
         ))}
 
         <button
           type="button"
-          className={`setup-studio-entry__pill setup-studio-entry__pill--more ${secondaryOpen ? "is-open" : ""}`}
+          className={`setup-studio-entry__more-trigger ${secondaryOpen ? "is-open" : ""}`}
           onClick={() => setSecondaryOpen((prev) => !prev)}
-          aria-label="More sources"
         >
-          <MoreHorizontal className="h-4 w-4" />
+          <span className="setup-studio-entry__more-plus">+</span>
+          <span className="setup-studio-entry__more-text">More</span>
         </button>
       </div>
 
       {secondaryOpen ? (
-        <div className="setup-studio-entry__secondary-rail">
-          {secondaryPills.map((item) => (
+        <div className="setup-studio-entry__more">
+          {secondarySources.map((item) => (
             <button
               key={item.key}
               type="button"
               className={[
-                "setup-studio-entry__secondary-pill",
+                "setup-studio-entry__more-item",
                 `theme-${item.theme}`,
                 activeKey === item.key ? "is-active" : "",
               ]
                 .filter(Boolean)
                 .join(" ")}
-              onClick={() => setActiveKey(item.key)}
+              onClick={() => handlePickSource(item.key)}
             >
-              <span className="setup-studio-entry__pill-mark">
+              <span className="setup-studio-entry__more-item-logo">
                 <SourceMark item={item} />
               </span>
-              <span>{item.label}</span>
+              <span className="setup-studio-entry__more-item-label">{item.label}</span>
             </button>
           ))}
         </div>
       ) : null}
 
-      <div className={`setup-studio-entry__composer theme-${activeSource.theme}`}>
-        <div className="setup-studio-entry__composer-main">
-          <div className="setup-studio-entry__composer-left">
-            <span className="setup-studio-entry__composer-mark">
-              <SourceMark item={activeSource} />
-            </span>
+      <div className={`setup-studio-entry__composer-shell theme-${activeSource.theme}`}>
+        <div className="setup-studio-entry__composer">
+          <span className="setup-studio-entry__composer-prefix">
+            <SourceMark item={activeSource} />
+          </span>
 
-            {activeSource.multiline ? (
-              <textarea
-                value={activeDraft}
-                onChange={(e) => handleDraftChange(e.target.value)}
-                className="setup-studio-entry__textarea"
-                placeholder={activeSource.placeholder}
-              />
-            ) : (
-              <input
-                value={activeDraft}
-                onChange={(e) => handleDraftChange(e.target.value)}
-                onKeyDown={handleInputKeyDown}
-                className="setup-studio-entry__input"
-                placeholder={activeSource.placeholder}
-                autoComplete="off"
-                spellCheck={false}
-              />
-            )}
-          </div>
+          {activeSource.multiline ? (
+            <textarea
+              value={activeDraft}
+              onChange={(e) => handleDraftChange(e.target.value)}
+              className="setup-studio-entry__composer-textarea"
+              placeholder={activeSource.placeholder}
+            />
+          ) : (
+            <input
+              value={activeDraft}
+              onChange={(e) => handleDraftChange(e.target.value)}
+              onKeyDown={handleInputKeyDown}
+              className="setup-studio-entry__composer-input"
+              placeholder={activeSource.placeholder}
+              autoComplete="off"
+              spellCheck={false}
+            />
+          )}
 
           <button
             type="button"
-            className="setup-studio-entry__add"
+            className="setup-studio-entry__composer-add"
             onClick={handleAddSource}
             disabled={!s(activeDraft)}
           >
@@ -667,50 +708,47 @@ export default function SetupStudioEntryStage({
         </div>
       </div>
 
-      <div className="setup-studio-entry__chips">
-        {chips.map((chip) => (
-          <div key={chip.key} className={`setup-studio-entry__chip theme-${chip.theme}`}>
-            <span className="setup-studio-entry__chip-mark">
-              {chip.imageType === "globe" ? (
-                <Globe className="setup-studio-entry__chip-icon" strokeWidth={1.9} />
-              ) : chip.imageSrc ? (
-                <img
-                  src={chip.imageSrc}
-                  alt=""
-                  aria-hidden="true"
-                  className="setup-studio-entry__chip-logo"
-                />
-              ) : (
-                <FileText className="setup-studio-entry__chip-icon" strokeWidth={1.9} />
-              )}
-            </span>
-
-            <span className="setup-studio-entry__chip-text">
-              <strong>{chip.label}</strong>
-              <span>{chip.value}</span>
-            </span>
-
-            <button
-              type="button"
-              className="setup-studio-entry__chip-remove"
-              onClick={() => handleRemoveSource(chip.key)}
-              aria-label={`Remove ${chip.label}`}
+      {selectedItems.length ? (
+        <div className="setup-studio-entry__selected">
+          {selectedItems.map((item) => (
+            <div
+              key={item.key}
+              className={`setup-studio-entry__selected-item theme-${item.theme}`}
             >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        ))}
-      </div>
+              <span className="setup-studio-entry__selected-logo">
+                {item.imageSrc ? (
+                  <img src={item.imageSrc} alt="" aria-hidden="true" className="setup-studio-entry__source-logo-image" />
+                ) : (
+                  <FileText className="setup-studio-entry__source-logo-icon" strokeWidth={1.9} />
+                )}
+              </span>
 
-      <div className="setup-studio-entry__bottom">
-        <div className="setup-studio-entry__primary">
+              <span className="setup-studio-entry__selected-label">{item.label}</span>
+              <span className="setup-studio-entry__selected-value">{item.value}</span>
+
+              <button
+                type="button"
+                className="setup-studio-entry__selected-remove"
+                onClick={() => handleRemoveSource(item.key)}
+                aria-label={`Remove ${item.label}`}
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      <div className="setup-studio-entry__footer">
+        <div className="setup-studio-entry__meta">
           {primarySource ? (
             <>
-              <span className="setup-studio-entry__primary-label">Primary source:</span>
-              <span className="setup-studio-entry__primary-value">{primarySource.label}</span>
+              <span className="setup-studio-entry__meta-muted">Primary source</span>
+              <span className="setup-studio-entry__meta-dot">·</span>
+              <span className="setup-studio-entry__meta-strong">{primarySource.label}</span>
             </>
           ) : (
-            <span className="setup-studio-entry__primary-empty">Add one source to continue</span>
+            <span className="setup-studio-entry__meta-muted">Add one real source to continue</span>
           )}
         </div>
 
