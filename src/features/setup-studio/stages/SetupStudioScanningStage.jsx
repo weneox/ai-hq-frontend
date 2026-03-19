@@ -1,6 +1,5 @@
 import { motion } from "framer-motion";
-import { Globe } from "lucide-react";
-import SetupStudioStageShell from "../components/SetupStudioStageShell.jsx";
+import { Globe, Sparkles } from "lucide-react";
 import { truncateMiddle } from "../lib/setupStudioHelpers.js";
 
 export default function SetupStudioScanningStage({
@@ -9,57 +8,113 @@ export default function SetupStudioScanningStage({
   scanLineIndex,
 }) {
   return (
-    <SetupStudioStageShell
-      eyebrow="scanning"
-      title={
-        <>
-          Scanning your website.
-          <br />
-          Extracting the first shape.
-        </>
-      }
-      body="Bu hissə oxunmur, axır. Sistem səhifələri yoxlayır və ilk operational twin qatını hazırlayır."
+    <motion.div
+      key="setup-studio-scanning"
+      initial={{ opacity: 0, y: 18, filter: "blur(10px)" }}
+      animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+      exit={{ opacity: 0, y: -12, filter: "blur(8px)" }}
+      transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+      className="setup-studio-scan"
     >
-      <div className="mx-auto max-w-[760px]">
-        {lastUrl ? (
-          <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-slate-900/8 bg-white/80 px-4 py-2 text-sm text-slate-600">
-            <Globe className="h-4 w-4" />
-            {truncateMiddle(lastUrl, 34, 20)}
+      <div className="setup-studio-scan__intro">
+        <div className="setup-studio-scan__eyebrow">reading source</div>
+        <div className="setup-studio-scan__headline">
+          The surface is being translated into structure.
+        </div>
+        <p className="setup-studio-scan__copy">
+          Burada sistem sadəcə yükləmir. Business siqnalları ayırır, ilk identity
+          skeletini çıxarır və operational memory qatını formalaşdırır.
+        </p>
+      </div>
+
+      <div className="setup-studio-scan__layout">
+        <div className="setup-studio-scan__panel">
+          <div className="setup-studio-scan__panel-glow" />
+          <div className="setup-studio-scan__panel-grid" />
+
+          <div className="setup-studio-scan__top">
+            <div className="setup-studio-scan__state">
+              <span className="setup-studio-scan__state-dot" />
+              <span>live pass running</span>
+            </div>
+
+            <div className="setup-studio-scan__badge">
+              <Sparkles className="h-4 w-4" />
+              <span>shape extraction</span>
+            </div>
           </div>
-        ) : null}
 
-        <div className="space-y-4">
-          {scanLines.map((line, index) => {
-            const active = index === scanLineIndex;
-            const passed = index < scanLineIndex;
+          {lastUrl ? (
+            <div className="setup-studio-scan__url">
+              <Globe className="h-4 w-4" />
+              <span>{truncateMiddle(lastUrl, 42, 22)}</span>
+            </div>
+          ) : null}
 
-            return (
-              <motion.div
-                key={line}
-                animate={{
-                  opacity: active || passed ? 1 : 0.42,
-                  x: active ? 12 : 0,
-                }}
-                transition={{ duration: 0.28 }}
-                className="flex items-center gap-4 border-b border-slate-900/8 pb-4"
-              >
-                <span
-                  className={`h-2.5 w-2.5 rounded-full ${
-                    passed ? "bg-emerald-500" : active ? "bg-cyan-500" : "bg-slate-300"
-                  }`}
-                />
-                <div
-                  className={`text-2xl font-medium tracking-[-0.04em] ${
-                    active || passed ? "text-slate-950" : "text-slate-400"
-                  }`}
+          <div className="setup-studio-scan__steps">
+            {scanLines.map((line, index) => {
+              const active = index === scanLineIndex;
+              const passed = index < scanLineIndex;
+
+              return (
+                <motion.div
+                  key={line}
+                  animate={{
+                    opacity: active || passed ? 1 : 0.36,
+                    y: active ? -2 : 0,
+                    scale: active ? 1.01 : 1,
+                  }}
+                  transition={{ duration: 0.28 }}
+                  className={[
+                    "setup-studio-scan__step",
+                    active ? "is-active" : "",
+                    passed ? "is-passed" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
                 >
-                  {line}
-                </div>
-              </motion.div>
-            );
-          })}
+                  <div className="setup-studio-scan__step-rail">
+                    <span className="setup-studio-scan__step-dot" />
+                    <span className="setup-studio-scan__step-line" />
+                  </div>
+
+                  <div className="setup-studio-scan__step-body">
+                    <div className="setup-studio-scan__step-index">
+                      {String(index + 1).padStart(2, "0")}
+                    </div>
+                    <div className="setup-studio-scan__step-text">{line}</div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="setup-studio-scan__side">
+          <div className="setup-studio-scan__side-label">current pass</div>
+
+          <div className="setup-studio-scan__side-stack">
+            <div className="setup-studio-scan__side-card">
+              <div className="setup-studio-scan__side-name">active line</div>
+              <div className="setup-studio-scan__side-value">
+                {scanLines[scanLineIndex] || "Reading source"}
+              </div>
+            </div>
+
+            <div className="setup-studio-scan__side-card">
+              <div className="setup-studio-scan__side-name">next output</div>
+              <div className="setup-studio-scan__side-value">
+                identity draft and knowledge candidates
+              </div>
+            </div>
+
+            <div className="setup-studio-scan__side-card">
+              <div className="setup-studio-scan__side-name">mode</div>
+              <div className="setup-studio-scan__side-value">continuous extraction</div>
+            </div>
+          </div>
         </div>
       </div>
-    </SetupStudioStageShell>
+    </motion.div>
   );
 }

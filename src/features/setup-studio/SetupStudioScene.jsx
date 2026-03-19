@@ -1,10 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence } from "framer-motion";
-import {
-  isSuccessMode,
-  s,
-  profilePreviewRows,
-} from "./lib/setupStudioHelpers.js";
+import { isSuccessMode, s } from "./lib/setupStudioHelpers.js";
 import SetupStudioRefineModal from "./components/SetupStudioRefineModal.jsx";
 import SetupStudioIntakeModal from "./components/SetupStudioIntakeModal.jsx";
 import SetupStudioEntryStage from "./stages/SetupStudioEntryStage.jsx";
@@ -14,54 +10,6 @@ import SetupStudioKnowledgeStage from "./stages/SetupStudioKnowledgeStage.jsx";
 import SetupStudioServiceStage from "./stages/SetupStudioServiceStage.jsx";
 import SetupStudioReadyStage from "./stages/SetupStudioReadyStage.jsx";
 import { discoveryModeLabel as defaultDiscoveryModeLabel } from "./lib/setupStudioHelpers.js";
-
-const JOURNEY = [
-  { key: "entry", index: "01", label: "signal" },
-  { key: "scanning", index: "02", label: "reading" },
-  { key: "identity", index: "03", label: "shape" },
-  { key: "knowledge", index: "04", label: "memory" },
-  { key: "service", index: "05", label: "offer" },
-  { key: "ready", index: "06", label: "launch" },
-];
-
-const STAGE_META = {
-  entry: {
-    eyebrow: "first move",
-    title: "Bring the business into the room.",
-    copy:
-      "Website, notes, and raw direction enter here. The page should feel like it listens, not like it asks you to fill a wizard.",
-  },
-  scanning: {
-    eyebrow: "reading surface",
-    title: "The system is pulling shape from the source.",
-    copy:
-      "We are scanning for signals, extracting business language, and drafting the first live version of the studio memory.",
-  },
-  identity: {
-    eyebrow: "identity draft",
-    title: "The first version of the business is taking form.",
-    copy:
-      "This stage should feel like a shaped response, not a spreadsheet of extracted fields.",
-  },
-  knowledge: {
-    eyebrow: "memory build",
-    title: "Signals are turning into usable knowledge.",
-    copy:
-      "Approve, reject, or refine what matters. The point is not quantity, it is sharpness.",
-  },
-  service: {
-    eyebrow: "offer frame",
-    title: "The offer layer comes into focus.",
-    copy:
-      "Services should emerge from the business direction naturally, not as a dull catalog setup step.",
-  },
-  ready: {
-    eyebrow: "launch state",
-    title: "The studio is close to becoming operational.",
-    copy:
-      "What remains is polishing the first working version and opening the workspace with confidence.",
-  },
-};
 
 export default function SetupStudioScene({
   loading,
@@ -151,17 +99,6 @@ export default function SetupStudioScene({
     setStage("ready");
   }
 
-  const journeyItems = useMemo(() => {
-    const currentIndex = JOURNEY.findIndex((item) => item.key === stage);
-
-    return JOURNEY.map((item, index) => ({
-      ...item,
-      active: index === currentIndex,
-      done: index < currentIndex,
-    }));
-  }, [stage]);
-
-  const currentMeta = STAGE_META[stage] || STAGE_META.entry;
   const currentTitle =
     s(businessForm.companyName) ||
     discoveryProfileRows?.find?.(([label]) => label === "Name")?.[1] ||
@@ -172,72 +109,8 @@ export default function SetupStudioScene({
     discoveryProfileRows?.find?.(([label]) => label === "Description")?.[1] ||
     "We extracted a first draft of the business direction from the website.";
 
-  const rightRailItems = useMemo(() => {
-    const readiness = `${Number(meta?.readinessScore || 0)}%`;
-    const pending = String(Number(meta?.pendingCandidateCount || 0)).padStart(2, "0");
-    const approved = String(Number(meta?.approvedKnowledgeCount || 0)).padStart(2, "0");
-    const serviceCount = String(Number(meta?.serviceCount || services.length || 0)).padStart(2, "0");
-
-    if (stage === "identity") {
-      return [
-        { label: "current draft", value: currentTitle },
-        { label: "language", value: s(businessForm.language || "az").toUpperCase() },
-        { label: "timezone", value: s(businessForm.timezone || "Asia/Baku") },
-      ];
-    }
-
-    if (stage === "knowledge") {
-      return [
-        { label: "pending", value: pending },
-        { label: "approved", value: approved },
-        { label: "signals", value: String(knowledgePreview.length).padStart(2, "0") },
-      ];
-    }
-
-    if (stage === "service") {
-      return [
-        { label: "services", value: serviceCount },
-        { label: "seed title", value: s(serviceSuggestionTitle || "not set") },
-        { label: "readiness", value: readiness },
-      ];
-    }
-
-    if (stage === "ready") {
-      return [
-        { label: "readiness", value: readiness },
-        { label: "knowledge", value: approved },
-        { label: "services", value: serviceCount },
-      ];
-    }
-
-    if (stage === "scanning") {
-      return [
-        { label: "surface", value: s(discoveryState.lastUrl || "waiting") },
-        { label: "mode", value: "live scan" },
-        { label: "pass", value: scanLines[scanLineIndex] },
-      ];
-    }
-
-    return [
-      { label: "state", value: "ready to begin" },
-      { label: "knowledge", value: approved },
-      { label: "services", value: serviceCount },
-    ];
-  }, [
-    stage,
-    meta,
-    services.length,
-    businessForm.language,
-    businessForm.timezone,
-    currentTitle,
-    serviceSuggestionTitle,
-    knowledgePreview.length,
-    discoveryState.lastUrl,
-    scanLines,
-    scanLineIndex,
-  ]);
-
   const statusLabel = discoveryModeLabel(importingWebsite ? "running" : discoveryState.mode);
+  const isEntryStage = stage === "entry";
 
   if (loading) {
     return (
@@ -248,14 +121,7 @@ export default function SetupStudioScene({
   }
 
   return (
-    <div className="setup-studio-scene" data-stage={stage}>
-      <div className="setup-studio-scene__backdrop">
-        <div className="setup-studio-scene__ring setup-studio-scene__ring--left" />
-        <div className="setup-studio-scene__ring setup-studio-scene__ring--right" />
-        <div className="setup-studio-scene__beam setup-studio-scene__beam--top" />
-        <div className="setup-studio-scene__beam setup-studio-scene__beam--bottom" />
-      </div>
-
+    <div className={`setup-studio-scene ${isEntryStage ? "is-entry-stage" : ""}`} data-stage={stage}>
       <header className="setup-studio-scene__topbar">
         <div className="setup-studio-scene__brand">
           <span className="setup-studio-scene__brand-mark" />
@@ -263,7 +129,10 @@ export default function SetupStudioScene({
         </div>
 
         <div className="setup-studio-scene__topbar-actions">
-          <div className="setup-studio-scene__status" data-mode={importingWebsite ? "running" : s(discoveryState.mode || "idle")}>
+          <div
+            className="setup-studio-scene__status"
+            data-mode={importingWebsite ? "running" : s(discoveryState.mode || "idle")}
+          >
             <span className="setup-studio-scene__status-dot" />
             <span>{statusLabel}</span>
           </div>
@@ -279,28 +148,18 @@ export default function SetupStudioScene({
         </div>
       </header>
 
-      <div className="setup-studio-scene__frame">
-        <aside className="setup-studio-scene__rail setup-studio-scene__rail--left">
-          <div className="setup-studio-scene__rail-index">
-            {journeyItems.find((item) => item.active)?.index || "01"}
-          </div>
+      {isEntryStage ? (
+        <main className="setup-studio-entry-page">
+          <div className="setup-studio-entry-page__halo" />
+          <div className="setup-studio-entry-page__inner">
+            <div className="setup-studio-entry-page__eyebrow">first move</div>
+            <h1 className="setup-studio-entry-page__title">Start from the website.</h1>
+            <p className="setup-studio-entry-page__copy">
+              Tək URL daxil et. Qalanını studio çıxarsın.
+            </p>
 
-          <div className="setup-studio-scene__rail-eyebrow">{currentMeta.eyebrow}</div>
-
-          <h2 className="setup-studio-scene__rail-title">{currentMeta.title}</h2>
-
-          <p className="setup-studio-scene__rail-copy">
-            {stage === "identity" ? currentDescription : currentMeta.copy}
-          </p>
-
-          {error ? <div className="setup-studio-scene__error">{error}</div> : null}
-        </aside>
-
-        <main className="setup-studio-scene__main">
-          <div className="setup-studio-scene__main-glow" />
-          <div className="setup-studio-scene__stage-host">
-            <AnimatePresence mode="wait" initial={false}>
-              {stage === "entry" ? (
+            <div className="setup-studio-entry-page__host">
+              <AnimatePresence mode="wait" initial={false}>
                 <SetupStudioEntryStage
                   key="entry"
                   discoveryForm={discoveryForm}
@@ -309,8 +168,24 @@ export default function SetupStudioScene({
                   onSetDiscoveryField={onSetDiscoveryField}
                   onScanBusiness={onScanBusiness}
                 />
-              ) : null}
+              </AnimatePresence>
+            </div>
 
+            <div className="setup-studio-entry-page__meta">
+              <span>website</span>
+              <span className="setup-studio-entry-page__meta-dot" />
+              <span>identity</span>
+              <span className="setup-studio-entry-page__meta-dot" />
+              <span>knowledge</span>
+              <span className="setup-studio-entry-page__meta-dot" />
+              <span>service</span>
+            </div>
+          </div>
+        </main>
+      ) : (
+        <main className="setup-studio-flow-page">
+          <div className="setup-studio-flow-page__host">
+            <AnimatePresence mode="wait" initial={false}>
               {stage === "scanning" ? (
                 <SetupStudioScanningStage
                   key="scanning"
@@ -369,41 +244,7 @@ export default function SetupStudioScene({
             </AnimatePresence>
           </div>
         </main>
-
-        <aside className="setup-studio-scene__rail setup-studio-scene__rail--right">
-          <div className="setup-studio-scene__signal-label">live signals</div>
-
-          <div className="setup-studio-scene__signal-list">
-            {rightRailItems.map((item) => (
-              <div key={item.label} className="setup-studio-scene__signal-row">
-                <div className="setup-studio-scene__signal-name">{item.label}</div>
-                <div className="setup-studio-scene__signal-value">{item.value}</div>
-              </div>
-            ))}
-          </div>
-        </aside>
-      </div>
-
-      <div className="setup-studio-scene__journey">
-        {journeyItems.map((item) => (
-          <div
-            key={item.key}
-            className={[
-              "setup-studio-scene__journey-item",
-              item.active ? "is-active" : "",
-              item.done ? "is-done" : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-          >
-            <div className="setup-studio-scene__journey-line" />
-            <div className="setup-studio-scene__journey-meta">
-              <span className="setup-studio-scene__journey-index">{item.index}</span>
-              <span className="setup-studio-scene__journey-label">{item.label}</span>
-            </div>
-          </div>
-        ))}
-      </div>
+      )}
 
       <AnimatePresence>
         {showRefine ? (
