@@ -1,22 +1,92 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Globe, Sparkles, Loader2, Plus, X } from "lucide-react";
+import {
+  Globe,
+  FileText,
+  Sparkles,
+  Loader2,
+  X,
+  ArrowRight,
+} from "lucide-react";
+
+import instagramIcon from "../../../assets/setup-studio/brands/instagram.svg";
+import messengerIcon from "../../../assets/setup-studio/brands/messenger.svg";
+import telegramIcon from "../../../assets/setup-studio/brands/telegram.svg";
+import tiktokIcon from "../../../assets/setup-studio/brands/tiktok.svg";
+import whatsappIcon from "../../../assets/setup-studio/brands/whatsapp.svg";
 
 const SOURCE_OPTIONS = [
-  { key: "website", label: "Website" },
-  { key: "instagram", label: "Instagram" },
-  { key: "tiktok", label: "TikTok" },
-  { key: "facebook", label: "Facebook" },
-  { key: "whatsapp", label: "WhatsApp" },
-  { key: "note", label: "Note" },
+  {
+    key: "website",
+    label: "Website",
+    hint: "Domain or website link",
+    placeholder: "yourbusiness.com",
+    icon: Globe,
+    theme: "website",
+  },
+  {
+    key: "instagram",
+    label: "Instagram",
+    hint: "Handle or profile link",
+    placeholder: "@yourbrand",
+    iconSrc: instagramIcon,
+    theme: "instagram",
+  },
+  {
+    key: "tiktok",
+    label: "TikTok",
+    hint: "Handle or profile link",
+    placeholder: "@yourbrand",
+    iconSrc: tiktokIcon,
+    theme: "tiktok",
+  },
+  {
+    key: "messenger",
+    label: "Messenger",
+    hint: "Page or chat link",
+    placeholder: "m.me/yourbrand",
+    iconSrc: messengerIcon,
+    theme: "messenger",
+  },
+  {
+    key: "whatsapp",
+    label: "WhatsApp",
+    hint: "Phone or wa.me link",
+    placeholder: "+994 50 000 00 00",
+    iconSrc: whatsappIcon,
+    theme: "whatsapp",
+  },
+  {
+    key: "telegram",
+    label: "Telegram",
+    hint: "Handle or t.me link",
+    placeholder: "@yourbrand",
+    iconSrc: telegramIcon,
+    theme: "telegram",
+  },
+  {
+    key: "note",
+    label: "Note",
+    hint: "Anything useful in one line",
+    placeholder: "We book appointments mostly from Instagram and WhatsApp.",
+    icon: FileText,
+    theme: "note",
+    multiline: true,
+  },
 ];
+
+const URL_SOURCE_ORDER = ["website", "instagram", "tiktok", "messenger", "whatsapp", "telegram"];
 
 function s(v) {
   return String(v ?? "").trim();
 }
 
 function cleanHandle(v) {
-  return s(v).replace(/^@+/, "").replace(/^https?:\/\//i, "").replace(/^www\./i, "");
+  return s(v)
+    .replace(/^@+/, "")
+    .replace(/^https?:\/\//i, "")
+    .replace(/^www\./i, "")
+    .replace(/\/+$/, "");
 }
 
 function normalizeWebsite(v) {
@@ -37,15 +107,19 @@ function normalizeTikTok(v) {
   const x = s(v);
   if (!x) return "";
   if (/^https?:\/\//i.test(x)) return x;
-  const handle = cleanHandle(x).replace(/^tiktok\.com\//i, "");
-  return `https://tiktok.com/${handle.startsWith("@") ? handle : `@${handle}`}`;
+  const handle = cleanHandle(x).replace(/^tiktok\.com\//i, "").replace(/^@/, "");
+  return `https://tiktok.com/@${handle}`;
 }
 
-function normalizeFacebook(v) {
+function normalizeMessenger(v) {
   const x = s(v);
   if (!x) return "";
   if (/^https?:\/\//i.test(x)) return x;
-  return `https://facebook.com/${cleanHandle(x).replace(/^facebook\.com\//i, "")}`;
+  const handle = cleanHandle(x)
+    .replace(/^facebook\.com\//i, "")
+    .replace(/^m\.me\//i, "")
+    .replace(/^messenger\.com\//i, "");
+  return `https://m.me/${handle}`;
 }
 
 function normalizeWhatsApp(v) {
@@ -56,8 +130,53 @@ function normalizeWhatsApp(v) {
   return digits ? `https://wa.me/${digits}` : "";
 }
 
+function normalizeTelegram(v) {
+  const x = s(v);
+  if (!x) return "";
+  if (/^https?:\/\//i.test(x)) return x;
+  const handle = cleanHandle(x).replace(/^t\.me\//i, "").replace(/^telegram\.me\//i, "").replace(/^@/, "");
+  return `https://t.me/${handle}`;
+}
+
 function extractPlainNote(raw) {
   return s(raw).split("[studio_sources]")[0].trim();
+}
+
+function parseStudioSources(raw) {
+  const out = {
+    website: "",
+    instagram: "",
+    tiktok: "",
+    messenger: "",
+    whatsapp: "",
+    telegram: "",
+  };
+
+  const text = s(raw);
+  const marker = "[studio_sources]";
+  const idx = text.indexOf(marker);
+
+  if (idx === -1) return out;
+
+  const block = text.slice(idx + marker.length).trim();
+  if (!block) return out;
+
+  for (const line of block.split(/\r?\n/)) {
+    const [label, ...rest] = line.split(":");
+    const value = rest.join(":").trim();
+    const key = s(label).toLowerCase();
+
+    if (!value) continue;
+
+    if (key === "website") out.website = value;
+    if (key === "instagram") out.instagram = value;
+    if (key === "tiktok") out.tiktok = value;
+    if (key === "messenger") out.messenger = value;
+    if (key === "whatsapp") out.whatsapp = value;
+    if (key === "telegram") out.telegram = value;
+  }
+
+  return out;
 }
 
 function seedSourcesFromPrimary(primary) {
@@ -68,34 +187,83 @@ function seedSourcesFromPrimary(primary) {
       website: "",
       instagram: "",
       tiktok: "",
-      facebook: "",
+      messenger: "",
       whatsapp: "",
+      telegram: "",
     };
   }
 
   if (url.includes("instagram.com")) {
-    return { website: "", instagram: primary, tiktok: "", facebook: "", whatsapp: "" };
+    return { website: "", instagram: primary, tiktok: "", messenger: "", whatsapp: "", telegram: "" };
   }
 
   if (url.includes("tiktok.com")) {
-    return { website: "", instagram: "", tiktok: primary, facebook: "", whatsapp: "" };
+    return { website: "", instagram: "", tiktok: primary, messenger: "", whatsapp: "", telegram: "" };
   }
 
-  if (url.includes("facebook.com")) {
-    return { website: "", instagram: "", tiktok: "", facebook: primary, whatsapp: "" };
+  if (url.includes("m.me") || url.includes("facebook.com") || url.includes("messenger.com")) {
+    return { website: "", instagram: "", tiktok: "", messenger: primary, whatsapp: "", telegram: "" };
   }
 
   if (url.includes("wa.me") || url.includes("whatsapp")) {
-    return { website: "", instagram: "", tiktok: "", facebook: "", whatsapp: primary };
+    return { website: "", instagram: "", tiktok: "", messenger: "", whatsapp: primary, telegram: "" };
+  }
+
+  if (url.includes("t.me") || url.includes("telegram.me")) {
+    return { website: "", instagram: "", tiktok: "", messenger: "", whatsapp: "", telegram: primary };
   }
 
   return {
     website: primary.replace(/^https?:\/\//i, ""),
     instagram: "",
     tiktok: "",
-    facebook: "",
+    messenger: "",
     whatsapp: "",
+    telegram: "",
   };
+}
+
+function formatSourceValue(key, raw) {
+  const x = s(raw);
+  if (!x) return "";
+
+  if (key === "website") {
+    return x.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+  }
+
+  if (key === "instagram") {
+    const handle = cleanHandle(x).replace(/^instagram\.com\//i, "").replace(/^@/, "");
+    return `@${handle}`;
+  }
+
+  if (key === "tiktok") {
+    const handle = cleanHandle(x).replace(/^tiktok\.com\//i, "").replace(/^@/, "");
+    return `@${handle}`;
+  }
+
+  if (key === "messenger") {
+    return x.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+  }
+
+  if (key === "whatsapp") {
+    return x;
+  }
+
+  if (key === "telegram") {
+    const handle = cleanHandle(x).replace(/^t\.me\//i, "").replace(/^telegram\.me\//i, "").replace(/^@/, "");
+    return `@${handle}`;
+  }
+
+  return x;
+}
+
+function SourceIcon({ item }) {
+  if (item.iconSrc) {
+    return <img src={item.iconSrc} alt="" aria-hidden="true" className="setup-studio-entry__icon-image" />;
+  }
+
+  const Icon = item.icon;
+  return <Icon className="h-4 w-4" />;
 }
 
 export default function SetupStudioEntryStage({
@@ -105,223 +273,338 @@ export default function SetupStudioEntryStage({
   onSetDiscoveryField,
   onScanBusiness,
 }) {
-  const seeded = useMemo(
+  const primarySeed = useMemo(
     () => seedSourcesFromPrimary(discoveryForm?.websiteUrl),
     [discoveryForm?.websiteUrl]
   );
 
-  const [enabled, setEnabled] = useState(["website", "note"]);
-  const [values, setValues] = useState({
-    website: seeded.website,
-    instagram: seeded.instagram,
-    tiktok: seeded.tiktok,
-    facebook: seeded.facebook,
-    whatsapp: seeded.whatsapp,
-    note: extractPlainNote(discoveryForm?.note),
-  });
+  const noteSeed = useMemo(
+    () => parseStudioSources(discoveryForm?.note),
+    [discoveryForm?.note]
+  );
+
+  const initialValues = useMemo(
+    () => ({
+      website: noteSeed.website || primarySeed.website || "",
+      instagram: noteSeed.instagram || primarySeed.instagram || "",
+      tiktok: noteSeed.tiktok || primarySeed.tiktok || "",
+      messenger: noteSeed.messenger || primarySeed.messenger || "",
+      whatsapp: noteSeed.whatsapp || primarySeed.whatsapp || "",
+      telegram: noteSeed.telegram || primarySeed.telegram || "",
+      note: extractPlainNote(discoveryForm?.note),
+    }),
+    [
+      noteSeed.website,
+      noteSeed.instagram,
+      noteSeed.tiktok,
+      noteSeed.messenger,
+      noteSeed.whatsapp,
+      noteSeed.telegram,
+      primarySeed.website,
+      primarySeed.instagram,
+      primarySeed.tiktok,
+      primarySeed.messenger,
+      primarySeed.whatsapp,
+      primarySeed.telegram,
+      discoveryForm?.note,
+    ]
+  );
+
+  const [activeKey, setActiveKey] = useState("website");
+  const [values, setValues] = useState(initialValues);
 
   useEffect(() => {
-    const nextEnabled = ["note"];
+    setValues(initialValues);
 
-    if (s(values.website) || s(seeded.website)) nextEnabled.push("website");
-    if (s(values.instagram) || s(seeded.instagram)) nextEnabled.push("instagram");
-    if (s(values.tiktok) || s(seeded.tiktok)) nextEnabled.push("tiktok");
-    if (s(values.facebook) || s(seeded.facebook)) nextEnabled.push("facebook");
-    if (s(values.whatsapp) || s(seeded.whatsapp)) nextEnabled.push("whatsapp");
+    const firstFilled =
+      SOURCE_OPTIONS.find((item) => item.key !== "note" && s(initialValues[item.key]))?.key ||
+      (s(initialValues.note) ? "note" : "website");
 
-    if (!nextEnabled.includes("website") &&
-        !nextEnabled.includes("instagram") &&
-        !nextEnabled.includes("tiktok") &&
-        !nextEnabled.includes("facebook") &&
-        !nextEnabled.includes("whatsapp")) {
-      nextEnabled.unshift("website");
-    }
+    setActiveKey(firstFilled);
+  }, [initialValues]);
 
-    setEnabled((prev) => {
-      const uniq = Array.from(new Set([...prev, ...nextEnabled]));
-      return uniq.filter((key) => key === "note" || nextEnabled.includes(key));
-    });
-  }, [seeded.website, seeded.instagram, seeded.tiktok, seeded.facebook, seeded.whatsapp]);
+  const normalizedMap = useMemo(
+    () => ({
+      website: normalizeWebsite(values.website),
+      instagram: normalizeInstagram(values.instagram),
+      tiktok: normalizeTikTok(values.tiktok),
+      messenger: normalizeMessenger(values.messenger),
+      whatsapp: normalizeWhatsApp(values.whatsapp),
+      telegram: normalizeTelegram(values.telegram),
+    }),
+    [values]
+  );
 
-  const normalized = useMemo(() => {
-    const website = normalizeWebsite(values.website);
-    const instagram = normalizeInstagram(values.instagram);
-    const tiktok = normalizeTikTok(values.tiktok);
-    const facebook = normalizeFacebook(values.facebook);
-    const whatsapp = normalizeWhatsApp(values.whatsapp);
+  const linkSources = useMemo(() => {
+    return URL_SOURCE_ORDER.map((key) => {
+      const item = SOURCE_OPTIONS.find((entry) => entry.key === key);
+      const url = normalizedMap[key];
 
-    const sources = [
-      { key: "website", label: "Website", url: website },
-      { key: "instagram", label: "Instagram", url: instagram },
-      { key: "tiktok", label: "TikTok", url: tiktok },
-      { key: "facebook", label: "Facebook", url: facebook },
-      { key: "whatsapp", label: "WhatsApp", url: whatsapp },
-    ].filter((item) => item.url);
+      return url
+        ? {
+            ...item,
+            url,
+            value: formatSourceValue(key, values[key]),
+          }
+        : null;
+    }).filter(Boolean);
+  }, [normalizedMap, values]);
 
-    const primaryUrl = sources[0]?.url || "";
-    const sourceLines = sources.map((item) => `${item.label}: ${item.url}`);
+  const primarySource = linkSources[0] || null;
+
+  const composedNote = useMemo(() => {
     const noteParts = [];
+    const sourceLines = linkSources.map((item) => `${item.label}: ${item.url}`);
 
     if (s(values.note)) noteParts.push(s(values.note));
-    if (sourceLines.length) {
-      noteParts.push(`[studio_sources]\n${sourceLines.join("\n")}`);
-    }
+    if (sourceLines.length) noteParts.push(`[studio_sources]\n${sourceLines.join("\n")}`);
 
-    return {
-      primaryUrl,
-      composedNote: noteParts.join("\n\n").trim(),
-    };
-  }, [values]);
+    return noteParts.join("\n\n").trim();
+  }, [linkSources, values.note]);
 
   useEffect(() => {
-    onSetDiscoveryField("websiteUrl", normalized.primaryUrl);
-    onSetDiscoveryField("note", normalized.composedNote);
-  }, [normalized.primaryUrl, normalized.composedNote]);
-
-  function toggleSource(key) {
-    setEnabled((prev) => {
-      if (prev.includes(key)) {
-        if (key === "note") return prev;
-        return prev.filter((item) => item !== key);
-      }
-      return [...prev, key];
-    });
-  }
-
-  function removeSource(key) {
-    setEnabled((prev) => prev.filter((item) => item !== key));
-    setValues((prev) => ({ ...prev, [key]: "" }));
-  }
+    onSetDiscoveryField("websiteUrl", primarySource?.url || "");
+    onSetDiscoveryField("note", composedNote);
+  }, [primarySource?.url, composedNote, onSetDiscoveryField]);
 
   function setValue(key, value) {
     setValues((prev) => ({ ...prev, [key]: value }));
   }
 
-  const visibleSources = SOURCE_OPTIONS.filter((item) => enabled.includes(item.key));
+  function clearValue(key) {
+    setValues((prev) => ({ ...prev, [key]: "" }));
+  }
+
+  const activeSource = SOURCE_OPTIONS.find((item) => item.key === activeKey) || SOURCE_OPTIONS[0];
+  const activeHasValue = !!s(values[activeKey]);
+
+  const signalNodes = SOURCE_OPTIONS.filter((item) => item.key !== "note").map((item, index) => {
+    const angle = -90 + index * 60;
+    const hasValue = !!normalizedMap[item.key];
+    const isActive = activeKey === item.key;
+
+    return {
+      ...item,
+      angle,
+      hasValue,
+      isActive,
+    };
+  });
 
   return (
     <motion.form
       onSubmit={onScanBusiness}
-      initial={{ opacity: 0, y: 10 }}
+      initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
-      transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
-      className="setup-studio-source-intake"
+      exit={{ opacity: 0, y: -12 }}
+      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+      className="setup-studio-entry"
     >
-      <div className="setup-studio-source-intake__toolbar">
-        <div className="setup-studio-source-intake__toolbar-copy">
-          Nə varsa onu əlavə et. İlk mövcud link primary source kimi götürüləcək.
-        </div>
+      <section className="setup-studio-entry__hero">
+        <div className="setup-studio-entry__eyebrow">first signal</div>
+        <h1 className="setup-studio-entry__title">Bring what already exists.</h1>
+        <p className="setup-studio-entry__subtitle">
+          A domain, a handle, a number, or a note.
+        </p>
+      </section>
 
-        <div className="setup-studio-source-intake__chips">
+      <section className="setup-studio-entry__theatre" aria-hidden="true">
+        <div className="setup-studio-entry__core">
+          <div className="setup-studio-entry__core-halo setup-studio-entry__core-halo--outer" />
+          <div className="setup-studio-entry__core-halo setup-studio-entry__core-halo--mid" />
+          <div className="setup-studio-entry__core-shell">
+            <div className="setup-studio-entry__core-shell-inner">
+              <Sparkles className="h-5 w-5" />
+            </div>
+          </div>
+
+          {signalNodes.map((item) => (
+            <motion.button
+              key={item.key}
+              type="button"
+              className={[
+                "setup-studio-entry__orbit-node",
+                `theme-${item.theme}`,
+                item.isActive ? "is-active" : "",
+                item.hasValue ? "has-value" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              style={{
+                left: "50%",
+                top: "50%",
+                transform: `translate(-50%, -50%) rotate(${item.angle}deg) translateY(-180px) rotate(${-item.angle}deg)`,
+              }}
+              onClick={() => setActiveKey(item.key)}
+              whileHover={{ y: -2, scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <span className="setup-studio-entry__orbit-icon">
+                <SourceIcon item={item} />
+              </span>
+              <span className="setup-studio-entry__orbit-label">{item.label}</span>
+            </motion.button>
+          ))}
+        </div>
+      </section>
+
+      <section className="setup-studio-entry__composer">
+        <div className="setup-studio-entry__source-rail">
           {SOURCE_OPTIONS.map((item) => {
-            const active = enabled.includes(item.key);
+            const isActive = activeKey === item.key;
+            const hasValue = item.key === "note" ? !!s(values.note) : !!normalizedMap[item.key];
 
             return (
               <button
                 key={item.key}
                 type="button"
-                onClick={() => toggleSource(item.key)}
-                className={`setup-studio-source-intake__chip ${active ? "is-active" : ""}`}
+                className={[
+                  "setup-studio-entry__source-pill",
+                  `theme-${item.theme}`,
+                  isActive ? "is-active" : "",
+                  hasValue ? "has-value" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                onClick={() => setActiveKey(item.key)}
               >
-                <Plus className="h-3.5 w-3.5" />
-                {item.label}
+                <span className="setup-studio-entry__source-pill-icon">
+                  <SourceIcon item={item} />
+                </span>
+                <span>{item.label}</span>
               </button>
             );
           })}
         </div>
-      </div>
 
-      <div className="setup-studio-source-intake__list">
-        {visibleSources.map((item) => {
-          if (item.key === "note") {
-            return (
-              <div key={item.key} className="setup-studio-source-intake__row is-note">
-                <div className="setup-studio-source-intake__label-wrap">
-                  <div className="setup-studio-source-intake__label">Note</div>
-                  <div className="setup-studio-source-intake__sub">
-                    İstəyə görə qısa kontekst
-                  </div>
-                </div>
+        <div className={`setup-studio-entry__dock theme-${activeSource.theme}`}>
+          <div className="setup-studio-entry__dock-head">
+            <div className="setup-studio-entry__dock-source">
+              <span className="setup-studio-entry__dock-icon">
+                <SourceIcon item={activeSource} />
+              </span>
 
-                <div className="setup-studio-source-intake__control">
-                  <textarea
-                    value={values.note}
-                    onChange={(e) => setValue("note", e.target.value)}
-                    className="setup-studio-source-intake__textarea"
-                    placeholder="Məsələn: əsas istiqamətimiz Instagram DM automation və lead qualification-dır."
-                  />
-                </div>
-              </div>
-            );
-          }
-
-          const placeholders = {
-            website: "yourbusiness.com",
-            instagram: "instagram.com/yourbusiness",
-            tiktok: "tiktok.com/@yourbusiness",
-            facebook: "facebook.com/yourbusiness",
-            whatsapp: "+994 50 000 00 00",
-          };
-
-          return (
-            <div key={item.key} className="setup-studio-source-intake__row">
-              <div className="setup-studio-source-intake__label-wrap">
-                <div className="setup-studio-source-intake__label">{item.label}</div>
-                <div className="setup-studio-source-intake__sub">
-                  {item.key === "website" ? "Domain və ya link" : "Profil linki və ya handle"}
-                </div>
-              </div>
-
-              <div className="setup-studio-source-intake__control">
-                <input
-                  value={values[item.key]}
-                  onChange={(e) => setValue(item.key, e.target.value)}
-                  className="setup-studio-source-intake__input"
-                  placeholder={placeholders[item.key]}
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-
-                <button
-                  type="button"
-                  className="setup-studio-source-intake__remove"
-                  onClick={() => removeSource(item.key)}
-                  aria-label={`${item.label} sil`}
-                >
-                  <X className="h-4 w-4" />
-                </button>
+              <div className="setup-studio-entry__dock-copy">
+                <div className="setup-studio-entry__dock-title">{activeSource.label}</div>
+                <div className="setup-studio-entry__dock-hint">{activeSource.hint}</div>
               </div>
             </div>
-          );
-        })}
-      </div>
 
-      {error ? <div className="setup-studio-source-intake__error">{error}</div> : null}
+            {activeHasValue ? (
+              <button
+                type="button"
+                className="setup-studio-entry__dock-clear"
+                onClick={() => clearValue(activeKey)}
+                aria-label={`${activeSource.label} remove`}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            ) : null}
+          </div>
 
-      <div className="setup-studio-source-intake__footer">
-        <div className="setup-studio-source-intake__footer-copy">
-          Website yoxdursa sosial linklərlə başla. Sonra bunu tam multi-source crawler-a da çevirərik.
+          {activeSource.multiline ? (
+            <textarea
+              value={values.note}
+              onChange={(e) => setValue("note", e.target.value)}
+              className="setup-studio-entry__textarea"
+              placeholder={activeSource.placeholder}
+            />
+          ) : (
+            <input
+              value={values[activeKey]}
+              onChange={(e) => setValue(activeKey, e.target.value)}
+              className="setup-studio-entry__input"
+              placeholder={activeSource.placeholder}
+              autoComplete="off"
+              spellCheck={false}
+            />
+          )}
         </div>
 
-        <button
-          type="submit"
-          disabled={importingWebsite || !normalized.primaryUrl}
-          className="setup-studio-source-intake__submit"
-        >
-          {importingWebsite ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Scanning
-            </>
-          ) : (
-            <>
-              <Sparkles className="h-4 w-4" />
-              Start scan
-            </>
-          )}
-        </button>
-      </div>
+        <div className="setup-studio-entry__signals">
+          {primarySource ? (
+            <motion.button
+              type="button"
+              className={`setup-studio-entry__signal setup-studio-entry__signal--primary theme-${primarySource.theme}`}
+              onClick={() => setActiveKey(primarySource.key)}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <span className="setup-studio-entry__signal-icon">
+                <SourceIcon item={primarySource} />
+              </span>
+
+              <span className="setup-studio-entry__signal-copy">
+                <span className="setup-studio-entry__signal-kicker">Primary signal</span>
+                <span className="setup-studio-entry__signal-value">{primarySource.value}</span>
+              </span>
+            </motion.button>
+          ) : null}
+
+          {linkSources
+            .filter((item) => item.key !== primarySource?.key)
+            .map((item) => (
+              <motion.button
+                key={item.key}
+                type="button"
+                className={`setup-studio-entry__signal theme-${item.theme}`}
+                onClick={() => setActiveKey(item.key)}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                <span className="setup-studio-entry__signal-icon">
+                  <SourceIcon item={item} />
+                </span>
+                <span className="setup-studio-entry__signal-copy">
+                  <span className="setup-studio-entry__signal-kicker">{item.label}</span>
+                  <span className="setup-studio-entry__signal-value">{item.value}</span>
+                </span>
+              </motion.button>
+            ))}
+
+          {s(values.note) ? (
+            <motion.button
+              type="button"
+              className="setup-studio-entry__signal setup-studio-entry__signal--note theme-note"
+              onClick={() => setActiveKey("note")}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <span className="setup-studio-entry__signal-icon">
+                <FileText className="h-4 w-4" />
+              </span>
+              <span className="setup-studio-entry__signal-copy">
+                <span className="setup-studio-entry__signal-kicker">Context note</span>
+                <span className="setup-studio-entry__signal-value">
+                  {values.note.length > 88 ? `${values.note.slice(0, 88)}...` : values.note}
+                </span>
+              </span>
+            </motion.button>
+          ) : null}
+        </div>
+
+        {error ? <div className="setup-studio-entry__error">{error}</div> : null}
+
+        <div className="setup-studio-entry__footer">
+          <button
+            type="submit"
+            disabled={importingWebsite || !primarySource?.url}
+            className="setup-studio-entry__submit"
+          >
+            {importingWebsite ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Scanning
+              </>
+            ) : (
+              <>
+                Start discovery
+                <ArrowRight className="h-4 w-4" />
+              </>
+            )}
+          </button>
+        </div>
+      </section>
     </motion.form>
   );
 }

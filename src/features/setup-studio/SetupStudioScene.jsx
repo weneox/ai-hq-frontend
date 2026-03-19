@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence } from "framer-motion";
+import { RotateCw } from "lucide-react";
 import { isSuccessMode, s } from "./lib/setupStudioHelpers.js";
 import SetupStudioRefineModal from "./components/SetupStudioRefineModal.jsx";
 import SetupStudioIntakeModal from "./components/SetupStudioIntakeModal.jsx";
@@ -10,6 +11,14 @@ import SetupStudioKnowledgeStage from "./stages/SetupStudioKnowledgeStage.jsx";
 import SetupStudioServiceStage from "./stages/SetupStudioServiceStage.jsx";
 import SetupStudioReadyStage from "./stages/SetupStudioReadyStage.jsx";
 import { discoveryModeLabel as defaultDiscoveryModeLabel } from "./lib/setupStudioHelpers.js";
+
+const STEP_LABELS = {
+  entry: "Signal",
+  identity: "Identity",
+  knowledge: "Knowledge",
+  service: "Service",
+  ready: "Launch",
+};
 
 export default function SetupStudioScene({
   loading,
@@ -48,6 +57,13 @@ export default function SetupStudioScene({
 
   const stageSequence = useMemo(() => {
     const list = ["identity"];
+    if (hasKnowledge) list.push("knowledge");
+    list.push("service", "ready");
+    return list;
+  }, [hasKnowledge]);
+
+  const progressSteps = useMemo(() => {
+    const list = ["entry", "identity"];
     if (hasKnowledge) list.push("knowledge");
     list.push("service", "ready");
     return list;
@@ -112,6 +128,9 @@ export default function SetupStudioScene({
   const statusLabel = discoveryModeLabel(importingWebsite ? "running" : discoveryState.mode);
   const isEntryStage = stage === "entry";
 
+  const progressCurrentStage = importingWebsite ? "entry" : stage;
+  const progressCurrentIndex = Math.max(0, progressSteps.indexOf(progressCurrentStage));
+
   if (loading) {
     return (
       <div className="setup-studio-loading">
@@ -128,6 +147,29 @@ export default function SetupStudioScene({
           <span className="setup-studio-scene__brand-text">AI Setup Studio</span>
         </div>
 
+        <nav className="setup-studio-scene__progress" aria-label="Setup progress">
+          {progressSteps.map((item, index) => {
+            const isActive = index === progressCurrentIndex;
+            const isDone = index < progressCurrentIndex;
+
+            return (
+              <div
+                key={item}
+                className={[
+                  "setup-studio-scene__progress-item",
+                  isActive ? "is-active" : "",
+                  isDone ? "is-done" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+              >
+                <span className="setup-studio-scene__progress-dot" />
+                <span className="setup-studio-scene__progress-label">{STEP_LABELS[item]}</span>
+              </div>
+            );
+          })}
+        </nav>
+
         <div className="setup-studio-scene__topbar-actions">
           <div
             className="setup-studio-scene__status"
@@ -142,36 +184,26 @@ export default function SetupStudioScene({
             className="setup-studio-scene__refresh"
             onClick={onRefresh}
             disabled={refreshing}
+            aria-label="Refresh setup studio"
           >
-            {refreshing ? "Refreshing..." : "Refresh"}
+            <RotateCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
           </button>
         </div>
       </header>
 
       {isEntryStage ? (
-        <main className="setup-studio-source-page">
-          <div className="setup-studio-source-page__inner">
-            <div className="setup-studio-source-page__eyebrow">source intake</div>
-
-            <h1 className="setup-studio-source-page__title">Add what you have</h1>
-
-            <p className="setup-studio-source-page__copy">
-              Website varsa domain yaz. Yoxdursa Instagram, TikTok, Facebook,
-              WhatsApp və ya qısa qeyd əlavə et.
-            </p>
-
-            <div className="setup-studio-source-page__stage">
-              <AnimatePresence mode="wait" initial={false}>
-                <SetupStudioEntryStage
-                  key="entry"
-                  discoveryForm={discoveryForm}
-                  error={error}
-                  importingWebsite={importingWebsite}
-                  onSetDiscoveryField={onSetDiscoveryField}
-                  onScanBusiness={onScanBusiness}
-                />
-              </AnimatePresence>
-            </div>
+        <main className="setup-studio-entry-page">
+          <div className="setup-studio-entry-page__shell">
+            <AnimatePresence mode="wait" initial={false}>
+              <SetupStudioEntryStage
+                key="entry"
+                discoveryForm={discoveryForm}
+                error={error}
+                importingWebsite={importingWebsite}
+                onSetDiscoveryField={onSetDiscoveryField}
+                onScanBusiness={onScanBusiness}
+              />
+            </AnimatePresence>
           </div>
         </main>
       ) : (
