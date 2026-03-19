@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import { RotateCw } from "lucide-react";
 import { isSuccessMode, s } from "./lib/setupStudioHelpers.js";
@@ -46,12 +47,13 @@ export default function SetupStudioScene({
   onApproveKnowledge,
   onRejectKnowledge,
   onCreateSuggestedService,
-  onOpenWorkspace,
   onRefresh,
   onToggleRefine,
   onToggleKnowledge,
   discoveryModeLabel = defaultDiscoveryModeLabel,
 }) {
+  const navigate = useNavigate();
+
   const scanDone = isSuccessMode(discoveryState.mode) || !!s(discoveryState.lastUrl);
   const hasKnowledge = knowledgePreview.length > 0;
 
@@ -123,6 +125,10 @@ export default function SetupStudioScene({
   async function handleCreateServiceAndNext() {
     await onCreateSuggestedService();
     setStage("ready");
+  }
+
+  function handleOpenWorkspace() {
+    navigate("/", { replace: true });
   }
 
   const currentTitle =
@@ -281,7 +287,7 @@ export default function SetupStudioScene({
                   hasKnowledge={hasKnowledge}
                   onToggleRefine={onToggleRefine}
                   onToggleKnowledge={onToggleKnowledge}
-                  onOpenWorkspace={onOpenWorkspace}
+                  onOpenWorkspace={handleOpenWorkspace}
                 />
               ) : null}
             </AnimatePresence>
