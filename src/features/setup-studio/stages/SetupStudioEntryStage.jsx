@@ -1,13 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import {
-  Globe,
-  FileText,
-  Sparkles,
-  Loader2,
-  X,
-  ArrowRight,
-} from "lucide-react";
+import { Globe, FileText, Loader2, ArrowRight, Check } from "lucide-react";
 
 import instagramIcon from "../../../assets/setup-studio/brands/instagram.svg";
 import messengerIcon from "../../../assets/setup-studio/brands/messenger.svg";
@@ -19,7 +12,7 @@ const SOURCE_OPTIONS = [
   {
     key: "website",
     label: "Website",
-    hint: "Domain or website link",
+    hint: "Use a domain or website link",
     placeholder: "yourbusiness.com",
     icon: Globe,
     theme: "website",
@@ -27,7 +20,7 @@ const SOURCE_OPTIONS = [
   {
     key: "instagram",
     label: "Instagram",
-    hint: "Handle or profile link",
+    hint: "Use a handle or profile link",
     placeholder: "@yourbrand",
     iconSrc: instagramIcon,
     theme: "instagram",
@@ -35,47 +28,47 @@ const SOURCE_OPTIONS = [
   {
     key: "tiktok",
     label: "TikTok",
-    hint: "Handle or profile link",
+    hint: "Use a handle or profile link",
     placeholder: "@yourbrand",
     iconSrc: tiktokIcon,
     theme: "tiktok",
   },
   {
-    key: "messenger",
-    label: "Messenger",
-    hint: "Page or chat link",
-    placeholder: "m.me/yourbrand",
-    iconSrc: messengerIcon,
-    theme: "messenger",
-  },
-  {
     key: "whatsapp",
     label: "WhatsApp",
-    hint: "Phone or wa.me link",
+    hint: "Use a number or wa.me link",
     placeholder: "+994 50 000 00 00",
     iconSrc: whatsappIcon,
     theme: "whatsapp",
   },
   {
+    key: "messenger",
+    label: "Messenger",
+    hint: "Use a page or m.me link",
+    placeholder: "m.me/yourbrand",
+    iconSrc: messengerIcon,
+    theme: "messenger",
+  },
+  {
     key: "telegram",
     label: "Telegram",
-    hint: "Handle or t.me link",
+    hint: "Use a handle or t.me link",
     placeholder: "@yourbrand",
     iconSrc: telegramIcon,
     theme: "telegram",
   },
   {
     key: "note",
-    label: "Note",
-    hint: "Anything useful in one line",
-    placeholder: "We book appointments mostly from Instagram and WhatsApp.",
+    label: "Short note",
+    hint: "Anything important in one line",
+    placeholder: "We get most leads from Instagram and WhatsApp.",
     icon: FileText,
     theme: "note",
     multiline: true,
   },
 ];
 
-const URL_SOURCE_ORDER = ["website", "instagram", "tiktok", "messenger", "whatsapp", "telegram"];
+const URL_SOURCE_ORDER = ["website", "instagram", "tiktok", "whatsapp", "messenger", "telegram"];
 
 function s(v) {
   return String(v ?? "").trim();
@@ -115,10 +108,12 @@ function normalizeMessenger(v) {
   const x = s(v);
   if (!x) return "";
   if (/^https?:\/\//i.test(x)) return x;
+
   const handle = cleanHandle(x)
     .replace(/^facebook\.com\//i, "")
     .replace(/^m\.me\//i, "")
     .replace(/^messenger\.com\//i, "");
+
   return `https://m.me/${handle}`;
 }
 
@@ -134,7 +129,10 @@ function normalizeTelegram(v) {
   const x = s(v);
   if (!x) return "";
   if (/^https?:\/\//i.test(x)) return x;
-  const handle = cleanHandle(x).replace(/^t\.me\//i, "").replace(/^telegram\.me\//i, "").replace(/^@/, "");
+  const handle = cleanHandle(x)
+    .replace(/^t\.me\//i, "")
+    .replace(/^telegram\.me\//i, "")
+    .replace(/^@/, "");
   return `https://t.me/${handle}`;
 }
 
@@ -147,8 +145,8 @@ function parseStudioSources(raw) {
     website: "",
     instagram: "",
     tiktok: "",
-    messenger: "",
     whatsapp: "",
+    messenger: "",
     telegram: "",
   };
 
@@ -167,12 +165,11 @@ function parseStudioSources(raw) {
     const key = s(label).toLowerCase();
 
     if (!value) continue;
-
     if (key === "website") out.website = value;
     if (key === "instagram") out.instagram = value;
     if (key === "tiktok") out.tiktok = value;
-    if (key === "messenger") out.messenger = value;
     if (key === "whatsapp") out.whatsapp = value;
+    if (key === "messenger") out.messenger = value;
     if (key === "telegram") out.telegram = value;
   }
 
@@ -187,38 +184,38 @@ function seedSourcesFromPrimary(primary) {
       website: "",
       instagram: "",
       tiktok: "",
-      messenger: "",
       whatsapp: "",
+      messenger: "",
       telegram: "",
     };
   }
 
   if (url.includes("instagram.com")) {
-    return { website: "", instagram: primary, tiktok: "", messenger: "", whatsapp: "", telegram: "" };
+    return { website: "", instagram: primary, tiktok: "", whatsapp: "", messenger: "", telegram: "" };
   }
 
   if (url.includes("tiktok.com")) {
-    return { website: "", instagram: "", tiktok: primary, messenger: "", whatsapp: "", telegram: "" };
-  }
-
-  if (url.includes("m.me") || url.includes("facebook.com") || url.includes("messenger.com")) {
-    return { website: "", instagram: "", tiktok: "", messenger: primary, whatsapp: "", telegram: "" };
+    return { website: "", instagram: "", tiktok: primary, whatsapp: "", messenger: "", telegram: "" };
   }
 
   if (url.includes("wa.me") || url.includes("whatsapp")) {
-    return { website: "", instagram: "", tiktok: "", messenger: "", whatsapp: primary, telegram: "" };
+    return { website: "", instagram: "", tiktok: "", whatsapp: primary, messenger: "", telegram: "" };
+  }
+
+  if (url.includes("m.me") || url.includes("messenger.com") || url.includes("facebook.com")) {
+    return { website: "", instagram: "", tiktok: "", whatsapp: "", messenger: primary, telegram: "" };
   }
 
   if (url.includes("t.me") || url.includes("telegram.me")) {
-    return { website: "", instagram: "", tiktok: "", messenger: "", whatsapp: "", telegram: primary };
+    return { website: "", instagram: "", tiktok: "", whatsapp: "", messenger: "", telegram: primary };
   }
 
   return {
     website: primary.replace(/^https?:\/\//i, ""),
     instagram: "",
     tiktok: "",
-    messenger: "",
     whatsapp: "",
+    messenger: "",
     telegram: "",
   };
 }
@@ -241,25 +238,23 @@ function formatSourceValue(key, raw) {
     return `@${handle}`;
   }
 
-  if (key === "messenger") {
-    return x.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
-  }
-
-  if (key === "whatsapp") {
-    return x;
-  }
-
   if (key === "telegram") {
     const handle = cleanHandle(x).replace(/^t\.me\//i, "").replace(/^telegram\.me\//i, "").replace(/^@/, "");
     return `@${handle}`;
   }
 
-  return x;
+  return x.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
 }
 
 function SourceIcon({ item }) {
   if (item.iconSrc) {
-    return <img src={item.iconSrc} alt="" aria-hidden="true" className="setup-studio-entry__icon-image" />;
+    return (
+      <span
+        className="setup-studio-brand-icon"
+        aria-hidden="true"
+        style={{ "--brand-icon-url": `url(${item.iconSrc})` }}
+      />
+    );
   }
 
   const Icon = item.icon;
@@ -288,8 +283,8 @@ export default function SetupStudioEntryStage({
       website: noteSeed.website || primarySeed.website || "",
       instagram: noteSeed.instagram || primarySeed.instagram || "",
       tiktok: noteSeed.tiktok || primarySeed.tiktok || "",
-      messenger: noteSeed.messenger || primarySeed.messenger || "",
       whatsapp: noteSeed.whatsapp || primarySeed.whatsapp || "",
+      messenger: noteSeed.messenger || primarySeed.messenger || "",
       telegram: noteSeed.telegram || primarySeed.telegram || "",
       note: extractPlainNote(discoveryForm?.note),
     }),
@@ -297,14 +292,14 @@ export default function SetupStudioEntryStage({
       noteSeed.website,
       noteSeed.instagram,
       noteSeed.tiktok,
-      noteSeed.messenger,
       noteSeed.whatsapp,
+      noteSeed.messenger,
       noteSeed.telegram,
       primarySeed.website,
       primarySeed.instagram,
       primarySeed.tiktok,
-      primarySeed.messenger,
       primarySeed.whatsapp,
+      primarySeed.messenger,
       primarySeed.telegram,
       discoveryForm?.note,
     ]
@@ -328,8 +323,8 @@ export default function SetupStudioEntryStage({
       website: normalizeWebsite(values.website),
       instagram: normalizeInstagram(values.instagram),
       tiktok: normalizeTikTok(values.tiktok),
-      messenger: normalizeMessenger(values.messenger),
       whatsapp: normalizeWhatsApp(values.whatsapp),
+      messenger: normalizeMessenger(values.messenger),
       telegram: normalizeTelegram(values.telegram),
     }),
     [values]
@@ -371,149 +366,122 @@ export default function SetupStudioEntryStage({
     setValues((prev) => ({ ...prev, [key]: value }));
   }
 
-  function clearValue(key) {
-    setValues((prev) => ({ ...prev, [key]: "" }));
+  function getStatus(item) {
+    if (item.key === "note") return s(values.note) ? "added" : "idle";
+    return normalizedMap[item.key] ? "added" : "idle";
   }
 
   const activeSource = SOURCE_OPTIONS.find((item) => item.key === activeKey) || SOURCE_OPTIONS[0];
-  const activeHasValue = !!s(values[activeKey]);
-
-  const signalNodes = SOURCE_OPTIONS.filter((item) => item.key !== "note").map((item, index) => {
-    const angle = -90 + index * 60;
-    const hasValue = !!normalizedMap[item.key];
-    const isActive = activeKey === item.key;
-
-    return {
-      ...item,
-      angle,
-      hasValue,
-      isActive,
-    };
-  });
+  const activeValue = values[activeKey] || "";
 
   return (
     <motion.form
       onSubmit={onScanBusiness}
-      initial={{ opacity: 0, y: 16 }}
+      initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -12 }}
-      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-      className="setup-studio-entry"
+      exit={{ opacity: 0, y: -10 }}
+      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+      className="setup-studio-intake"
     >
-      <section className="setup-studio-entry__hero">
-        <div className="setup-studio-entry__eyebrow">first signal</div>
-        <h1 className="setup-studio-entry__title">Bring what already exists.</h1>
-        <p className="setup-studio-entry__subtitle">
-          A domain, a handle, a number, or a note.
-        </p>
-      </section>
+      <section className="setup-studio-intake__intro">
+        <div className="setup-studio-intake__eyebrow">First signal</div>
 
-      <section className="setup-studio-entry__theatre" aria-hidden="true">
-        <div className="setup-studio-entry__core">
-          <div className="setup-studio-entry__core-halo setup-studio-entry__core-halo--outer" />
-          <div className="setup-studio-entry__core-halo setup-studio-entry__core-halo--mid" />
-          <div className="setup-studio-entry__core-shell">
-            <div className="setup-studio-entry__core-shell-inner">
-              <Sparkles className="h-5 w-5" />
+        <h1 className="setup-studio-intake__title">Start from one place.</h1>
+
+        <p className="setup-studio-intake__copy">
+          A domain, a handle, a number, or a short note. We’ll use the first valid source as the primary one.
+        </p>
+
+        <div className="setup-studio-intake__art">
+          <div className="setup-studio-intake__art-card setup-studio-intake__art-card--back" />
+          <div className="setup-studio-intake__art-card setup-studio-intake__art-card--mid" />
+          <div className="setup-studio-intake__art-card setup-studio-intake__art-card--front">
+            <div className="setup-studio-intake__art-badge theme-instagram">
+              <span
+                className="setup-studio-brand-icon"
+                style={{ "--brand-icon-url": `url(${instagramIcon})` }}
+                aria-hidden="true"
+              />
+            </div>
+            <div className="setup-studio-intake__art-badge theme-whatsapp">
+              <span
+                className="setup-studio-brand-icon"
+                style={{ "--brand-icon-url": `url(${whatsappIcon})` }}
+                aria-hidden="true"
+              />
+            </div>
+            <div className="setup-studio-intake__art-badge theme-website">
+              <Globe className="h-4 w-4" />
             </div>
           </div>
-
-          {signalNodes.map((item) => (
-            <motion.button
-              key={item.key}
-              type="button"
-              className={[
-                "setup-studio-entry__orbit-node",
-                `theme-${item.theme}`,
-                item.isActive ? "is-active" : "",
-                item.hasValue ? "has-value" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              style={{
-                left: "50%",
-                top: "50%",
-                transform: `translate(-50%, -50%) rotate(${item.angle}deg) translateY(-180px) rotate(${-item.angle}deg)`,
-              }}
-              onClick={() => setActiveKey(item.key)}
-              whileHover={{ y: -2, scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <span className="setup-studio-entry__orbit-icon">
-                <SourceIcon item={item} />
-              </span>
-              <span className="setup-studio-entry__orbit-label">{item.label}</span>
-            </motion.button>
-          ))}
         </div>
       </section>
 
-      <section className="setup-studio-entry__composer">
-        <div className="setup-studio-entry__source-rail">
+      <section className="setup-studio-intake__panel">
+        <div className="setup-studio-intake__list">
           {SOURCE_OPTIONS.map((item) => {
             const isActive = activeKey === item.key;
-            const hasValue = item.key === "note" ? !!s(values.note) : !!normalizedMap[item.key];
+            const isAdded = getStatus(item) === "added";
 
             return (
               <button
                 key={item.key}
                 type="button"
                 className={[
-                  "setup-studio-entry__source-pill",
+                  "setup-studio-intake__source",
                   `theme-${item.theme}`,
                   isActive ? "is-active" : "",
-                  hasValue ? "has-value" : "",
+                  isAdded ? "is-added" : "",
                 ]
                   .filter(Boolean)
                   .join(" ")}
                 onClick={() => setActiveKey(item.key)}
               >
-                <span className="setup-studio-entry__source-pill-icon">
+                <span className="setup-studio-intake__source-icon">
                   <SourceIcon item={item} />
                 </span>
-                <span>{item.label}</span>
+
+                <span className="setup-studio-intake__source-copy">
+                  <span className="setup-studio-intake__source-title">{item.label}</span>
+                  <span className="setup-studio-intake__source-hint">{item.hint}</span>
+                </span>
+
+                {isAdded ? (
+                  <span className="setup-studio-intake__source-state">
+                    <Check className="h-3.5 w-3.5" />
+                  </span>
+                ) : null}
               </button>
             );
           })}
         </div>
 
-        <div className={`setup-studio-entry__dock theme-${activeSource.theme}`}>
-          <div className="setup-studio-entry__dock-head">
-            <div className="setup-studio-entry__dock-source">
-              <span className="setup-studio-entry__dock-icon">
+        <div className={`setup-studio-intake__composer theme-${activeSource.theme}`}>
+          <div className="setup-studio-intake__composer-head">
+            <div className="setup-studio-intake__composer-source">
+              <span className="setup-studio-intake__composer-icon">
                 <SourceIcon item={activeSource} />
               </span>
 
-              <div className="setup-studio-entry__dock-copy">
-                <div className="setup-studio-entry__dock-title">{activeSource.label}</div>
-                <div className="setup-studio-entry__dock-hint">{activeSource.hint}</div>
+              <div className="setup-studio-intake__composer-copy">
+                <div className="setup-studio-intake__composer-title">{activeSource.label}</div>
+                <div className="setup-studio-intake__composer-hint">{activeSource.hint}</div>
               </div>
             </div>
-
-            {activeHasValue ? (
-              <button
-                type="button"
-                className="setup-studio-entry__dock-clear"
-                onClick={() => clearValue(activeKey)}
-                aria-label={`${activeSource.label} remove`}
-              >
-                <X className="h-4 w-4" />
-              </button>
-            ) : null}
           </div>
 
           {activeSource.multiline ? (
             <textarea
               value={values.note}
               onChange={(e) => setValue("note", e.target.value)}
-              className="setup-studio-entry__textarea"
+              className="setup-studio-intake__textarea"
               placeholder={activeSource.placeholder}
             />
           ) : (
             <input
-              value={values[activeKey]}
+              value={activeValue}
               onChange={(e) => setValue(activeKey, e.target.value)}
-              className="setup-studio-entry__input"
+              className="setup-studio-intake__input"
               placeholder={activeSource.placeholder}
               autoComplete="off"
               spellCheck={false}
@@ -521,75 +489,27 @@ export default function SetupStudioEntryStage({
           )}
         </div>
 
-        <div className="setup-studio-entry__signals">
-          {primarySource ? (
-            <motion.button
-              type="button"
-              className={`setup-studio-entry__signal setup-studio-entry__signal--primary theme-${primarySource.theme}`}
-              onClick={() => setActiveKey(primarySource.key)}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <span className="setup-studio-entry__signal-icon">
-                <SourceIcon item={primarySource} />
-              </span>
+        <div className="setup-studio-intake__footer">
+          <div className="setup-studio-intake__summary">
+            {primarySource ? (
+              <>
+                <div className="setup-studio-intake__summary-kicker">Primary source</div>
+                <div className="setup-studio-intake__summary-value">{primarySource.value}</div>
+              </>
+            ) : (
+              <>
+                <div className="setup-studio-intake__summary-kicker">Primary source</div>
+                <div className="setup-studio-intake__summary-value is-empty">
+                  Add one valid source to continue
+                </div>
+              </>
+            )}
+          </div>
 
-              <span className="setup-studio-entry__signal-copy">
-                <span className="setup-studio-entry__signal-kicker">Primary signal</span>
-                <span className="setup-studio-entry__signal-value">{primarySource.value}</span>
-              </span>
-            </motion.button>
-          ) : null}
-
-          {linkSources
-            .filter((item) => item.key !== primarySource?.key)
-            .map((item) => (
-              <motion.button
-                key={item.key}
-                type="button"
-                className={`setup-studio-entry__signal theme-${item.theme}`}
-                onClick={() => setActiveKey(item.key)}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-              >
-                <span className="setup-studio-entry__signal-icon">
-                  <SourceIcon item={item} />
-                </span>
-                <span className="setup-studio-entry__signal-copy">
-                  <span className="setup-studio-entry__signal-kicker">{item.label}</span>
-                  <span className="setup-studio-entry__signal-value">{item.value}</span>
-                </span>
-              </motion.button>
-            ))}
-
-          {s(values.note) ? (
-            <motion.button
-              type="button"
-              className="setup-studio-entry__signal setup-studio-entry__signal--note theme-note"
-              onClick={() => setActiveKey("note")}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <span className="setup-studio-entry__signal-icon">
-                <FileText className="h-4 w-4" />
-              </span>
-              <span className="setup-studio-entry__signal-copy">
-                <span className="setup-studio-entry__signal-kicker">Context note</span>
-                <span className="setup-studio-entry__signal-value">
-                  {values.note.length > 88 ? `${values.note.slice(0, 88)}...` : values.note}
-                </span>
-              </span>
-            </motion.button>
-          ) : null}
-        </div>
-
-        {error ? <div className="setup-studio-entry__error">{error}</div> : null}
-
-        <div className="setup-studio-entry__footer">
           <button
             type="submit"
             disabled={importingWebsite || !primarySource?.url}
-            className="setup-studio-entry__submit"
+            className="setup-studio-intake__submit"
           >
             {importingWebsite ? (
               <>
@@ -604,6 +524,8 @@ export default function SetupStudioEntryStage({
             )}
           </button>
         </div>
+
+        {error ? <div className="setup-studio-intake__error">{error}</div> : null}
       </section>
     </motion.form>
   );

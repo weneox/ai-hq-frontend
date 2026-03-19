@@ -126,10 +126,9 @@ export default function SetupStudioScene({
     "We extracted a first draft of the business direction from the website.";
 
   const statusLabel = discoveryModeLabel(importingWebsite ? "running" : discoveryState.mode);
-  const isEntryStage = stage === "entry";
-
   const progressCurrentStage = importingWebsite ? "entry" : stage;
   const progressCurrentIndex = Math.max(0, progressSteps.indexOf(progressCurrentStage));
+  const isEntryStage = stage === "entry";
 
   if (loading) {
     return (
@@ -147,7 +146,7 @@ export default function SetupStudioScene({
           <span className="setup-studio-scene__brand-text">AI Setup Studio</span>
         </div>
 
-        <nav className="setup-studio-scene__progress" aria-label="Setup progress">
+        <div className="setup-studio-scene__progress" aria-label="Setup progress">
           {progressSteps.map((item, index) => {
             const isActive = index === progressCurrentIndex;
             const isDone = index < progressCurrentIndex;
@@ -168,7 +167,7 @@ export default function SetupStudioScene({
               </div>
             );
           })}
-        </nav>
+        </div>
 
         <div className="setup-studio-scene__topbar-actions">
           <div
@@ -184,7 +183,7 @@ export default function SetupStudioScene({
             className="setup-studio-scene__refresh"
             onClick={onRefresh}
             disabled={refreshing}
-            aria-label="Refresh setup studio"
+            aria-label="Refresh"
           >
             <RotateCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
           </button>
