@@ -2,12 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
-  Check,
-  ChevronDown,
-  ChevronUp,
   FileText,
   Loader2,
+  MoreHorizontal,
   Plus,
+  X,
 } from "lucide-react";
 
 import websiteIcon from "../../../assets/setup-studio/channels/weblink.webp";
@@ -24,18 +23,17 @@ const SOURCE_OPTIONS = [
   {
     key: "website",
     label: "Website",
-    hint: "Domain or website link",
     placeholder: "yourbusiness.com",
+    hint: "Domain or website link",
     imageSrc: websiteIcon,
     theme: "website",
-    recommended: true,
     priority: "primary",
   },
   {
     key: "instagram",
     label: "Instagram",
-    hint: "Handle or profile link",
     placeholder: "@yourbrand",
+    hint: "Handle or profile link",
     imageSrc: instagramIcon,
     theme: "instagram",
     priority: "primary",
@@ -43,8 +41,8 @@ const SOURCE_OPTIONS = [
   {
     key: "facebook",
     label: "Facebook",
-    hint: "Page link or page name",
     placeholder: "facebook.com/yourbrand",
+    hint: "Page link or page name",
     imageSrc: facebookIcon,
     theme: "facebook",
     priority: "primary",
@@ -52,8 +50,8 @@ const SOURCE_OPTIONS = [
   {
     key: "googleMaps",
     label: "Google Maps",
+    placeholder: "maps link or business name",
     hint: "Listing link or business name",
-    placeholder: "maps.app.goo.gl/... or your business name",
     imageSrc: googleMapsIcon,
     theme: "google-maps",
     priority: "primary",
@@ -61,8 +59,8 @@ const SOURCE_OPTIONS = [
   {
     key: "linkedin",
     label: "LinkedIn",
-    hint: "Company page link",
     placeholder: "linkedin.com/company/yourbrand",
+    hint: "Company page link",
     imageSrc: linkedinIcon,
     theme: "linkedin",
     priority: "primary",
@@ -70,8 +68,8 @@ const SOURCE_OPTIONS = [
   {
     key: "github",
     label: "GitHub",
-    hint: "Organization or profile link",
     placeholder: "github.com/yourbrand",
+    hint: "Organization or profile link",
     imageSrc: githubIcon,
     theme: "github",
     priority: "secondary",
@@ -79,8 +77,8 @@ const SOURCE_OPTIONS = [
   {
     key: "tiktok",
     label: "TikTok",
-    hint: "Handle or profile link",
     placeholder: "@yourbrand",
+    hint: "Handle or profile link",
     imageSrc: tiktokIcon,
     theme: "tiktok",
     priority: "secondary",
@@ -88,8 +86,8 @@ const SOURCE_OPTIONS = [
   {
     key: "whatsapp",
     label: "WhatsApp",
-    hint: "Number or wa.me link",
     placeholder: "+994 50 000 00 00",
+    hint: "Number or wa.me link",
     imageSrc: whatsappIcon,
     theme: "whatsapp",
     priority: "secondary",
@@ -97,8 +95,8 @@ const SOURCE_OPTIONS = [
   {
     key: "youtube",
     label: "YouTube",
-    hint: "Channel or handle",
     placeholder: "@yourbrand",
+    hint: "Channel or handle",
     imageSrc: youtubeIcon,
     theme: "youtube",
     priority: "secondary",
@@ -106,8 +104,8 @@ const SOURCE_OPTIONS = [
   {
     key: "note",
     label: "Short note",
+    placeholder: "We mainly get orders from Instagram and WhatsApp.",
     hint: "Extra business context",
-    placeholder: "We mainly sell custom cakes and take most orders from Instagram and WhatsApp.",
     icon: FileText,
     theme: "note",
     multiline: true,
@@ -115,7 +113,7 @@ const SOURCE_OPTIONS = [
   },
 ];
 
-const PRIMARY_SOURCE_ORDER = [
+const PRIMARY_ORDER = [
   "website",
   "instagram",
   "facebook",
@@ -187,10 +185,7 @@ function normalizeLinkedIn(v) {
   if (/^https?:\/\//i.test(x)) return x;
 
   const handle = cleanHandle(x).replace(/^linkedin\.com\//i, "");
-
-  if (handle.includes("/")) {
-    return `https://linkedin.com/${handle}`;
-  }
+  if (handle.includes("/")) return `https://linkedin.com/${handle}`;
 
   return `https://linkedin.com/company/${handle}`;
 }
@@ -229,9 +224,8 @@ function normalizeYouTube(v) {
   if (/^https?:\/\//i.test(x)) return x;
 
   const handle = cleanHandle(x).replace(/^youtube\.com\//i, "");
-  if (handle.startsWith("@")) return `https://youtube.com/${handle}`;
-
   if (
+    handle.startsWith("@") ||
     handle.startsWith("channel/") ||
     handle.startsWith("c/") ||
     handle.startsWith("user/")
@@ -359,43 +353,24 @@ function formatSourceValue(key, raw) {
     return `@${handle}`;
   }
 
-  if (key === "facebook") {
-    return x.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
-  }
-
   if (key === "googleMaps") {
-    return s(raw);
-  }
-
-  if (key === "linkedin") {
-    return x.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
-  }
-
-  if (key === "github") {
-    return x.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+    return x;
   }
 
   if (key === "whatsapp") {
-    return s(raw);
+    return x;
   }
 
-  return x;
+  return x.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
 }
 
-function SourceMark({ item, className = "" }) {
+function SourceMark({ item }) {
   if (item.imageSrc) {
-    return (
-      <img
-        src={item.imageSrc}
-        alt=""
-        aria-hidden="true"
-        className={`setup-studio-source-mark ${className}`.trim()}
-      />
-    );
+    return <img src={item.imageSrc} alt="" aria-hidden="true" className="setup-studio-entry__logo" />;
   }
 
   const Icon = item.icon;
-  return <Icon className={`h-4 w-4 ${className}`.trim()} />;
+  return <Icon className="h-4 w-4" />;
 }
 
 export default function SetupStudioEntryStage({
@@ -453,10 +428,12 @@ export default function SetupStudioEntryStage({
 
   const [activeKey, setActiveKey] = useState("website");
   const [secondaryOpen, setSecondaryOpen] = useState(false);
-  const [values, setValues] = useState(initialValues);
+  const [drafts, setDrafts] = useState(initialValues);
+  const [sources, setSources] = useState(initialValues);
 
   useEffect(() => {
-    setValues(initialValues);
+    setDrafts(initialValues);
+    setSources(initialValues);
 
     const firstFilled =
       SOURCE_OPTIONS.find((item) => item.key !== "note" && s(initialValues[item.key]))?.key ||
@@ -465,28 +442,28 @@ export default function SetupStudioEntryStage({
     setActiveKey(firstFilled);
     setSecondaryOpen(
       SOURCE_OPTIONS.some(
-        (item) => item.priority === "secondary" && item.key !== "note" && s(initialValues[item.key])
-      ) || s(initialValues.note)
+        (item) => item.priority === "secondary" && s(initialValues[item.key])
+      )
     );
   }, [initialValues]);
 
   const normalizedMap = useMemo(
     () => ({
-      website: normalizeWebsite(values.website),
-      instagram: normalizeInstagram(values.instagram),
-      facebook: normalizeFacebook(values.facebook),
-      googleMaps: normalizeGoogleMaps(values.googleMaps),
-      linkedin: normalizeLinkedIn(values.linkedin),
-      github: normalizeGitHub(values.github),
-      tiktok: normalizeTikTok(values.tiktok),
-      whatsapp: normalizeWhatsApp(values.whatsapp),
-      youtube: normalizeYouTube(values.youtube),
+      website: normalizeWebsite(sources.website),
+      instagram: normalizeInstagram(sources.instagram),
+      facebook: normalizeFacebook(sources.facebook),
+      googleMaps: normalizeGoogleMaps(sources.googleMaps),
+      linkedin: normalizeLinkedIn(sources.linkedin),
+      github: normalizeGitHub(sources.github),
+      tiktok: normalizeTikTok(sources.tiktok),
+      whatsapp: normalizeWhatsApp(sources.whatsapp),
+      youtube: normalizeYouTube(sources.youtube),
     }),
-    [values]
+    [sources]
   );
 
-  const addedSourceList = useMemo(() => {
-    return PRIMARY_SOURCE_ORDER.map((key) => {
+  const addedSources = useMemo(() => {
+    return PRIMARY_ORDER.map((key) => {
       const item = SOURCE_OPTIONS.find((entry) => entry.key === key);
       const url = normalizedMap[key];
 
@@ -495,266 +472,267 @@ export default function SetupStudioEntryStage({
       return {
         ...item,
         url,
-        value: formatSourceValue(key, values[key]),
+        value: formatSourceValue(key, sources[key]),
       };
     }).filter(Boolean);
-  }, [normalizedMap, values]);
+  }, [normalizedMap, sources]);
 
-  const primarySource = addedSourceList[0] || null;
-  const supportCount = Math.max(0, addedSourceList.length - (primarySource ? 1 : 0));
-  const hasContextNote = !!s(values.note);
+  const primarySource = addedSources[0] || null;
+
+  const chips = useMemo(() => {
+    const sourceChips = addedSources.map((item) => ({
+      key: item.key,
+      label: item.label,
+      value: item.value,
+      imageSrc: item.imageSrc,
+      theme: item.theme,
+    }));
+
+    if (s(sources.note)) {
+      sourceChips.push({
+        key: "note",
+        label: "Note",
+        value: s(sources.note).slice(0, 72),
+        icon: FileText,
+        theme: "note",
+      });
+    }
+
+    return sourceChips;
+  }, [addedSources, sources.note]);
 
   const composedNote = useMemo(() => {
     const noteParts = [];
-    const sourceLines = addedSourceList.map((item) => `${item.key}: ${item.url}`);
+    const sourceLines = addedSources.map((item) => `${item.key}: ${item.url}`);
 
-    if (s(values.note)) noteParts.push(s(values.note));
+    if (s(sources.note)) noteParts.push(s(sources.note));
     if (sourceLines.length) noteParts.push(`[studio_sources]\n${sourceLines.join("\n")}`);
 
     return noteParts.join("\n\n").trim();
-  }, [addedSourceList, values.note]);
+  }, [addedSources, sources.note]);
 
   useEffect(() => {
     onSetDiscoveryField("websiteUrl", primarySource?.url || "");
     onSetDiscoveryField("note", composedNote);
   }, [primarySource?.url, composedNote, onSetDiscoveryField]);
 
-  function setValue(key, value) {
-    setValues((prev) => ({ ...prev, [key]: value }));
-  }
-
-  function getStatus(item) {
-    if (item.key === "note") return s(values.note) ? "added" : "idle";
-    return normalizedMap[item.key] ? "added" : "idle";
-  }
-
   const activeSource =
     SOURCE_OPTIONS.find((item) => item.key === activeKey) || SOURCE_OPTIONS[0];
 
-  const activeValue = values[activeKey] || "";
+  const activeDraft = drafts[activeKey] || "";
+  const primaryPills = SOURCE_OPTIONS.filter((item) => item.priority === "primary");
+  const secondaryPills = SOURCE_OPTIONS.filter((item) => item.priority === "secondary");
 
-  const primaryOptions = SOURCE_OPTIONS.filter((item) => item.priority === "primary");
-  const secondaryOptions = SOURCE_OPTIONS.filter((item) => item.priority === "secondary");
+  function handleDraftChange(value) {
+    setDrafts((prev) => ({ ...prev, [activeKey]: value }));
+  }
+
+  function handleAddSource() {
+    const value = s(drafts[activeKey]);
+    if (!value) return;
+
+    setSources((prev) => ({
+      ...prev,
+      [activeKey]: value,
+    }));
+  }
+
+  function handleRemoveSource(key) {
+    setSources((prev) => ({ ...prev, [key]: "" }));
+    setDrafts((prev) => ({ ...prev, [key]: "" }));
+
+    if (activeKey === key) {
+      setActiveKey("website");
+    }
+  }
+
+  function handleSubmit(e) {
+    e.preventDefault();
+
+    if (!primarySource?.url || importingWebsite) return;
+    onScanBusiness?.(e);
+  }
+
+  function handleInputKeyDown(e) {
+    if (activeSource.multiline) return;
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleAddSource();
+    }
+  }
+
+  function getButtonLabel() {
+    if (activeSource.key === "note") return "Add note";
+    return sources[activeKey] ? "Update" : "Add";
+  }
 
   return (
     <motion.form
-      onSubmit={onScanBusiness}
+      onSubmit={handleSubmit}
       initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
       transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
       className="setup-studio-entry"
     >
-      <section className="setup-studio-entry__intro">
-        <div className="setup-studio-entry__eyebrow">Business setup</div>
+      <div className="setup-studio-entry__hero">
+        <h1 className="setup-studio-entry__title">Add your business sources.</h1>
 
-        <h1 className="setup-studio-entry__title">Give us a starting point.</h1>
-
-        <p className="setup-studio-entry__copy">
-          Add the first real places that describe the business. We’ll use the first valid source as
-          the primary one and pull the rest in as context.
+        <p className="setup-studio-entry__subtitle">
+          Mention places where your business already exists. We’ll use the first valid source as
+          the main one and build the rest in as context.
         </p>
+      </div>
 
-        <div className="setup-studio-entry__signal">
-          <div className="setup-studio-entry__signal-core">Business profile</div>
+      <div className="setup-studio-entry__pill-rail">
+        {primaryPills.map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            className={[
+              "setup-studio-entry__pill",
+              `theme-${item.theme}`,
+              activeKey === item.key ? "is-active" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            onClick={() => setActiveKey(item.key)}
+          >
+            <SourceMark item={item} />
+            <span>{item.label}</span>
+          </button>
+        ))}
 
-          <div className="setup-studio-entry__signal-node setup-studio-entry__signal-node--website theme-website">
-            <SourceMark item={SOURCE_OPTIONS[0]} />
-          </div>
+        <button
+          type="button"
+          className={`setup-studio-entry__pill setup-studio-entry__pill--more ${secondaryOpen ? "is-open" : ""}`}
+          onClick={() => setSecondaryOpen((prev) => !prev)}
+        >
+          <MoreHorizontal className="h-4 w-4" />
+        </button>
+      </div>
 
-          <div className="setup-studio-entry__signal-node setup-studio-entry__signal-node--instagram theme-instagram">
-            <SourceMark item={SOURCE_OPTIONS[1]} />
-          </div>
-
-          <div className="setup-studio-entry__signal-node setup-studio-entry__signal-node--maps theme-google-maps">
-            <SourceMark item={SOURCE_OPTIONS[3]} />
-          </div>
-
-          <div className="setup-studio-entry__signal-node setup-studio-entry__signal-node--linkedin theme-linkedin">
-            <SourceMark item={SOURCE_OPTIONS[4]} />
-          </div>
+      {secondaryOpen ? (
+        <div className="setup-studio-entry__secondary-rail">
+          {secondaryPills.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              className={[
+                "setup-studio-entry__secondary-pill",
+                `theme-${item.theme}`,
+                activeKey === item.key ? "is-active" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              onClick={() => setActiveKey(item.key)}
+            >
+              <SourceMark item={item} />
+              <span>{item.label}</span>
+            </button>
+          ))}
         </div>
-      </section>
+      ) : null}
 
-      <section className="setup-studio-entry__workspace">
-        <div className="setup-studio-entry__heading">
-          <div className="setup-studio-entry__heading-kicker">Main sources</div>
-          <div className="setup-studio-entry__heading-meta">Website is recommended, not required.</div>
-        </div>
+      <div className={`setup-studio-entry__composer theme-${activeSource.theme}`}>
+        <div className="setup-studio-entry__composer-main">
+          <div className="setup-studio-entry__composer-left">
+            <div className="setup-studio-entry__composer-mark">
+              <SourceMark item={activeSource} />
+            </div>
 
-        <div className="setup-studio-entry__primary-grid">
-          {primaryOptions.map((item) => {
-            const isActive = activeKey === item.key;
-            const isAdded = getStatus(item) === "added";
+            {activeSource.multiline ? (
+              <textarea
+                value={activeDraft}
+                onChange={(e) => handleDraftChange(e.target.value)}
+                className="setup-studio-entry__textarea"
+                placeholder={activeSource.placeholder}
+              />
+            ) : (
+              <input
+                value={activeDraft}
+                onChange={(e) => handleDraftChange(e.target.value)}
+                onKeyDown={handleInputKeyDown}
+                className="setup-studio-entry__input"
+                placeholder={activeSource.placeholder}
+                autoComplete="off"
+                spellCheck={false}
+              />
+            )}
+          </div>
 
-            return (
-              <button
-                key={item.key}
-                type="button"
-                className={[
-                  "setup-studio-entry__source",
-                  `theme-${item.theme}`,
-                  item.key === "website" ? "is-main" : "",
-                  isActive ? "is-active" : "",
-                  isAdded ? "is-added" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-                onClick={() => setActiveKey(item.key)}
-              >
-                <span className="setup-studio-entry__source-icon">
-                  <SourceMark item={item} />
-                </span>
-
-                <span className="setup-studio-entry__source-copy">
-                  <span className="setup-studio-entry__source-topline">
-                    <span className="setup-studio-entry__source-title">{item.label}</span>
-                    {item.recommended ? (
-                      <span className="setup-studio-entry__source-badge">Recommended</span>
-                    ) : null}
-                  </span>
-
-                  <span className="setup-studio-entry__source-hint">{item.hint}</span>
-                </span>
-
-                {isAdded ? (
-                  <span className="setup-studio-entry__source-state">
-                    <Check className="h-3.5 w-3.5" />
-                  </span>
-                ) : null}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="setup-studio-entry__secondary">
           <button
             type="button"
-            className={`setup-studio-entry__secondary-toggle ${secondaryOpen ? "is-open" : ""}`}
-            onClick={() => setSecondaryOpen((prev) => !prev)}
+            className="setup-studio-entry__add"
+            onClick={handleAddSource}
+            disabled={!s(activeDraft)}
           >
-            <span className="setup-studio-entry__secondary-toggle-left">
-              <Plus className="h-4 w-4" />
-              <span>Add another source</span>
+            {sources[activeKey] ? null : <Plus className="h-4 w-4" />}
+            <span>{getButtonLabel()}</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="setup-studio-entry__chips">
+        {chips.map((chip) => (
+          <div key={chip.key} className={`setup-studio-entry__chip theme-${chip.theme}`}>
+            <span className="setup-studio-entry__chip-mark">
+              {chip.imageSrc ? (
+                <img src={chip.imageSrc} alt="" aria-hidden="true" className="setup-studio-entry__chip-logo" />
+              ) : (
+                <FileText className="h-3.5 w-3.5" />
+              )}
             </span>
 
-            {secondaryOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-          </button>
+            <span className="setup-studio-entry__chip-text">
+              <strong>{chip.label}</strong>
+              <span>{chip.value}</span>
+            </span>
 
-          {secondaryOpen ? (
-            <div className="setup-studio-entry__secondary-grid">
-              {secondaryOptions.map((item) => {
-                const isActive = activeKey === item.key;
-                const isAdded = getStatus(item) === "added";
-
-                return (
-                  <button
-                    key={item.key}
-                    type="button"
-                    className={[
-                      "setup-studio-entry__secondary-source",
-                      `theme-${item.theme}`,
-                      isActive ? "is-active" : "",
-                      isAdded ? "is-added" : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                    onClick={() => setActiveKey(item.key)}
-                  >
-                    <span className="setup-studio-entry__secondary-source-icon">
-                      <SourceMark item={item} />
-                    </span>
-
-                    <span className="setup-studio-entry__secondary-source-label">{item.label}</span>
-
-                    {isAdded ? (
-                      <span className="setup-studio-entry__secondary-source-state">
-                        <Check className="h-3.5 w-3.5" />
-                      </span>
-                    ) : null}
-                  </button>
-                );
-              })}
-            </div>
-          ) : null}
-        </div>
-
-        <div className={`setup-studio-entry__composer theme-${activeSource.theme}`}>
-          <div className="setup-studio-entry__composer-head">
-            <div className="setup-studio-entry__composer-source">
-              <span className="setup-studio-entry__composer-icon">
-                <SourceMark item={activeSource} />
-              </span>
-
-              <div className="setup-studio-entry__composer-copy">
-                <div className="setup-studio-entry__composer-title">{activeSource.label}</div>
-                <div className="setup-studio-entry__composer-hint">{activeSource.hint}</div>
-              </div>
-            </div>
+            <button
+              type="button"
+              className="setup-studio-entry__chip-remove"
+              onClick={() => handleRemoveSource(chip.key)}
+              aria-label={`Remove ${chip.label}`}
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
           </div>
+        ))}
+      </div>
 
-          {activeSource.multiline ? (
-            <textarea
-              value={values.note}
-              onChange={(e) => setValue("note", e.target.value)}
-              className="setup-studio-entry__textarea"
-              placeholder={activeSource.placeholder}
-            />
+      <div className="setup-studio-entry__bottom">
+        <div className="setup-studio-entry__primary">
+          {primarySource ? (
+            <>
+              <span className="setup-studio-entry__primary-label">Primary source:</span>
+              <span className="setup-studio-entry__primary-value">{primarySource.label}</span>
+            </>
           ) : (
-            <input
-              value={activeValue}
-              onChange={(e) => setValue(activeKey, e.target.value)}
-              className="setup-studio-entry__input"
-              placeholder={activeSource.placeholder}
-              autoComplete="off"
-              spellCheck={false}
-            />
+            <span className="setup-studio-entry__primary-empty">Add one source to continue</span>
           )}
         </div>
 
-        <div className="setup-studio-entry__footer">
-          <div className="setup-studio-entry__summary">
-            <div className="setup-studio-entry__summary-kicker">Primary source</div>
+        <button
+          type="submit"
+          disabled={importingWebsite || !primarySource?.url}
+          className="setup-studio-entry__submit"
+        >
+          {importingWebsite ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Analyzing
+            </>
+          ) : (
+            <>
+              Analyze business
+              <ArrowRight className="h-4 w-4" />
+            </>
+          )}
+        </button>
+      </div>
 
-            {primarySource ? (
-              <div className="setup-studio-entry__summary-value">{primarySource.value}</div>
-            ) : (
-              <div className="setup-studio-entry__summary-value is-empty">
-                Add one real source to continue
-              </div>
-            )}
-
-            {primarySource ? (
-              <div className="setup-studio-entry__summary-meta">
-                {supportCount > 0
-                  ? `${supportCount} supporting source${supportCount > 1 ? "s" : ""}`
-                  : "No supporting sources yet"}
-                {hasContextNote ? " · note added" : ""}
-              </div>
-            ) : null}
-          </div>
-
-          <button
-            type="submit"
-            disabled={importingWebsite || !primarySource?.url}
-            className="setup-studio-entry__submit"
-          >
-            {importingWebsite ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Analyzing
-              </>
-            ) : (
-              <>
-                Analyze business
-                <ArrowRight className="h-4 w-4" />
-              </>
-            )}
-          </button>
-        </div>
-
-        {error ? <div className="setup-studio-entry__error">{error}</div> : null}
-      </section>
+      {error ? <div className="setup-studio-entry__error">{error}</div> : null}
     </motion.form>
   );
 }

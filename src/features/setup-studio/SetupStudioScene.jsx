@@ -125,10 +125,15 @@ export default function SetupStudioScene({
     discoveryProfileRows?.find?.(([label]) => label === "Description")?.[1] ||
     "We extracted a first draft of the business direction from the source signals.";
 
-  const statusLabel = discoveryModeLabel(importingWebsite ? "running" : discoveryState.mode);
   const progressCurrentStage = importingWebsite ? "entry" : stage;
   const progressCurrentIndex = Math.max(0, progressSteps.indexOf(progressCurrentStage));
   const isEntryStage = stage === "entry";
+
+  const statusLabel = importingWebsite
+    ? "Analyzing"
+    : isEntryStage
+      ? "Ready to analyze"
+      : discoveryModeLabel(discoveryState.mode);
 
   if (loading) {
     return (
@@ -146,7 +151,7 @@ export default function SetupStudioScene({
       <header className="setup-studio-scene__topbar">
         <div className="setup-studio-scene__brand">
           <span className="setup-studio-scene__brand-mark" />
-          <span className="setup-studio-scene__brand-text">AI Setup Studio</span>
+          <span className="setup-studio-scene__brand-text">AI SETUP STUDIO</span>
         </div>
 
         <div className="setup-studio-scene__progress" aria-label="Setup progress">
