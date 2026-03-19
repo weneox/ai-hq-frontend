@@ -80,6 +80,16 @@ export default function SetupStudioScene({
   ];
 
   useEffect(() => {
+    document.documentElement.classList.add("setup-studio-lock");
+    document.body.classList.add("setup-studio-lock");
+
+    return () => {
+      document.documentElement.classList.remove("setup-studio-lock");
+      document.body.classList.remove("setup-studio-lock");
+    };
+  }, []);
+
+  useEffect(() => {
     if (importingWebsite) {
       setStage("scanning");
       return;
