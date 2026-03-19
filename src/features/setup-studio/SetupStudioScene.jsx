@@ -149,16 +149,20 @@ export default function SetupStudioScene({
       </header>
 
       {isEntryStage ? (
-        <main className="setup-studio-entry-page">
-          <div className="setup-studio-entry-page__halo" />
-          <div className="setup-studio-entry-page__inner">
-            <div className="setup-studio-entry-page__eyebrow">first move</div>
-            <h1 className="setup-studio-entry-page__title">Start from the website.</h1>
-            <p className="setup-studio-entry-page__copy">
-              Tək URL daxil et. Qalanını studio çıxarsın.
+        <main className="setup-studio-entry-raw">
+          <div className="setup-studio-entry-raw__glow setup-studio-entry-raw__glow--left" />
+          <div className="setup-studio-entry-raw__glow setup-studio-entry-raw__glow--center" />
+          <div className="setup-studio-entry-raw__line setup-studio-entry-raw__line--top" />
+          <div className="setup-studio-entry-raw__line setup-studio-entry-raw__line--bottom" />
+
+          <div className="setup-studio-entry-raw__inner">
+            <div className="setup-studio-entry-raw__eyebrow">first move</div>
+            <h1 className="setup-studio-entry-raw__title">Give me the website.</h1>
+            <p className="setup-studio-entry-raw__copy">
+              Tək bir source. Qalan shape-ı studio çıxarsın.
             </p>
 
-            <div className="setup-studio-entry-page__host">
+            <div className="setup-studio-entry-raw__stage">
               <AnimatePresence mode="wait" initial={false}>
                 <SetupStudioEntryStage
                   key="entry"
@@ -169,16 +173,6 @@ export default function SetupStudioScene({
                   onScanBusiness={onScanBusiness}
                 />
               </AnimatePresence>
-            </div>
-
-            <div className="setup-studio-entry-page__meta">
-              <span>website</span>
-              <span className="setup-studio-entry-page__meta-dot" />
-              <span>identity</span>
-              <span className="setup-studio-entry-page__meta-dot" />
-              <span>knowledge</span>
-              <span className="setup-studio-entry-page__meta-dot" />
-              <span>service</span>
             </div>
           </div>
         </main>
