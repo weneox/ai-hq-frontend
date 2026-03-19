@@ -149,20 +149,18 @@ export default function SetupStudioScene({
       </header>
 
       {isEntryStage ? (
-        <main className="setup-studio-entry-clean">
-          <div className="setup-studio-entry-clean__inner">
-            <div className="setup-studio-entry-clean__eyebrow">website import</div>
+        <main className="setup-studio-source-page">
+          <div className="setup-studio-source-page__inner">
+            <div className="setup-studio-source-page__eyebrow">source intake</div>
 
-            <h1 className="setup-studio-entry-clean__title">
-              Start with your website
-            </h1>
+            <h1 className="setup-studio-source-page__title">Add what you have</h1>
 
-            <p className="setup-studio-entry-clean__copy">
-              Homepage URL-ni daxil et. Studio ilk business draftını, knowledge siqnallarını
-              və service direction-ı özü çıxarsın.
+            <p className="setup-studio-source-page__copy">
+              Website varsa domain yaz. Yoxdursa Instagram, TikTok, Facebook,
+              WhatsApp və ya qısa qeyd əlavə et.
             </p>
 
-            <div className="setup-studio-entry-clean__stage">
+            <div className="setup-studio-source-page__stage">
               <AnimatePresence mode="wait" initial={false}>
                 <SetupStudioEntryStage
                   key="entry"
