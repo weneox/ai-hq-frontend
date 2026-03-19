@@ -149,20 +149,20 @@ export default function SetupStudioScene({
       </header>
 
       {isEntryStage ? (
-        <main className="setup-studio-entry-raw">
-          <div className="setup-studio-entry-raw__glow setup-studio-entry-raw__glow--left" />
-          <div className="setup-studio-entry-raw__glow setup-studio-entry-raw__glow--center" />
-          <div className="setup-studio-entry-raw__line setup-studio-entry-raw__line--top" />
-          <div className="setup-studio-entry-raw__line setup-studio-entry-raw__line--bottom" />
+        <main className="setup-studio-entry-clean">
+          <div className="setup-studio-entry-clean__inner">
+            <div className="setup-studio-entry-clean__eyebrow">website import</div>
 
-          <div className="setup-studio-entry-raw__inner">
-            <div className="setup-studio-entry-raw__eyebrow">first move</div>
-            <h1 className="setup-studio-entry-raw__title">Give me the website.</h1>
-            <p className="setup-studio-entry-raw__copy">
-              Tək bir source. Qalan shape-ı studio çıxarsın.
+            <h1 className="setup-studio-entry-clean__title">
+              Start with your website
+            </h1>
+
+            <p className="setup-studio-entry-clean__copy">
+              Homepage URL-ni daxil et. Studio ilk business draftını, knowledge siqnallarını
+              və service direction-ı özü çıxarsın.
             </p>
 
-            <div className="setup-studio-entry-raw__stage">
+            <div className="setup-studio-entry-clean__stage">
               <AnimatePresence mode="wait" initial={false}>
                 <SetupStudioEntryStage
                   key="entry"
