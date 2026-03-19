@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence } from "framer-motion";
-import { pageTone, isSuccessMode, s } from "./lib/setupStudioHelpers.js";
-import SetupStudioHeader from "./components/SetupStudioHeader.jsx";
-import SetupStudioProgressDots from "./components/SetupStudioProgressDots.jsx";
+import {
+  isSuccessMode,
+  s,
+  profilePreviewRows,
+} from "./lib/setupStudioHelpers.js";
 import SetupStudioRefineModal from "./components/SetupStudioRefineModal.jsx";
 import SetupStudioIntakeModal from "./components/SetupStudioIntakeModal.jsx";
 import SetupStudioEntryStage from "./stages/SetupStudioEntryStage.jsx";
@@ -12,6 +14,54 @@ import SetupStudioKnowledgeStage from "./stages/SetupStudioKnowledgeStage.jsx";
 import SetupStudioServiceStage from "./stages/SetupStudioServiceStage.jsx";
 import SetupStudioReadyStage from "./stages/SetupStudioReadyStage.jsx";
 import { discoveryModeLabel as defaultDiscoveryModeLabel } from "./lib/setupStudioHelpers.js";
+
+const JOURNEY = [
+  { key: "entry", index: "01", label: "signal" },
+  { key: "scanning", index: "02", label: "reading" },
+  { key: "identity", index: "03", label: "shape" },
+  { key: "knowledge", index: "04", label: "memory" },
+  { key: "service", index: "05", label: "offer" },
+  { key: "ready", index: "06", label: "launch" },
+];
+
+const STAGE_META = {
+  entry: {
+    eyebrow: "first move",
+    title: "Bring the business into the room.",
+    copy:
+      "Website, notes, and raw direction enter here. The page should feel like it listens, not like it asks you to fill a wizard.",
+  },
+  scanning: {
+    eyebrow: "reading surface",
+    title: "The system is pulling shape from the source.",
+    copy:
+      "We are scanning for signals, extracting business language, and drafting the first live version of the studio memory.",
+  },
+  identity: {
+    eyebrow: "identity draft",
+    title: "The first version of the business is taking form.",
+    copy:
+      "This stage should feel like a shaped response, not a spreadsheet of extracted fields.",
+  },
+  knowledge: {
+    eyebrow: "memory build",
+    title: "Signals are turning into usable knowledge.",
+    copy:
+      "Approve, reject, or refine what matters. The point is not quantity, it is sharpness.",
+  },
+  service: {
+    eyebrow: "offer frame",
+    title: "The offer layer comes into focus.",
+    copy:
+      "Services should emerge from the business direction naturally, not as a dull catalog setup step.",
+  },
+  ready: {
+    eyebrow: "launch state",
+    title: "The studio is close to becoming operational.",
+    copy:
+      "What remains is polishing the first working version and opening the workspace with confidence.",
+  },
+};
 
 export default function SetupStudioScene({
   loading,
@@ -45,8 +95,6 @@ export default function SetupStudioScene({
   onToggleKnowledge,
   discoveryModeLabel = defaultDiscoveryModeLabel,
 }) {
-  const tone = pageTone(discoveryState.mode, importingWebsite);
-
   const scanDone = isSuccessMode(discoveryState.mode) || !!s(discoveryState.lastUrl);
   const hasKnowledge = knowledgePreview.length > 0;
 
@@ -103,143 +151,263 @@ export default function SetupStudioScene({
     setStage("ready");
   }
 
-  const miniProgress = useMemo(() => {
-    const list = [
-      { key: "entry", label: "start" },
-      { key: "scanning", label: "scan" },
-      { key: "identity", label: "identity" },
-      { key: "knowledge", label: "knowledge" },
-      { key: "service", label: "service" },
-      { key: "ready", label: "ready" },
-    ];
+  const journeyItems = useMemo(() => {
+    const currentIndex = JOURNEY.findIndex((item) => item.key === stage);
 
-    const currentIndex = list.findIndex((item) => item.key === stage);
-
-    return list.map((item, index) => ({
+    return JOURNEY.map((item, index) => ({
       ...item,
       active: index === currentIndex,
       done: index < currentIndex,
     }));
   }, [stage]);
 
+  const currentMeta = STAGE_META[stage] || STAGE_META.entry;
   const currentTitle =
     s(businessForm.companyName) ||
-    discoveryProfileRows.find(([label]) => label === "Name")?.[1] ||
+    discoveryProfileRows?.find?.(([label]) => label === "Name")?.[1] ||
     "Business identity";
 
   const currentDescription =
     s(businessForm.description) ||
-    discoveryProfileRows.find(([label]) => label === "Description")?.[1] ||
+    discoveryProfileRows?.find?.(([label]) => label === "Description")?.[1] ||
     "We extracted a first draft of the business direction from the website.";
+
+  const rightRailItems = useMemo(() => {
+    const readiness = `${Number(meta?.readinessScore || 0)}%`;
+    const pending = String(Number(meta?.pendingCandidateCount || 0)).padStart(2, "0");
+    const approved = String(Number(meta?.approvedKnowledgeCount || 0)).padStart(2, "0");
+    const serviceCount = String(Number(meta?.serviceCount || services.length || 0)).padStart(2, "0");
+
+    if (stage === "identity") {
+      return [
+        { label: "current draft", value: currentTitle },
+        { label: "language", value: s(businessForm.language || "az").toUpperCase() },
+        { label: "timezone", value: s(businessForm.timezone || "Asia/Baku") },
+      ];
+    }
+
+    if (stage === "knowledge") {
+      return [
+        { label: "pending", value: pending },
+        { label: "approved", value: approved },
+        { label: "signals", value: String(knowledgePreview.length).padStart(2, "0") },
+      ];
+    }
+
+    if (stage === "service") {
+      return [
+        { label: "services", value: serviceCount },
+        { label: "seed title", value: s(serviceSuggestionTitle || "not set") },
+        { label: "readiness", value: readiness },
+      ];
+    }
+
+    if (stage === "ready") {
+      return [
+        { label: "readiness", value: readiness },
+        { label: "knowledge", value: approved },
+        { label: "services", value: serviceCount },
+      ];
+    }
+
+    if (stage === "scanning") {
+      return [
+        { label: "surface", value: s(discoveryState.lastUrl || "waiting") },
+        { label: "mode", value: "live scan" },
+        { label: "pass", value: scanLines[scanLineIndex] },
+      ];
+    }
+
+    return [
+      { label: "state", value: "ready to begin" },
+      { label: "knowledge", value: approved },
+      { label: "services", value: serviceCount },
+    ];
+  }, [
+    stage,
+    meta,
+    services.length,
+    businessForm.language,
+    businessForm.timezone,
+    currentTitle,
+    serviceSuggestionTitle,
+    knowledgePreview.length,
+    discoveryState.lastUrl,
+    scanLines,
+    scanLineIndex,
+  ]);
+
+  const statusLabel = discoveryModeLabel(importingWebsite ? "running" : discoveryState.mode);
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center px-4">
-        <div className="inline-flex items-center gap-3 rounded-full border border-white/80 bg-white/82 px-5 py-3 text-sm text-slate-600 shadow-[0_24px_80px_rgba(15,23,42,0.08)] backdrop-blur-xl">
-          Setup studio hazırlanır...
-        </div>
+      <div className="setup-studio-loading">
+        <div className="setup-studio-loading__pill">Setup studio hazırlanır...</div>
       </div>
     );
   }
 
   return (
-    <div className="relative h-full overflow-hidden">
-      <div className="mx-auto flex h-full max-w-[1320px] flex-col px-4 py-4 sm:px-6 lg:px-8 lg:py-6">
-        <SetupStudioHeader
-          tone={tone}
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          statusLabel={discoveryModeLabel(importingWebsite ? "running" : discoveryState.mode)}
-        />
+    <div className="setup-studio-scene" data-stage={stage}>
+      <div className="setup-studio-scene__backdrop">
+        <div className="setup-studio-scene__ring setup-studio-scene__ring--left" />
+        <div className="setup-studio-scene__ring setup-studio-scene__ring--right" />
+        <div className="setup-studio-scene__beam setup-studio-scene__beam--top" />
+        <div className="setup-studio-scene__beam setup-studio-scene__beam--bottom" />
+      </div>
 
-        <div className="relative min-h-0 flex-1 overflow-hidden rounded-[36px] border border-white/80 bg-white/44 shadow-[0_40px_140px_rgba(15,23,42,0.08)] backdrop-blur-2xl">
-          <div className="pointer-events-none absolute inset-x-0 top-[88px] h-px bg-gradient-to-r from-transparent via-slate-300/70 to-transparent" />
-          <div className="pointer-events-none absolute inset-x-[16%] top-[50%] h-px bg-gradient-to-r from-transparent via-slate-300/60 to-transparent" />
-          <div className="pointer-events-none absolute left-[10%] top-[18%] h-[180px] w-[180px] rounded-full border border-white/70" />
-          <div className="pointer-events-none absolute right-[8%] top-[16%] h-[240px] w-[240px] rounded-full border border-white/70" />
+      <header className="setup-studio-scene__topbar">
+        <div className="setup-studio-scene__brand">
+          <span className="setup-studio-scene__brand-mark" />
+          <span className="setup-studio-scene__brand-text">AI Setup Studio</span>
+        </div>
 
-          <div className="relative flex h-full flex-col">
-            <div className="px-5 pt-5 sm:px-8 sm:pt-7">
-              <SetupStudioProgressDots items={miniProgress} />
-            </div>
+        <div className="setup-studio-scene__topbar-actions">
+          <div className="setup-studio-scene__status" data-mode={importingWebsite ? "running" : s(discoveryState.mode || "idle")}>
+            <span className="setup-studio-scene__status-dot" />
+            <span>{statusLabel}</span>
+          </div>
 
-            <div className="relative flex min-h-0 flex-1 items-center px-5 pb-6 pt-4 sm:px-8 sm:pb-8">
-              <AnimatePresence mode="wait">
-                {stage === "entry" ? (
-                  <SetupStudioEntryStage
-                    key="entry"
-                    discoveryForm={discoveryForm}
-                    error={error}
-                    importingWebsite={importingWebsite}
-                    onSetDiscoveryField={onSetDiscoveryField}
-                    onScanBusiness={onScanBusiness}
-                  />
-                ) : null}
+          <button
+            type="button"
+            className="setup-studio-scene__refresh"
+            onClick={onRefresh}
+            disabled={refreshing}
+          >
+            {refreshing ? "Refreshing..." : "Refresh"}
+          </button>
+        </div>
+      </header>
 
-                {stage === "scanning" ? (
-                  <SetupStudioScanningStage
-                    key="scanning"
-                    lastUrl={discoveryState.lastUrl}
-                    scanLines={scanLines}
-                    scanLineIndex={scanLineIndex}
-                  />
-                ) : null}
+      <div className="setup-studio-scene__frame">
+        <aside className="setup-studio-scene__rail setup-studio-scene__rail--left">
+          <div className="setup-studio-scene__rail-index">
+            {journeyItems.find((item) => item.active)?.index || "01"}
+          </div>
 
-                {stage === "identity" ? (
-                  <SetupStudioIdentityStage
-                    key="identity"
-                    currentTitle={currentTitle}
-                    currentDescription={currentDescription}
-                    discoveryProfileRows={discoveryProfileRows}
-                    onNext={goNextStage}
-                    onToggleRefine={onToggleRefine}
-                  />
-                ) : null}
+          <div className="setup-studio-scene__rail-eyebrow">{currentMeta.eyebrow}</div>
 
-                {stage === "knowledge" ? (
-                  <SetupStudioKnowledgeStage
-                    key="knowledge"
-                    knowledgePreview={knowledgePreview}
-                    actingKnowledgeId={actingKnowledgeId}
-                    onApproveKnowledge={onApproveKnowledge}
-                    onRejectKnowledge={onRejectKnowledge}
-                    onNext={goNextStage}
-                    onToggleKnowledge={onToggleKnowledge}
-                  />
-                ) : null}
+          <h2 className="setup-studio-scene__rail-title">{currentMeta.title}</h2>
 
-                {stage === "service" ? (
-                  <SetupStudioServiceStage
-                    key="service"
-                    serviceSuggestionTitle={serviceSuggestionTitle}
-                    meta={meta}
-                    services={services}
-                    savingServiceSuggestion={savingServiceSuggestion}
-                    onCreateSeed={handleCreateServiceAndNext}
-                    onSkip={goNextStage}
-                  />
-                ) : null}
+          <p className="setup-studio-scene__rail-copy">
+            {stage === "identity" ? currentDescription : currentMeta.copy}
+          </p>
 
-                {stage === "ready" ? (
-                  <SetupStudioReadyStage
-                    key="ready"
-                    meta={meta}
-                    studioProgress={studioProgress}
-                    hasKnowledge={hasKnowledge}
-                    onToggleRefine={onToggleRefine}
-                    onToggleKnowledge={onToggleKnowledge}
-                    onOpenWorkspace={onOpenWorkspace}
-                  />
-                ) : null}
-              </AnimatePresence>
+          {error ? <div className="setup-studio-scene__error">{error}</div> : null}
+        </aside>
+
+        <main className="setup-studio-scene__main">
+          <div className="setup-studio-scene__main-glow" />
+          <div className="setup-studio-scene__stage-host">
+            <AnimatePresence mode="wait" initial={false}>
+              {stage === "entry" ? (
+                <SetupStudioEntryStage
+                  key="entry"
+                  discoveryForm={discoveryForm}
+                  error={error}
+                  importingWebsite={importingWebsite}
+                  onSetDiscoveryField={onSetDiscoveryField}
+                  onScanBusiness={onScanBusiness}
+                />
+              ) : null}
+
+              {stage === "scanning" ? (
+                <SetupStudioScanningStage
+                  key="scanning"
+                  lastUrl={discoveryState.lastUrl}
+                  scanLines={scanLines}
+                  scanLineIndex={scanLineIndex}
+                />
+              ) : null}
+
+              {stage === "identity" ? (
+                <SetupStudioIdentityStage
+                  key="identity"
+                  currentTitle={currentTitle}
+                  currentDescription={currentDescription}
+                  discoveryProfileRows={discoveryProfileRows}
+                  onNext={goNextStage}
+                  onToggleRefine={onToggleRefine}
+                />
+              ) : null}
+
+              {stage === "knowledge" ? (
+                <SetupStudioKnowledgeStage
+                  key="knowledge"
+                  knowledgePreview={knowledgePreview}
+                  actingKnowledgeId={actingKnowledgeId}
+                  onApproveKnowledge={onApproveKnowledge}
+                  onRejectKnowledge={onRejectKnowledge}
+                  onNext={goNextStage}
+                  onToggleKnowledge={onToggleKnowledge}
+                />
+              ) : null}
+
+              {stage === "service" ? (
+                <SetupStudioServiceStage
+                  key="service"
+                  serviceSuggestionTitle={serviceSuggestionTitle}
+                  meta={meta}
+                  services={services}
+                  savingServiceSuggestion={savingServiceSuggestion}
+                  onCreateSeed={handleCreateServiceAndNext}
+                  onSkip={goNextStage}
+                />
+              ) : null}
+
+              {stage === "ready" ? (
+                <SetupStudioReadyStage
+                  key="ready"
+                  meta={meta}
+                  studioProgress={studioProgress}
+                  hasKnowledge={hasKnowledge}
+                  onToggleRefine={onToggleRefine}
+                  onToggleKnowledge={onToggleKnowledge}
+                  onOpenWorkspace={onOpenWorkspace}
+                />
+              ) : null}
+            </AnimatePresence>
+          </div>
+        </main>
+
+        <aside className="setup-studio-scene__rail setup-studio-scene__rail--right">
+          <div className="setup-studio-scene__signal-label">live signals</div>
+
+          <div className="setup-studio-scene__signal-list">
+            {rightRailItems.map((item) => (
+              <div key={item.label} className="setup-studio-scene__signal-row">
+                <div className="setup-studio-scene__signal-name">{item.label}</div>
+                <div className="setup-studio-scene__signal-value">{item.value}</div>
+              </div>
+            ))}
+          </div>
+        </aside>
+      </div>
+
+      <div className="setup-studio-scene__journey">
+        {journeyItems.map((item) => (
+          <div
+            key={item.key}
+            className={[
+              "setup-studio-scene__journey-item",
+              item.active ? "is-active" : "",
+              item.done ? "is-done" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            <div className="setup-studio-scene__journey-line" />
+            <div className="setup-studio-scene__journey-meta">
+              <span className="setup-studio-scene__journey-index">{item.index}</span>
+              <span className="setup-studio-scene__journey-label">{item.label}</span>
             </div>
           </div>
-        </div>
+        ))}
       </div>
 
       <AnimatePresence>
         {showRefine ? (
-          <div className="absolute inset-0 z-40 flex items-center justify-center bg-slate-950/16 px-4 backdrop-blur-[6px]">
+          <div className="setup-studio-overlay">
             <SetupStudioRefineModal
               savingBusiness={savingBusiness}
               businessForm={businessForm}
@@ -254,7 +422,7 @@ export default function SetupStudioScene({
 
       <AnimatePresence>
         {showKnowledge ? (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-950/16 px-4 backdrop-blur-[6px]">
+          <div className="setup-studio-overlay setup-studio-overlay--deep">
             <SetupStudioIntakeModal
               knowledgePreview={knowledgePreview}
               actingKnowledgeId={actingKnowledgeId}

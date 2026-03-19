@@ -1,5 +1,5 @@
-import { Globe, Loader2, Wand2 } from "lucide-react";
-import SetupStudioStageShell from "../components/SetupStudioStageShell.jsx";
+import { Globe, Loader2, Sparkles, Wand2 } from "lucide-react";
+import { motion } from "framer-motion";
 
 export default function SetupStudioEntryStage({
   discoveryForm,
@@ -9,70 +9,133 @@ export default function SetupStudioEntryStage({
   onScanBusiness,
 }) {
   return (
-    <SetupStudioStageShell
-      eyebrow="first move"
-      title={
-        <>
-          Start with the website.
-          <br />
-          Let the page answer back.
-        </>
-      }
-      body="Tək bir URL yaz. Sonra bu səhifə step-step özü danışacaq: əvvəl scan, sonra identity, sonra knowledge, sonra service."
+    <motion.div
+      key="setup-studio-entry"
+      initial={{ opacity: 0, y: 18, filter: "blur(10px)" }}
+      animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+      exit={{ opacity: 0, y: -12, filter: "blur(8px)" }}
+      transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+      className="setup-studio-entry"
     >
-      <div className="grid gap-6 lg:grid-cols-[1fr_260px] lg:items-end">
-        <form onSubmit={onScanBusiness} className="space-y-4">
-          <div className="flex items-center gap-3 border-b border-slate-300/90 pb-4">
-            <Globe className="h-5 w-5 text-slate-400" />
-            <input
-              value={discoveryForm.websiteUrl}
-              onChange={(e) => onSetDiscoveryField("websiteUrl", e.target.value)}
-              className="w-full bg-transparent text-2xl font-medium tracking-[-0.04em] text-slate-950 outline-none placeholder:text-slate-400 sm:text-3xl"
-              placeholder="https://yourbusiness.com"
+      <div className="setup-studio-entry__intro">
+        <div className="setup-studio-entry__eyebrow">entry signal</div>
+        <p className="setup-studio-entry__lead">
+          URL daxil et. Studio əvvəl səthi oxuyacaq, sonra identity, knowledge və
+          service istiqamətini özü qurmağa başlayacaq.
+        </p>
+      </div>
+
+      <div className="setup-studio-entry__layout">
+        <form onSubmit={onScanBusiness} className="setup-studio-entry__surface">
+          <div className="setup-studio-entry__surface-glow" />
+          <div className="setup-studio-entry__surface-grid" />
+
+          <div className="setup-studio-entry__surface-top">
+            <div className="setup-studio-entry__modes">
+              <div className="setup-studio-entry__mode is-active">
+                <Globe className="h-4 w-4" />
+                <span>website</span>
+              </div>
+              <div className="setup-studio-entry__mode">
+                <Sparkles className="h-4 w-4" />
+                <span>notes</span>
+              </div>
+            </div>
+
+            <div className="setup-studio-entry__surface-state">
+              <span className="setup-studio-entry__surface-state-dot" />
+              <span>{importingWebsite ? "reading source" : "awaiting source"}</span>
+            </div>
+          </div>
+
+          <div className="setup-studio-entry__command-wrap">
+            <div className="setup-studio-entry__command-label">surface</div>
+
+            <div className="setup-studio-entry__command">
+              <Globe className="setup-studio-entry__command-icon h-5 w-5" />
+              <input
+                value={discoveryForm.websiteUrl}
+                onChange={(e) => onSetDiscoveryField("websiteUrl", e.target.value)}
+                className="setup-studio-entry__command-input"
+                placeholder="https://yourbusiness.com"
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </div>
+          </div>
+
+          <div className="setup-studio-entry__note-wrap">
+            <div className="setup-studio-entry__note-label">optional direction</div>
+
+            <textarea
+              value={discoveryForm.note}
+              onChange={(e) => onSetDiscoveryField("note", e.target.value)}
+              className="setup-studio-entry__note"
+              placeholder="Məsələn: əsas istiqamətimiz Instagram DM automation, lead qualification və AI-driven sales flow-dur."
             />
           </div>
 
-          <textarea
-            value={discoveryForm.note}
-            onChange={(e) => onSetDiscoveryField("note", e.target.value)}
-            className="min-h-[76px] w-full resize-none bg-transparent text-sm leading-7 text-slate-600 outline-none placeholder:text-slate-400"
-            placeholder="İstəsən fokus yaz: məsələn əsas istiqamətimiz Instagram DM automation və lead qualification-dır."
-          />
-
           {error ? (
-            <div className="rounded-[18px] border border-rose-200 bg-rose-50/90 px-4 py-3 text-sm text-rose-700">
+            <div className="setup-studio-entry__error">
               {error}
             </div>
           ) : null}
+
+          <div className="setup-studio-entry__footer">
+            <div className="setup-studio-entry__trace">
+              <div className="setup-studio-entry__trace-line" />
+              <div className="setup-studio-entry__trace-copy">
+                Studio source-dan ilk business memory draftını quracaq.
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={importingWebsite}
+              className="setup-studio-entry__submit"
+            >
+              {importingWebsite ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Scanning
+                </>
+              ) : (
+                <>
+                  <Wand2 className="h-4 w-4" />
+                  Start scan
+                </>
+              )}
+            </button>
+          </div>
         </form>
 
-        <div className="space-y-4">
-          <div className="space-y-2 text-sm text-slate-500">
-            <div>Detects identity</div>
-            <div>Extracts knowledge</div>
-            <div>Prepares service direction</div>
-          </div>
+        <div className="setup-studio-entry__signals">
+          <div className="setup-studio-entry__signals-label">first pass</div>
 
-          <button
-            type="button"
-            onClick={(e) => onScanBusiness(e)}
-            disabled={importingWebsite}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-slate-950 px-6 py-3.5 text-sm font-medium text-white shadow-[0_20px_60px_rgba(15,23,42,0.18)] disabled:opacity-60"
-          >
-            {importingWebsite ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Scanning business
-              </>
-            ) : (
-              <>
-                <Wand2 className="h-4 w-4" />
-                Begin scan
-              </>
-            )}
-          </button>
+          <div className="setup-studio-entry__signal-list">
+            <div className="setup-studio-entry__signal-item">
+              <div className="setup-studio-entry__signal-name">identity</div>
+              <div className="setup-studio-entry__signal-value">
+                business name, language, positioning
+              </div>
+            </div>
+
+            <div className="setup-studio-entry__signal-item">
+              <div className="setup-studio-entry__signal-name">knowledge</div>
+              <div className="setup-studio-entry__signal-value">
+                reusable facts, proof points, source signals
+              </div>
+            </div>
+
+            <div className="setup-studio-entry__signal-item">
+              <div className="setup-studio-entry__signal-name">offer</div>
+              <div className="setup-studio-entry__signal-value">
+                service direction and first operational shape
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-    </SetupStudioStageShell>
+    </motion.div>
   );
 }
