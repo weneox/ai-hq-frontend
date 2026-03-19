@@ -13,7 +13,7 @@ import SetupStudioReadyStage from "./stages/SetupStudioReadyStage.jsx";
 import { discoveryModeLabel as defaultDiscoveryModeLabel } from "./lib/setupStudioHelpers.js";
 
 const STEP_LABELS = {
-  entry: "Signal",
+  entry: "Source",
   identity: "Identity",
   knowledge: "Knowledge",
   service: "Service",
@@ -73,10 +73,10 @@ export default function SetupStudioScene({
   const [scanLineIndex, setScanLineIndex] = useState(0);
 
   const scanLines = [
-    "Reading key pages",
+    "Reading the primary source",
     "Extracting business identity",
-    "Collecting knowledge",
-    "Detecting service signals",
+    "Collecting knowledge signals",
+    "Detecting service structure",
   ];
 
   useEffect(() => {
@@ -123,7 +123,7 @@ export default function SetupStudioScene({
   const currentDescription =
     s(businessForm.description) ||
     discoveryProfileRows?.find?.(([label]) => label === "Description")?.[1] ||
-    "We extracted a first draft of the business direction from the website.";
+    "We extracted a first draft of the business direction from the source signals.";
 
   const statusLabel = discoveryModeLabel(importingWebsite ? "running" : discoveryState.mode);
   const progressCurrentStage = importingWebsite ? "entry" : stage;
@@ -139,7 +139,10 @@ export default function SetupStudioScene({
   }
 
   return (
-    <div className={`setup-studio-scene ${isEntryStage ? "is-entry-stage" : ""}`} data-stage={stage}>
+    <div
+      className={`setup-studio-scene ${isEntryStage ? "is-entry-stage" : ""}`}
+      data-stage={stage}
+    >
       <header className="setup-studio-scene__topbar">
         <div className="setup-studio-scene__brand">
           <span className="setup-studio-scene__brand-mark" />
