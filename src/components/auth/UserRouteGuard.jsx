@@ -51,24 +51,28 @@ export default function UserRouteGuard({ children }) {
           const setupCompleted = !!workspace.setupCompleted;
           const onSetup = isSetupPath(location.pathname);
 
-          if (!setupCompleted) {
-            const requestedSetupTarget = normalizeSetupRoute(
-              workspace.nextSetupRoute ||
-                workspace.initialRoute ||
-                "/setup/studio"
-            );
-
-            if (!onSetup) {
-              redirectTo = requestedSetupTarget;
-            } else if (location.pathname !== "/setup/studio") {
-              redirectTo = "/setup/studio";
+          if (setupCompleted) {
+            if (onSetup) {
+              redirectTo = "/";
             }
-          } else if (onSetup) {
-            redirectTo = "/";
+          } else {
+            if (location.pathname === "/setup") {
+              redirectTo = "/setup/studio";
+            } else if (
+              onSetup &&
+              location.pathname !== normalizeSetupRoute(location.pathname)
+            ) {
+              redirectTo = "/setup/studio";
+            } else {
+              redirectTo = "";
+            }
           }
         } catch {
           const onSetup = isSetupPath(location.pathname);
-          if (onSetup && location.pathname !== "/setup/studio") {
+
+          if (location.pathname === "/setup") {
+            redirectTo = "/setup/studio";
+          } else if (onSetup && location.pathname !== "/setup/studio") {
             redirectTo = "/setup/studio";
           } else {
             redirectTo = "";
