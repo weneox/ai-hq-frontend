@@ -44,6 +44,7 @@ function normalizeBootMeta(boot = {}, pendingKnowledge = [], serviceItems = []) 
   const knowledge = obj(setup?.knowledge || workspace?.knowledge);
   const catalog = obj(setup?.catalog || workspace?.catalog);
   const progress = obj(setup?.progress || workspace?.progress || workspace);
+  const runtime = obj(setup?.runtime || workspace?.runtime);
 
   return {
     readinessScore: Number(
@@ -58,7 +59,10 @@ function normalizeBootMeta(boot = {}, pendingKnowledge = [], serviceItems = []) 
     ),
     nextRoute: s(progress?.nextRoute || workspace?.nextRoute || "/"),
     nextSetupRoute: s(
-      progress?.nextSetupRoute || workspace?.nextSetupRoute || "/setup"
+      progress?.nextSetupRoute || workspace?.nextSetupRoute || "/setup/studio"
+    ),
+    nextStudioStage: s(
+      progress?.nextStudioStage || workspace?.nextStudioStage || "entry"
     ),
     setupCompleted: !!(
       progress?.setupCompleted ?? workspace?.setupCompleted ?? false
@@ -69,6 +73,9 @@ function normalizeBootMeta(boot = {}, pendingKnowledge = [], serviceItems = []) 
     approvedKnowledgeCount: Number(knowledge?.approvedKnowledgeCount || 0),
     serviceCount: Number(catalog?.serviceCount || serviceItems.length || 0),
     playbookCount: Number(catalog?.playbookCount || 0),
+    runtimeKnowledgeCount: Number(runtime?.knowledgeCount || 0),
+    runtimeServiceCount: Number(runtime?.serviceCount || 0),
+    runtimePlaybookCount: Number(runtime?.playbookCount || 0),
   };
 }
 
@@ -196,6 +203,23 @@ function scanCompleteLabel(sourceType = "", candidateCount = 0) {
     : "Website import tamamlandı.";
 }
 
+function applyUiHintsFromMeta({
+  nextMeta = {},
+  pendingKnowledge = [],
+  setShowKnowledge,
+  setShowRefine,
+}) {
+  const stage = s(nextMeta?.nextStudioStage);
+
+  if (stage === "knowledge" && arr(pendingKnowledge).length > 0) {
+    setShowKnowledge(true);
+  }
+
+  if (stage === "identity" || stage === "business_profile") {
+    setShowRefine(true);
+  }
+}
+
 export default function SetupStudioScreen() {
   const navigate = useNavigate();
 
@@ -228,9 +252,14 @@ export default function SetupStudioScreen() {
     mode: "idle",
     lastUrl: "",
     lastSourceType: "",
+    sourceLabel: "",
     message: "",
     candidateCount: 0,
     profileApplied: false,
+    shouldReview: false,
+    warnings: [],
+    requestId: "",
+    intakeContext: {},
     profile: {},
     signals: {},
     snapshot: {},
@@ -245,12 +274,16 @@ export default function SetupStudioScreen() {
     missingSteps: [],
     primaryMissingStep: "",
     nextRoute: "/",
-    nextSetupRoute: "/setup",
+    nextSetupRoute: "/setup/studio",
+    nextStudioStage: "entry",
     setupCompleted: false,
     pendingCandidateCount: 0,
     approvedKnowledgeCount: 0,
     serviceCount: 0,
     playbookCount: 0,
+    runtimeKnowledgeCount: 0,
+    runtimeServiceCount: 0,
+    runtimePlaybookCount: 0,
   });
 
   async function loadData({ silent = false, preserveBusinessForm = false } = {}) {
@@ -290,6 +323,13 @@ export default function SetupStudioScreen() {
       setKnowledgeCandidates(pendingKnowledge);
       setServices(serviceItems);
 
+      applyUiHintsFromMeta({
+        nextMeta,
+        pendingKnowledge,
+        setShowKnowledge,
+        setShowRefine,
+      });
+
       return {
         boot,
         workspace,
@@ -324,6 +364,14 @@ export default function SetupStudioScreen() {
     loadData();
   }, []);
 
+  useEffect(() => {
+    if (meta.setupCompleted) return;
+
+    if (s(meta.nextStudioStage) === "knowledge" && knowledgeCandidates.length > 0) {
+      setShowKnowledge(true);
+    }
+  }, [meta.nextStudioStage, meta.setupCompleted, knowledgeCandidates.length]);
+
   async function refreshAndMaybeRouteHome({ preserveBusinessForm = false } = {}) {
     const snapshot = await loadData({
       silent: true,
@@ -339,6 +387,13 @@ export default function SetupStudioScreen() {
         snapshot,
       };
     }
+
+    applyUiHintsFromMeta({
+      nextMeta,
+      pendingKnowledge: arr(snapshot?.pendingKnowledge),
+      setShowKnowledge,
+      setShowRefine,
+    });
 
     return {
       routed: false,
@@ -384,7 +439,10 @@ export default function SetupStudioScreen() {
         mode: "running",
         lastUrl: sourceUrl,
         lastSourceType: sourceType,
+        sourceLabel: sourceType === "google_maps" ? "Google Maps" : "Website",
         message: scanStartLabel(sourceType),
+        warnings: [],
+        shouldReview: false,
       }));
 
       const result = await importSourceForSetup({
@@ -407,13 +465,23 @@ export default function SetupStudioScreen() {
         setBusinessForm(mergedForm);
       }
 
+      const resultWarnings = arr(result?.warnings).map((x) => s(x)).filter(Boolean);
+
       setDiscoveryState({
         mode: s(result?.mode) || "success",
         lastUrl: sourceUrl,
         lastSourceType: sourceType,
-        message: scanCompleteLabel(sourceType, result?.candidateCount),
+        sourceLabel: s(result?.sourceLabel || (sourceType === "google_maps" ? "Google Maps" : "Website")),
+        message:
+          resultWarnings.length > 0
+            ? resultWarnings[0]
+            : scanCompleteLabel(sourceType, result?.candidateCount),
         candidateCount: Number(result?.candidateCount || 0),
         profileApplied,
+        shouldReview: !!result?.shouldReview,
+        warnings: resultWarnings,
+        requestId: s(result?.requestId),
+        intakeContext: obj(result?.intakeContext),
         profile: discoveredProfile,
         signals: obj(result?.signals),
         snapshot: obj(result?.snapshot),
@@ -429,10 +497,16 @@ export default function SetupStudioScreen() {
         );
 
         const shouldOpenKnowledge =
+          !!result?.shouldReview ||
           Number(result?.candidateCount || 0) > 0 ||
-          refreshedPendingKnowledge.length > 0;
+          refreshedPendingKnowledge.length > 0 ||
+          s(refreshResult?.snapshot?.meta?.nextStudioStage) === "knowledge";
 
         setShowKnowledge(shouldOpenKnowledge);
+
+        if (profileApplied || s(refreshResult?.snapshot?.meta?.nextStudioStage) === "identity") {
+          setShowRefine(true);
+        }
       }
     } catch (e2) {
       const message = String(e2?.message || e2 || "Source scan alınmadı.");
@@ -441,6 +515,7 @@ export default function SetupStudioScreen() {
         mode: "error",
         lastUrl: sourceUrl,
         lastSourceType: sourceType,
+        sourceLabel: sourceType === "google_maps" ? "Google Maps" : "Website",
         message,
       }));
       setError(message);
@@ -464,7 +539,12 @@ export default function SetupStudioScreen() {
         languages: businessForm.language ? [businessForm.language] : [],
       });
 
-      await refreshAndMaybeRouteHome({ preserveBusinessForm: false });
+      const refreshed = await refreshAndMaybeRouteHome({ preserveBusinessForm: false });
+
+      if (!refreshed?.routed && s(refreshed?.snapshot?.meta?.nextStudioStage) === "knowledge") {
+        setShowKnowledge(true);
+      }
+
       return { ok: true };
     } catch (e2) {
       setError(String(e2?.message || e2 || "Business profile could not be saved."));
@@ -483,7 +563,15 @@ export default function SetupStudioScreen() {
       setError("");
 
       await approveKnowledgeCandidate(id, {});
-      await refreshAndMaybeRouteHome({ preserveBusinessForm: true });
+      const refreshed = await refreshAndMaybeRouteHome({ preserveBusinessForm: true });
+
+      if (!refreshed?.routed) {
+        const nextStage = s(refreshed?.snapshot?.meta?.nextStudioStage);
+        if (nextStage !== "knowledge") {
+          setShowKnowledge(false);
+        }
+      }
+
       return { ok: true };
     } catch (e) {
       setError(String(e?.message || e || "Candidate could not be approved."));
@@ -502,7 +590,15 @@ export default function SetupStudioScreen() {
       setError("");
 
       await rejectKnowledgeCandidate(id, {});
-      await refreshAndMaybeRouteHome({ preserveBusinessForm: true });
+      const refreshed = await refreshAndMaybeRouteHome({ preserveBusinessForm: true });
+
+      if (!refreshed?.routed) {
+        const remaining = Number(refreshed?.snapshot?.meta?.pendingCandidateCount || 0);
+        if (remaining <= 0) {
+          setShowKnowledge(false);
+        }
+      }
+
       return { ok: true };
     } catch (e) {
       setError(String(e?.message || e || "Candidate could not be rejected."));
@@ -547,7 +643,14 @@ export default function SetupStudioScreen() {
         return;
       }
 
-      setError("Hələ bir neçə step qalır. Onları tamamlayıb yenə yoxla.");
+      applyUiHintsFromMeta({
+        nextMeta,
+        pendingKnowledge: arr(snapshot?.pendingKnowledge),
+        setShowKnowledge,
+        setShowRefine,
+      });
+
+      navigate("/setup/studio", { replace: true });
     } catch (e) {
       setError(String(e?.message || e || "Workspace status could not be checked."));
     }
@@ -579,7 +682,8 @@ export default function SetupStudioScreen() {
         : arr(derived.missingSteps),
       primaryMissingStep: s(meta.primaryMissingStep || derived.primaryMissingStep),
       nextRoute: s(meta.nextRoute || derived.nextRoute || "/"),
-      nextSetupRoute: s(meta.nextSetupRoute || derived.nextSetupRoute || "/setup"),
+      nextSetupRoute: s(meta.nextSetupRoute || derived.nextSetupRoute || "/setup/studio"),
+      nextStudioStage: s(meta.nextStudioStage || "entry"),
       setupCompleted: !!(meta.setupCompleted ?? derived.setupCompleted),
     };
   }, [importingWebsite, discoveryState, meta]);

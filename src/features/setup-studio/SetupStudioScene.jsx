@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import { RotateCw } from "lucide-react";
-import { isSuccessMode, s } from "./lib/setupStudioHelpers.js";
+import { isSuccessMode, s, arr, obj } from "./lib/setupStudioHelpers.js";
 import SetupStudioRefineModal from "./components/SetupStudioRefineModal.jsx";
 import SetupStudioIntakeModal from "./components/SetupStudioIntakeModal.jsx";
 import SetupStudioEntryStage from "./stages/SetupStudioEntryStage.jsx";
@@ -31,29 +31,70 @@ function findProfileRowValue(rows = [], wantedKeys = []) {
   return s(match?.[1]);
 }
 
+function normalizeStageCandidate(stage = "", { hasKnowledge, hasServices, scanSucceeded } = {}) {
+  const x = s(stage);
+
+  if (x === "scanning") return "scanning";
+  if (x === "ready") return "ready";
+  if (x === "service") return "service";
+  if (x === "knowledge") return hasKnowledge ? "knowledge" : hasServices ? "ready" : "service";
+  if (x === "identity") return scanSucceeded ? "identity" : "entry";
+  return "entry";
+}
+
 function buildRecoveredStage({
   importingWebsite,
   scanSucceeded,
   hasKnowledge,
-  services,
+  hasServices,
   studioProgress,
+  hasScannedUrl,
 }) {
   if (importingWebsite) return "scanning";
-  if (!scanSucceeded) return "entry";
+
+  const nextStudioStage = s(
+    studioProgress?.nextStudioStage ||
+      studioProgress?.progress?.nextStudioStage
+  );
 
   if (studioProgress?.setupCompleted) {
     return "ready";
   }
 
-  if (hasKnowledge) {
-    return "knowledge";
+  if (!scanSucceeded && !hasScannedUrl) {
+    return nextStudioStage === "entry" ? "entry" : "entry";
   }
 
-  if (Array.isArray(services) && services.length > 0) {
-    return "ready";
+  if (nextStudioStage) {
+    return normalizeStageCandidate(nextStudioStage, {
+      hasKnowledge,
+      hasServices,
+      scanSucceeded,
+    });
   }
 
+  if (!scanSucceeded) return "entry";
+  if (hasKnowledge) return "knowledge";
+  if (hasServices) return "ready";
   return "identity";
+}
+
+function buildStatusLabel({
+  importingWebsite,
+  discoveryState,
+  discoveryModeLabel,
+}) {
+  if (importingWebsite) return "Analyzing";
+
+  if (arr(discoveryState?.warnings).length > 0) {
+    return "Review needed";
+  }
+
+  if (discoveryState?.shouldReview) {
+    return "Needs review";
+  }
+
+  return discoveryModeLabel(discoveryState?.mode);
 }
 
 export default function SetupStudioScene({
@@ -83,6 +124,7 @@ export default function SetupStudioScene({
   onApproveKnowledge,
   onRejectKnowledge,
   onCreateSuggestedService,
+  onOpenWorkspace,
   onRefresh,
   onToggleRefine,
   onToggleKnowledge,
@@ -118,8 +160,9 @@ export default function SetupStudioScene({
       importingWebsite,
       scanSucceeded,
       hasKnowledge,
-      services,
+      hasServices,
       studioProgress,
+      hasScannedUrl,
     })
   );
   const [scanLineIndex, setScanLineIndex] = useState(0);
@@ -146,8 +189,9 @@ export default function SetupStudioScene({
       importingWebsite,
       scanSucceeded,
       hasKnowledge,
-      services,
+      hasServices,
       studioProgress,
+      hasScannedUrl,
     });
 
     if (importingWebsite) {
@@ -165,20 +209,51 @@ export default function SetupStudioScene({
       return;
     }
 
-    if (hasKnowledge && stage === "identity") {
+    if (!hasKnowledge && stage === "knowledge") {
+      setStage(hasServices ? "ready" : "service");
       return;
     }
 
-    if (!hasKnowledge && stage === "knowledge") {
-      setStage("service");
+    const requestedStage = normalizeStageCandidate(
+      s(studioProgress?.nextStudioStage),
+      {
+        hasKnowledge,
+        hasServices,
+        scanSucceeded,
+      }
+    );
+
+    if (
+      requestedStage &&
+      requestedStage !== "entry" &&
+      requestedStage !== "scanning"
+    ) {
+      if (stage === "identity" && requestedStage === "knowledge" && hasKnowledge) {
+        setStage("knowledge");
+        return;
+      }
+
+      if (stage === "knowledge" && requestedStage === "service") {
+        setStage("service");
+        return;
+      }
+
+      if (
+        (stage === "service" || stage === "identity" || stage === "knowledge") &&
+        requestedStage === "ready" &&
+        (hasServices || studioProgress?.setupCompleted)
+      ) {
+        setStage("ready");
+      }
     }
   }, [
     importingWebsite,
     scanSucceeded,
     hasKnowledge,
-    services,
+    hasServices,
     studioProgress,
     stage,
+    hasScannedUrl,
   ]);
 
   useEffect(() => {
@@ -211,6 +286,11 @@ export default function SetupStudioScene({
   }
 
   function handleOpenWorkspace() {
+    if (typeof onOpenWorkspace === "function") {
+      onOpenWorkspace();
+      return;
+    }
+
     const target =
       s(studioProgress?.nextRoute) ||
       s(studioProgress?.progress?.nextRoute) ||
@@ -242,18 +322,39 @@ export default function SetupStudioScene({
     discoveredDescription ||
     "We extracted a first draft of the business direction from the source signals.";
 
-  const progressCurrentStage = importingWebsite ? "identity" : stage;
+  const progressCurrentStage = importingWebsite
+    ? normalizeStageCandidate(s(studioProgress?.nextStudioStage || "identity"), {
+        hasKnowledge,
+        hasServices,
+        scanSucceeded: true,
+      })
+    : stage;
+
   const progressCurrentIndex = Math.max(
     0,
     progressSteps.indexOf(progressCurrentStage)
   );
+
   const isEntryStage = stage === "entry";
 
-  const statusLabel = importingWebsite
-    ? "Analyzing"
-    : isEntryStage
-      ? "Ready"
-      : discoveryModeLabel(discoveryState.mode);
+  const statusLabel = buildStatusLabel({
+    importingWebsite,
+    discoveryState,
+    discoveryModeLabel,
+  });
+
+  const sourceLabel = s(
+    discoveryState?.sourceLabel ||
+      (s(discoveryState?.lastSourceType) === "google_maps"
+        ? "Google Maps"
+        : s(discoveryState?.lastSourceType) === "website"
+          ? "Website"
+          : "")
+  );
+
+  const stageMeta = obj(meta);
+  const stageWarnings = arr(discoveryState?.warnings).filter(Boolean);
+  const nextStudioStage = s(stageMeta?.nextStudioStage || studioProgress?.nextStudioStage || "");
 
   if (loading) {
     return (
@@ -323,6 +424,40 @@ export default function SetupStudioScene({
         </div>
       </header>
 
+      {!isEntryStage && (error || sourceLabel || stageWarnings.length > 0) ? (
+        <div className="setup-studio-scene__meta-strip">
+          {sourceLabel ? (
+            <span className="setup-studio-scene__meta-chip">
+              Source: {sourceLabel}
+            </span>
+          ) : null}
+
+          {nextStudioStage ? (
+            <span className="setup-studio-scene__meta-chip">
+              Next: {nextStudioStage}
+            </span>
+          ) : null}
+
+          {discoveryState?.shouldReview ? (
+            <span className="setup-studio-scene__meta-chip">
+              Review required
+            </span>
+          ) : null}
+
+          {stageWarnings.length > 0 ? (
+            <span className="setup-studio-scene__meta-chip">
+              {stageWarnings[0]}
+            </span>
+          ) : null}
+
+          {error ? (
+            <span className="setup-studio-scene__meta-chip is-error">
+              {error}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
       {isEntryStage ? (
         <main className="setup-studio-entry-page">
           <div className="setup-studio-entry-page__shell">
@@ -346,8 +481,10 @@ export default function SetupStudioScene({
                 <SetupStudioScanningStage
                   key="scanning"
                   lastUrl={discoveryState.lastUrl}
+                  sourceLabel={sourceLabel}
                   scanLines={scanLines}
                   scanLineIndex={scanLineIndex}
+                  requestId={s(discoveryState.requestId)}
                 />
               ) : null}
 
@@ -357,6 +494,8 @@ export default function SetupStudioScene({
                   currentTitle={currentTitle}
                   currentDescription={currentDescription}
                   discoveryProfileRows={discoveryProfileRows}
+                  discoveryWarnings={stageWarnings}
+                  sourceLabel={sourceLabel}
                   onNext={goNextStage}
                   onToggleRefine={onToggleRefine}
                 />
@@ -367,6 +506,8 @@ export default function SetupStudioScene({
                   key="knowledge"
                   knowledgePreview={knowledgePreview}
                   actingKnowledgeId={actingKnowledgeId}
+                  sourceLabel={sourceLabel}
+                  warnings={stageWarnings}
                   onApproveKnowledge={onApproveKnowledge}
                   onRejectKnowledge={onRejectKnowledge}
                   onNext={goNextStage}
@@ -380,6 +521,7 @@ export default function SetupStudioScene({
                   serviceSuggestionTitle={serviceSuggestionTitle}
                   meta={meta}
                   services={services}
+                  sourceLabel={sourceLabel}
                   savingServiceSuggestion={savingServiceSuggestion}
                   onCreateSeed={handleCreateServiceAndNext}
                   onSkip={goNextStage}
@@ -392,6 +534,8 @@ export default function SetupStudioScene({
                   meta={meta}
                   studioProgress={studioProgress}
                   hasKnowledge={hasKnowledge}
+                  sourceLabel={sourceLabel}
+                  warnings={stageWarnings}
                   onToggleRefine={onToggleRefine}
                   onToggleKnowledge={onToggleKnowledge}
                   onOpenWorkspace={handleOpenWorkspace}

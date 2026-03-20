@@ -1,5 +1,5 @@
 // src/features/setup-studio/lib/setupStudioHelpers.js
-// FINAL v1.2
+// FINAL v2.0 — canonical setup studio helpers
 
 export function arr(value) {
   return Array.isArray(value) ? value : [];
@@ -24,6 +24,9 @@ export function firstLanguage(profile) {
   if (Array.isArray(profile?.languages) && profile.languages[0]) {
     return String(profile.languages[0]);
   }
+  if (Array.isArray(profile?.supportedLanguages) && profile.supportedLanguages[0]) {
+    return String(profile.supportedLanguages[0]);
+  }
   return "az";
 }
 
@@ -40,6 +43,8 @@ export function extractItems(payload) {
     payload.candidates,
     payload.queue,
     payload.services,
+    payload.knowledgeItems,
+    payload.playbooks,
   ];
 
   for (const item of candidates) {
@@ -128,7 +133,8 @@ export function candidateValue(item = {}) {
             valueJson.email ||
             valueJson.phone ||
             valueJson.url ||
-            valueJson.title
+            valueJson.title ||
+            valueJson.company_name
         );
 
   if (combined) return combined;
@@ -143,14 +149,20 @@ export function candidateValue(item = {}) {
   }
 }
 
+export function evidenceList(item = {}) {
+  return parseJsonArray(item.source_evidence_json).slice(0, 3);
+}
+
 export function candidateSource(item = {}) {
   const evidence = evidenceList(item)[0] || {};
 
   return (
     s(item.source_display_name) ||
     s(item.display_name) ||
+    s(item.source_label) ||
     s(item.source_type) ||
     s(item.source_key) ||
+    s(evidence.source_label) ||
     s(evidence.type) ||
     s(evidence.source_type) ||
     "Unknown source"
@@ -165,17 +177,15 @@ export function candidateConfidence(item = {}) {
   return `${Math.round(percent)}%`;
 }
 
-export function evidenceList(item = {}) {
-  return parseJsonArray(item.source_evidence_json).slice(0, 2);
-}
-
 export function profilePatchFromDiscovery(profile = {}) {
   const p = obj(profile);
   const languages = arr(p.languages);
+  const supportedLanguages = arr(p.supportedLanguages);
 
   return {
     companyName: s(
       p.companyName ||
+        p.displayName ||
         p.businessName ||
         p.name ||
         p.title ||
@@ -184,15 +194,22 @@ export function profilePatchFromDiscovery(profile = {}) {
     ),
     description: s(
       p.description ||
+        p.summaryShort ||
         p.summary ||
         p.businessDescription ||
         p.about ||
         p.companySummaryShort ||
         p.companySummaryLong ||
+        p.summaryLong ||
         p.aboutSection
     ),
     timezone: s(p.timezone || p.timeZone),
-    language: s(p.language || languages[0]),
+    language: s(
+      p.language ||
+        p.mainLanguage ||
+        languages[0] ||
+        supportedLanguages[0]
+    ),
   };
 }
 
@@ -222,12 +239,20 @@ export function profilePreviewRows(profile = {}) {
   const p = obj(profile);
 
   const services = arr(p.services).filter(Boolean).slice(0, 4).join(", ");
+  const products = arr(p.products).filter(Boolean).slice(0, 4).join(", ");
+  const pricingHints = arr(p.pricingHints).filter(Boolean).slice(0, 3).join(" · ");
+  const socialLinks = arr(p.socialLinks)
+    .map((item) => s(item?.platform || item?.url || item))
+    .filter(Boolean)
+    .slice(0, 4)
+    .join(", ");
 
   return [
     [
       "Name",
       s(
         p.companyName ||
+          p.displayName ||
           p.businessName ||
           p.name ||
           p.title ||
@@ -239,18 +264,26 @@ export function profilePreviewRows(profile = {}) {
       "Description",
       s(
         p.description ||
+          p.summaryShort ||
           p.summary ||
           p.businessDescription ||
           p.about ||
           p.companySummaryShort ||
           p.companySummaryLong ||
+          p.summaryLong ||
           p.aboutSection
       ),
     ],
     ["Timezone", s(p.timezone || p.timeZone)],
-    ["Language", s(p.language || arr(p.languages)[0])],
-    ["Website", s(p.website || p.url || p.siteUrl)],
+    ["Language", s(p.language || p.mainLanguage || arr(p.languages)[0] || arr(p.supportedLanguages)[0])],
+    ["Website", s(p.websiteUrl || p.website || p.url || p.siteUrl)],
+    ["Phone", s(p.primaryPhone || arr(p.phones)[0])],
+    ["Email", s(p.primaryEmail || arr(p.emails)[0])],
+    ["Address", s(p.primaryAddress || arr(p.addresses)[0])],
     ["Services", services],
+    ["Products", products],
+    ["Pricing", pricingHints],
+    ["Social", socialLinks],
   ].filter(([, value]) => value);
 }
 
@@ -259,6 +292,7 @@ export function discoveryModeLabel(mode = "") {
 
   if (!value || value === "idle") return "Ready to scan";
   if (["running", "queued", "processing", "syncing"].includes(value)) return "AI is scanning";
+  if (["partial", "warning", "warnings", "needs_review"].includes(value)) return "Review needed";
   if (["success", "completed", "complete", "done"].includes(value)) return "Scan completed";
   if (["error", "failed"].includes(value)) return "Scan failed";
 
@@ -270,14 +304,28 @@ export function stepDone(meta, key) {
   return !missing.includes(String(key).toLowerCase());
 }
 
+function normalizeProgressStage(value = "") {
+  const x = s(value).toLowerCase();
+
+  if (["entry", "source"].includes(x)) return "entry";
+  if (["identity", "business_profile", "business"].includes(x)) return "identity";
+  if (["knowledge", "review"].includes(x)) return "knowledge";
+  if (["service", "services"].includes(x)) return "service";
+  if (["ready", "launch", "complete"].includes(x)) return "ready";
+
+  return "entry";
+}
+
 export function deriveStudioProgress({ importingWebsite, discoveryState, meta }) {
   const readinessScore = Number(meta?.readinessScore || 0);
   const setupCompleted = !!meta?.setupCompleted;
   const missingSteps = arr(meta?.missingSteps);
   const primaryMissingStep = s(meta?.primaryMissingStep);
   const nextRoute = s(meta?.nextRoute || "/");
-  const nextSetupRoute = s(meta?.nextSetupRoute || "/setup");
+  const nextSetupRoute = s(meta?.nextSetupRoute || "/setup/studio");
+  const nextStudioStage = normalizeProgressStage(meta?.nextStudioStage);
   const readinessLabel = s(meta?.readinessLabel);
+  const pendingCandidateCount = Number(meta?.pendingCandidateCount || 0);
 
   let progressPercent = readinessScore;
 
@@ -286,13 +334,15 @@ export function deriveStudioProgress({ importingWebsite, discoveryState, meta })
   } else if (importingWebsite) {
     progressPercent = Math.max(
       24,
-      Math.min(76, 36 + Number(meta?.pendingCandidateCount || 0) * 4)
+      Math.min(76, 36 + pendingCandidateCount * 4)
     );
   } else {
     const mode = s(discoveryState?.mode).toLowerCase();
 
     if (["success", "completed", "complete", "done"].includes(mode)) {
       progressPercent = Math.max(readinessScore, 72);
+    } else if (["partial", "warning", "warnings", "needs_review"].includes(mode)) {
+      progressPercent = Math.max(readinessScore, 64);
     } else if (["error", "failed"].includes(mode)) {
       progressPercent = Math.max(12, readinessScore);
     } else {
@@ -308,12 +358,16 @@ export function deriveStudioProgress({ importingWebsite, discoveryState, meta })
     primaryMissingStep,
     nextRoute,
     nextSetupRoute,
+    nextStudioStage,
     setupCompleted,
+    pendingCandidateCount,
   };
 }
 
 export function isSuccessMode(mode = "") {
-  return ["success", "completed", "complete", "done"].includes(s(mode).toLowerCase());
+  return ["success", "completed", "complete", "done", "partial"].includes(
+    s(mode).toLowerCase()
+  );
 }
 
 export function pageTone(mode = "", importingWebsite = false) {
@@ -332,6 +386,14 @@ export function pageTone(mode = "", importingWebsite = false) {
       dot: "bg-cyan-500",
       text: "text-cyan-700",
       chip: "border-cyan-500/15 bg-cyan-500/10 text-cyan-700",
+    };
+  }
+
+  if (["partial", "warning", "warnings", "needs_review"].includes(value)) {
+    return {
+      dot: "bg-amber-500",
+      text: "text-amber-700",
+      chip: "border-amber-500/15 bg-amber-500/10 text-amber-700",
     };
   }
 
