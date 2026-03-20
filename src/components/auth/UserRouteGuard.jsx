@@ -43,36 +43,29 @@ export default function UserRouteGuard({ children }) {
           return;
         }
 
+        const onSetup = isSetupPath(location.pathname);
         let redirectTo = "";
 
         try {
-          const boot = await getAppBootstrap();
-          const workspace = boot?.workspace || {};
-          const setupCompleted = !!workspace.setupCompleted;
-          const onSetup = isSetupPath(location.pathname);
-
-          if (setupCompleted) {
-            if (onSetup) {
-              redirectTo = "/";
-            }
-          } else {
-            if (location.pathname === "/setup") {
-              redirectTo = "/setup/studio";
-            } else if (
-              onSetup &&
-              location.pathname !== normalizeSetupRoute(location.pathname)
-            ) {
-              redirectTo = "/setup/studio";
-            } else {
-              redirectTo = "";
-            }
-          }
-        } catch {
-          const onSetup = isSetupPath(location.pathname);
+          await getAppBootstrap();
 
           if (location.pathname === "/setup") {
             redirectTo = "/setup/studio";
-          } else if (onSetup && location.pathname !== "/setup/studio") {
+          } else if (
+            onSetup &&
+            location.pathname !== normalizeSetupRoute(location.pathname)
+          ) {
+            redirectTo = "/setup/studio";
+          } else {
+            redirectTo = "";
+          }
+        } catch {
+          if (location.pathname === "/setup") {
+            redirectTo = "/setup/studio";
+          } else if (
+            onSetup &&
+            location.pathname !== normalizeSetupRoute(location.pathname)
+          ) {
             redirectTo = "/setup/studio";
           } else {
             redirectTo = "";
