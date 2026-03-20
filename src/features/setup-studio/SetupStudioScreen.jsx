@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getAppBootstrap } from "../../api/app.js";
-import { importWebsiteForSetup, saveBusinessProfile } from "../../api/setup.js";
+import { importSourceForSetup, saveBusinessProfile } from "../../api/setup.js";
 import {
   approveKnowledgeCandidate,
   getKnowledgeCandidates,
@@ -84,7 +84,8 @@ function deriveSuggestedServicePayload({
 
   const discoveredServices = arr(
     discoveryState?.profile?.services ||
-      discoveryState?.signals?.offerings?.services
+      discoveryState?.signals?.sourceFusion?.profile?.services ||
+      discoveryState?.signals?.website?.offerings?.services
   );
 
   const fallbackTitle =
@@ -97,10 +98,11 @@ function deriveSuggestedServicePayload({
     s(candidateValue(serviceCandidate)) ||
     s(discoveryForm.note) ||
     s(
-      discoveryState?.profile?.companySummaryShort ||
+      discoveryState?.profile?.summaryShort ||
+        discoveryState?.profile?.companySummaryShort ||
         discoveryState?.profile?.description
     ) ||
-    `Service discovered from ${s(discoveryState?.lastUrl || "website import")}.`;
+    `Service discovered from ${s(discoveryState?.lastUrl || "source import")}.`;
 
   const category = (() => {
     const raw = s(candidateCategory(serviceCandidate)).toLowerCase();
@@ -120,6 +122,78 @@ function deriveSuggestedServicePayload({
     highlightsText: "",
     isActive: true,
   };
+}
+
+function normalizeIncomingSourceType(value = "") {
+  const x = s(value).toLowerCase().replace(/[\s-]+/g, "_");
+
+  if (x === "website" || x === "site" || x === "web") return "website";
+  if (x === "google_maps" || x === "googlemaps" || x === "maps" || x === "gmaps") {
+    return "google_maps";
+  }
+
+  return "";
+}
+
+function detectSourceTypeFromUrl(url = "") {
+  const value = s(url).toLowerCase();
+
+  if (
+    value.includes("google.com/maps") ||
+    value.includes("maps.app.goo.gl") ||
+    value.includes("g.co/kgs")
+  ) {
+    return "google_maps";
+  }
+
+  return "website";
+}
+
+function normalizeScanRequest(input, discoveryForm = {}) {
+  if (input && typeof input.preventDefault === "function") {
+    input.preventDefault();
+
+    const fallbackUrl = s(discoveryForm.websiteUrl);
+    return {
+      sourceType: detectSourceTypeFromUrl(fallbackUrl),
+      url: fallbackUrl,
+      note: s(discoveryForm.note),
+      sources: [],
+      primarySource: null,
+    };
+  }
+
+  const payload = obj(input);
+  const url = s(payload.url || payload.sourceUrl || discoveryForm.websiteUrl);
+  const sourceType =
+    normalizeIncomingSourceType(payload.sourceType || payload.type) ||
+    detectSourceTypeFromUrl(url);
+
+  return {
+    sourceType,
+    url,
+    note: s(payload.note || discoveryForm.note),
+    sources: arr(payload.sources),
+    primarySource: payload.primarySource || null,
+  };
+}
+
+function scanStartLabel(sourceType = "") {
+  return sourceType === "google_maps"
+    ? "Google Maps scan başladı..."
+    : "Website scan başladı...";
+}
+
+function scanCompleteLabel(sourceType = "", candidateCount = 0) {
+  const count = Number(candidateCount || 0);
+
+  if (count > 0) {
+    return `${count} discovery hazırlandı.`;
+  }
+
+  return sourceType === "google_maps"
+    ? "Google Maps import tamamlandı."
+    : "Website import tamamlandı.";
 }
 
 export default function SetupStudioScreen() {
@@ -153,11 +227,13 @@ export default function SetupStudioScreen() {
   const [discoveryState, setDiscoveryState] = useState({
     mode: "idle",
     lastUrl: "",
+    lastSourceType: "",
     message: "",
     candidateCount: 0,
     profileApplied: false,
     profile: {},
     signals: {},
+    snapshot: {},
   });
 
   const [knowledgeCandidates, setKnowledgeCandidates] = useState([]);
@@ -258,10 +334,16 @@ export default function SetupStudioScreen() {
 
     if (nextMeta.setupCompleted) {
       navigate(s(nextMeta.nextRoute || "/"), { replace: true });
-      return true;
+      return {
+        routed: true,
+        snapshot,
+      };
     }
 
-    return false;
+    return {
+      routed: false,
+      snapshot,
+    };
   }
 
   function setBusinessField(key, value) {
@@ -278,12 +360,18 @@ export default function SetupStudioScreen() {
     }));
   }
 
-  async function onScanBusiness(e) {
-    e.preventDefault();
+  async function onScanBusiness(input) {
+    const request = normalizeScanRequest(input, discoveryForm);
+    const sourceType = request.sourceType;
+    const sourceUrl = s(request.url);
 
-    const websiteUrl = s(discoveryForm.websiteUrl);
-    if (!websiteUrl) {
-      setError("Website URL boş ola bilməz.");
+    if (!sourceUrl) {
+      setError("Source URL boş ola bilməz.");
+      return;
+    }
+
+    if (!sourceType) {
+      setError("Scan üçün source type müəyyən edilə bilmədi.");
       return;
     }
 
@@ -294,15 +382,19 @@ export default function SetupStudioScreen() {
       setDiscoveryState((prev) => ({
         ...prev,
         mode: "running",
-        lastUrl: websiteUrl,
-        message: "Website scan başladı...",
+        lastUrl: sourceUrl,
+        lastSourceType: sourceType,
+        message: scanStartLabel(sourceType),
       }));
 
-      const result = await importWebsiteForSetup({
-        url: websiteUrl,
-        sourceUrl: websiteUrl,
-        note: discoveryForm.note,
-        businessNote: discoveryForm.note,
+      const result = await importSourceForSetup({
+        sourceType,
+        url: sourceUrl,
+        sourceUrl: sourceUrl,
+        note: request.note,
+        businessNote: request.note,
+        sources: request.sources,
+        primarySource: request.primarySource,
       });
 
       const discoveredProfile = obj(result?.profile);
@@ -317,33 +409,38 @@ export default function SetupStudioScreen() {
 
       setDiscoveryState({
         mode: s(result?.mode) || "success",
-        lastUrl: websiteUrl,
-        message:
-          Number(result?.candidateCount || 0) > 0
-            ? `${Number(result?.candidateCount || 0)} discovery hazırlandı.`
-            : "Website import tamamlandı.",
+        lastUrl: sourceUrl,
+        lastSourceType: sourceType,
+        message: scanCompleteLabel(sourceType, result?.candidateCount),
         candidateCount: Number(result?.candidateCount || 0),
         profileApplied,
         profile: discoveredProfile,
         signals: obj(result?.signals),
+        snapshot: obj(result?.snapshot),
       });
 
-      const routed = await refreshAndMaybeRouteHome({
+      const refreshResult = await refreshAndMaybeRouteHome({
         preserveBusinessForm: true,
       });
 
-      if (!routed) {
+      if (!refreshResult.routed) {
+        const refreshedPendingKnowledge = arr(
+          refreshResult?.snapshot?.pendingKnowledge
+        );
+
         const shouldOpenKnowledge =
           Number(result?.candidateCount || 0) > 0 ||
-          knowledgeCandidates.length > 0;
+          refreshedPendingKnowledge.length > 0;
 
         setShowKnowledge(shouldOpenKnowledge);
       }
     } catch (e2) {
-      const message = String(e2?.message || e2 || "Website scan alınmadı.");
+      const message = String(e2?.message || e2 || "Source scan alınmadı.");
       setDiscoveryState((prev) => ({
         ...prev,
         mode: "error",
+        lastUrl: sourceUrl,
+        lastSourceType: sourceType,
         message,
       }));
       setError(message);

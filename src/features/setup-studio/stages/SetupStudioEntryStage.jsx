@@ -20,66 +20,80 @@ import youtubeIcon from "../../../assets/setup-studio/channels/youtube.svg";
 const SOURCE_OPTIONS = [
   {
     key: "website",
+    apiSourceType: "website",
     label: "Website",
     placeholder: "yourbusiness.com",
     imageSrc: websiteIcon,
     theme: "website",
     priority: "primary",
     actionLabel: "Add",
+    canStartScan: true,
   },
   {
     key: "instagram",
+    apiSourceType: "instagram",
     label: "Instagram",
     placeholder: "@yourbrand",
     imageSrc: instagramIcon,
     theme: "instagram",
     priority: "primary",
     actionLabel: "Connect",
+    canStartScan: false,
   },
   {
     key: "facebook",
+    apiSourceType: "facebook",
     label: "Facebook",
     placeholder: "facebook.com/yourbrand",
     imageSrc: facebookIcon,
     theme: "facebook",
     priority: "primary",
     actionLabel: "Connect",
+    canStartScan: false,
   },
   {
     key: "googleMaps",
+    apiSourceType: "google_maps",
     label: "Google Maps",
     placeholder: "maps link or business name",
     imageSrc: googleMapsIcon,
     theme: "google-maps",
     priority: "primary",
     actionLabel: "Add",
+    canStartScan: true,
   },
   {
     key: "linkedin",
+    apiSourceType: "linkedin",
     label: "LinkedIn",
     placeholder: "linkedin.com/company/yourbrand",
     imageSrc: linkedinIcon,
     theme: "linkedin",
     priority: "primary",
     actionLabel: "Connect",
+    canStartScan: false,
   },
   {
     key: "tiktok",
+    apiSourceType: "tiktok",
     label: "TikTok",
     placeholder: "@yourbrand",
     imageSrc: tiktokIcon,
     theme: "tiktok",
     priority: "secondary",
     actionLabel: "Connect",
+    canStartScan: false,
   },
   {
     key: "youtube",
+    apiSourceType: "youtube",
     label: "YouTube",
     placeholder: "@yourbrand",
     imageSrc: youtubeIcon,
     theme: "youtube",
     priority: "secondary",
     actionLabel: "Connect",
+    canStartScan: false,
   },
 ];
 
@@ -196,7 +210,16 @@ function normalizeSourceKey(raw) {
 }
 
 function extractPlainNote(raw) {
-  return s(raw).split("[studio_sources]")[0].trim();
+  const text = s(raw);
+  const primaryIdx = text.indexOf("[studio_primary]");
+  const sourcesIdx = text.indexOf("[studio_sources]");
+
+  let cutIndex = -1;
+  if (primaryIdx >= 0 && sourcesIdx >= 0) cutIndex = Math.min(primaryIdx, sourcesIdx);
+  else cutIndex = Math.max(primaryIdx, sourcesIdx);
+
+  if (cutIndex === -1) return text.trim();
+  return text.slice(0, cutIndex).trim();
 }
 
 function parseStudioSources(raw) {
@@ -226,6 +249,36 @@ function parseStudioSources(raw) {
 
     if (!key || !value) continue;
     out[key] = value;
+  }
+
+  return out;
+}
+
+function parseStudioPrimary(raw) {
+  const text = s(raw);
+  const marker = "[studio_primary]";
+  const idx = text.indexOf(marker);
+
+  if (idx === -1) {
+    return {
+      sourceType: "",
+      url: "",
+    };
+  }
+
+  const block = text.slice(idx + marker.length).trim();
+  const out = {
+    sourceType: "",
+    url: "",
+  };
+
+  for (const line of block.split(/\r?\n/)) {
+    const [label, ...rest] = line.split(":");
+    const value = rest.join(":").trim();
+    const key = s(label).toLowerCase();
+
+    if (key === "sourcetype") out.sourceType = value;
+    if (key === "url") out.url = value;
   }
 
   return out;
@@ -277,11 +330,13 @@ function detectPrimaryKey(raw) {
   return "website";
 }
 
-function buildInitialSourceOrder(values, primaryUrl) {
+function buildInitialSourceOrder(values, primaryUrl, primarySourceType = "") {
   const filled = SOURCE_KEYS.filter((key) => s(values[key]));
   if (!filled.length) return [];
 
-  const primaryKey = detectPrimaryKey(primaryUrl);
+  const normalizedPrimaryType = normalizeSourceKey(primarySourceType);
+  const primaryKey = normalizedPrimaryType || detectPrimaryKey(primaryUrl);
+
   if (!primaryKey || !filled.includes(primaryKey)) return filled;
 
   return [primaryKey, ...filled.filter((key) => key !== primaryKey)];
@@ -367,6 +422,11 @@ export default function SetupStudioEntryStage({
     [discoveryForm?.note]
   );
 
+  const primaryMetaSeed = useMemo(
+    () => parseStudioPrimary(discoveryForm?.note),
+    [discoveryForm?.note]
+  );
+
   const plainNote = useMemo(
     () => extractPlainNote(discoveryForm?.note),
     [discoveryForm?.note]
@@ -401,8 +461,13 @@ export default function SetupStudioEntryStage({
   );
 
   const initialOrder = useMemo(
-    () => buildInitialSourceOrder(initialValues, discoveryForm?.websiteUrl),
-    [initialValues, discoveryForm?.websiteUrl]
+    () =>
+      buildInitialSourceOrder(
+        initialValues,
+        primaryMetaSeed.url || discoveryForm?.websiteUrl,
+        primaryMetaSeed.sourceType
+      ),
+    [initialValues, primaryMetaSeed.url, primaryMetaSeed.sourceType, discoveryForm?.websiteUrl]
   );
 
   const [activeKey, setActiveKey] = useState("website");
@@ -460,36 +525,55 @@ export default function SetupStudioEntryStage({
       .filter(Boolean);
   }, [addedSourceKeys, normalizedMap, sources]);
 
-  const primarySource = addedSources[0] || null;
+  const primaryScannableSource = useMemo(() => {
+    return addedSources.find((item) => item.canStartScan) || null;
+  }, [addedSources]);
 
-  const websiteSubmitUrl = s(normalizedMap.website);
-  const canAnalyze = !!websiteSubmitUrl && !importingWebsite;
+  const canAnalyze = !!primaryScannableSource?.url && !importingWebsite;
+
+  const primaryScanUrl = s(primaryScannableSource?.url);
+  const primaryScanType = s(primaryScannableSource?.apiSourceType);
 
   const composedNote = useMemo(() => {
     const parts = [];
     const sourceLines = addedSources.map((item) => `${item.key}: ${item.url}`);
 
-    if (plainNote) parts.push(plainNote);
-    if (sourceLines.length) parts.push(`[studio_sources]\n${sourceLines.join("\n")}`);
+    if (plainNote) {
+      parts.push(plainNote);
+    }
+
+    if (primaryScannableSource?.apiSourceType && primaryScannableSource?.url) {
+      parts.push(
+        [
+          "[studio_primary]",
+          `sourceType: ${primaryScannableSource.apiSourceType}`,
+          `url: ${primaryScannableSource.url}`,
+        ].join("\n")
+      );
+    }
+
+    if (sourceLines.length) {
+      parts.push(`[studio_sources]\n${sourceLines.join("\n")}`);
+    }
 
     return parts.join("\n\n").trim();
-  }, [addedSources, plainNote]);
+  }, [addedSources, plainNote, primaryScannableSource]);
 
   useEffect(() => {
-    const nextWebsiteUrl = websiteSubmitUrl;
+    const nextPrimaryUrl = primaryScanUrl;
     const nextNote = composedNote;
-    const currentWebsiteUrl = s(discoveryForm?.websiteUrl);
+    const currentPrimaryUrl = s(discoveryForm?.websiteUrl);
     const currentNote = s(discoveryForm?.note);
 
-    if (currentWebsiteUrl !== nextWebsiteUrl) {
-      onSetDiscoveryField("websiteUrl", nextWebsiteUrl);
+    if (currentPrimaryUrl !== nextPrimaryUrl) {
+      onSetDiscoveryField("websiteUrl", nextPrimaryUrl);
     }
 
     if (currentNote !== nextNote) {
       onSetDiscoveryField("note", nextNote);
     }
   }, [
-    websiteSubmitUrl,
+    primaryScanUrl,
     composedNote,
     discoveryForm?.websiteUrl,
     discoveryForm?.note,
@@ -536,7 +620,19 @@ export default function SetupStudioEntryStage({
   function handleSubmit(e) {
     e.preventDefault();
     if (!canAnalyze) return;
-    onScanBusiness?.(e);
+
+    onScanBusiness?.({
+      sourceType: primaryScanType,
+      url: primaryScanUrl,
+      note: composedNote,
+      sources: addedSources.map((item) => ({
+        key: item.key,
+        sourceType: item.apiSourceType,
+        url: item.url,
+        value: item.value,
+      })),
+      primarySource: primaryScannableSource,
+    });
   }
 
   function handleInputKeyDown(e) {
@@ -554,6 +650,12 @@ export default function SetupStudioEntryStage({
   function isSourceAdded(key) {
     return !!s(sources[key]);
   }
+
+  const dockNote = primaryScannableSource
+    ? primaryScannableSource.key === "website"
+      ? "Website will be used for the first scan. Other connected sources are attached as context."
+      : "Google Maps will be used for the first scan. Other connected sources are attached as context."
+    : "Add a Website or Google Maps source to start the first scan. Other sources can already be attached as context.";
 
   return (
     <motion.form
@@ -761,11 +863,7 @@ export default function SetupStudioEntryStage({
           </button>
         </div>
 
-        <div className="setup-studio-intake__dock-note">
-          {websiteSubmitUrl
-            ? "Website will be used for the first scan. Other connected sources are attached as context."
-            : "Add a website to start the first scan. Other sources can still be attached now as context."}
-        </div>
+        <div className="setup-studio-intake__dock-note">{dockNote}</div>
       </motion.div>
 
       {error ? <div className="setup-studio-intake__error">{error}</div> : null}

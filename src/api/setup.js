@@ -1,5 +1,5 @@
 // src/api/setup.js
-// FINAL v1.1
+// FINAL v1.2
 
 import { apiGet, apiPost, apiPut } from "./client.js";
 
@@ -21,4 +21,12 @@ export function saveRuntimePreferences(payload = {}) {
 
 export function importWebsiteForSetup(payload = {}) {
   return apiPost("/api/setup/import/website", payload);
+}
+
+export function importGoogleMapsForSetup(payload = {}) {
+  return apiPost("/api/setup/import/google-maps", payload);
+}
+
+export function importSourceForSetup(payload = {}) {
+  return apiPost("/api/setup/import/source", payload);
 }
