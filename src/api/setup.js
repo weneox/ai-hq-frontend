@@ -1,7 +1,7 @@
 // src/api/setup.js
-// FINAL v1.3
+// FINAL v2.0 — setup studio API with session review flow
 
-import { apiGet, apiPost, apiPut } from "./client.js";
+import { apiGet, apiPost, apiPut, apiPatch } from "./client.js";
 
 export function getSetupStatus() {
   return apiGet("/api/setup/status");
@@ -31,21 +31,37 @@ export function importSourceForSetup(payload = {}) {
   return apiPost("/api/setup/import/source", payload);
 }
 
-export function getSetupReviewDraft(params = {}) {
+export function getCurrentSetupReview(params = {}) {
   const query = new URLSearchParams();
 
-  if (params?.sourceId) {
-    query.set("sourceId", String(params.sourceId));
-  }
-
-  if (params?.sourceRunId) {
-    query.set("sourceRunId", String(params.sourceRunId));
+  if (params?.eventLimit != null && String(params.eventLimit).trim()) {
+    query.set("eventLimit", String(params.eventLimit));
   }
 
   const qs = query.toString();
-  return apiGet(`/api/setup/review-draft${qs ? `?${qs}` : ""}`);
+  return apiGet(`/api/setup/review/current${qs ? `?${qs}` : ""}`);
+}
+
+export function patchCurrentSetupReview(payload = {}) {
+  return apiPatch("/api/setup/review/current", payload);
+}
+
+export function discardCurrentSetupReview(payload = {}) {
+  return apiPost("/api/setup/review/current/discard", payload);
+}
+
+export function finalizeCurrentSetupReview(payload = {}) {
+  return apiPost("/api/setup/review/current/finalize", payload);
+}
+
+/*
+  Backward-compatible aliases so older files do not break immediately.
+*/
+
+export function getSetupReviewDraft(params = {}) {
+  return getCurrentSetupReview(params);
 }
 
 export function finalizeSetupReview(payload = {}) {
-  return apiPost("/api/setup/review-finalize", payload);
+  return finalizeCurrentSetupReview(payload);
 }

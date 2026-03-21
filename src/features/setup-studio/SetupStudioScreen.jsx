@@ -3,8 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { getAppBootstrap } from "../../api/app.js";
 import {
   importSourceForSetup,
-  getSetupReviewDraft,
-  finalizeSetupReview,
+  getCurrentSetupReview,
+  patchCurrentSetupReview,
+  finalizeCurrentSetupReview,
 } from "../../api/setup.js";
 import {
   approveKnowledgeCandidate,
@@ -230,7 +231,7 @@ function formFromProfile(profile = {}, prev = {}) {
   return {
     ...prev,
     companyName: s(
-      x.companyName || x.company_name || x.displayName || x.display_name || prev.companyName
+      x.companyName || x.company_name || x.displayName || x.display_name || x.name || prev.companyName
     ),
     description: s(
       x.summaryShort ||
@@ -240,19 +241,208 @@ function formFromProfile(profile = {}, prev = {}) {
         x.description ||
         prev.description
     ),
-    timezone: s(prev.timezone || "Asia/Baku"),
+    timezone: s(x.timezone || prev.timezone || "Asia/Baku"),
     language: s(
       x.mainLanguage || x.main_language || x.language || prev.language || "az"
     ),
-    websiteUrl: s(x.websiteUrl || x.website_url || prev.websiteUrl),
+    websiteUrl: s(
+      x.websiteUrl ||
+        x.website_url ||
+        x.siteUrl ||
+        x.site_url ||
+        prev.websiteUrl
+    ),
     primaryPhone: s(x.primaryPhone || x.primary_phone || prev.primaryPhone),
     primaryEmail: s(x.primaryEmail || x.primary_email || prev.primaryEmail),
     primaryAddress: s(x.primaryAddress || x.primary_address || prev.primaryAddress),
   };
 }
 
-function mapDraftToBusinessForm(draft = {}, prev = {}) {
-  return formFromProfile(obj(draft?.overview), prev);
+function normalizeReviewState(payload = {}) {
+  const review = obj(payload?.review || payload);
+
+  return {
+    session: review?.session || null,
+    draft: obj(review?.draft),
+    sources: arr(review?.sources),
+    events: arr(review?.events),
+  };
+}
+
+function normalizeDraftServiceItem(item = {}) {
+  const x = obj(item);
+
+  return {
+    id: s(x.id || x.key || x.title),
+    key: s(x.key),
+    title: s(x.title || x.name || x.label),
+    valueText: s(x.description || x.valueText || x.value_text),
+    category: s(x.category || "service"),
+    sourceType: s(x.sourceType || x.source_type),
+    status: s(x.status || "pending"),
+    confidence:
+      typeof x.confidence === "number" ? x.confidence : Number(x.confidence || 0) || 0,
+    confidenceLabel: s(x.confidenceLabel || x.confidence_label),
+    evidence: arr(x.evidence),
+    metadataJson: obj(x.metadataJson || x.metadata_json),
+    origin: s(x.origin || "setup_review_session"),
+  };
+}
+
+function normalizeDraftKnowledgeItem(item = {}) {
+  const x = obj(item);
+
+  return {
+    id: s(x.id || x.key || x.title),
+    candidateId: s(x.candidateId || x.id),
+    key: s(x.key || x.itemKey || x.item_key),
+    title: s(x.title || x.label || x.key),
+    valueText: s(
+      x.valueText ||
+        x.value_text ||
+        x.normalizedText ||
+        x.normalized_text ||
+        x.description
+    ),
+    category: s(x.category || "general"),
+    sourceType: s(x.sourceType || x.source_type),
+    status: s(x.status || "pending"),
+    confidence:
+      typeof x.confidence === "number" ? x.confidence : Number(x.confidence || 0) || 0,
+    confidenceLabel: s(x.confidenceLabel || x.confidence_label),
+    evidence: arr(x.evidence),
+    sourceEvidenceJson: arr(x.evidence),
+    metadataJson: obj(x.metadataJson || x.metadata_json),
+    origin: s(x.origin || "setup_review_session"),
+  };
+}
+
+function draftItemsToText(items = [], mode = "default") {
+  return arr(items)
+    .map((item) => {
+      const x = obj(item);
+
+      if (mode === "service") {
+        return `${s(x.title)} | ${s(x.valueText || x.description)}`.trim();
+      }
+
+      return `${s(x.title)} | ${s(x.valueText)}`.trim();
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
+function mapCurrentReviewToLegacyDraft(review = {}) {
+  const session = review?.session || null;
+  const draft = obj(review?.draft);
+  const profile = obj(draft?.businessProfile);
+  const capabilities = obj(draft?.capabilities);
+  const sourceSummary = obj(draft?.sourceSummary);
+  const latestImport = obj(sourceSummary?.latestImport);
+  const services = arr(draft?.services).map((item) => normalizeDraftServiceItem(item));
+  const knowledgeItems = arr(draft?.knowledgeItems).map((item) =>
+    normalizeDraftKnowledgeItem(item)
+  );
+
+  const faqItems = knowledgeItems.filter((item) =>
+    ["faq", "faqs"].includes(s(item.category).toLowerCase())
+  );
+
+  const policyItems = knowledgeItems.filter((item) =>
+    ["policy", "policies"].includes(s(item.category).toLowerCase())
+  );
+
+  const pendingReviewCount = knowledgeItems.filter((item) => {
+    const status = s(item.status).toLowerCase();
+    return !status || status === "pending" || status === "review";
+  }).length;
+
+  return {
+    sourceId: s(session?.primarySourceId || sourceSummary?.latestSourceId || latestImport?.sourceId),
+    sourceRunId: s(sourceSummary?.latestRunId || latestImport?.runId),
+    snapshotId: s(draft?.lastSnapshotId),
+    quickSummary: s(
+      draft?.draftPayload?.profile?.summaryShort ||
+        profile?.summaryShort ||
+        profile?.description ||
+        profile?.summaryLong
+    ),
+    overview: profile,
+    capabilities,
+    sections: {
+      services,
+      faqs: faqItems,
+      policies: policyItems,
+    },
+    reviewQueue: knowledgeItems,
+    existing: {},
+    stats: {
+      pendingReviewCount,
+      knowledgeCount: knowledgeItems.length,
+      serviceCount: services.length,
+      warningCount: arr(draft?.warnings).length,
+    },
+    completeness: obj(draft?.completeness),
+    confidenceSummary: obj(draft?.confidenceSummary),
+    warnings: arr(draft?.warnings),
+    rawDraft: draft,
+  };
+}
+
+function buildManualSectionsFromReview(review = {}) {
+  const draft = obj(review?.draft);
+  const services = arr(draft?.services).map((item) => normalizeDraftServiceItem(item));
+  const knowledgeItems = arr(draft?.knowledgeItems).map((item) =>
+    normalizeDraftKnowledgeItem(item)
+  );
+
+  const faqs = knowledgeItems.filter((item) =>
+    ["faq", "faqs"].includes(s(item.category).toLowerCase())
+  );
+  const policies = knowledgeItems.filter((item) =>
+    ["policy", "policies"].includes(s(item.category).toLowerCase())
+  );
+
+  return {
+    servicesText: draftItemsToText(services, "service"),
+    faqsText: draftItemsToText(faqs, "faq"),
+    policiesText: draftItemsToText(policies, "policy"),
+  };
+}
+
+function safeDraftKey(value = "", fallback = "item") {
+  return s(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 80) || fallback;
+}
+
+function mergeItemsByKey(existing = [], incoming = [], keys = ["key", "title", "category"]) {
+  const map = new Map();
+
+  const buildKey = (item = {}) =>
+    keys.map((key) => s(item?.[key]).toLowerCase()).filter(Boolean).join("|");
+
+  for (const item of arr(existing)) {
+    const stableKey = buildKey(item) || JSON.stringify(item);
+    map.set(stableKey, { ...obj(item) });
+  }
+
+  for (const item of arr(incoming)) {
+    const stableKey = buildKey(item) || JSON.stringify(item);
+    if (!map.has(stableKey)) {
+      map.set(stableKey, { ...obj(item) });
+      continue;
+    }
+
+    map.set(stableKey, {
+      ...obj(map.get(stableKey)),
+      ...obj(item),
+    });
+  }
+
+  return [...map.values()];
 }
 
 function parseServicesText(value = "") {
@@ -306,28 +496,96 @@ function parsePoliciesText(value = "") {
     .filter((item) => s(item.title) || s(item.description));
 }
 
-function textFromDraftSection(items = [], mode = "title") {
-  return arr(items)
-    .map((item) => {
-      const x = obj(item);
+function buildServiceDraftItemsFromManual(value = "", existing = []) {
+  const manual = parseServicesText(value).map((item) => ({
+    key: safeDraftKey(s(item.name), "service"),
+    title: s(item.name),
+    description: s(item.description),
+    valueText: s(item.description),
+    category: "service",
+    origin: "manual_setup",
+    status: "approved",
+  }));
 
-      if (mode === "faq") {
-        return `${s(x.title)} | ${s(x.valueText)}`.trim();
-      }
-
-      return `${s(x.title)} | ${s(x.valueText)}`.trim();
-    })
-    .filter(Boolean)
-    .join("\n");
+  return mergeItemsByKey(existing, manual, ["key", "title"]);
 }
 
-function buildManualSectionsFromDraft(draft = {}) {
-  const sections = obj(draft?.sections);
+function buildKnowledgeDraftItemsFromManual({
+  faqsText = "",
+  policiesText = "",
+  existing = [],
+}) {
+  const preserved = arr(existing).filter((item) => {
+    const category = s(item.category).toLowerCase();
+    return category !== "faq" && category !== "faqs" && category !== "policy" && category !== "policies";
+  });
+
+  const faqItems = parseFaqsText(faqsText).map((item) => ({
+    key: safeDraftKey(s(item.question), "faq"),
+    title: s(item.question),
+    valueText: s(item.answer),
+    normalizedText: s(item.answer),
+    category: "faq",
+    origin: "manual_setup",
+    status: "approved",
+  }));
+
+  const policyItems = parsePoliciesText(policiesText).map((item) => ({
+    key: safeDraftKey(s(item.title), "policy"),
+    title: s(item.title),
+    valueText: s(item.description),
+    normalizedText: s(item.description),
+    category: "policy",
+    origin: "manual_setup",
+    status: "approved",
+  }));
+
+  return mergeItemsByKey(preserved, [...faqItems, ...policyItems], [
+    "key",
+    "title",
+    "category",
+  ]);
+}
+
+function buildBusinessProfilePatch({
+  businessForm = {},
+  currentReview = {},
+  discoveryState = {},
+}) {
+  const existing = obj(currentReview?.draft?.businessProfile);
 
   return {
-    servicesText: textFromDraftSection(sections.services, "service"),
-    faqsText: textFromDraftSection(sections.faqs, "faq"),
-    policiesText: textFromDraftSection(sections.policies, "policy"),
+    ...existing,
+    companyName: s(businessForm.companyName),
+    displayName: s(businessForm.companyName),
+    name: s(businessForm.companyName || existing.name),
+    summaryShort: s(businessForm.description),
+    summaryLong: s(businessForm.description || existing.summaryLong),
+    description: s(businessForm.description),
+    mainLanguage: s(businessForm.language || "az"),
+    language: s(businessForm.language || "az"),
+    timezone: s(businessForm.timezone || "Asia/Baku"),
+    websiteUrl: s(
+      businessForm.websiteUrl ||
+        existing.websiteUrl ||
+        discoveryState?.lastUrl
+    ),
+    primaryPhone: s(businessForm.primaryPhone),
+    primaryEmail: s(businessForm.primaryEmail),
+    primaryAddress: s(businessForm.primaryAddress),
+  };
+}
+
+function buildCapabilitiesPatch({ currentReview = {}, businessForm = {} }) {
+  const existing = obj(currentReview?.draft?.capabilities);
+  const language = s(businessForm.language || "az");
+
+  return {
+    ...existing,
+    primaryLanguage: language,
+    mainLanguage: language,
+    supportedLanguages: language ? [language] : [],
+    supportsMultilanguage: false,
   };
 }
 
@@ -362,6 +620,13 @@ export default function SetupStudioScreen() {
     servicesText: "",
     faqsText: "",
     policiesText: "",
+  });
+
+  const [currentReview, setCurrentReview] = useState({
+    session: null,
+    draft: {},
+    sources: [],
+    events: [],
   });
 
   const [reviewDraft, setReviewDraft] = useState({
@@ -400,6 +665,8 @@ export default function SetupStudioScreen() {
     sourceId: "",
     sourceRunId: "",
     snapshotId: "",
+    reviewSessionId: "",
+    reviewSessionStatus: "",
   });
 
   const [knowledgeCandidates, setKnowledgeCandidates] = useState([]);
@@ -444,30 +711,64 @@ export default function SetupStudioScreen() {
     }));
   }
 
-  async function loadDraft({ sourceId = "", sourceRunId = "" } = {}) {
+  function applyReviewState(reviewPayload = {}, { preserveBusinessForm = false } = {}) {
+    const normalized = normalizeReviewState(reviewPayload);
+    const legacy = mapCurrentReviewToLegacyDraft(normalized);
+    const nextManualSections = buildManualSectionsFromReview(normalized);
+
+    setCurrentReview(normalized);
+    setReviewDraft(legacy);
+
+    if (!preserveBusinessForm) {
+      setBusinessForm((prev) => formFromProfile(legacy.overview, prev));
+    }
+
+    setManualSections((prev) => ({
+      servicesText: preserveBusinessForm && s(prev.servicesText)
+        ? s(prev.servicesText)
+        : s(nextManualSections.servicesText),
+      faqsText: preserveBusinessForm && s(prev.faqsText)
+        ? s(prev.faqsText)
+        : s(nextManualSections.faqsText),
+      policiesText: preserveBusinessForm && s(prev.policiesText)
+        ? s(prev.policiesText)
+        : s(nextManualSections.policiesText),
+    }));
+
+    return {
+      currentReview: normalized,
+      reviewDraft: legacy,
+    };
+  }
+
+  async function loadCurrentReview({ preserveBusinessForm = false } = {}) {
     try {
-      const payload = await getSetupReviewDraft({
-        sourceId,
-        sourceRunId,
-      });
-
-      const nextDraft = obj(payload?.draft);
-      if (Object.keys(nextDraft).length) {
-        setReviewDraft(nextDraft);
-        setBusinessForm((prev) => mapDraftToBusinessForm(nextDraft, prev));
-        setManualSections((prev) => {
-          const draftSections = buildManualSectionsFromDraft(nextDraft);
-          return {
-            servicesText: s(prev.servicesText) || s(draftSections.servicesText),
-            faqsText: s(prev.faqsText) || s(draftSections.faqsText),
-            policiesText: s(prev.policiesText) || s(draftSections.policiesText),
-          };
-        });
-      }
-
-      return nextDraft;
+      const payload = await getCurrentSetupReview({ eventLimit: 30 });
+      return applyReviewState(payload, { preserveBusinessForm });
     } catch {
-      return {};
+      const empty = {
+        session: null,
+        draft: {},
+        sources: [],
+        events: [],
+      };
+      setCurrentReview(empty);
+      setReviewDraft({
+        sourceId: "",
+        sourceRunId: "",
+        snapshotId: "",
+        quickSummary: "",
+        overview: {},
+        capabilities: {},
+        sections: {},
+        reviewQueue: [],
+        existing: {},
+        stats: {},
+      });
+      return {
+        currentReview: empty,
+        reviewDraft: {},
+      };
     }
   }
 
@@ -482,7 +783,7 @@ export default function SetupStudioScreen() {
         getAppBootstrap(),
         getKnowledgeCandidates(),
         getSetupServices(),
-        getSetupReviewDraft().catch(() => ({ draft: {} })),
+        getCurrentSetupReview({ eventLimit: 30 }).catch(() => ({ review: {} })),
       ]);
 
       const workspace = obj(boot?.workspace);
@@ -494,17 +795,19 @@ export default function SetupStudioScreen() {
       const serviceItems = extractItems(servicesPayload);
 
       const nextMeta = normalizeBootMeta(boot, pendingKnowledge, serviceItems);
-
       setMeta(nextMeta);
 
-      const loadedDraft = obj(reviewPayload?.draft);
-      if (Object.keys(loadedDraft).length) {
-        setReviewDraft(loadedDraft);
-      }
+      const reviewState = normalizeReviewState(reviewPayload);
+      setCurrentReview(reviewState);
+
+      const legacyDraft = mapCurrentReviewToLegacyDraft(reviewState);
+      setReviewDraft(legacyDraft);
 
       if (!preserveBusinessForm) {
         const baseProfile =
-          Object.keys(loadedDraft).length > 0 ? loadedDraft?.overview : profile;
+          Object.keys(obj(legacyDraft?.overview)).length > 0
+            ? legacyDraft?.overview
+            : profile;
 
         setBusinessForm((prev) =>
           formFromProfile(baseProfile, {
@@ -521,16 +824,21 @@ export default function SetupStudioScreen() {
         );
       }
 
-      if (Object.keys(loadedDraft).length) {
-        setManualSections((prev) => {
-          const draftSections = buildManualSectionsFromDraft(loadedDraft);
-          return {
-            servicesText: s(prev.servicesText) || s(draftSections.servicesText),
-            faqsText: s(prev.faqsText) || s(draftSections.faqsText),
-            policiesText: s(prev.policiesText) || s(draftSections.policiesText),
-          };
-        });
-      }
+      const nextManualSections = buildManualSectionsFromReview(reviewState);
+      setManualSections((prev) => ({
+        servicesText:
+          preserveBusinessForm && s(prev.servicesText)
+            ? s(prev.servicesText)
+            : s(nextManualSections.servicesText),
+        faqsText:
+          preserveBusinessForm && s(prev.faqsText)
+            ? s(prev.faqsText)
+            : s(nextManualSections.faqsText),
+        policiesText:
+          preserveBusinessForm && s(prev.policiesText)
+            ? s(prev.policiesText)
+            : s(nextManualSections.policiesText),
+      }));
 
       setKnowledgeCandidates(pendingKnowledge);
       setServices(serviceItems);
@@ -550,7 +858,7 @@ export default function SetupStudioScreen() {
         pendingKnowledge,
         serviceItems,
         meta: nextMeta,
-        reviewDraft: loadedDraft,
+        currentReview: reviewState,
       };
     } catch (e) {
       const message = String(
@@ -565,7 +873,7 @@ export default function SetupStudioScreen() {
         pendingKnowledge: [],
         serviceItems: [],
         meta: {},
-        reviewDraft: {},
+        currentReview: {},
         error: message,
       };
     } finally {
@@ -656,10 +964,12 @@ export default function SetupStudioScreen() {
       });
 
       const discoveredProfile = obj(result?.profile);
-      const draftFromImport = obj(result?.draft);
+      const importedReview = normalizeReviewState(result?.review || {});
+      const legacyImportedDraft = mapCurrentReviewToLegacyDraft(importedReview);
+
       const profilePatch =
-        Object.keys(draftFromImport).length > 0
-          ? mapDraftToBusinessForm(draftFromImport, {})
+        Object.keys(obj(legacyImportedDraft?.overview)).length > 0
+          ? formFromProfile(legacyImportedDraft.overview, {})
           : profilePatchFromDiscovery(discoveredProfile);
 
       const mergedForm = mergeBusinessForm(businessForm, profilePatch);
@@ -670,11 +980,24 @@ export default function SetupStudioScreen() {
         setBusinessForm(mergedForm);
       }
 
+      if (result?.review) {
+        applyReviewState(result.review, { preserveBusinessForm: true });
+      }
+
       const resultWarnings = arr(result?.warnings).map((x) => s(x)).filter(Boolean);
 
-      const sourceId = s(result?.source?.id);
-      const sourceRunId = s(result?.run?.id);
-      const snapshotId = s(result?.snapshot?.id);
+      const sourceId = s(
+        result?.source?.id ||
+          legacyImportedDraft?.sourceId
+      );
+      const sourceRunId = s(
+        result?.run?.id ||
+          legacyImportedDraft?.sourceRunId
+      );
+      const snapshotId = s(
+        legacyImportedDraft?.snapshotId ||
+          result?.snapshot?.id
+      );
 
       setDiscoveryState({
         mode: s(result?.mode) || "success",
@@ -699,23 +1022,9 @@ export default function SetupStudioScreen() {
         sourceId,
         sourceRunId,
         snapshotId,
+        reviewSessionId: s(result?.reviewSessionId || importedReview?.session?.id),
+        reviewSessionStatus: s(result?.reviewSessionStatus || importedReview?.session?.status),
       });
-
-      let nextDraft = draftFromImport;
-
-      if (!Object.keys(nextDraft).length) {
-        nextDraft = await loadDraft({ sourceId, sourceRunId });
-      } else {
-        setReviewDraft(nextDraft);
-        setManualSections((prev) => {
-          const draftSections = buildManualSectionsFromDraft(nextDraft);
-          return {
-            servicesText: s(prev.servicesText) || s(draftSections.servicesText),
-            faqsText: s(prev.faqsText) || s(draftSections.faqsText),
-            policiesText: s(prev.policiesText) || s(draftSections.policiesText),
-          };
-        });
-      }
 
       const refreshResult = await refreshAndMaybeRouteHome({
         preserveBusinessForm: true,
@@ -730,7 +1039,6 @@ export default function SetupStudioScreen() {
           !!result?.shouldReview ||
           Number(result?.candidateCount || 0) > 0 ||
           refreshedPendingKnowledge.length > 0 ||
-          arr(nextDraft?.reviewQueue).length > 0 ||
           s(refreshResult?.snapshot?.meta?.nextStudioStage) === "knowledge";
 
         setShowKnowledge(shouldOpenKnowledge);
@@ -759,43 +1067,46 @@ export default function SetupStudioScreen() {
       setSavingBusiness(true);
       setError("");
 
-      const approveCandidateIds = arr(reviewDraft?.reviewQueue)
-        .map((item) => s(item.candidateId || item.id))
-        .filter(Boolean);
+      const activeSessionId = s(currentReview?.session?.id);
 
-      await finalizeSetupReview({
-        sourceId: s(reviewDraft?.sourceId || discoveryState?.sourceId),
-        sourceRunId: s(reviewDraft?.sourceRunId || discoveryState?.sourceRunId),
-        snapshotId: s(reviewDraft?.snapshotId || discoveryState?.snapshotId),
-        profile: {
-          companyName: s(businessForm.companyName),
-          displayName: s(businessForm.companyName),
-          summaryShort: s(businessForm.description),
-          summaryLong: s(businessForm.description),
-          mainLanguage: s(businessForm.language || "az"),
-          supportedLanguages: businessForm.language ? [businessForm.language] : [],
-          websiteUrl: s(
-            businessForm.websiteUrl || reviewDraft?.overview?.websiteUrl || discoveryState?.lastUrl
-          ),
-          primaryPhone: s(businessForm.primaryPhone),
-          primaryEmail: s(businessForm.primaryEmail),
-          primaryAddress: s(businessForm.primaryAddress),
+      if (!activeSessionId) {
+        throw new Error("Aktiv setup review session tapılmadı.");
+      }
+
+      const businessProfilePatch = buildBusinessProfilePatch({
+        businessForm,
+        currentReview,
+        discoveryState,
+      });
+
+      const capabilitiesPatch = buildCapabilitiesPatch({
+        currentReview,
+        businessForm,
+      });
+
+      const mergedServices = buildServiceDraftItemsFromManual(
+        manualSections.servicesText,
+        arr(currentReview?.draft?.services)
+      );
+
+      const mergedKnowledgeItems = buildKnowledgeDraftItemsFromManual({
+        faqsText: manualSections.faqsText,
+        policiesText: manualSections.policiesText,
+        existing: arr(currentReview?.draft?.knowledgeItems),
+      });
+
+      await patchCurrentSetupReview({
+        patch: {
+          businessProfile: businessProfilePatch,
+          capabilities: capabilitiesPatch,
+          services: mergedServices,
+          knowledgeItems: mergedKnowledgeItems,
         },
-        capabilities: {
-          ...obj(reviewDraft?.capabilities),
-          primaryLanguage: s(businessForm.language || "az"),
-          supportedLanguages: businessForm.language ? [businessForm.language] : [],
-          supportsMultilanguage: false,
-        },
-        services: parseServicesText(manualSections.servicesText),
-        faqs: parseFaqsText(manualSections.faqsText),
-        policies: parsePoliciesText(manualSections.policiesText),
-        candidateDecisions: {
-          approve: approveCandidateIds.map((candidateId) => ({ candidateId })),
-          reject: [],
-        },
-        metadataJson: {
-          source: "setup_studio_finalize",
+      });
+
+      await finalizeCurrentSetupReview({
+        reason: "setup_studio_finalize",
+        metadata: {
           requestId: s(discoveryState.requestId),
         },
       });
@@ -803,10 +1114,12 @@ export default function SetupStudioScreen() {
       setShowRefine(false);
       setShowKnowledge(false);
 
-      const refreshed = await refreshAndMaybeRouteHome({ preserveBusinessForm: false });
+      const refreshed = await refreshAndMaybeRouteHome({
+        preserveBusinessForm: false,
+      });
 
       if (!refreshed?.routed) {
-        await loadDraft();
+        await loadCurrentReview({ preserveBusinessForm: false });
       }
 
       return { ok: true };
@@ -819,7 +1132,7 @@ export default function SetupStudioScreen() {
   }
 
   async function onApproveKnowledge(item) {
-    const id = s(item.id);
+    const id = s(item.id || item.candidateId);
     if (!id) return { ok: false };
 
     try {
@@ -827,7 +1140,7 @@ export default function SetupStudioScreen() {
       setError("");
 
       await approveKnowledgeCandidate(id, {});
-      await loadDraft();
+      await loadCurrentReview({ preserveBusinessForm: true });
       const refreshed = await refreshAndMaybeRouteHome({ preserveBusinessForm: true });
 
       if (!refreshed?.routed) {
@@ -847,7 +1160,7 @@ export default function SetupStudioScreen() {
   }
 
   async function onRejectKnowledge(item) {
-    const id = s(item.id);
+    const id = s(item.id || item.candidateId);
     if (!id) return { ok: false };
 
     try {
@@ -855,7 +1168,7 @@ export default function SetupStudioScreen() {
       setError("");
 
       await rejectKnowledgeCandidate(id, {});
-      await loadDraft();
+      await loadCurrentReview({ preserveBusinessForm: true });
       const refreshed = await refreshAndMaybeRouteHome({ preserveBusinessForm: true });
 
       if (!refreshed?.routed) {
@@ -962,9 +1275,9 @@ export default function SetupStudioScreen() {
   }, [importingWebsite, discoveryState, meta]);
 
   const knowledgePreview = useMemo(() => {
-    const sourceItems = arr(reviewDraft?.reviewQueue).length
-      ? arr(reviewDraft?.reviewQueue)
-      : knowledgeCandidates;
+    const sourceItems = arr(knowledgeCandidates).length
+      ? knowledgeCandidates
+      : arr(reviewDraft?.reviewQueue);
 
     return sourceItems.slice(0, 6).map((item) => ({
       id: s(item.id || item.candidateId),
@@ -988,7 +1301,8 @@ export default function SetupStudioScreen() {
       s(
         businessForm.companyName ||
           reviewDraft?.overview?.companyName ||
-          reviewDraft?.overview?.displayName
+          reviewDraft?.overview?.displayName ||
+          reviewDraft?.overview?.name
       ),
     [businessForm.companyName, reviewDraft]
   );
@@ -1025,6 +1339,7 @@ export default function SetupStudioScreen() {
       currentDescription={currentDescription}
       discoveryProfileRows={discoveryProfileRows}
       knowledgePreview={knowledgePreview}
+      knowledgeItems={knowledgeCandidates}
       serviceSuggestionTitle={serviceSuggestionTitle}
       studioProgress={studioProgress}
       services={services}
@@ -1037,7 +1352,7 @@ export default function SetupStudioScreen() {
       onRejectKnowledge={onRejectKnowledge}
       onCreateSuggestedService={onCreateSuggestedService}
       onOpenWorkspace={onOpenWorkspace}
-      onReloadReviewDraft={() => loadDraft()}
+      onReloadReviewDraft={() => loadCurrentReview({ preserveBusinessForm: true })}
       onRefresh={() => loadData({ silent: true, preserveBusinessForm: true })}
       onToggleRefine={() => setShowRefine((prev) => !prev)}
       onToggleKnowledge={() => setShowKnowledge((prev) => !prev)}
