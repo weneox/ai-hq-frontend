@@ -194,12 +194,14 @@ export default function SetupStudioScene({
 
   const draftQueue = arr(reviewDraft?.reviewQueue);
   const hasKnowledge = draftQueue.length > 0 || safeKnowledgePreview.length > 0;
+
   const intakeItems =
     safeKnowledgeItems.length > 0
       ? safeKnowledgeItems
       : draftQueue.length > 0
         ? draftQueue
         : safeKnowledgePreview;
+
   const hasServices = safeServices.length > 0;
 
   const stageSequence = useMemo(() => {
@@ -226,7 +228,9 @@ export default function SetupStudioScene({
       hasScannedUrl,
     })
   );
+
   const [scanLineIndex, setScanLineIndex] = useState(0);
+  const [overlayIntent, setOverlayIntent] = useState("");
 
   const scanLines = [
     "Reading the primary source",
@@ -235,17 +239,23 @@ export default function SetupStudioScene({
     "Detecting service structure",
   ];
 
-  const hasKnowledgeModalContent = showKnowledge && intakeItems.length > 0;
+  const refineContentAvailable =
+    safeDiscoveryProfileRows.length > 0 ||
+    !!s(currentTitle) ||
+    !!s(currentDescription) ||
+    !!s(businessForm?.companyName) ||
+    !!s(businessForm?.description);
+
+  const knowledgeContentAvailable = intakeItems.length > 0;
+
+  const wantsRefineOverlay = overlayIntent === "refine";
+  const wantsKnowledgeOverlay = overlayIntent === "knowledge";
 
   const hasRefineModalContent =
-    showRefine &&
-    (
-      safeDiscoveryProfileRows.length > 0 ||
-      !!s(currentTitle) ||
-      !!s(currentDescription) ||
-      !!s(businessForm?.companyName) ||
-      !!s(businessForm?.description)
-    );
+    wantsRefineOverlay && !!showRefine && refineContentAvailable;
+
+  const hasKnowledgeModalContent =
+    wantsKnowledgeOverlay && !!showKnowledge && knowledgeContentAvailable;
 
   const activeOverlay = hasKnowledgeModalContent
     ? "knowledge"
@@ -368,6 +378,42 @@ export default function SetupStudioScene({
     return () => window.clearInterval(id);
   }, [importingWebsite]);
 
+  useEffect(() => {
+    if (importingWebsite || stage === "entry" || stage === "scanning") {
+      setOverlayIntent("");
+    }
+  }, [importingWebsite, stage]);
+
+  useEffect(() => {
+    if (!showKnowledge && overlayIntent === "knowledge") {
+      setOverlayIntent("");
+    }
+  }, [showKnowledge, overlayIntent]);
+
+  useEffect(() => {
+    if (!showRefine && overlayIntent === "refine") {
+      setOverlayIntent("");
+    }
+  }, [showRefine, overlayIntent]);
+
+  useEffect(() => {
+    if (overlayIntent === "knowledge" && showKnowledge && !knowledgeContentAvailable) {
+      setOverlayIntent("");
+      if (typeof onToggleKnowledge === "function") {
+        onToggleKnowledge();
+      }
+    }
+  }, [overlayIntent, showKnowledge, knowledgeContentAvailable, onToggleKnowledge]);
+
+  useEffect(() => {
+    if (overlayIntent === "refine" && showRefine && !refineContentAvailable) {
+      setOverlayIntent("");
+      if (typeof onToggleRefine === "function") {
+        onToggleRefine();
+      }
+    }
+  }, [overlayIntent, showRefine, refineContentAvailable, onToggleRefine]);
+
   function goNextStage() {
     const idx = stageSequence.indexOf(stage);
     if (idx >= 0 && idx < stageSequence.length - 1) {
@@ -395,6 +441,34 @@ export default function SetupStudioScene({
       s(studioProgress?.progress?.nextRoute) ||
       "/";
     navigate(target, { replace: true });
+  }
+
+  function handleOpenRefine() {
+    setOverlayIntent("refine");
+    if (!showRefine && typeof onToggleRefine === "function") {
+      onToggleRefine();
+    }
+  }
+
+  function handleCloseRefine() {
+    setOverlayIntent("");
+    if (showRefine && typeof onToggleRefine === "function") {
+      onToggleRefine();
+    }
+  }
+
+  function handleOpenKnowledge() {
+    setOverlayIntent("knowledge");
+    if (!showKnowledge && typeof onToggleKnowledge === "function") {
+      onToggleKnowledge();
+    }
+  }
+
+  function handleCloseKnowledge() {
+    setOverlayIntent("");
+    if (showKnowledge && typeof onToggleKnowledge === "function") {
+      onToggleKnowledge();
+    }
   }
 
   const discoveredTitle =
@@ -478,6 +552,8 @@ export default function SetupStudioScene({
       }`}
       data-stage={stage}
       data-scan-url={hasScannedUrl ? "yes" : "no"}
+      data-overlay-intent={overlayIntent || "none"}
+      data-overlay-open={hasOverlay ? "yes" : "no"}
     >
       <div
         aria-hidden={hasOverlay ? "true" : "false"}
@@ -631,7 +707,7 @@ export default function SetupStudioScene({
                       discoveryWarnings={stageWarnings}
                       sourceLabel={sourceLabel}
                       onNext={goNextStage}
-                      onToggleRefine={onToggleRefine}
+                      onToggleRefine={handleOpenRefine}
                     />
                   ) : null}
 
@@ -645,7 +721,7 @@ export default function SetupStudioScene({
                       onApproveKnowledge={onApproveKnowledge}
                       onRejectKnowledge={onRejectKnowledge}
                       onNext={goNextStage}
-                      onToggleKnowledge={onToggleKnowledge}
+                      onToggleKnowledge={handleOpenKnowledge}
                     />
                   ) : null}
 
@@ -670,8 +746,8 @@ export default function SetupStudioScene({
                       hasKnowledge={hasKnowledge}
                       sourceLabel={sourceLabel}
                       warnings={stageWarnings}
-                      onToggleRefine={onToggleRefine}
-                      onToggleKnowledge={onToggleKnowledge}
+                      onToggleRefine={handleOpenRefine}
+                      onToggleKnowledge={handleOpenKnowledge}
                       onOpenWorkspace={handleOpenWorkspace}
                     />
                   ) : null}
@@ -695,7 +771,7 @@ export default function SetupStudioScene({
           onSetBusinessField={onSetBusinessField}
           onSetManualSection={onSetManualSection}
           onSaveBusiness={onSaveBusiness}
-          onClose={onToggleRefine}
+          onClose={handleCloseRefine}
         />
       </SetupStudioModalLayer>
 
@@ -709,7 +785,7 @@ export default function SetupStudioScene({
           actingKnowledgeId={actingKnowledgeId}
           onApproveKnowledge={onApproveKnowledge}
           onRejectKnowledge={onRejectKnowledge}
-          onClose={onToggleKnowledge}
+          onClose={handleCloseKnowledge}
           onRefresh={onReloadReviewDraft}
         />
       </SetupStudioModalLayer>
