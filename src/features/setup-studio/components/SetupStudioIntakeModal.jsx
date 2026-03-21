@@ -58,7 +58,7 @@ export default function SetupStudioIntakeModal({
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.96, y: 18 }}
       transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-      className="relative mx-auto w-full max-w-[980px] overflow-hidden rounded-[32px] border border-white/80 bg-white/94 shadow-[0_40px_120px_rgba(15,23,42,0.12)] backdrop-blur-2xl"
+      className="relative my-2 flex w-full max-w-[980px] flex-col overflow-hidden rounded-[32px] border border-white/80 bg-white/94 shadow-[0_40px_120px_rgba(15,23,42,0.12)] backdrop-blur-2xl max-h-[calc(100vh-1rem)] sm:my-4 sm:max-h-[calc(100vh-2rem)]"
     >
       <div className="flex items-start justify-between gap-4 border-b border-slate-900/8 px-5 py-5 sm:px-6">
         <div>
@@ -98,7 +98,7 @@ export default function SetupStudioIntakeModal({
         </div>
       </div>
 
-      <div className="max-h-[62vh] overflow-y-auto px-5 pb-5 sm:px-6">
+      <div className="min-h-0 overflow-y-auto px-5 pb-5 sm:px-6">
         {items.length ? (
           items.map((item) => (
             <SetupStudioKnowledgeLine

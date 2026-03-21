@@ -573,32 +573,36 @@ export default function SetupStudioScene({
 
       <AnimatePresence>
         {showRefine ? (
-          <div className="setup-studio-overlay">
-            <SetupStudioRefineModal
-              savingBusiness={savingBusiness}
-              businessForm={businessForm}
-              discoveryProfileRows={discoveryProfileRows}
-              manualSections={manualSections}
-              onSetBusinessField={onSetBusinessField}
-              onSetManualSection={onSetManualSection}
-              onSaveBusiness={onSaveBusiness}
-              onClose={onToggleRefine}
-            />
+          <div className="fixed inset-0 z-[120] overflow-y-auto bg-slate-950/20 px-4 py-4 backdrop-blur-[3px] sm:px-6 sm:py-6 lg:px-8 lg:py-8">
+            <div className="flex min-h-full items-start justify-center">
+              <SetupStudioRefineModal
+                savingBusiness={savingBusiness}
+                businessForm={businessForm}
+                discoveryProfileRows={discoveryProfileRows}
+                manualSections={manualSections}
+                onSetBusinessField={onSetBusinessField}
+                onSetManualSection={onSetManualSection}
+                onSaveBusiness={onSaveBusiness}
+                onClose={onToggleRefine}
+              />
+            </div>
           </div>
         ) : null}
       </AnimatePresence>
 
       <AnimatePresence>
         {showKnowledge ? (
-          <div className="setup-studio-overlay setup-studio-overlay--deep">
-            <SetupStudioIntakeModal
-              knowledgeItems={intakeItems}
-              actingKnowledgeId={actingKnowledgeId}
-              onApproveKnowledge={onApproveKnowledge}
-              onRejectKnowledge={onRejectKnowledge}
-              onClose={onToggleKnowledge}
-              onRefresh={onReloadReviewDraft}
-            />
+          <div className="fixed inset-0 z-[130] overflow-y-auto bg-slate-950/30 px-4 py-4 backdrop-blur-[4px] sm:px-6 sm:py-6 lg:px-8 lg:py-8">
+            <div className="flex min-h-full items-start justify-center">
+              <SetupStudioIntakeModal
+                knowledgeItems={intakeItems}
+                actingKnowledgeId={actingKnowledgeId}
+                onApproveKnowledge={onApproveKnowledge}
+                onRejectKnowledge={onRejectKnowledge}
+                onClose={onToggleKnowledge}
+                onRefresh={onReloadReviewDraft}
+              />
+            </div>
           </div>
         ) : null}
       </AnimatePresence>
