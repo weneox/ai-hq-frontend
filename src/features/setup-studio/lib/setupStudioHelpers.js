@@ -1,5 +1,5 @@
 // src/features/setup-studio/lib/setupStudioHelpers.js
-// FINAL v2.0 — canonical setup studio helpers
+// FINAL v2.1 — canonical setup studio helpers with session-review compatibility
 
 export function arr(value) {
   return Array.isArray(value) ? value : [];
@@ -20,13 +20,24 @@ export function truncateMiddle(value = "", start = 28, end = 18) {
 }
 
 export function firstLanguage(profile) {
-  if (profile?.language) return String(profile.language);
-  if (Array.isArray(profile?.languages) && profile.languages[0]) {
-    return String(profile.languages[0]);
+  const p = obj(profile);
+
+  if (p.language) return String(p.language);
+  if (p.mainLanguage) return String(p.mainLanguage);
+  if (p.main_language) return String(p.main_language);
+
+  if (Array.isArray(p.languages) && p.languages[0]) {
+    return String(p.languages[0]);
   }
-  if (Array.isArray(profile?.supportedLanguages) && profile.supportedLanguages[0]) {
-    return String(profile.supportedLanguages[0]);
+
+  if (Array.isArray(p.supportedLanguages) && p.supportedLanguages[0]) {
+    return String(p.supportedLanguages[0]);
   }
+
+  if (Array.isArray(p.supported_languages) && p.supported_languages[0]) {
+    return String(p.supported_languages[0]);
+  }
+
   return "az";
 }
 
@@ -44,6 +55,7 @@ export function extractItems(payload) {
     payload.queue,
     payload.services,
     payload.knowledgeItems,
+    payload.knowledge_items,
     payload.playbooks,
   ];
 
@@ -96,7 +108,13 @@ export function compactValue(value) {
 }
 
 export function isPendingKnowledge(item = {}) {
-  const status = s(item.status || item.review_status || item.state).toLowerCase();
+  const status = s(
+    item.status ||
+      item.reviewStatus ||
+      item.review_status ||
+      item.state
+  ).toLowerCase();
+
   if (!status) return true;
 
   return ["pending", "needs_review", "conflict", "review", "awaiting_review"].includes(
@@ -105,42 +123,79 @@ export function isPendingKnowledge(item = {}) {
 }
 
 export function candidateTitle(item = {}) {
-  return s(item.title) || s(item.item_key) || s(item.canonical_key) || "Untitled discovery";
+  return (
+    s(item.title) ||
+    s(item.name) ||
+    s(item.label) ||
+    s(item.itemKey) ||
+    s(item.item_key) ||
+    s(item.key) ||
+    s(item.canonical_key) ||
+    "Untitled discovery"
+  );
 }
 
 export function candidateCategory(item = {}) {
-  return s(item.category || item.candidate_group || "general");
+  return s(item.category || item.candidateGroup || item.candidate_group || "general");
 }
 
 export function candidateValue(item = {}) {
-  const text = s(item.value_text || item.summary || item.description);
+  const text = s(
+    item.valueText ||
+      item.value_text ||
+      item.normalizedText ||
+      item.normalized_text ||
+      item.summary ||
+      item.description
+  );
+
   if (text) return text;
 
-  const valueJson = obj(item.value_json);
+  const valueJson = obj(item.valueJson || item.value_json);
+  const normalizedJson = obj(item.normalizedJson || item.normalized_json);
 
   const combined =
-    s(valueJson.question) && s(valueJson.answer)
-      ? `${s(valueJson.question)} — ${s(valueJson.answer)}`
+    s(valueJson.question || normalizedJson.question) &&
+    s(valueJson.answer || normalizedJson.answer)
+      ? `${s(valueJson.question || normalizedJson.question)} — ${s(
+          valueJson.answer || normalizedJson.answer
+        )}`
       : s(
           valueJson.summary ||
+            normalizedJson.summary ||
             valueJson.text ||
+            normalizedJson.text ||
             valueJson.description ||
+            normalizedJson.description ||
             valueJson.service ||
+            normalizedJson.service ||
             valueJson.product ||
+            normalizedJson.product ||
             valueJson.policy ||
+            normalizedJson.policy ||
             valueJson.address ||
+            normalizedJson.address ||
             valueJson.hours ||
+            normalizedJson.hours ||
             valueJson.email ||
+            normalizedJson.email ||
             valueJson.phone ||
+            normalizedJson.phone ||
             valueJson.url ||
+            normalizedJson.url ||
             valueJson.title ||
-            valueJson.company_name
+            normalizedJson.title ||
+            valueJson.company_name ||
+            normalizedJson.company_name
         );
 
   if (combined) return combined;
 
-  const compact = compactValue(valueJson);
-  if (compact) return compact;
+  const compactJson = compactValue(valueJson);
+  if (compactJson) return compactJson;
+
+  const compactNormalized = compactValue(normalizedJson);
+  if (compactNormalized) return compactNormalized;
 
   try {
     return JSON.stringify(valueJson, null, 2);
@@ -150,21 +205,31 @@ export function candidateValue(item = {}) {
 }
 
 export function evidenceList(item = {}) {
-  return parseJsonArray(item.source_evidence_json).slice(0, 3);
+  return [
+    ...parseJsonArray(item.sourceEvidenceJson),
+    ...parseJsonArray(item.source_evidence_json),
+    ...parseJsonArray(item.evidence),
+  ].slice(0, 3);
 }
 
 export function candidateSource(item = {}) {
   const evidence = evidenceList(item)[0] || {};
 
   return (
+    s(item.sourceDisplayName) ||
     s(item.source_display_name) ||
+    s(item.displayName) ||
     s(item.display_name) ||
+    s(item.sourceLabel) ||
     s(item.source_label) ||
+    s(item.sourceType) ||
     s(item.source_type) ||
     s(item.source_key) ||
     s(evidence.source_label) ||
+    s(evidence.sourceLabel) ||
     s(evidence.type) ||
     s(evidence.source_type) ||
+    s(evidence.sourceType) ||
     "Unknown source"
   );
 }
@@ -181,6 +246,7 @@ export function profilePatchFromDiscovery(profile = {}) {
   const p = obj(profile);
   const languages = arr(p.languages);
   const supportedLanguages = arr(p.supportedLanguages);
+  const supportedLanguagesLegacy = arr(p.supported_languages);
 
   return {
     companyName: s(
@@ -207,8 +273,10 @@ export function profilePatchFromDiscovery(profile = {}) {
     language: s(
       p.language ||
         p.mainLanguage ||
+        p.main_language ||
         languages[0] ||
-        supportedLanguages[0]
+        supportedLanguages[0] ||
+        supportedLanguagesLegacy[0]
     ),
   };
 }
@@ -238,10 +306,25 @@ export function mergeBusinessForm(prev, patch = {}) {
 export function profilePreviewRows(profile = {}) {
   const p = obj(profile);
 
-  const services = arr(p.services).filter(Boolean).slice(0, 4).join(", ");
-  const products = arr(p.products).filter(Boolean).slice(0, 4).join(", ");
-  const pricingHints = arr(p.pricingHints).filter(Boolean).slice(0, 3).join(" · ");
-  const socialLinks = arr(p.socialLinks)
+  const services = arr(p.services)
+    .map((item) => (typeof item === "string" ? item : s(item?.title || item?.name || item?.label)))
+    .filter(Boolean)
+    .slice(0, 4)
+    .join(", ");
+
+  const products = arr(p.products)
+    .map((item) => (typeof item === "string" ? item : s(item?.title || item?.name || item?.label)))
+    .filter(Boolean)
+    .slice(0, 4)
+    .join(", ");
+
+  const pricingHints = arr(p.pricingHints || p.pricing_hints)
+    .map((item) => (typeof item === "string" ? item : compactValue(item)))
+    .filter(Boolean)
+    .slice(0, 3)
+    .join(" · ");
+
+  const socialLinks = arr(p.socialLinks || p.social_links)
     .map((item) => s(item?.platform || item?.url || item))
     .filter(Boolean)
     .slice(0, 4)
@@ -275,11 +358,21 @@ export function profilePreviewRows(profile = {}) {
       ),
     ],
     ["Timezone", s(p.timezone || p.timeZone)],
-    ["Language", s(p.language || p.mainLanguage || arr(p.languages)[0] || arr(p.supportedLanguages)[0])],
-    ["Website", s(p.websiteUrl || p.website || p.url || p.siteUrl)],
-    ["Phone", s(p.primaryPhone || arr(p.phones)[0])],
-    ["Email", s(p.primaryEmail || arr(p.emails)[0])],
-    ["Address", s(p.primaryAddress || arr(p.addresses)[0])],
+    [
+      "Language",
+      s(
+        p.language ||
+          p.mainLanguage ||
+          p.main_language ||
+          arr(p.languages)[0] ||
+          arr(p.supportedLanguages)[0] ||
+          arr(p.supported_languages)[0]
+      ),
+    ],
+    ["Website", s(p.websiteUrl || p.website || p.url || p.siteUrl || p.site_url)],
+    ["Phone", s(p.primaryPhone || p.primary_phone || arr(p.phones)[0])],
+    ["Email", s(p.primaryEmail || p.primary_email || arr(p.emails)[0])],
+    ["Address", s(p.primaryAddress || p.primary_address || arr(p.addresses)[0])],
     ["Services", services],
     ["Products", products],
     ["Pricing", pricingHints],
