@@ -31,13 +31,18 @@ function findProfileRowValue(rows = [], wantedKeys = []) {
   return s(match?.[1]);
 }
 
-function normalizeStageCandidate(stage = "", { hasKnowledge, hasServices, scanSucceeded } = {}) {
+function normalizeStageCandidate(
+  stage = "",
+  { hasKnowledge, hasServices, scanSucceeded } = {}
+) {
   const x = s(stage);
 
   if (x === "scanning") return "scanning";
   if (x === "ready") return "ready";
   if (x === "service") return "service";
-  if (x === "knowledge") return hasKnowledge ? "knowledge" : hasServices ? "ready" : "service";
+  if (x === "knowledge") {
+    return hasKnowledge ? "knowledge" : hasServices ? "ready" : "service";
+  }
   if (x === "identity") return scanSucceeded ? "identity" : "entry";
   return "entry";
 }
@@ -53,8 +58,7 @@ function buildRecoveredStage({
   if (importingWebsite) return "scanning";
 
   const nextStudioStage = s(
-    studioProgress?.nextStudioStage ||
-      studioProgress?.progress?.nextStudioStage
+    studioProgress?.nextStudioStage || studioProgress?.progress?.nextStudioStage
   );
 
   if (studioProgress?.setupCompleted) {
@@ -62,7 +66,7 @@ function buildRecoveredStage({
   }
 
   if (!scanSucceeded && !hasScannedUrl) {
-    return nextStudioStage === "entry" ? "entry" : "entry";
+    return "entry";
   }
 
   if (nextStudioStage) {
@@ -110,7 +114,11 @@ export default function SetupStudioScene({
   businessForm,
   discoveryForm,
   discoveryState,
+  reviewDraft,
+  manualSections,
   meta,
+  currentTitle,
+  currentDescription,
   discoveryProfileRows,
   knowledgePreview,
   knowledgeItems,
@@ -118,6 +126,7 @@ export default function SetupStudioScene({
   studioProgress,
   services,
   onSetBusinessField,
+  onSetManualSection,
   onSetDiscoveryField,
   onScanBusiness,
   onSaveBusiness,
@@ -125,6 +134,7 @@ export default function SetupStudioScene({
   onRejectKnowledge,
   onCreateSuggestedService,
   onOpenWorkspace,
+  onReloadReviewDraft,
   onRefresh,
   onToggleRefine,
   onToggleKnowledge,
@@ -134,11 +144,14 @@ export default function SetupStudioScene({
 
   const scanSucceeded = isSuccessMode(discoveryState.mode);
   const hasScannedUrl = !!s(discoveryState.lastUrl);
-  const hasKnowledge = knowledgePreview.length > 0;
+  const draftQueue = arr(reviewDraft?.reviewQueue);
+  const hasKnowledge = draftQueue.length > 0 || knowledgePreview.length > 0;
   const intakeItems =
     Array.isArray(knowledgeItems) && knowledgeItems.length
       ? knowledgeItems
-      : knowledgePreview;
+      : draftQueue.length
+        ? draftQueue
+        : knowledgePreview;
   const hasServices = Array.isArray(services) && services.length > 0;
 
   const stageSequence = useMemo(() => {
@@ -314,10 +327,14 @@ export default function SetupStudioScene({
       "business description",
     ]) || s(meta?.companySummaryShort || meta?.description);
 
-  const currentTitle =
-    s(businessForm.companyName) || discoveredTitle || "Business identity";
+  const resolvedCurrentTitle =
+    s(currentTitle) ||
+    s(businessForm.companyName) ||
+    discoveredTitle ||
+    "Business identity";
 
-  const currentDescription =
+  const resolvedCurrentDescription =
+    s(currentDescription) ||
     s(businessForm.description) ||
     discoveredDescription ||
     "We extracted a first draft of the business direction from the source signals.";
@@ -354,7 +371,9 @@ export default function SetupStudioScene({
 
   const stageMeta = obj(meta);
   const stageWarnings = arr(discoveryState?.warnings).filter(Boolean);
-  const nextStudioStage = s(stageMeta?.nextStudioStage || studioProgress?.nextStudioStage || "");
+  const nextStudioStage = s(
+    stageMeta?.nextStudioStage || studioProgress?.nextStudioStage || ""
+  );
 
   if (loading) {
     return (
@@ -438,6 +457,12 @@ export default function SetupStudioScene({
             </span>
           ) : null}
 
+          {reviewDraft?.stats?.pendingReviewCount ? (
+            <span className="setup-studio-scene__meta-chip">
+              Pending review: {Number(reviewDraft.stats.pendingReviewCount || 0)}
+            </span>
+          ) : null}
+
           {discoveryState?.shouldReview ? (
             <span className="setup-studio-scene__meta-chip">
               Review required
@@ -491,8 +516,8 @@ export default function SetupStudioScene({
               {stage === "identity" ? (
                 <SetupStudioIdentityStage
                   key="identity"
-                  currentTitle={currentTitle}
-                  currentDescription={currentDescription}
+                  currentTitle={resolvedCurrentTitle}
+                  currentDescription={resolvedCurrentDescription}
                   discoveryProfileRows={discoveryProfileRows}
                   discoveryWarnings={stageWarnings}
                   sourceLabel={sourceLabel}
@@ -553,7 +578,9 @@ export default function SetupStudioScene({
               savingBusiness={savingBusiness}
               businessForm={businessForm}
               discoveryProfileRows={discoveryProfileRows}
+              manualSections={manualSections}
               onSetBusinessField={onSetBusinessField}
+              onSetManualSection={onSetManualSection}
               onSaveBusiness={onSaveBusiness}
               onClose={onToggleRefine}
             />
@@ -570,6 +597,7 @@ export default function SetupStudioScene({
               onApproveKnowledge={onApproveKnowledge}
               onRejectKnowledge={onRejectKnowledge}
               onClose={onToggleKnowledge}
+              onRefresh={onReloadReviewDraft}
             />
           </div>
         ) : null}

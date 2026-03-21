@@ -1,9 +1,44 @@
-// src/features/setup-studio/components/SetupStudioIntakeModal.jsx
-
 import { motion } from "framer-motion";
-import { BadgeCheck, X } from "lucide-react";
+import { BadgeCheck, RotateCw, X } from "lucide-react";
 import { TinyLabel } from "./SetupStudioUi.jsx";
 import SetupStudioKnowledgeLine from "./SetupStudioKnowledgeLine.jsx";
+
+function s(v, d = "") {
+  return String(v ?? d).trim();
+}
+
+function arr(v, d = []) {
+  return Array.isArray(v) ? v : d;
+}
+
+function obj(v, d = {}) {
+  return v && typeof v === "object" && !Array.isArray(v) ? v : d;
+}
+
+function normalizeKnowledgeItem(item = {}, index = 0) {
+  const x = obj(item);
+  const evidence = arr(x.evidence || x.source_evidence_json);
+
+  return {
+    ...x,
+    id: s(x.id || x.candidateId),
+    index: String(index + 1).padStart(2, "0"),
+    title: s(x.title),
+    value: s(x.value || x.valueText || x.value_text),
+    category: s(x.category),
+    source: s(x.source || x.sourceLabel || x.source_display_name || x.source_type),
+    confidence: s(x.confidence || x.confidenceLabel || x.confidence_label),
+    confidenceLabel: s(x.confidenceLabel || x.confidence_label),
+    evidence,
+    evidenceUrl: s(
+      x.evidenceUrl ||
+        evidence[0]?.pageUrl ||
+        evidence[0]?.url ||
+        evidence[0]?.source_url ||
+        evidence[0]?.link
+    ),
+  };
+}
 
 export default function SetupStudioIntakeModal({
   knowledgeItems,
@@ -11,8 +46,11 @@ export default function SetupStudioIntakeModal({
   onApproveKnowledge,
   onRejectKnowledge,
   onClose,
+  onRefresh,
 }) {
-  const items = Array.isArray(knowledgeItems) ? knowledgeItems : [];
+  const items = arr(knowledgeItems).map((item, index) =>
+    normalizeKnowledgeItem(item, index)
+  );
 
   return (
     <motion.div
@@ -32,26 +70,43 @@ export default function SetupStudioIntakeModal({
           <h2 className="mt-4 text-3xl font-semibold tracking-[-0.05em] text-slate-950">
             Review what enters the twin
           </h2>
+
+          <p className="mt-3 text-sm leading-7 text-slate-500">
+            Burda source-dan çıxarılan knowledge item-ləri approve və reject edə bilərsən.
+          </p>
         </div>
 
-        <button
-          type="button"
-          onClick={onClose}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-900/10 bg-white text-slate-600"
-        >
-          <X className="h-4 w-4" />
-        </button>
+        <div className="flex items-center gap-2">
+          {typeof onRefresh === "function" ? (
+            <button
+              type="button"
+              onClick={onRefresh}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-900/10 bg-white text-slate-600"
+              aria-label="Refresh intake"
+            >
+              <RotateCw className="h-4 w-4" />
+            </button>
+          ) : null}
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-900/10 bg-white text-slate-600"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       <div className="max-h-[62vh] overflow-y-auto px-5 pb-5 sm:px-6">
         {items.length ? (
-          items.map((item, index) => (
+          items.map((item) => (
             <SetupStudioKnowledgeLine
-              key={item.id || item.title || index}
-              item={{ ...item, index: String(index + 1).padStart(2, "0") }}
+              key={item.id || item.title || item.index}
+              item={item}
               busy={actingKnowledgeId === item.id}
-              onApprove={() => onApproveKnowledge(item)}
-              onReject={() => onRejectKnowledge(item)}
+              onApprove={() => onApproveKnowledge({ ...item, id: item.id })}
+              onReject={() => onRejectKnowledge({ ...item, id: item.id })}
             />
           ))
         ) : (
