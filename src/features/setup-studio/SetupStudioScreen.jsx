@@ -589,6 +589,104 @@ function buildCapabilitiesPatch({ currentReview = {}, businessForm = {} }) {
   };
 }
 
+function extractProfileName(profile = {}) {
+  const x = obj(profile);
+  return s(
+    x.companyName ||
+      x.company_name ||
+      x.displayName ||
+      x.display_name ||
+      x.name
+  );
+}
+
+function hasMeaningfulProfile(profile = {}) {
+  const x = obj(profile);
+  return !!(
+    extractProfileName(x) ||
+    s(x.summaryShort || x.summary_short || x.description || x.summaryLong || x.summary_long) ||
+    s(x.websiteUrl || x.website_url) ||
+    s(x.primaryPhone || x.primary_phone) ||
+    s(x.primaryEmail || x.primary_email) ||
+    s(x.primaryAddress || x.primary_address)
+  );
+}
+
+function isPlaceholderBusinessName(value = "") {
+  const x = s(value).toLowerCase();
+
+  if (!x) return true;
+
+  return [
+    "google maps",
+    "maps",
+    "website",
+    "source",
+    "business",
+    "company",
+  ].includes(x);
+}
+
+function shouldPreferCandidateCompanyName(currentValue = "", nextValue = "") {
+  const current = s(currentValue);
+  const next = s(nextValue);
+
+  if (!next) return false;
+  if (!current) return true;
+  if (isPlaceholderBusinessName(current) && !isPlaceholderBusinessName(next)) return true;
+  return false;
+}
+
+function hydrateBusinessFormFromProfile(prev = {}, profile = {}, { force = false } = {}) {
+  const candidate = formFromProfile(profile, prev);
+
+  const next = { ...prev };
+
+  const prevCompanyName = s(prev.companyName);
+  const nextCompanyName = s(candidate.companyName);
+
+  if (force || shouldPreferCandidateCompanyName(prevCompanyName, nextCompanyName)) {
+    next.companyName = nextCompanyName;
+  }
+
+  if (force || !s(next.description)) {
+    next.description = s(candidate.description || prev.description);
+  }
+
+  if (force || !s(next.websiteUrl)) {
+    next.websiteUrl = s(candidate.websiteUrl || prev.websiteUrl);
+  }
+
+  if (force || !s(next.primaryPhone)) {
+    next.primaryPhone = s(candidate.primaryPhone || prev.primaryPhone);
+  }
+
+  if (force || !s(next.primaryEmail)) {
+    next.primaryEmail = s(candidate.primaryEmail || prev.primaryEmail);
+  }
+
+  if (force || !s(next.primaryAddress)) {
+    next.primaryAddress = s(candidate.primaryAddress || prev.primaryAddress);
+  }
+
+  if (force || !s(next.timezone)) {
+    next.timezone = s(candidate.timezone || prev.timezone || "Asia/Baku");
+  }
+
+  if (force || !s(next.language)) {
+    next.language = s(candidate.language || prev.language || "az");
+  }
+
+  return next;
+}
+
+function chooseBestProfileForForm(...profiles) {
+  for (const profile of profiles) {
+    if (hasMeaningfulProfile(profile)) return obj(profile);
+  }
+  return {};
+}
+
 export default function SetupStudioScreen() {
   const navigate = useNavigate();
 
@@ -711,7 +809,10 @@ export default function SetupStudioScreen() {
     }));
   }
 
-  function applyReviewState(reviewPayload = {}, { preserveBusinessForm = false } = {}) {
+  function applyReviewState(
+    reviewPayload = {},
+    { preserveBusinessForm = false, fallbackProfile = {} } = {}
+  ) {
     const normalized = normalizeReviewState(reviewPayload);
     const legacy = mapCurrentReviewToLegacyDraft(normalized);
     const nextManualSections = buildManualSectionsFromReview(normalized);
@@ -719,9 +820,26 @@ export default function SetupStudioScreen() {
     setCurrentReview(normalized);
     setReviewDraft(legacy);
 
-    if (!preserveBusinessForm) {
-      setBusinessForm((prev) => formFromProfile(legacy.overview, prev));
-    }
+    const preferredProfile = chooseBestProfileForForm(
+      legacy.overview,
+      fallbackProfile
+    );
+
+    setBusinessForm((prev) => {
+      if (!hasMeaningfulProfile(preferredProfile)) {
+        return preserveBusinessForm ? prev : formFromProfile(legacy.overview, prev);
+      }
+
+      if (preserveBusinessForm) {
+        return hydrateBusinessFormFromProfile(prev, preferredProfile, {
+          force: false,
+        });
+      }
+
+      return hydrateBusinessFormFromProfile(prev, preferredProfile, {
+        force: true,
+      });
+    });
 
     setManualSections((prev) => ({
       servicesText: preserveBusinessForm && s(prev.servicesText)
@@ -803,26 +921,34 @@ export default function SetupStudioScreen() {
       const legacyDraft = mapCurrentReviewToLegacyDraft(reviewState);
       setReviewDraft(legacyDraft);
 
-      if (!preserveBusinessForm) {
-        const baseProfile =
-          Object.keys(obj(legacyDraft?.overview)).length > 0
-            ? legacyDraft?.overview
-            : profile;
+      const baseProfile = chooseBestProfileForForm(
+        legacyDraft?.overview,
+        profile
+      );
 
-        setBusinessForm((prev) =>
-          formFromProfile(baseProfile, {
-            ...prev,
-            companyName: s(profile?.companyName),
-            description: s(profile?.description),
-            timezone: s(profile?.timezone || "Asia/Baku"),
-            language: firstLanguage(profile),
-            websiteUrl: s(profile?.websiteUrl || profile?.website_url),
-            primaryPhone: s(profile?.primaryPhone || profile?.primary_phone),
-            primaryEmail: s(profile?.primaryEmail || profile?.primary_email),
-            primaryAddress: s(profile?.primaryAddress || profile?.primary_address),
-          })
-        );
-      }
+      setBusinessForm((prev) => {
+        if (!preserveBusinessForm) {
+          return hydrateBusinessFormFromProfile(
+            {
+              ...prev,
+              companyName: s(profile?.companyName),
+              description: s(profile?.description),
+              timezone: s(profile?.timezone || "Asia/Baku"),
+              language: firstLanguage(profile),
+              websiteUrl: s(profile?.websiteUrl || profile?.website_url),
+              primaryPhone: s(profile?.primaryPhone || profile?.primary_phone),
+              primaryEmail: s(profile?.primaryEmail || profile?.primary_email),
+              primaryAddress: s(profile?.primaryAddress || profile?.primary_address),
+            },
+            baseProfile,
+            { force: true }
+          );
+        }
+
+        return hydrateBusinessFormFromProfile(prev, baseProfile, {
+          force: false,
+        });
+      });
 
       const nextManualSections = buildManualSectionsFromReview(reviewState);
       setManualSections((prev) => ({
@@ -967,21 +1093,28 @@ export default function SetupStudioScreen() {
       const importedReview = normalizeReviewState(result?.review || {});
       const legacyImportedDraft = mapCurrentReviewToLegacyDraft(importedReview);
 
-      const profilePatch =
-        Object.keys(obj(legacyImportedDraft?.overview)).length > 0
-          ? formFromProfile(legacyImportedDraft.overview, {})
-          : profilePatchFromDiscovery(discoveredProfile);
+      const reviewBackedProfile = obj(legacyImportedDraft?.overview);
+      const helperProfilePatch = profilePatchFromDiscovery(discoveredProfile);
+      const bestIncomingProfile = chooseBestProfileForForm(
+        reviewBackedProfile,
+        discoveredProfile,
+        helperProfilePatch
+      );
 
-      const mergedForm = mergeBusinessForm(businessForm, profilePatch);
-      const profileApplied =
-        JSON.stringify(mergedForm) !== JSON.stringify(businessForm);
-
-      if (profileApplied) {
-        setBusinessForm(mergedForm);
-      }
+      setBusinessForm((prev) => {
+        const mergedFromHelper = mergeBusinessForm(prev, helperProfilePatch);
+        return hydrateBusinessFormFromProfile(
+          mergedFromHelper,
+          bestIncomingProfile,
+          { force: false }
+        );
+      });
 
       if (result?.review) {
-        applyReviewState(result.review, { preserveBusinessForm: true });
+        applyReviewState(result.review, {
+          preserveBusinessForm: true,
+          fallbackProfile: discoveredProfile,
+        });
       }
 
       const resultWarnings = arr(result?.warnings).map((x) => s(x)).filter(Boolean);
@@ -1011,7 +1144,7 @@ export default function SetupStudioScreen() {
             ? resultWarnings[0]
             : scanCompleteLabel(sourceType, result?.candidateCount),
         candidateCount: Number(result?.candidateCount || 0),
-        profileApplied,
+        profileApplied: hasMeaningfulProfile(bestIncomingProfile),
         shouldReview: !!result?.shouldReview,
         warnings: resultWarnings,
         requestId: s(result?.requestId),
@@ -1296,16 +1429,23 @@ export default function SetupStudioScreen() {
     }));
   }, [knowledgeCandidates, reviewDraft]);
 
-  const currentTitle = useMemo(
-    () =>
-      s(
-        businessForm.companyName ||
-          reviewDraft?.overview?.companyName ||
-          reviewDraft?.overview?.displayName ||
-          reviewDraft?.overview?.name
-      ),
-    [businessForm.companyName, reviewDraft]
-  );
+  const currentTitle = useMemo(() => {
+    const businessName = s(businessForm.companyName);
+    const reviewName = s(
+      reviewDraft?.overview?.companyName ||
+        reviewDraft?.overview?.displayName ||
+        reviewDraft?.overview?.name
+    );
+
+    if (shouldPreferCandidateCompanyName(businessName, reviewName)) {
+      return reviewName;
+    }
+
+    return s(
+      businessName ||
+        reviewName
+    );
+  }, [businessForm.companyName, reviewDraft]);
 
   const currentDescription = useMemo(
     () =>
