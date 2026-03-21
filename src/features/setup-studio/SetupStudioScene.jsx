@@ -183,17 +183,24 @@ export default function SetupStudioScene({
 }) {
   const navigate = useNavigate();
 
-  const scanSucceeded = isSuccessMode(discoveryState.mode);
-  const hasScannedUrl = !!s(discoveryState.lastUrl);
+  const safeKnowledgePreview = arr(knowledgePreview);
+  const safeKnowledgeItems = arr(knowledgeItems);
+  const safeServices = arr(services);
+  const safeDiscoveryProfileRows = arr(discoveryProfileRows);
+  const safeWarnings = arr(discoveryState?.warnings).filter(Boolean);
+
+  const scanSucceeded = isSuccessMode(discoveryState?.mode);
+  const hasScannedUrl = !!s(discoveryState?.lastUrl);
+
   const draftQueue = arr(reviewDraft?.reviewQueue);
-  const hasKnowledge = draftQueue.length > 0 || knowledgePreview.length > 0;
+  const hasKnowledge = draftQueue.length > 0 || safeKnowledgePreview.length > 0;
   const intakeItems =
-    Array.isArray(knowledgeItems) && knowledgeItems.length
-      ? knowledgeItems
-      : draftQueue.length
+    safeKnowledgeItems.length > 0
+      ? safeKnowledgeItems
+      : draftQueue.length > 0
         ? draftQueue
-        : knowledgePreview;
-  const hasServices = Array.isArray(services) && services.length > 0;
+        : safeKnowledgePreview;
+  const hasServices = safeServices.length > 0;
 
   const stageSequence = useMemo(() => {
     const list = ["identity"];
@@ -228,7 +235,24 @@ export default function SetupStudioScene({
     "Detecting service structure",
   ];
 
-  const activeOverlay = showKnowledge ? "knowledge" : showRefine ? "refine" : "";
+  const hasKnowledgeModalContent = showKnowledge && intakeItems.length > 0;
+
+  const hasRefineModalContent =
+    showRefine &&
+    (
+      safeDiscoveryProfileRows.length > 0 ||
+      !!s(currentTitle) ||
+      !!s(currentDescription) ||
+      !!s(businessForm?.companyName) ||
+      !!s(businessForm?.description)
+    );
+
+  const activeOverlay = hasKnowledgeModalContent
+    ? "knowledge"
+    : hasRefineModalContent
+      ? "refine"
+      : "";
+
   const hasOverlay = !!activeOverlay;
 
   useEffect(() => {
@@ -374,7 +398,7 @@ export default function SetupStudioScene({
   }
 
   const discoveredTitle =
-    findProfileRowValue(discoveryProfileRows, [
+    findProfileRowValue(safeDiscoveryProfileRows, [
       "name",
       "business name",
       "company name",
@@ -382,7 +406,7 @@ export default function SetupStudioScene({
     ]) || s(meta?.companyName);
 
   const discoveredDescription =
-    findProfileRowValue(discoveryProfileRows, [
+    findProfileRowValue(safeDiscoveryProfileRows, [
       "description",
       "summary",
       "about",
@@ -391,13 +415,13 @@ export default function SetupStudioScene({
 
   const resolvedCurrentTitle =
     s(currentTitle) ||
-    s(businessForm.companyName) ||
+    s(businessForm?.companyName) ||
     discoveredTitle ||
     "Business identity";
 
   const resolvedCurrentDescription =
     s(currentDescription) ||
-    s(businessForm.description) ||
+    s(businessForm?.description) ||
     discoveredDescription ||
     "We extracted a first draft of the business direction from the source signals.";
 
@@ -432,7 +456,7 @@ export default function SetupStudioScene({
   );
 
   const stageMeta = obj(meta);
-  const stageWarnings = arr(discoveryState?.warnings).filter(Boolean);
+  const stageWarnings = safeWarnings;
   const nextStudioStage = s(
     stageMeta?.nextStudioStage || studioProgress?.nextStudioStage || ""
   );
@@ -505,7 +529,7 @@ export default function SetupStudioScene({
               {!isEntryStage ? (
                 <div
                   className="hidden rounded-full border border-slate-200 bg-white/90 px-3 py-2 text-sm font-medium text-slate-600 shadow-sm sm:flex"
-                  data-mode={importingWebsite ? "running" : s(discoveryState.mode || "idle")}
+                  data-mode={importingWebsite ? "running" : s(discoveryState?.mode || "idle")}
                 >
                   <span className="mr-2 mt-[1px] inline-block h-2 w-2 rounded-full bg-slate-400" />
                   {statusLabel}
@@ -590,11 +614,11 @@ export default function SetupStudioScene({
                   {stage === "scanning" ? (
                     <SetupStudioScanningStage
                       key="scanning"
-                      lastUrl={discoveryState.lastUrl}
+                      lastUrl={discoveryState?.lastUrl}
                       sourceLabel={sourceLabel}
                       scanLines={scanLines}
                       scanLineIndex={scanLineIndex}
-                      requestId={s(discoveryState.requestId)}
+                      requestId={s(discoveryState?.requestId)}
                     />
                   ) : null}
 
@@ -603,7 +627,7 @@ export default function SetupStudioScene({
                       key="identity"
                       currentTitle={resolvedCurrentTitle}
                       currentDescription={resolvedCurrentDescription}
-                      discoveryProfileRows={discoveryProfileRows}
+                      discoveryProfileRows={safeDiscoveryProfileRows}
                       discoveryWarnings={stageWarnings}
                       sourceLabel={sourceLabel}
                       onNext={goNextStage}
@@ -614,7 +638,7 @@ export default function SetupStudioScene({
                   {stage === "knowledge" ? (
                     <SetupStudioKnowledgeStage
                       key="knowledge"
-                      knowledgePreview={knowledgePreview}
+                      knowledgePreview={safeKnowledgePreview}
                       actingKnowledgeId={actingKnowledgeId}
                       sourceLabel={sourceLabel}
                       warnings={stageWarnings}
@@ -630,7 +654,7 @@ export default function SetupStudioScene({
                       key="service"
                       serviceSuggestionTitle={serviceSuggestionTitle}
                       meta={meta}
-                      services={services}
+                      services={safeServices}
                       sourceLabel={sourceLabel}
                       savingServiceSuggestion={savingServiceSuggestion}
                       onCreateSeed={handleCreateServiceAndNext}
@@ -659,14 +683,14 @@ export default function SetupStudioScene({
       </div>
 
       <SetupStudioModalLayer
-        open={showRefine && !showKnowledge}
+        open={hasRefineModalContent && !hasKnowledgeModalContent}
         zIndexClass="z-[160]"
         backdropClass="bg-slate-950/42 backdrop-blur-md"
       >
         <SetupStudioRefineModal
           savingBusiness={savingBusiness}
           businessForm={businessForm}
-          discoveryProfileRows={discoveryProfileRows}
+          discoveryProfileRows={safeDiscoveryProfileRows}
           manualSections={manualSections}
           onSetBusinessField={onSetBusinessField}
           onSetManualSection={onSetManualSection}
@@ -676,7 +700,7 @@ export default function SetupStudioScene({
       </SetupStudioModalLayer>
 
       <SetupStudioModalLayer
-        open={showKnowledge}
+        open={hasKnowledgeModalContent}
         zIndexClass="z-[170]"
         backdropClass="bg-slate-950/52 backdrop-blur-lg"
       >
