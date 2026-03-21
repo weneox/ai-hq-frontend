@@ -34,6 +34,62 @@ import {
   deriveStudioProgress,
 } from "./lib/setupStudioHelpers.js";
 
+function createEmptyReviewState() {
+  return {
+    session: null,
+    draft: {},
+    sources: [],
+    events: [],
+  };
+}
+
+function createEmptyLegacyDraft() {
+  return {
+    sourceId: "",
+    sourceRunId: "",
+    snapshotId: "",
+    quickSummary: "",
+    overview: {},
+    capabilities: {},
+    sections: {},
+    reviewQueue: [],
+    existing: {},
+    stats: {},
+    warnings: [],
+    completeness: {},
+    confidenceSummary: {},
+    rawDraft: {},
+  };
+}
+
+function createIdleDiscoveryState() {
+  return {
+    mode: "idle",
+    lastUrl: "",
+    lastSourceType: "",
+    sourceLabel: "",
+    message: "",
+    candidateCount: 0,
+    profileApplied: false,
+    shouldReview: false,
+    warnings: [],
+    requestId: "",
+    intakeContext: {},
+    profile: {},
+    signals: {},
+    snapshot: {},
+    sourceId: "",
+    sourceRunId: "",
+    snapshotId: "",
+    reviewSessionId: "",
+    reviewSessionStatus: "",
+    hasResults: false,
+    resultCount: 0,
+    importedKnowledgeItems: [],
+    importedServices: [],
+  };
+}
+
 function pickSetupProfile(setup = {}, workspace = {}) {
   return obj(
     setup?.tenantProfile ||
@@ -335,7 +391,9 @@ function normalizeDraftKnowledgeItem(item = {}) {
 
 function normalizeVisibleKnowledgeItem(item = {}) {
   const x = obj(item);
-  const fallbackEvidence = arr(x.evidence || x.sourceEvidenceJson || x.source_evidence_json);
+  const fallbackEvidence = arr(
+    x.evidence || x.sourceEvidenceJson || x.source_evidence_json
+  );
   const helperEvidence = arr(evidenceList(x));
   const allEvidence = fallbackEvidence.length ? fallbackEvidence : helperEvidence;
 
@@ -378,9 +436,7 @@ function normalizeVisibleServiceItem(item = {}) {
 
   return {
     id: s(x.id || x.serviceId || x.key || x.title || x.name),
-    key:
-      s(x.key) ||
-      safeDraftKey(s(x.title || x.name || x.label), "service"),
+    key: s(x.key) || safeDraftKey(s(x.title || x.name || x.label), "service"),
     title: s(x.title || x.name || x.label),
     valueText: s(x.valueText || x.description || x.summary || x.notes),
     description: s(x.description || x.valueText || x.summary || x.notes),
@@ -459,7 +515,9 @@ function mapCurrentReviewToLegacyDraft(review = {}) {
   const capabilities = obj(draft?.capabilities);
   const sourceSummary = obj(draft?.sourceSummary);
   const latestImport = obj(sourceSummary?.latestImport);
-  const services = arr(draft?.services).map((item) => normalizeDraftServiceItem(item));
+  const services = arr(draft?.services).map((item) =>
+    normalizeDraftServiceItem(item)
+  );
   const knowledgeItems = arr(draft?.knowledgeItems).map((item) =>
     normalizeDraftKnowledgeItem(item)
   );
@@ -515,7 +573,9 @@ function mapCurrentReviewToLegacyDraft(review = {}) {
 
 function buildManualSectionsFromReview(review = {}) {
   const draft = obj(review?.draft);
-  const services = arr(draft?.services).map((item) => normalizeDraftServiceItem(item));
+  const services = arr(draft?.services).map((item) =>
+    normalizeDraftServiceItem(item)
+  );
   const knowledgeItems = arr(draft?.knowledgeItems).map((item) =>
     normalizeDraftKnowledgeItem(item)
   );
@@ -823,15 +883,10 @@ function chooseBestProfileForForm(...profiles) {
 }
 
 function deriveVisibleKnowledgeItems({
-  knowledgeCandidates = [],
   reviewDraft = {},
   currentReview = {},
   discoveryState = {},
 }) {
-  const apiItems = arr(knowledgeCandidates).map((item) =>
-    normalizeVisibleKnowledgeItem(item)
-  );
-
   const reviewQueueItems = arr(reviewDraft?.reviewQueue).map((item) =>
     normalizeVisibleKnowledgeItem(item)
   );
@@ -841,12 +896,14 @@ function deriveVisibleKnowledgeItems({
   );
 
   const snapshotItems = arr(
-    discoveryState?.snapshot?.knowledgeItems || discoveryState?.snapshot?.items
+    discoveryState?.snapshot?.knowledgeItems ||
+      discoveryState?.snapshot?.items ||
+      discoveryState?.importedKnowledgeItems
   ).map((item) => normalizeVisibleKnowledgeItem(item));
 
   const merged = mergeItemsByKey(
-    apiItems,
-    [...reviewQueueItems, ...currentDraftItems, ...snapshotItems],
+    reviewQueueItems,
+    [...currentDraftItems, ...snapshotItems],
     ["candidateId", "key", "title", "category"]
   );
 
@@ -854,15 +911,10 @@ function deriveVisibleKnowledgeItems({
 }
 
 function deriveVisibleServiceItems({
-  services = [],
   reviewDraft = {},
   currentReview = {},
   discoveryState = {},
 }) {
-  const savedServices = arr(services).map((item) =>
-    normalizeVisibleServiceItem(item)
-  );
-
   const sectionServices = arr(reviewDraft?.sections?.services).map((item) =>
     normalizeVisibleServiceItem(item)
   );
@@ -871,20 +923,23 @@ function deriveVisibleServiceItems({
     normalizeVisibleServiceItem(item)
   );
 
-  const snapshotServices = arr(
-    discoveryState?.snapshot?.services ||
-      discoveryState?.profile?.services ||
-      discoveryState?.signals?.sourceFusion?.profile?.services ||
-      discoveryState?.signals?.website?.offerings?.services
-  ).map((item) =>
+  const snapshotServices = [
+    ...arr(discoveryState?.importedServices),
+    ...arr(
+      discoveryState?.snapshot?.services ||
+        discoveryState?.profile?.services ||
+        discoveryState?.signals?.sourceFusion?.profile?.services ||
+        discoveryState?.signals?.website?.offerings?.services
+    ),
+  ].map((item) =>
     typeof item === "string"
       ? normalizeVisibleServiceItem({ title: item, description: item })
       : normalizeVisibleServiceItem(item)
   );
 
   const merged = mergeItemsByKey(
-    savedServices,
-    [...sectionServices, ...currentDraftServices, ...snapshotServices],
+    sectionServices,
+    [...currentDraftServices, ...snapshotServices],
     ["id", "key", "title", "category"]
   );
 
@@ -957,6 +1012,8 @@ export default function SetupStudioScreen() {
   const [showRefine, setShowRefine] = useState(false);
   const [showKnowledge, setShowKnowledge] = useState(false);
 
+  const [freshEntryMode, setFreshEntryMode] = useState(true);
+
   const [error, setError] = useState("");
 
   const [businessForm, setBusinessForm] = useState({
@@ -976,53 +1033,13 @@ export default function SetupStudioScreen() {
     policiesText: "",
   });
 
-  const [currentReview, setCurrentReview] = useState({
-    session: null,
-    draft: {},
-    sources: [],
-    events: [],
-  });
-
-  const [reviewDraft, setReviewDraft] = useState({
-    sourceId: "",
-    sourceRunId: "",
-    snapshotId: "",
-    quickSummary: "",
-    overview: {},
-    capabilities: {},
-    sections: {},
-    reviewQueue: [],
-    existing: {},
-    stats: {},
-  });
+  const [currentReview, setCurrentReview] = useState(createEmptyReviewState);
+  const [reviewDraft, setReviewDraft] = useState(createEmptyLegacyDraft);
+  const [discoveryState, setDiscoveryState] = useState(createIdleDiscoveryState);
 
   const [discoveryForm, setDiscoveryForm] = useState({
     websiteUrl: "",
     note: "",
-  });
-
-  const [discoveryState, setDiscoveryState] = useState({
-    mode: "idle",
-    lastUrl: "",
-    lastSourceType: "",
-    sourceLabel: "",
-    message: "",
-    candidateCount: 0,
-    profileApplied: false,
-    shouldReview: false,
-    warnings: [],
-    requestId: "",
-    intakeContext: {},
-    profile: {},
-    signals: {},
-    snapshot: {},
-    sourceId: "",
-    sourceRunId: "",
-    snapshotId: "",
-    reviewSessionId: "",
-    reviewSessionStatus: "",
-    hasResults: false,
-    resultCount: 0,
   });
 
   const [knowledgeCandidates, setKnowledgeCandidates] = useState([]);
@@ -1045,6 +1062,15 @@ export default function SetupStudioScreen() {
     runtimeServiceCount: 0,
     runtimePlaybookCount: 0,
   });
+
+  function clearStudioReviewState() {
+    autoRevealRef.current = "";
+    setCurrentReview(createEmptyReviewState());
+    setReviewDraft(createEmptyLegacyDraft());
+    setDiscoveryState(createIdleDiscoveryState());
+    setShowRefine(false);
+    setShowKnowledge(false);
+  }
 
   function setBusinessField(key, value) {
     setBusinessForm((prev) => ({
@@ -1120,51 +1146,58 @@ export default function SetupStudioScreen() {
     };
   }
 
-  async function loadCurrentReview({ preserveBusinessForm = false } = {}) {
+  async function loadCurrentReview({
+    preserveBusinessForm = false,
+    activateReviewSession = true,
+  } = {}) {
     try {
       const payload = await getCurrentSetupReview({ eventLimit: 30 });
+
+      if (activateReviewSession) {
+        setFreshEntryMode(false);
+      }
+
       return applyReviewState(payload, { preserveBusinessForm });
     } catch {
-      const empty = {
-        session: null,
-        draft: {},
-        sources: [],
-        events: [],
-      };
+      const empty = createEmptyReviewState();
       setCurrentReview(empty);
-      setReviewDraft({
-        sourceId: "",
-        sourceRunId: "",
-        snapshotId: "",
-        quickSummary: "",
-        overview: {},
-        capabilities: {},
-        sections: {},
-        reviewQueue: [],
-        existing: {},
-        stats: {},
-      });
+      setReviewDraft(createEmptyLegacyDraft());
       return {
         currentReview: empty,
-        reviewDraft: {},
+        reviewDraft: createEmptyLegacyDraft(),
       };
     }
   }
 
-  async function loadData({ silent = false, preserveBusinessForm = false } = {}) {
+  async function loadData({
+    silent = false,
+    preserveBusinessForm = false,
+    hydrateReview = false,
+  } = {}) {
     try {
       if (silent) setRefreshing(true);
       else setLoading(true);
 
       setError("");
 
-      const [boot, knowledgePayload, servicesPayload, reviewPayload] =
-        await Promise.all([
-          getAppBootstrap(),
-          getKnowledgeCandidates(),
-          getSetupServices(),
-          getCurrentSetupReview({ eventLimit: 30 }).catch(() => ({ review: {} })),
-        ]);
+      const requests = [
+        getAppBootstrap(),
+        getKnowledgeCandidates(),
+        getSetupServices(),
+      ];
+
+      if (hydrateReview) {
+        requests.push(
+          getCurrentSetupReview({ eventLimit: 30 }).catch(() => ({ review: {} }))
+        );
+      }
+
+      const responses = await Promise.all(requests);
+
+      const boot = responses[0];
+      const knowledgePayload = responses[1];
+      const servicesPayload = responses[2];
+      const reviewPayload = hydrateReview ? responses[3] : { review: {} };
 
       const workspace = obj(boot?.workspace);
       const setup = obj(boot?.setup);
@@ -1177,62 +1210,97 @@ export default function SetupStudioScreen() {
       const nextMeta = normalizeBootMeta(boot, pendingKnowledge, serviceItems);
       setMeta(nextMeta);
 
-      const reviewState = normalizeReviewState(reviewPayload);
-      setCurrentReview(reviewState);
-
-      const legacyDraft = mapCurrentReviewToLegacyDraft(reviewState);
-      setReviewDraft(legacyDraft);
-
-      const baseProfile = chooseBestProfileForForm(legacyDraft?.overview, profile);
-
-      setBusinessForm((prev) => {
-        if (!preserveBusinessForm) {
-          return hydrateBusinessFormFromProfile(
-            {
-              ...prev,
-              companyName: s(profile?.companyName),
-              description: s(profile?.description),
-              timezone: s(profile?.timezone || "Asia/Baku"),
-              language: firstLanguage(profile),
-              websiteUrl: s(profile?.websiteUrl || profile?.website_url),
-              primaryPhone: s(profile?.primaryPhone || profile?.primary_phone),
-              primaryEmail: s(profile?.primaryEmail || profile?.primary_email),
-              primaryAddress: s(profile?.primaryAddress || profile?.primary_address),
-            },
-            baseProfile,
-            { force: true }
-          );
-        }
-
-        return hydrateBusinessFormFromProfile(prev, baseProfile, {
-          force: false,
-        });
-      });
-
-      const nextManualSections = buildManualSectionsFromReview(reviewState);
-      setManualSections((prev) => ({
-        servicesText:
-          preserveBusinessForm && s(prev.servicesText)
-            ? s(prev.servicesText)
-            : s(nextManualSections.servicesText),
-        faqsText:
-          preserveBusinessForm && s(prev.faqsText)
-            ? s(prev.faqsText)
-            : s(nextManualSections.faqsText),
-        policiesText:
-          preserveBusinessForm && s(prev.policiesText)
-            ? s(prev.policiesText)
-            : s(nextManualSections.policiesText),
-      }));
-
       setKnowledgeCandidates(pendingKnowledge);
       setServices(serviceItems);
 
-      applyUiHintsFromMeta({
-        nextMeta,
-        pendingKnowledge,
-        setShowKnowledge,
-        setShowRefine,
+      if (hydrateReview) {
+        const reviewState = normalizeReviewState(reviewPayload);
+        setCurrentReview(reviewState);
+
+        const legacyDraft = mapCurrentReviewToLegacyDraft(reviewState);
+        setReviewDraft(legacyDraft);
+
+        const baseProfile = chooseBestProfileForForm(legacyDraft?.overview, profile);
+
+        setBusinessForm((prev) => {
+          if (!preserveBusinessForm) {
+            return hydrateBusinessFormFromProfile(
+              {
+                ...prev,
+                companyName: s(profile?.companyName),
+                description: s(profile?.description),
+                timezone: s(profile?.timezone || "Asia/Baku"),
+                language: firstLanguage(profile),
+                websiteUrl: s(profile?.websiteUrl || profile?.website_url),
+                primaryPhone: s(profile?.primaryPhone || profile?.primary_phone),
+                primaryEmail: s(profile?.primaryEmail || profile?.primary_email),
+                primaryAddress: s(profile?.primaryAddress || profile?.primary_address),
+              },
+              baseProfile,
+              { force: true }
+            );
+          }
+
+          return hydrateBusinessFormFromProfile(prev, baseProfile, {
+            force: false,
+          });
+        });
+
+        const nextManualSections = buildManualSectionsFromReview(reviewState);
+        setManualSections((prev) => ({
+          servicesText:
+            preserveBusinessForm && s(prev.servicesText)
+              ? s(prev.servicesText)
+              : s(nextManualSections.servicesText),
+          faqsText:
+            preserveBusinessForm && s(prev.faqsText)
+              ? s(prev.faqsText)
+              : s(nextManualSections.faqsText),
+          policiesText:
+            preserveBusinessForm && s(prev.policiesText)
+              ? s(prev.policiesText)
+              : s(nextManualSections.policiesText),
+        }));
+
+        applyUiHintsFromMeta({
+          nextMeta,
+          pendingKnowledge,
+          setShowKnowledge,
+          setShowRefine,
+        });
+
+        return {
+          boot,
+          workspace,
+          setup,
+          profile,
+          pendingKnowledge,
+          serviceItems,
+          meta: nextMeta,
+          currentReview: reviewState,
+        };
+      }
+
+      setCurrentReview(createEmptyReviewState());
+      setReviewDraft(createEmptyLegacyDraft());
+      setDiscoveryState(createIdleDiscoveryState());
+      setShowRefine(false);
+      setShowKnowledge(false);
+
+      setBusinessForm((prev) => {
+        if (preserveBusinessForm) return prev;
+
+        return {
+          ...prev,
+          companyName: s(profile?.companyName),
+          description: s(profile?.description),
+          timezone: s(profile?.timezone || "Asia/Baku"),
+          language: firstLanguage(profile),
+          websiteUrl: s(profile?.websiteUrl || profile?.website_url),
+          primaryPhone: s(profile?.primaryPhone || profile?.primary_phone),
+          primaryEmail: s(profile?.primaryEmail || profile?.primary_email),
+          primaryAddress: s(profile?.primaryAddress || profile?.primary_address),
+        };
       });
 
       return {
@@ -1243,7 +1311,7 @@ export default function SetupStudioScreen() {
         pendingKnowledge,
         serviceItems,
         meta: nextMeta,
-        currentReview: reviewState,
+        currentReview: createEmptyReviewState(),
       };
     } catch (e) {
       const message = String(
@@ -1268,10 +1336,14 @@ export default function SetupStudioScreen() {
   }
 
   useEffect(() => {
-    loadData();
+    loadData({
+      hydrateReview: false,
+      preserveBusinessForm: false,
+    });
   }, []);
 
   useEffect(() => {
+    if (freshEntryMode) return;
     if (meta.setupCompleted) return;
 
     if (
@@ -1280,12 +1352,21 @@ export default function SetupStudioScreen() {
     ) {
       setShowKnowledge(true);
     }
-  }, [meta.nextStudioStage, meta.setupCompleted, knowledgeCandidates.length]);
+  }, [
+    freshEntryMode,
+    meta.nextStudioStage,
+    meta.setupCompleted,
+    knowledgeCandidates.length,
+  ]);
 
-  async function refreshAndMaybeRouteHome({ preserveBusinessForm = false } = {}) {
+  async function refreshAndMaybeRouteHome({
+    preserveBusinessForm = false,
+    hydrateReview = !freshEntryMode,
+  } = {}) {
     const snapshot = await loadData({
       silent: true,
       preserveBusinessForm,
+      hydrateReview,
     });
 
     const nextMeta = obj(snapshot?.meta);
@@ -1298,12 +1379,14 @@ export default function SetupStudioScreen() {
       };
     }
 
-    applyUiHintsFromMeta({
-      nextMeta,
-      pendingKnowledge: arr(snapshot?.pendingKnowledge),
-      setShowKnowledge,
-      setShowRefine,
-    });
+    if (hydrateReview) {
+      applyUiHintsFromMeta({
+        nextMeta,
+        pendingKnowledge: arr(snapshot?.pendingKnowledge),
+        setShowKnowledge,
+        setShowRefine,
+      });
+    }
 
     return {
       routed: false,
@@ -1328,7 +1411,9 @@ export default function SetupStudioScreen() {
 
     try {
       setImportingWebsite(true);
+      setFreshEntryMode(false);
       setError("");
+      autoRevealRef.current = "";
 
       setDiscoveryState((prev) => ({
         ...prev,
@@ -1341,6 +1426,8 @@ export default function SetupStudioScreen() {
         shouldReview: false,
         hasResults: false,
         resultCount: 0,
+        importedKnowledgeItems: [],
+        importedServices: [],
       }));
 
       const result = await importSourceForSetup({
@@ -1403,17 +1490,17 @@ export default function SetupStudioScreen() {
         sourceId,
         sourceRunId,
         snapshotId,
+        importedKnowledgeItems: arr(result?.candidates || result?.knowledgeItems),
+        importedServices: arr(result?.services),
       };
 
       const importedVisibleKnowledgeItems = deriveVisibleKnowledgeItems({
-        knowledgeCandidates: arr(result?.candidates || result?.knowledgeItems),
         reviewDraft: legacyImportedDraft,
         currentReview: importedReview,
         discoveryState: immediateDiscoveryState,
       });
 
       const importedVisibleServiceItems = deriveVisibleServiceItems({
-        services: arr(result?.services),
         reviewDraft: legacyImportedDraft,
         currentReview: importedReview,
         discoveryState: immediateDiscoveryState,
@@ -1470,10 +1557,13 @@ export default function SetupStudioScreen() {
           importedVisibleServiceItems.length +
           importedVisibleSources.length +
           importedProfileRows.length,
+        importedKnowledgeItems: arr(result?.candidates || result?.knowledgeItems),
+        importedServices: arr(result?.services),
       });
 
       const refreshResult = await refreshAndMaybeRouteHome({
         preserveBusinessForm: true,
+        hydrateReview: true,
       });
 
       if (!refreshResult.routed) {
@@ -1509,6 +1599,8 @@ export default function SetupStudioScreen() {
         message,
         hasResults: false,
         resultCount: 0,
+        importedKnowledgeItems: [],
+        importedServices: [],
       }));
       setError(message);
     } finally {
@@ -1520,6 +1612,7 @@ export default function SetupStudioScreen() {
     if (e?.preventDefault) e.preventDefault();
 
     try {
+      setFreshEntryMode(false);
       setSavingBusiness(true);
       setError("");
 
@@ -1572,10 +1665,14 @@ export default function SetupStudioScreen() {
 
       const refreshed = await refreshAndMaybeRouteHome({
         preserveBusinessForm: false,
+        hydrateReview: true,
       });
 
       if (!refreshed?.routed) {
-        await loadCurrentReview({ preserveBusinessForm: false });
+        await loadCurrentReview({
+          preserveBusinessForm: false,
+          activateReviewSession: true,
+        });
       }
 
       return { ok: true };
@@ -1594,17 +1691,25 @@ export default function SetupStudioScreen() {
     if (!id) return { ok: false };
 
     try {
+      setFreshEntryMode(false);
       setActingKnowledgeId(id);
       setError("");
 
       await approveKnowledgeCandidate(id, {});
-      await loadCurrentReview({ preserveBusinessForm: true });
+      await loadCurrentReview({
+        preserveBusinessForm: true,
+        activateReviewSession: true,
+      });
+
       const refreshed = await refreshAndMaybeRouteHome({
         preserveBusinessForm: true,
+        hydrateReview: true,
       });
 
       if (!refreshed?.routed) {
-        const nextStage = s(refreshed?.snapshot?.meta?.nextStudioStage).toLowerCase();
+        const nextStage = s(
+          refreshed?.snapshot?.meta?.nextStudioStage
+        ).toLowerCase();
         if (nextStage !== "knowledge") {
           setShowKnowledge(false);
         }
@@ -1624,13 +1729,19 @@ export default function SetupStudioScreen() {
     if (!id) return { ok: false };
 
     try {
+      setFreshEntryMode(false);
       setActingKnowledgeId(id);
       setError("");
 
       await rejectKnowledgeCandidate(id, {});
-      await loadCurrentReview({ preserveBusinessForm: true });
+      await loadCurrentReview({
+        preserveBusinessForm: true,
+        activateReviewSession: true,
+      });
+
       const refreshed = await refreshAndMaybeRouteHome({
         preserveBusinessForm: true,
+        hydrateReview: true,
       });
 
       if (!refreshed?.routed) {
@@ -1652,33 +1763,38 @@ export default function SetupStudioScreen() {
   }
 
   const visibleKnowledgeItems = useMemo(() => {
+    if (freshEntryMode) return [];
+
     return deriveVisibleKnowledgeItems({
-      knowledgeCandidates,
       reviewDraft,
       currentReview,
       discoveryState,
     });
-  }, [knowledgeCandidates, reviewDraft, currentReview, discoveryState]);
+  }, [freshEntryMode, reviewDraft, currentReview, discoveryState]);
 
   const visibleServiceItems = useMemo(() => {
+    if (freshEntryMode) return [];
+
     return deriveVisibleServiceItems({
-      services,
       reviewDraft,
       currentReview,
       discoveryState,
     });
-  }, [services, reviewDraft, currentReview, discoveryState]);
+  }, [freshEntryMode, reviewDraft, currentReview, discoveryState]);
 
   const visibleSources = useMemo(() => {
+    if (freshEntryMode) return [];
     return deriveVisibleSources({ currentReview, discoveryState });
-  }, [currentReview, discoveryState]);
+  }, [freshEntryMode, currentReview, discoveryState]);
 
   const visibleEvents = useMemo(() => {
+    if (freshEntryMode) return [];
     return deriveVisibleEvents(currentReview);
-  }, [currentReview]);
+  }, [freshEntryMode, currentReview]);
 
   async function onCreateSuggestedService() {
     try {
+      setFreshEntryMode(false);
       setSavingServiceSuggestion("creating");
       setError("");
 
@@ -1689,7 +1805,10 @@ export default function SetupStudioScreen() {
       });
 
       await createSetupService(payload);
-      await refreshAndMaybeRouteHome({ preserveBusinessForm: true });
+      await refreshAndMaybeRouteHome({
+        preserveBusinessForm: true,
+        hydrateReview: true,
+      });
 
       return { ok: true };
     } catch (e) {
@@ -1709,6 +1828,7 @@ export default function SetupStudioScreen() {
       const snapshot = await loadData({
         silent: true,
         preserveBusinessForm: true,
+        hydrateReview: !freshEntryMode,
       });
       const nextMeta = obj(snapshot?.meta);
 
@@ -1717,12 +1837,14 @@ export default function SetupStudioScreen() {
         return;
       }
 
-      applyUiHintsFromMeta({
-        nextMeta,
-        pendingKnowledge: arr(snapshot?.pendingKnowledge),
-        setShowKnowledge,
-        setShowRefine,
-      });
+      if (!freshEntryMode) {
+        applyUiHintsFromMeta({
+          nextMeta,
+          pendingKnowledge: arr(snapshot?.pendingKnowledge),
+          setShowKnowledge,
+          setShowRefine,
+        });
+      }
 
       navigate("/setup/studio", { replace: true });
     } catch (e) {
@@ -1733,18 +1855,22 @@ export default function SetupStudioScreen() {
   }
 
   const draftBackedProfile = useMemo(() => {
+    if (freshEntryMode) return obj(discoveryState.profile);
+
     if (Object.keys(obj(reviewDraft?.overview)).length) {
       return obj(reviewDraft?.overview);
     }
     return obj(discoveryState.profile);
-  }, [reviewDraft, discoveryState.profile]);
+  }, [freshEntryMode, reviewDraft, discoveryState.profile]);
 
   const discoveryProfileRows = useMemo(
-    () => profilePreviewRows(draftBackedProfile),
-    [draftBackedProfile]
+    () => (freshEntryMode ? [] : profilePreviewRows(draftBackedProfile)),
+    [freshEntryMode, draftBackedProfile]
   );
 
   const hasVisibleResults = useMemo(() => {
+    if (freshEntryMode) return false;
+
     return !!(
       hasMeaningfulProfile(draftBackedProfile) ||
       discoveryProfileRows.length > 0 ||
@@ -1756,6 +1882,7 @@ export default function SetupStudioScreen() {
       s(reviewDraft?.quickSummary)
     );
   }, [
+    freshEntryMode,
     draftBackedProfile,
     discoveryProfileRows,
     visibleKnowledgeItems,
@@ -1895,6 +2022,8 @@ export default function SetupStudioScreen() {
   ]);
 
   useEffect(() => {
+    if (freshEntryMode) return;
+
     const mode = s(discoveryState.mode).toLowerCase();
 
     if (!hasVisibleResults) return;
@@ -1914,6 +2043,7 @@ export default function SetupStudioScreen() {
       setShowKnowledge(true);
     }
   }, [
+    freshEntryMode,
     autoRevealKey,
     hasVisibleResults,
     discoveryState.mode,
@@ -1961,8 +2091,19 @@ export default function SetupStudioScreen() {
       onRejectKnowledge={onRejectKnowledge}
       onCreateSuggestedService={onCreateSuggestedService}
       onOpenWorkspace={onOpenWorkspace}
-      onReloadReviewDraft={() => loadCurrentReview({ preserveBusinessForm: true })}
-      onRefresh={() => loadData({ silent: true, preserveBusinessForm: true })}
+      onReloadReviewDraft={() =>
+        loadCurrentReview({
+          preserveBusinessForm: true,
+          activateReviewSession: true,
+        })
+      }
+      onRefresh={() =>
+        loadData({
+          silent: true,
+          preserveBusinessForm: !freshEntryMode,
+          hydrateReview: !freshEntryMode,
+        })
+      }
       onToggleRefine={() => setShowRefine((prev) => !prev)}
       onToggleKnowledge={() => setShowKnowledge((prev) => !prev)}
       discoveryModeLabel={discoveryModeLabel}
