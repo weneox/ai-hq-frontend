@@ -384,22 +384,20 @@ function SourceMark({ item, className = "" }) {
       src={item.imageSrc}
       alt=""
       aria-hidden="true"
-      className={className || "setup-studio-intake__source-image"}
+      className={className || "h-8 w-8 rounded-xl object-contain"}
     />
   );
 }
 
 const cardVariants = {
-  hidden: { opacity: 0, x: -26, y: 18, scale: 0.98, filter: "blur(8px)" },
+  hidden: { opacity: 0, y: 16, scale: 0.985 },
   visible: (index) => ({
     opacity: 1,
-    x: 0,
     y: 0,
     scale: 1,
-    filter: "blur(0px)",
     transition: {
-      duration: 0.52,
-      delay: 0.12 + index * 0.08,
+      duration: 0.42,
+      delay: 0.08 + index * 0.05,
       ease: [0.22, 1, 0.36, 1],
     },
   }),
@@ -664,17 +662,23 @@ export default function SetupStudioEntryStage({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
       transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-      className="setup-studio-intake"
+      className="mx-auto flex w-full max-w-[1480px] flex-col gap-8"
     >
-      <div className="setup-studio-intake__hero">
-        <div className="setup-studio-intake__eyebrow">Source setup</div>
-        <h1 className="setup-studio-intake__title">Connect what already exists</h1>
-        <p className="setup-studio-intake__subtitle">
+      <div className="mx-auto flex w-full max-w-[980px] flex-col items-center gap-4 pt-2 text-center">
+        <div className="rounded-full border border-slate-200 bg-white/80 px-4 py-2 text-[13px] font-semibold uppercase tracking-[0.24em] text-slate-500 shadow-sm">
+          Source setup
+        </div>
+
+        <h1 className="max-w-[900px] text-[clamp(52px,8vw,92px)] font-semibold leading-[0.92] tracking-[-0.06em] text-slate-950">
+          Connect what already exists
+        </h1>
+
+        <p className="max-w-[760px] text-[18px] leading-8 text-slate-500 sm:text-[20px]">
           Start with your public business sources, then analyze everything we can find.
         </p>
       </div>
 
-      <div className="setup-studio-intake__cards">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
         {primarySources.map((item, index) => (
           <motion.button
             key={item.key}
@@ -683,31 +687,40 @@ export default function SetupStudioEntryStage({
             variants={cardVariants}
             initial="hidden"
             animate="visible"
-            className={[
-              "setup-studio-intake__card",
-              `theme-${item.theme}`,
-              activeKey === item.key ? "is-active" : "",
-              isSourceAdded(item.key) ? "is-added" : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
+            className={`group relative rounded-[28px] border bg-white/80 p-5 text-left shadow-[0_18px_50px_rgba(15,23,42,.05)] backdrop-blur transition-all duration-200 ${
+              activeKey === item.key
+                ? "border-slate-300 ring-2 ring-blue-200/60"
+                : "border-slate-200 hover:border-slate-300"
+            }`}
             onClick={() => handlePickSource(item.key)}
           >
-            <div className="setup-studio-intake__card-top">
-              <SourceMark item={item} />
-              <span className={`setup-studio-intake__card-badge ${isSourceAdded(item.key) ? "is-live" : ""}`}>
+            <div className="mb-6 flex items-start justify-between gap-3">
+              <SourceMark item={item} className="h-10 w-10 rounded-2xl object-contain" />
+              <span
+                className={`rounded-full border px-3 py-1 text-[12px] font-semibold uppercase tracking-[0.16em] ${
+                  isSourceAdded(item.key)
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : "border-slate-200 bg-slate-50 text-slate-500"
+                }`}
+              >
                 {isSourceAdded(item.key) ? "Added" : "Select"}
               </span>
             </div>
 
-            <div className="setup-studio-intake__card-main">
-              <div className="setup-studio-intake__card-label">{item.label}</div>
-              <div className="setup-studio-intake__card-value">
+            <div className="space-y-2">
+              <div className="text-[18px] font-semibold text-slate-900">{item.label}</div>
+              <div className="min-h-[24px] text-sm text-slate-500">
                 {isSourceAdded(item.key)
                   ? formatSourceValue(item.key, sources[item.key])
                   : item.actionLabel}
               </div>
             </div>
+
+            <div
+              className={`mt-6 h-[3px] rounded-full transition-all ${
+                activeKey === item.key ? "bg-blue-500" : "bg-transparent"
+              }`}
+            />
           </motion.button>
         ))}
 
@@ -717,27 +730,37 @@ export default function SetupStudioEntryStage({
           variants={cardVariants}
           initial="hidden"
           animate="visible"
-          className={`setup-studio-intake__card setup-studio-intake__card--more ${secondaryOpen ? "is-open" : ""}`}
+          className={`group relative rounded-[28px] border border-slate-200 bg-white/80 p-5 text-left shadow-[0_18px_50px_rgba(15,23,42,.05)] backdrop-blur transition-all duration-200 hover:border-slate-300 ${
+            secondaryOpen ? "ring-2 ring-blue-200/60" : ""
+          }`}
           onClick={() => setSecondaryOpen((prev) => !prev)}
         >
-          <div className="setup-studio-intake__card-top">
-            <div className="setup-studio-intake__more-mark">+</div>
-            <span className="setup-studio-intake__card-badge">Optional</span>
+          <div className="mb-6 flex items-start justify-between gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-50 text-3xl leading-none text-slate-900">
+              +
+            </div>
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[12px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+              Optional
+            </span>
           </div>
 
-          <div className="setup-studio-intake__card-main">
-            <div className="setup-studio-intake__card-label">More sources</div>
-            <div className="setup-studio-intake__card-value">TikTok · YouTube</div>
+          <div className="space-y-2">
+            <div className="text-[18px] font-semibold text-slate-900">More sources</div>
+            <div className="text-sm text-slate-500">TikTok · YouTube</div>
           </div>
 
-          <ChevronDown className={`setup-studio-intake__more-arrow ${secondaryOpen ? "is-open" : ""}`} />
+          <ChevronDown
+            className={`absolute bottom-5 right-5 h-5 w-5 text-slate-400 transition ${
+              secondaryOpen ? "rotate-180" : ""
+            }`}
+          />
         </motion.button>
       </div>
 
       <AnimatePresence initial={false}>
         {secondaryOpen ? (
           <motion.div
-            className="setup-studio-intake__secondary"
+            className="flex flex-wrap gap-3"
             initial={{ opacity: 0, y: -12, height: 0 }}
             animate={{ opacity: 1, y: 0, height: "auto" }}
             exit={{ opacity: 0, y: -10, height: 0 }}
@@ -751,19 +774,16 @@ export default function SetupStudioEntryStage({
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -12 }}
                 transition={{ duration: 0.32, delay: index * 0.06, ease: [0.22, 1, 0.36, 1] }}
-                className={[
-                  "setup-studio-intake__secondary-item",
-                  `theme-${item.theme}`,
-                  activeKey === item.key ? "is-active" : "",
-                  isSourceAdded(item.key) ? "is-added" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
+                className={`inline-flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm font-medium shadow-sm transition ${
+                  activeKey === item.key
+                    ? "border-slate-300 bg-white text-slate-900 ring-2 ring-blue-200/60"
+                    : "border-slate-200 bg-white/80 text-slate-600 hover:border-slate-300"
+                }`}
                 onClick={() => handlePickSource(item.key)}
               >
-                <SourceMark item={item} className="setup-studio-intake__secondary-image" />
+                <SourceMark item={item} className="h-6 w-6 rounded-lg object-contain" />
                 <span>{item.label}</span>
-                {isSourceAdded(item.key) ? <Check className="setup-studio-intake__secondary-check" /> : null}
+                {isSourceAdded(item.key) ? <Check className="h-4 w-4 text-emerald-600" /> : null}
               </motion.button>
             ))}
           </motion.div>
@@ -771,102 +791,117 @@ export default function SetupStudioEntryStage({
       </AnimatePresence>
 
       <motion.div
-        className={`setup-studio-intake__dock theme-${activeSource.theme}`}
         layout
         transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+        className="overflow-hidden rounded-[34px] border border-slate-200 bg-white/85 shadow-[0_30px_90px_rgba(15,23,42,.08)] backdrop-blur-xl"
       >
-        <div className="setup-studio-intake__dock-head">
-          <div className="setup-studio-intake__dock-source">
-            <SourceMark item={activeSource} className="setup-studio-intake__dock-image" />
-            <div className="setup-studio-intake__dock-meta">
-              <span className="setup-studio-intake__dock-label">{activeSource.label}</span>
-              <span className="setup-studio-intake__dock-state">
-                {isSourceAdded(activeKey) ? "Connected" : "Ready to connect"}
-              </span>
+        <div className="border-b border-slate-200/80 px-5 py-5 sm:px-6 lg:px-8">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-4">
+              <SourceMark item={activeSource} className="h-11 w-11 rounded-2xl object-contain" />
+              <div>
+                <div className="text-[15px] font-semibold text-slate-900">{activeSource.label}</div>
+                <div className="text-sm font-medium uppercase tracking-[0.14em] text-slate-400">
+                  {isSourceAdded(activeKey) ? "Connected" : "Ready to connect"}
+                </div>
+              </div>
+            </div>
+
+            <div className="inline-flex items-center gap-2 self-start rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-[13px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+              <Link2 className="h-4 w-4" />
+              Handle or link
             </div>
           </div>
+        </div>
 
-          <div className="setup-studio-intake__dock-hint">
-            <Link2 className="h-4 w-4" />
-            <span>Handle or link</span>
+        <div className="space-y-6 px-5 py-5 sm:px-6 sm:py-6 lg:px-8">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_180px]">
+            <input
+              value={activeDraft}
+              onChange={(e) => handleDraftChange(e.target.value)}
+              onKeyDown={handleInputKeyDown}
+              className="h-[78px] rounded-[24px] border border-slate-200 bg-slate-50/80 px-7 text-[28px] font-semibold tracking-[-0.04em] text-slate-900 outline-none transition placeholder:text-slate-300 focus:border-slate-300 focus:bg-white"
+              placeholder={activeSource.placeholder}
+              autoComplete="off"
+              spellCheck={false}
+            />
+
+            <button
+              type="button"
+              className="inline-flex h-[78px] items-center justify-center gap-2 rounded-[24px] bg-slate-900 px-6 text-[18px] font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+              onClick={handleAddSource}
+              disabled={!s(activeDraft)}
+            >
+              {!sources[activeKey] ? <Plus className="h-5 w-5" /> : null}
+              <span>{getActionLabel()}</span>
+            </button>
           </div>
-        </div>
 
-        <div className="setup-studio-intake__dock-input-row">
-          <input
-            value={activeDraft}
-            onChange={(e) => handleDraftChange(e.target.value)}
-            onKeyDown={handleInputKeyDown}
-            className="setup-studio-intake__input"
-            placeholder={activeSource.placeholder}
-            autoComplete="off"
-            spellCheck={false}
-          />
-
-          <button
-            type="button"
-            className="setup-studio-intake__add"
-            onClick={handleAddSource}
-            disabled={!s(activeDraft)}
-          >
-            {!sources[activeKey] ? <Plus className="h-4 w-4" /> : null}
-            <span>{getActionLabel()}</span>
-          </button>
-        </div>
-
-        <div className="setup-studio-intake__dock-footer">
-          <div className="setup-studio-intake__selected">
-            <AnimatePresence initial={false}>
-              {addedSources.map((item) => (
-                <motion.div
-                  key={item.key}
-                  layout
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  transition={{ duration: 0.2 }}
-                  className={`setup-studio-intake__selected-item theme-${item.theme}`}
-                >
-                  <SourceMark item={item} className="setup-studio-intake__selected-image" />
-                  <span className="setup-studio-intake__selected-name">{item.label}</span>
-                  <span className="setup-studio-intake__selected-value">{item.value}</span>
-
-                  <button
-                    type="button"
-                    className="setup-studio-intake__selected-remove"
-                    onClick={() => handleRemoveSource(item.key)}
-                    aria-label={`Remove ${item.label}`}
+          {addedSources.length > 0 ? (
+            <div className="flex flex-wrap gap-3">
+              <AnimatePresence initial={false}>
+                {addedSources.map((item) => (
+                  <motion.div
+                    key={item.key}
+                    layout
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.2 }}
+                    className="inline-flex max-w-full items-center gap-3 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700"
                   >
-                    ×
-                  </button>
-                </motion.div>
-              ))}
-            </AnimatePresence>
+                    <SourceMark item={item} className="h-5 w-5 rounded-md object-contain" />
+                    <span className="font-semibold">{item.label}</span>
+                    <span className="truncate text-slate-500">{item.value}</span>
+
+                    <button
+                      type="button"
+                      className="ml-1 inline-flex h-6 w-6 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
+                      onClick={() => handleRemoveSource(item.key)}
+                      aria-label={`Remove ${item.label}`}
+                    >
+                      ×
+                    </button>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+          ) : null}
+
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-end">
+            <div className="rounded-[24px] border border-slate-200 bg-slate-50/70 px-5 py-4">
+              <div className="mb-2 text-[13px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                Scan strategy
+              </div>
+              <div className="text-sm leading-7 text-slate-600">{dockNote}</div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={!canAnalyze}
+              className="inline-flex h-[72px] items-center justify-center gap-2 rounded-[24px] bg-[linear-gradient(135deg,#7bb2ff_0%,#4f8cff_45%,#4b79ff_100%)] px-6 text-[18px] font-semibold text-white shadow-[0_20px_50px_rgba(79,140,255,.28)] transition hover:translate-y-[-1px] hover:shadow-[0_24px_55px_rgba(79,140,255,.34)] disabled:cursor-not-allowed disabled:opacity-55 disabled:shadow-none"
+            >
+              {importingWebsite ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  Analyzing
+                </>
+              ) : (
+                <>
+                  Analyze business
+                  <ArrowRight className="h-5 w-5" />
+                </>
+              )}
+            </button>
           </div>
-
-          <button
-            type="submit"
-            disabled={!canAnalyze}
-            className="setup-studio-intake__submit"
-          >
-            {importingWebsite ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Analyzing
-              </>
-            ) : (
-              <>
-                Analyze business
-                <ArrowRight className="h-4 w-4" />
-              </>
-            )}
-          </button>
         </div>
-
-        <div className="setup-studio-intake__dock-note">{dockNote}</div>
       </motion.div>
 
-      {error ? <div className="setup-studio-intake__error">{error}</div> : null}
+      {error ? (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+          {error}
+        </div>
+      ) : null}
     </motion.form>
   );
 }
