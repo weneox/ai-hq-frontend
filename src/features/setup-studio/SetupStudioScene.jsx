@@ -144,6 +144,7 @@ function buildRecoveredStage({
   hasKnowledge,
   hasServices,
   hasScannedUrl,
+  stayOnSourceStage,
 }) {
   if (importingWebsite) return "scanning";
 
@@ -161,6 +162,10 @@ function buildRecoveredStage({
   );
 
   if (!hasAnyResultFlow) {
+    return "entry";
+  }
+
+  if (stayOnSourceStage) {
     return "entry";
   }
 
@@ -331,6 +336,8 @@ export default function SetupStudioScene({
     return list;
   }, [hasKnowledge]);
 
+  const [stayOnSourceStage, setStayOnSourceStage] = useState(true);
+
   const recoveredStage = useMemo(
     () =>
       buildRecoveredStage({
@@ -342,6 +349,7 @@ export default function SetupStudioScene({
         hasKnowledge,
         hasServices,
         hasScannedUrl,
+        stayOnSourceStage,
       }),
     [
       importingWebsite,
@@ -352,6 +360,7 @@ export default function SetupStudioScene({
       hasKnowledge,
       hasServices,
       hasScannedUrl,
+      stayOnSourceStage,
     ]
   );
 
@@ -383,10 +392,10 @@ export default function SetupStudioScene({
   const wantsKnowledgeOverlay = overlayIntent === "knowledge";
 
   const hasRefineModalContent =
-    wantsRefineOverlay && !!showRefine && refineContentAvailable;
+    wantsRefineOverlay && refineContentAvailable;
 
   const hasKnowledgeModalContent =
-    wantsKnowledgeOverlay && !!showKnowledge && knowledgeContentAvailable;
+    wantsKnowledgeOverlay && knowledgeContentAvailable;
 
   const activeOverlay = hasKnowledgeModalContent
     ? "knowledge"
@@ -454,42 +463,25 @@ export default function SetupStudioScene({
   }, [importingWebsite]);
 
   useEffect(() => {
-    if (importingWebsite || stage === "entry" || stage === "scanning") {
+    if (importingWebsite || stage === "scanning") {
       setOverlayIntent("");
     }
   }, [importingWebsite, stage]);
 
   useEffect(() => {
-    if (!showKnowledge && overlayIntent === "knowledge") {
+    if (overlayIntent === "knowledge" && !knowledgeContentAvailable) {
       setOverlayIntent("");
     }
-  }, [showKnowledge, overlayIntent]);
+  }, [overlayIntent, knowledgeContentAvailable]);
 
   useEffect(() => {
-    if (!showRefine && overlayIntent === "refine") {
+    if (overlayIntent === "refine" && !refineContentAvailable) {
       setOverlayIntent("");
     }
-  }, [showRefine, overlayIntent]);
-
-  useEffect(() => {
-    if (overlayIntent === "knowledge" && showKnowledge && !knowledgeContentAvailable) {
-      setOverlayIntent("");
-      if (typeof onToggleKnowledge === "function") {
-        onToggleKnowledge();
-      }
-    }
-  }, [overlayIntent, showKnowledge, knowledgeContentAvailable, onToggleKnowledge]);
-
-  useEffect(() => {
-    if (overlayIntent === "refine" && showRefine && !refineContentAvailable) {
-      setOverlayIntent("");
-      if (typeof onToggleRefine === "function") {
-        onToggleRefine();
-      }
-    }
-  }, [overlayIntent, showRefine, refineContentAvailable, onToggleRefine]);
+  }, [overlayIntent, refineContentAvailable]);
 
   function goNextStage() {
+    setStayOnSourceStage(false);
     const idx = stageSequence.indexOf(stage);
     if (idx >= 0 && idx < stageSequence.length - 1) {
       setStage(stageSequence[idx + 1]);
@@ -497,6 +489,7 @@ export default function SetupStudioScene({
   }
 
   async function handleCreateServiceAndNext() {
+    setStayOnSourceStage(false);
     const result = await onCreateSuggestedService?.();
     const failed = result?.ok === false || result?.error || result?.reason;
 
@@ -519,6 +512,7 @@ export default function SetupStudioScene({
   }
 
   function handleOpenRefine() {
+    if (!refineContentAvailable) return;
     setOverlayIntent("refine");
     if (!showRefine && typeof onToggleRefine === "function") {
       onToggleRefine();
@@ -533,6 +527,7 @@ export default function SetupStudioScene({
   }
 
   function handleOpenKnowledge() {
+    if (!knowledgeContentAvailable) return;
     setOverlayIntent("knowledge");
     if (!showKnowledge && typeof onToggleKnowledge === "function") {
       onToggleKnowledge();
@@ -544,6 +539,18 @@ export default function SetupStudioScene({
     if (showKnowledge && typeof onToggleKnowledge === "function") {
       onToggleKnowledge();
     }
+  }
+
+  function handleGoToSourceStage() {
+    setOverlayIntent("");
+    setStayOnSourceStage(true);
+    setStage("entry");
+  }
+
+  function handleContinueFlow() {
+    setOverlayIntent("");
+    setStayOnSourceStage(false);
+    setStage("identity");
   }
 
   const discoveredTitle =
@@ -574,7 +581,11 @@ export default function SetupStudioScene({
     discoveredDescription ||
     "We extracted a first draft of the business direction from the source signals.";
 
-  const progressCurrentStage = importingWebsite ? "identity" : stage;
+  const progressCurrentStage = importingWebsite
+    ? "identity"
+    : stage === "scanning"
+      ? "identity"
+      : stage;
 
   const progressCurrentIndex = Math.max(
     0,
@@ -636,7 +647,7 @@ export default function SetupStudioScene({
   const firstReviewSource = obj(safeReviewSources[0]);
   const firstEvent = obj(safeReviewEvents[0]);
 
-  const summaryVisible = !isEntryStage && !!(
+  const summaryVisible = !!(
     primarySourceUrl ||
     sourceLabel ||
     hasVisibleResults ||
@@ -674,6 +685,7 @@ export default function SetupStudioScene({
       data-overlay-intent={overlayIntent || "none"}
       data-overlay-open={hasOverlay ? "yes" : "no"}
       data-visible-results={hasVisibleResults ? "yes" : "no"}
+      data-stay-on-source-stage={stayOnSourceStage ? "yes" : "no"}
     >
       <div
         aria-hidden={hasOverlay ? "true" : "false"}
@@ -722,7 +734,7 @@ export default function SetupStudioScene({
             </div>
 
             <div className="flex items-center gap-3">
-              {!isEntryStage ? (
+              {summaryVisible || !isEntryStage ? (
                 <div
                   className="hidden rounded-full border border-slate-200 bg-white/90 px-3 py-2 text-sm font-medium text-slate-600 shadow-sm sm:flex"
                   data-mode={importingWebsite ? "running" : s(discoveryState?.mode || "idle")}
@@ -730,6 +742,16 @@ export default function SetupStudioScene({
                   <span className="mr-2 mt-[1px] inline-block h-2 w-2 rounded-full bg-slate-400" />
                   {statusLabel}
                 </div>
+              ) : null}
+
+              {!importingWebsite && !isEntryStage ? (
+                <button
+                  type="button"
+                  onClick={handleGoToSourceStage}
+                  className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white/90 px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-300 hover:text-slate-950"
+                >
+                  Source entry
+                </button>
               ) : null}
 
               <button
@@ -745,7 +767,7 @@ export default function SetupStudioScene({
           </div>
         </header>
 
-        {!isEntryStage && (error || sourceLabel || stageWarnings.length > 0) ? (
+        {(error || sourceLabel || stageWarnings.length > 0) ? (
           <div className="shrink-0 border-b border-slate-200/60 bg-white/55 backdrop-blur-sm">
             <div className="mx-auto flex w-full max-w-[1600px] flex-wrap gap-2 px-4 py-2.5 sm:px-6 lg:px-10">
               {sourceLabel ? (
@@ -827,6 +849,45 @@ export default function SetupStudioScene({
                           <span className="break-all">{primarySourceUrl}</span>
                         </div>
                       ) : null}
+
+                      <div className="flex flex-wrap gap-2 pt-2">
+                        <button
+                          type="button"
+                          onClick={handleOpenRefine}
+                          disabled={!refineContentAvailable}
+                          className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Refine draft
+                        </button>
+
+                        {knowledgeContentAvailable ? (
+                          <button
+                            type="button"
+                            onClick={handleOpenKnowledge}
+                            className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
+                          >
+                            Review knowledge
+                          </button>
+                        ) : null}
+
+                        {isEntryStage ? (
+                          <button
+                            type="button"
+                            onClick={handleContinueFlow}
+                            className="inline-flex items-center justify-center rounded-full border border-slate-950 bg-slate-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+                          >
+                            Continue flow
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={handleGoToSourceStage}
+                            className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
+                          >
+                            Back to source
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
 
