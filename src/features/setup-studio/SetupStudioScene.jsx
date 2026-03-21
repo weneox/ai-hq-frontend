@@ -49,9 +49,10 @@ function truncateText(value = "", max = 120) {
 function findProfileRowValue(rows = [], wantedKeys = []) {
   const normalizedWanted = arr(wantedKeys).map((x) => s(x).toLowerCase());
 
-  const match = arr(rows).find(([label]) =>
-    normalizedWanted.includes(s(label).toLowerCase())
-  );
+  const match = arr(rows).find((item) => {
+    if (!Array.isArray(item)) return false;
+    return normalizedWanted.includes(s(item[0]).toLowerCase());
+  });
 
   return s(match?.[1]);
 }
@@ -146,7 +147,9 @@ function buildRecoveredStage({
   hasScannedUrl,
   stayOnSourceStage,
 }) {
-  if (importingWebsite) return "scanning";
+  if (importingWebsite) {
+    return stayOnSourceStage ? "entry" : "scanning";
+  }
 
   if (studioProgress?.setupCompleted) {
     return "ready";
@@ -188,6 +191,28 @@ function buildStatusLabel({
   }
 
   return discoveryModeLabel(discoveryState?.mode);
+}
+
+function inferSourceLabel(type = "", url = "") {
+  const normalizedType = s(type).toLowerCase();
+  const normalizedUrl = s(url).toLowerCase();
+
+  if (normalizedType === "google_maps") return "Google Maps";
+  if (normalizedType === "website") return "Website";
+
+  if (
+    normalizedUrl.includes("maps.app.goo.gl") ||
+    normalizedUrl.includes("google.com/maps") ||
+    normalizedUrl.includes("g.co/kgs")
+  ) {
+    return "Google Maps";
+  }
+
+  if (normalizedUrl) {
+    return "Website";
+  }
+
+  return "";
 }
 
 function SetupStudioModalLayer({
@@ -280,15 +305,6 @@ export default function SetupStudioScene({
   const safeReviewSources = arr(reviewSources);
   const safeReviewEvents = arr(reviewEvents);
 
-  const scanSucceeded = isSuccessMode(discoveryState?.mode);
-  const hasScannedUrl = !!s(
-    discoveryState?.lastUrl ||
-      discoveryState?.last_url ||
-      discoveryState?.url ||
-      discoveryState?.sourceUrl ||
-      discoveryState?.source_url
-  );
-
   const draftQueue = arr(
     reviewDraft?.reviewQueue || reviewDraft?.review_queue
   );
@@ -322,6 +338,41 @@ export default function SetupStudioScene({
     businessForm,
   });
 
+  const [stayOnSourceStage, setStayOnSourceStage] = useState(true);
+
+  const scanSucceeded = isSuccessMode(discoveryState?.mode);
+
+  const sourceLabelFromState = s(
+    discoveryState?.sourceLabel ||
+      discoveryState?.source_label ||
+      inferSourceLabel(
+        discoveryState?.lastSourceType || discoveryState?.last_source_type,
+        discoveryState?.lastUrl ||
+          discoveryState?.last_url ||
+          discoveryState?.url ||
+          discoveryState?.sourceUrl ||
+          discoveryState?.source_url
+      )
+  );
+
+  const primarySourceUrlFromState = s(
+    discoveryState?.lastUrl ||
+      discoveryState?.last_url ||
+      discoveryState?.url ||
+      discoveryState?.sourceUrl ||
+      discoveryState?.source_url
+  );
+
+  const primarySourceUrl = primarySourceUrlFromState || s(discoveryForm?.websiteUrl);
+  const sourceLabel =
+    sourceLabelFromState ||
+    inferSourceLabel(
+      discoveryState?.lastSourceType || discoveryState?.last_source_type,
+      discoveryForm?.websiteUrl
+    );
+
+  const hasScannedUrl = !!primarySourceUrl;
+
   const progressSteps = useMemo(() => {
     const list = ["entry", "identity"];
     if (hasKnowledge) list.push("knowledge");
@@ -335,8 +386,6 @@ export default function SetupStudioScene({
     list.push("service", "ready");
     return list;
   }, [hasKnowledge]);
-
-  const [stayOnSourceStage, setStayOnSourceStage] = useState(true);
 
   const recoveredStage = useMemo(
     () =>
@@ -435,7 +484,8 @@ export default function SetupStudioScene({
 
   useEffect(() => {
     if (importingWebsite) {
-      if (stage !== "scanning") setStage("scanning");
+      const nextStage = stayOnSourceStage ? "entry" : "scanning";
+      if (stage !== nextStage) setStage(nextStage);
       return;
     }
 
@@ -447,7 +497,7 @@ export default function SetupStudioScene({
     if (recoveredStage === "ready" && stage !== "ready") {
       setStage("ready");
     }
-  }, [importingWebsite, recoveredStage, stage]);
+  }, [importingWebsite, stayOnSourceStage, recoveredStage, stage]);
 
   useEffect(() => {
     if (!importingWebsite) {
@@ -581,11 +631,13 @@ export default function SetupStudioScene({
     discoveredDescription ||
     "We extracted a first draft of the business direction from the source signals.";
 
-  const progressCurrentStage = importingWebsite
-    ? "identity"
-    : stage === "scanning"
+  const progressCurrentStage = stayOnSourceStage
+    ? "entry"
+    : importingWebsite
       ? "identity"
-      : stage;
+      : stage === "scanning"
+        ? "identity"
+        : stage;
 
   const progressCurrentIndex = Math.max(
     0,
@@ -599,24 +651,6 @@ export default function SetupStudioScene({
     discoveryState,
     discoveryModeLabel,
   });
-
-  const sourceLabel = s(
-    discoveryState?.sourceLabel ||
-      discoveryState?.source_label ||
-      (s(discoveryState?.lastSourceType || discoveryState?.last_source_type) === "google_maps"
-        ? "Google Maps"
-        : s(discoveryState?.lastSourceType || discoveryState?.last_source_type) === "website"
-          ? "Website"
-          : "")
-  );
-
-  const primarySourceUrl = s(
-    discoveryState?.lastUrl ||
-      discoveryState?.last_url ||
-      discoveryState?.url ||
-      discoveryState?.sourceUrl ||
-      discoveryState?.source_url
-  );
 
   const stageMeta = obj(meta);
   const stageWarnings = safeWarnings;
@@ -648,6 +682,7 @@ export default function SetupStudioScene({
   const firstEvent = obj(safeReviewEvents[0]);
 
   const summaryVisible = !!(
+    importingWebsite ||
     primarySourceUrl ||
     sourceLabel ||
     hasVisibleResults ||
@@ -1005,6 +1040,25 @@ export default function SetupStudioScene({
                     importingWebsite={importingWebsite}
                     onSetDiscoveryField={onSetDiscoveryField}
                     onScanBusiness={onScanBusiness}
+                    hasAnalysis={summaryVisible}
+                    analysisLoading={importingWebsite}
+                    analysisSourceLabel={sourceLabel}
+                    analysisUrl={primarySourceUrl}
+                    analysisTitle={resolvedCurrentTitle}
+                    analysisDescription={resolvedCurrentDescription}
+                    analysisMessage={s(discoveryState?.message)}
+                    analysisWarnings={stageWarnings}
+                    analysisProfileRows={safeDiscoveryProfileRows}
+                    analysisKnowledgeCount={resultKnowledgeCount}
+                    analysisServiceCount={resultServiceCount}
+                    analysisSourceCount={resultSourceCount}
+                    analysisEventCount={resultEventCount}
+                    analysisReviewStatusLabel={reviewStatusLabel}
+                    analysisReviewSources={safeReviewSources}
+                    analysisReviewEvents={safeReviewEvents}
+                    onOpenRefine={handleOpenRefine}
+                    onOpenKnowledge={knowledgeContentAvailable ? handleOpenKnowledge : undefined}
+                    onContinueFlow={handleContinueFlow}
                   />
                 </AnimatePresence>
               </div>
