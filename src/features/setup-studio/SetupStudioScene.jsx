@@ -31,13 +31,6 @@ function n(value, fallback = 0) {
   return Number.isFinite(x) ? x : fallback;
 }
 
-function truncateText(value = "", max = 96) {
-  const x = s(value);
-  if (!x) return "";
-  if (x.length <= max) return x;
-  return `${x.slice(0, max - 1)}…`;
-}
-
 function firstNonEmpty(...values) {
   for (const value of values) {
     const x = s(value);
@@ -46,53 +39,21 @@ function firstNonEmpty(...values) {
   return "";
 }
 
+function truncateText(value = "", max = 120) {
+  const x = s(value);
+  if (!x) return "";
+  if (x.length <= max) return x;
+  return `${x.slice(0, max - 1)}…`;
+}
+
 function findProfileRowValue(rows = [], wantedKeys = []) {
-  const normalizedWanted = wantedKeys.map((x) => s(x).toLowerCase());
+  const normalizedWanted = arr(wantedKeys).map((x) => s(x).toLowerCase());
 
   const match = arr(rows).find(([label]) =>
     normalizedWanted.includes(s(label).toLowerCase())
   );
 
   return s(match?.[1]);
-}
-
-function normalizeStageCandidate(
-  stage = "",
-  { hasKnowledge, hasServices, hasIdentityData, hasScanEvidence } = {}
-) {
-  const x = s(stage).toLowerCase();
-
-  if (x === "scanning") return "scanning";
-
-  if (x === "ready" || x === "launch" || x === "complete") {
-    if (hasServices) return "service";
-    if (hasKnowledge) return "knowledge";
-    if (hasIdentityData || hasScanEvidence) return "identity";
-    return "entry";
-  }
-
-  if (x === "service" || x === "services") {
-    if (hasIdentityData || hasScanEvidence || hasServices) return "service";
-    return "entry";
-  }
-
-  if (x === "knowledge" || x === "review") {
-    if (hasKnowledge) return "knowledge";
-    if (hasServices) return "service";
-    if (hasIdentityData || hasScanEvidence) return "identity";
-    return "entry";
-  }
-
-  if (x === "identity" || x === "business" || x === "business_profile") {
-    return hasIdentityData || hasScanEvidence ? "identity" : "entry";
-  }
-
-  if (x === "entry" || x === "source") return "entry";
-
-  if (hasKnowledge) return "knowledge";
-  if (hasServices) return "service";
-  if (hasIdentityData || hasScanEvidence) return "identity";
-  return "entry";
 }
 
 function hasMeaningfulReviewDraft(reviewDraft = {}) {
@@ -176,69 +137,34 @@ function hasMeaningfulIdentityData({
 
 function buildRecoveredStage({
   importingWebsite,
-  scanSucceeded,
-  hasScannedUrl,
-  hasKnowledge,
-  hasServices,
+  studioProgress,
   hasIdentityData,
   hasReviewPayload,
   hasVisibleResults,
-  studioProgress,
-  discoveryState,
+  hasKnowledge,
+  hasServices,
+  hasScannedUrl,
 }) {
   if (importingWebsite) return "scanning";
-
-  const nextStudioStage = s(
-    studioProgress?.nextStudioStage || studioProgress?.progress?.nextStudioStage
-  );
 
   if (studioProgress?.setupCompleted) {
     return "ready";
   }
 
-  const hasFreshScanSession = !!(
-    s(discoveryState?.requestId || discoveryState?.request_id) ||
-    s(discoveryState?.sourceRunId || discoveryState?.source_run_id) ||
-    s(discoveryState?.snapshotId || discoveryState?.snapshot_id) ||
-    hasScannedUrl
-  );
-
-  const hasScanEvidence =
+  const hasAnyResultFlow = !!(
     hasVisibleResults ||
-    scanSucceeded ||
-    hasScannedUrl ||
     hasIdentityData ||
     hasReviewPayload ||
     hasKnowledge ||
     hasServices ||
-    !!nextStudioStage;
+    hasScannedUrl
+  );
 
-  const shouldPreferPostScanReviewFlow = hasFreshScanSession && hasScanEvidence;
-
-  if (shouldPreferPostScanReviewFlow) {
-    return "identity";
-  }
-
-  if (!hasScanEvidence) {
+  if (!hasAnyResultFlow) {
     return "entry";
   }
 
-  if (nextStudioStage) {
-    return normalizeStageCandidate(nextStudioStage, {
-      hasKnowledge,
-      hasServices,
-      hasIdentityData,
-      hasScanEvidence,
-    });
-  }
-
-  if (hasKnowledge) return "knowledge";
-  if (hasServices) return "service";
-  if (hasIdentityData || hasReviewPayload || scanSucceeded || hasScannedUrl) {
-    return "identity";
-  }
-
-  return "entry";
+  return "identity";
 }
 
 function buildStatusLabel({
@@ -358,7 +284,9 @@ export default function SetupStudioScene({
       discoveryState?.source_url
   );
 
-  const draftQueue = arr(reviewDraft?.reviewQueue || reviewDraft?.review_queue);
+  const draftQueue = arr(
+    reviewDraft?.reviewQueue || reviewDraft?.review_queue
+  );
 
   const intakeItems =
     safeKnowledgeItems.length > 0
@@ -366,6 +294,9 @@ export default function SetupStudioScene({
       : draftQueue.length > 0
         ? draftQueue
         : safeKnowledgePreview;
+
+  const stageKnowledgeItems =
+    safeKnowledgeItems.length > 0 ? safeKnowledgeItems : intakeItems;
 
   const hasKnowledge =
     safeKnowledgeItems.length > 0 ||
@@ -386,15 +317,15 @@ export default function SetupStudioScene({
     businessForm,
   });
 
-  const stageSequence = useMemo(() => {
-    const list = ["identity"];
+  const progressSteps = useMemo(() => {
+    const list = ["entry", "identity"];
     if (hasKnowledge) list.push("knowledge");
     list.push("service", "ready");
     return list;
   }, [hasKnowledge]);
 
-  const progressSteps = useMemo(() => {
-    const list = ["entry", "identity"];
+  const stageSequence = useMemo(() => {
+    const list = ["identity"];
     if (hasKnowledge) list.push("knowledge");
     list.push("service", "ready");
     return list;
@@ -404,27 +335,23 @@ export default function SetupStudioScene({
     () =>
       buildRecoveredStage({
         importingWebsite,
-        scanSucceeded,
-        hasScannedUrl,
-        hasKnowledge,
-        hasServices,
+        studioProgress,
         hasIdentityData,
         hasReviewPayload,
         hasVisibleResults,
-        studioProgress,
-        discoveryState,
+        hasKnowledge,
+        hasServices,
+        hasScannedUrl,
       }),
     [
       importingWebsite,
-      scanSucceeded,
-      hasScannedUrl,
-      hasKnowledge,
-      hasServices,
+      studioProgress,
       hasIdentityData,
       hasReviewPayload,
       hasVisibleResults,
-      studioProgress,
-      discoveryState,
+      hasKnowledge,
+      hasServices,
+      hasScannedUrl,
     ]
   );
 
@@ -469,55 +396,6 @@ export default function SetupStudioScene({
 
   const hasOverlay = !!activeOverlay;
 
-  const sourceLabel = s(
-    discoveryState?.sourceLabel ||
-      discoveryState?.source_label ||
-      (s(discoveryState?.lastSourceType || discoveryState?.last_source_type) ===
-      "google_maps"
-        ? "Google Maps"
-        : s(discoveryState?.lastSourceType || discoveryState?.last_source_type) ===
-            "website"
-          ? "Website"
-          : "")
-  );
-
-  const primarySourceUrl = s(
-    discoveryState?.lastUrl ||
-      discoveryState?.last_url ||
-      discoveryState?.url ||
-      discoveryState?.sourceUrl ||
-      discoveryState?.source_url
-  );
-
-  const resultKnowledgeCount = Math.max(
-    n(visibleKnowledgeCount),
-    safeKnowledgeItems.length,
-    safeKnowledgePreview.length
-  );
-
-  const resultServiceCount = Math.max(
-    n(visibleServiceCount),
-    safeServices.length
-  );
-
-  const resultSourceCount = safeReviewSources.length + (primarySourceUrl ? 1 : 0);
-  const resultEventCount = safeReviewEvents.length;
-
-  const summaryVisible = !(
-    stage === "entry" ||
-    (stage === "scanning" && !hasVisibleResults)
-  ) && !!(
-    primarySourceUrl ||
-    sourceLabel ||
-    hasVisibleResults ||
-    resultKnowledgeCount > 0 ||
-    resultServiceCount > 0 ||
-    resultSourceCount > 0 ||
-    resultEventCount > 0 ||
-    safeWarnings.length > 0 ||
-    s(discoveryState?.message)
-  );
-
   useEffect(() => {
     if (!hasOverlay) {
       document.documentElement.style.overflow = "";
@@ -557,21 +435,7 @@ export default function SetupStudioScene({
       return;
     }
 
-    if (recoveredStage === "entry") {
-      return;
-    }
-
-    if (stage === "identity" && ["knowledge", "service", "ready"].includes(recoveredStage)) {
-      setStage(recoveredStage);
-      return;
-    }
-
-    if (stage === "knowledge" && ["service", "ready"].includes(recoveredStage)) {
-      setStage(recoveredStage);
-      return;
-    }
-
-    if (stage === "service" && recoveredStage === "ready") {
+    if (recoveredStage === "ready" && stage !== "ready") {
       setStage("ready");
     }
   }, [importingWebsite, recoveredStage, stage]);
@@ -725,6 +589,24 @@ export default function SetupStudioScene({
     discoveryModeLabel,
   });
 
+  const sourceLabel = s(
+    discoveryState?.sourceLabel ||
+      discoveryState?.source_label ||
+      (s(discoveryState?.lastSourceType || discoveryState?.last_source_type) === "google_maps"
+        ? "Google Maps"
+        : s(discoveryState?.lastSourceType || discoveryState?.last_source_type) === "website"
+          ? "Website"
+          : "")
+  );
+
+  const primarySourceUrl = s(
+    discoveryState?.lastUrl ||
+      discoveryState?.last_url ||
+      discoveryState?.url ||
+      discoveryState?.sourceUrl ||
+      discoveryState?.source_url
+  );
+
   const stageMeta = obj(meta);
   const stageWarnings = safeWarnings;
   const nextStudioStage = s(
@@ -737,12 +619,38 @@ export default function SetupStudioScene({
     reviewDraft?.status
   );
 
+  const resultKnowledgeCount = Math.max(
+    n(visibleKnowledgeCount),
+    safeKnowledgeItems.length,
+    safeKnowledgePreview.length
+  );
+
+  const resultServiceCount = Math.max(
+    n(visibleServiceCount),
+    safeServices.length
+  );
+
+  const resultSourceCount = safeReviewSources.length + (primarySourceUrl ? 1 : 0);
+  const resultEventCount = safeReviewEvents.length;
+
   const firstReviewSource = obj(safeReviewSources[0]);
   const firstEvent = obj(safeReviewEvents[0]);
 
+  const summaryVisible = !isEntryStage && !!(
+    primarySourceUrl ||
+    sourceLabel ||
+    hasVisibleResults ||
+    resultKnowledgeCount > 0 ||
+    resultServiceCount > 0 ||
+    resultSourceCount > 0 ||
+    resultEventCount > 0 ||
+    safeWarnings.length > 0 ||
+    s(discoveryState?.message)
+  );
+
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center px-6">
+      <div className="flex h-screen items-center justify-center px-6">
         <div className="rounded-full border border-slate-200 bg-white/90 px-5 py-2 text-sm font-medium text-slate-600 shadow-sm backdrop-blur">
           Setup studio hazırlanır...
         </div>
@@ -752,7 +660,7 @@ export default function SetupStudioScene({
 
   return (
     <div
-      className={`setup-studio-scene min-h-screen overflow-x-hidden ${
+      className={`setup-studio-scene h-screen overflow-hidden ${
         hasOverlay ? "is-overlay-open" : ""
       }`}
       data-stage={stage}
@@ -769,11 +677,11 @@ export default function SetupStudioScene({
     >
       <div
         aria-hidden={hasOverlay ? "true" : "false"}
-        className={`transition-[filter,opacity,transform] duration-200 ${
+        className={`flex h-full flex-col transition-[filter,opacity,transform] duration-200 ${
           hasOverlay ? "pointer-events-none select-none opacity-[0.96] blur-[1px]" : ""
         }`}
       >
-        <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/72 backdrop-blur-xl">
+        <header className="shrink-0 border-b border-slate-200/70 bg-white/72 backdrop-blur-xl">
           <div className="mx-auto flex h-[72px] w-full max-w-[1600px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-10">
             <div className="flex min-w-0 items-center gap-3">
               <span className="h-4 w-4 rounded-full bg-[radial-gradient(circle_at_35%_35%,rgba(255,255,255,.95),rgba(191,219,254,.95)_40%,rgba(148,163,184,.85)_70%,rgba(148,163,184,.18)_100%)] shadow-[0_0_0_1px_rgba(148,163,184,.18),0_10px_30px_rgba(15,23,42,.08)]" />
@@ -838,7 +746,7 @@ export default function SetupStudioScene({
         </header>
 
         {!isEntryStage && (error || sourceLabel || stageWarnings.length > 0) ? (
-          <div className="border-b border-slate-200/60 bg-white/55 backdrop-blur-sm">
+          <div className="shrink-0 border-b border-slate-200/60 bg-white/55 backdrop-blur-sm">
             <div className="mx-auto flex w-full max-w-[1600px] flex-wrap gap-2 px-4 py-2.5 sm:px-6 lg:px-10">
               {sourceLabel ? (
                 <span className="rounded-full border border-slate-200 bg-white/85 px-3 py-1.5 text-sm font-medium text-slate-700">
@@ -879,246 +787,248 @@ export default function SetupStudioScene({
           </div>
         ) : null}
 
-        {summaryVisible ? (
-          <div className="border-b border-slate-200/60 bg-[linear-gradient(180deg,rgba(255,255,255,.86),rgba(248,250,252,.82))] backdrop-blur-sm">
-            <div className="mx-auto w-full max-w-[1600px] px-4 py-4 sm:px-6 lg:px-10">
-              <div className="grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,.85fr)_minmax(0,1fr)]">
-                <div className="rounded-[22px] border border-slate-200/70 bg-white/86 p-4 shadow-[0_12px_40px_rgba(15,23,42,.05)]">
-                  <div className="mb-2 flex flex-wrap items-center gap-2">
-                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-600">
-                      Analysis snapshot
-                    </span>
-                    {sourceLabel ? (
-                      <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700">
-                        {sourceLabel}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          {summaryVisible ? (
+            <div className="border-b border-slate-200/60 bg-[linear-gradient(180deg,rgba(255,255,255,.86),rgba(248,250,252,.82))] backdrop-blur-sm">
+              <div className="mx-auto w-full max-w-[1600px] px-4 py-4 sm:px-6 lg:px-10">
+                <div className="grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,.85fr)_minmax(0,1fr)]">
+                  <div className="rounded-[22px] border border-slate-200/70 bg-white/86 p-4 shadow-[0_12px_40px_rgba(15,23,42,.05)]">
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-600">
+                        Analysis snapshot
                       </span>
-                    ) : null}
-                    {reviewStatusLabel ? (
-                      <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700">
-                        {reviewStatusLabel}
-                      </span>
-                    ) : null}
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="text-sm font-semibold text-slate-950">
-                      {resolvedCurrentTitle}
+                      {sourceLabel ? (
+                        <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700">
+                          {sourceLabel}
+                        </span>
+                      ) : null}
+                      {reviewStatusLabel ? (
+                        <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700">
+                          {reviewStatusLabel}
+                        </span>
+                      ) : null}
                     </div>
 
-                    <p className="text-sm leading-6 text-slate-600">
-                      {truncateText(
-                        s(discoveryState?.message) ||
-                          resolvedCurrentDescription,
-                        220
-                      )}
-                    </p>
+                    <div className="space-y-2">
+                      <div className="text-sm font-semibold text-slate-950">
+                        {resolvedCurrentTitle}
+                      </div>
 
-                    {primarySourceUrl ? (
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-xs text-slate-600">
-                        <span className="font-medium text-slate-700">URL:</span>{" "}
-                        <span className="break-all">{primarySourceUrl}</span>
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
+                      <p className="text-sm leading-6 text-slate-600">
+                        {truncateText(
+                          s(discoveryState?.message) || resolvedCurrentDescription,
+                          220
+                        )}
+                      </p>
 
-                <div className="rounded-[22px] border border-slate-200/70 bg-white/86 p-4 shadow-[0_12px_40px_rgba(15,23,42,.05)]">
-                  <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    Extracted signals
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3">
-                      <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">
-                        Knowledge
-                      </div>
-                      <div className="mt-1 text-xl font-semibold text-slate-950">
-                        {resultKnowledgeCount}
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3">
-                      <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">
-                        Services
-                      </div>
-                      <div className="mt-1 text-xl font-semibold text-slate-950">
-                        {resultServiceCount}
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3">
-                      <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">
-                        Sources
-                      </div>
-                      <div className="mt-1 text-xl font-semibold text-slate-950">
-                        {resultSourceCount}
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3">
-                      <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">
-                        Events
-                      </div>
-                      <div className="mt-1 text-xl font-semibold text-slate-950">
-                        {resultEventCount}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-[22px] border border-slate-200/70 bg-white/86 p-4 shadow-[0_12px_40px_rgba(15,23,42,.05)]">
-                  <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    Evidence
-                  </div>
-
-                  <div className="space-y-2">
-                    {firstReviewSource?.label || firstReviewSource?.url ? (
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-2.5">
-                        <div className="text-xs font-medium text-slate-700">
-                          {s(firstReviewSource.label || firstReviewSource.sourceType || "Source")}
+                      {primarySourceUrl ? (
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-xs text-slate-600">
+                          <span className="font-medium text-slate-700">URL:</span>{" "}
+                          <span className="break-all">{primarySourceUrl}</span>
                         </div>
-                        {firstReviewSource.url ? (
-                          <div className="mt-1 break-all text-xs text-slate-500">
-                            {truncateText(firstReviewSource.url, 140)}
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[22px] border border-slate-200/70 bg-white/86 p-4 shadow-[0_12px_40px_rgba(15,23,42,.05)]">
+                    <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Extracted signals
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3">
+                        <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">
+                          Knowledge
+                        </div>
+                        <div className="mt-1 text-xl font-semibold text-slate-950">
+                          {resultKnowledgeCount}
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3">
+                        <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">
+                          Services
+                        </div>
+                        <div className="mt-1 text-xl font-semibold text-slate-950">
+                          {resultServiceCount}
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3">
+                        <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">
+                          Sources
+                        </div>
+                        <div className="mt-1 text-xl font-semibold text-slate-950">
+                          {resultSourceCount}
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3">
+                        <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">
+                          Events
+                        </div>
+                        <div className="mt-1 text-xl font-semibold text-slate-950">
+                          {resultEventCount}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[22px] border border-slate-200/70 bg-white/86 p-4 shadow-[0_12px_40px_rgba(15,23,42,.05)]">
+                    <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Evidence
+                    </div>
+
+                    <div className="space-y-2">
+                      {firstReviewSource?.label || firstReviewSource?.url ? (
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-2.5">
+                          <div className="text-xs font-medium text-slate-700">
+                            {s(firstReviewSource.label || firstReviewSource.sourceType || "Source")}
                           </div>
-                        ) : null}
-                      </div>
-                    ) : primarySourceUrl ? (
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-2.5">
-                        <div className="text-xs font-medium text-slate-700">
-                          Primary source
+                          {firstReviewSource.url ? (
+                            <div className="mt-1 break-all text-xs text-slate-500">
+                              {truncateText(firstReviewSource.url, 140)}
+                            </div>
+                          ) : null}
                         </div>
-                        <div className="mt-1 break-all text-xs text-slate-500">
-                          {truncateText(primarySourceUrl, 140)}
+                      ) : primarySourceUrl ? (
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-2.5">
+                          <div className="text-xs font-medium text-slate-700">
+                            Primary source
+                          </div>
+                          <div className="mt-1 break-all text-xs text-slate-500">
+                            {truncateText(primarySourceUrl, 140)}
+                          </div>
                         </div>
-                      </div>
-                    ) : null}
+                      ) : null}
 
-                    {firstEvent?.message || firstEvent?.title ? (
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-2.5">
-                        <div className="text-xs font-medium text-slate-700">
-                          {s(firstEvent.title || firstEvent.type || "Latest event")}
+                      {firstEvent?.message || firstEvent?.title ? (
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-2.5">
+                          <div className="text-xs font-medium text-slate-700">
+                            {s(firstEvent.title || firstEvent.type || "Latest event")}
+                          </div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            {truncateText(
+                              s(firstEvent.message || firstEvent.status || ""),
+                              140
+                            )}
+                          </div>
                         </div>
-                        <div className="mt-1 text-xs text-slate-500">
-                          {truncateText(
-                            s(firstEvent.message || firstEvent.status || ""),
-                            140
-                          )}
-                        </div>
-                      </div>
-                    ) : null}
+                      ) : null}
 
-                    {safeWarnings[0] ? (
-                      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2.5">
-                        <div className="text-xs font-medium text-amber-800">
-                          Warning
+                      {safeWarnings[0] ? (
+                        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2.5">
+                          <div className="text-xs font-medium text-amber-800">
+                            Warning
+                          </div>
+                          <div className="mt-1 text-xs text-amber-700">
+                            {truncateText(safeWarnings[0], 140)}
+                          </div>
                         </div>
-                        <div className="mt-1 text-xs text-amber-700">
-                          {truncateText(safeWarnings[0], 140)}
-                        </div>
-                      </div>
-                    ) : null}
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        ) : null}
+          ) : null}
 
-        {isEntryStage ? (
-          <main className="px-4 pb-6 pt-4 sm:px-6 sm:pb-8 lg:px-10 lg:pt-5">
-            <div className="mx-auto w-full max-w-[1600px]">
-              <AnimatePresence mode="wait" initial={false}>
-                <SetupStudioEntryStage
-                  key="entry"
-                  discoveryForm={discoveryForm}
-                  error={error}
-                  importingWebsite={importingWebsite}
-                  onSetDiscoveryField={onSetDiscoveryField}
-                  onScanBusiness={onScanBusiness}
-                />
-              </AnimatePresence>
-            </div>
-          </main>
-        ) : (
-          <main className="px-4 pb-8 pt-4 sm:px-6 sm:pb-10 lg:px-10 lg:pt-5">
-            <div className="mx-auto w-full max-w-[1600px]">
-              <div className="rounded-[28px] border border-white/60 bg-white/60 p-4 shadow-[0_20px_60px_rgba(15,23,42,.07)] backdrop-blur-xl sm:p-5 lg:p-6">
+          {isEntryStage ? (
+            <main className="px-4 pb-6 pt-4 sm:px-6 sm:pb-8 lg:px-10 lg:pt-5">
+              <div className="mx-auto w-full max-w-[1600px]">
                 <AnimatePresence mode="wait" initial={false}>
-                  {stage === "scanning" ? (
-                    <SetupStudioScanningStage
-                      key="scanning"
-                      lastUrl={
-                        discoveryState?.lastUrl ||
-                        discoveryState?.last_url ||
-                        discoveryState?.url ||
-                        ""
-                      }
-                      sourceLabel={sourceLabel}
-                      scanLines={scanLines}
-                      scanLineIndex={scanLineIndex}
-                      requestId={s(discoveryState?.requestId || discoveryState?.request_id)}
-                    />
-                  ) : null}
-
-                  {stage === "identity" ? (
-                    <SetupStudioIdentityStage
-                      key="identity"
-                      currentTitle={resolvedCurrentTitle}
-                      currentDescription={resolvedCurrentDescription}
-                      discoveryProfileRows={safeDiscoveryProfileRows}
-                      discoveryWarnings={stageWarnings}
-                      sourceLabel={sourceLabel}
-                      onNext={goNextStage}
-                      onToggleRefine={handleOpenRefine}
-                    />
-                  ) : null}
-
-                  {stage === "knowledge" ? (
-                    <SetupStudioKnowledgeStage
-                      key="knowledge"
-                      knowledgePreview={safeKnowledgePreview}
-                      actingKnowledgeId={actingKnowledgeId}
-                      sourceLabel={sourceLabel}
-                      warnings={stageWarnings}
-                      onApproveKnowledge={onApproveKnowledge}
-                      onRejectKnowledge={onRejectKnowledge}
-                      onNext={goNextStage}
-                      onToggleKnowledge={handleOpenKnowledge}
-                    />
-                  ) : null}
-
-                  {stage === "service" ? (
-                    <SetupStudioServiceStage
-                      key="service"
-                      serviceSuggestionTitle={serviceSuggestionTitle}
-                      meta={meta}
-                      services={safeServices}
-                      sourceLabel={sourceLabel}
-                      savingServiceSuggestion={savingServiceSuggestion}
-                      onCreateSeed={handleCreateServiceAndNext}
-                      onSkip={goNextStage}
-                    />
-                  ) : null}
-
-                  {stage === "ready" ? (
-                    <SetupStudioReadyStage
-                      key="ready"
-                      meta={meta}
-                      studioProgress={studioProgress}
-                      hasKnowledge={hasKnowledge}
-                      sourceLabel={sourceLabel}
-                      warnings={stageWarnings}
-                      onToggleRefine={handleOpenRefine}
-                      onToggleKnowledge={handleOpenKnowledge}
-                      onOpenWorkspace={handleOpenWorkspace}
-                    />
-                  ) : null}
+                  <SetupStudioEntryStage
+                    key="entry"
+                    discoveryForm={discoveryForm}
+                    error={error}
+                    importingWebsite={importingWebsite}
+                    onSetDiscoveryField={onSetDiscoveryField}
+                    onScanBusiness={onScanBusiness}
+                  />
                 </AnimatePresence>
               </div>
-            </div>
-          </main>
-        )}
+            </main>
+          ) : (
+            <main className="px-4 pb-8 pt-4 sm:px-6 sm:pb-10 lg:px-10 lg:pt-5">
+              <div className="mx-auto w-full max-w-[1600px]">
+                <div className="rounded-[28px] border border-white/60 bg-white/60 p-4 shadow-[0_20px_60px_rgba(15,23,42,.07)] backdrop-blur-xl sm:p-5 lg:p-6">
+                  <AnimatePresence mode="wait" initial={false}>
+                    {stage === "scanning" ? (
+                      <SetupStudioScanningStage
+                        key="scanning"
+                        lastUrl={
+                          discoveryState?.lastUrl ||
+                          discoveryState?.last_url ||
+                          discoveryState?.url ||
+                          ""
+                        }
+                        sourceLabel={sourceLabel}
+                        scanLines={scanLines}
+                        scanLineIndex={scanLineIndex}
+                        requestId={s(discoveryState?.requestId || discoveryState?.request_id)}
+                      />
+                    ) : null}
+
+                    {stage === "identity" ? (
+                      <SetupStudioIdentityStage
+                        key="identity"
+                        currentTitle={resolvedCurrentTitle}
+                        currentDescription={resolvedCurrentDescription}
+                        discoveryProfileRows={safeDiscoveryProfileRows}
+                        discoveryWarnings={stageWarnings}
+                        sourceLabel={sourceLabel}
+                        onNext={goNextStage}
+                        onToggleRefine={handleOpenRefine}
+                      />
+                    ) : null}
+
+                    {stage === "knowledge" ? (
+                      <SetupStudioKnowledgeStage
+                        key="knowledge"
+                        knowledgePreview={stageKnowledgeItems}
+                        knowledgeItems={stageKnowledgeItems}
+                        actingKnowledgeId={actingKnowledgeId}
+                        sourceLabel={sourceLabel}
+                        warnings={stageWarnings}
+                        onApproveKnowledge={onApproveKnowledge}
+                        onRejectKnowledge={onRejectKnowledge}
+                        onNext={goNextStage}
+                        onToggleKnowledge={handleOpenKnowledge}
+                      />
+                    ) : null}
+
+                    {stage === "service" ? (
+                      <SetupStudioServiceStage
+                        key="service"
+                        serviceSuggestionTitle={serviceSuggestionTitle}
+                        meta={meta}
+                        services={safeServices}
+                        sourceLabel={sourceLabel}
+                        savingServiceSuggestion={savingServiceSuggestion}
+                        onCreateSeed={handleCreateServiceAndNext}
+                        onSkip={goNextStage}
+                      />
+                    ) : null}
+
+                    {stage === "ready" ? (
+                      <SetupStudioReadyStage
+                        key="ready"
+                        meta={meta}
+                        studioProgress={studioProgress}
+                        hasKnowledge={hasKnowledge}
+                        sourceLabel={sourceLabel}
+                        warnings={stageWarnings}
+                        onToggleRefine={handleOpenRefine}
+                        onToggleKnowledge={handleOpenKnowledge}
+                        onOpenWorkspace={handleOpenWorkspace}
+                      />
+                    ) : null}
+                  </AnimatePresence>
+                </div>
+              </div>
+            </main>
+          )}
+        </div>
       </div>
 
       <SetupStudioModalLayer
