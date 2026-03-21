@@ -67,7 +67,7 @@ function normalizeBootMeta(boot = {}, pendingKnowledge = [], serviceItems = []) 
       progress?.nextSetupRoute || workspace?.nextSetupRoute || "/setup/studio"
     ),
     nextStudioStage: s(
-      progress?.nextStudioStage || workspace?.nextStudioStage || "entry"
+      progress?.nextStudioStage || workspace?.nextStudioStage || ""
     ),
     setupCompleted: !!(
       progress?.setupCompleted ?? workspace?.setupCompleted ?? false
@@ -214,10 +214,11 @@ function applyUiHintsFromMeta({
   setShowKnowledge,
   setShowRefine,
 }) {
-  const stage = s(nextMeta?.nextStudioStage);
+  const stage = s(nextMeta?.nextStudioStage).toLowerCase();
 
   if (stage === "knowledge" && arr(pendingKnowledge).length > 0) {
     setShowKnowledge(true);
+    return;
   }
 
   if (stage === "identity" || stage === "business_profile") {
@@ -777,7 +778,7 @@ export default function SetupStudioScreen() {
     primaryMissingStep: "",
     nextRoute: "/",
     nextSetupRoute: "/setup/studio",
-    nextStudioStage: "entry",
+    nextStudioStage: "",
     setupCompleted: false,
     pendingCandidateCount: 0,
     approvedKnowledgeCount: 0,
@@ -1015,7 +1016,7 @@ export default function SetupStudioScreen() {
   useEffect(() => {
     if (meta.setupCompleted) return;
 
-    if (s(meta.nextStudioStage) === "knowledge" && knowledgeCandidates.length > 0) {
+    if (s(meta.nextStudioStage).toLowerCase() === "knowledge" && knowledgeCandidates.length > 0) {
       setShowKnowledge(true);
     }
   }, [meta.nextStudioStage, meta.setupCompleted, knowledgeCandidates.length]);
@@ -1172,7 +1173,7 @@ export default function SetupStudioScreen() {
           !!result?.shouldReview ||
           Number(result?.candidateCount || 0) > 0 ||
           refreshedPendingKnowledge.length > 0 ||
-          s(refreshResult?.snapshot?.meta?.nextStudioStage) === "knowledge";
+          s(refreshResult?.snapshot?.meta?.nextStudioStage).toLowerCase() === "knowledge";
 
         setShowKnowledge(shouldOpenKnowledge);
         setShowRefine(true);
@@ -1277,7 +1278,7 @@ export default function SetupStudioScreen() {
       const refreshed = await refreshAndMaybeRouteHome({ preserveBusinessForm: true });
 
       if (!refreshed?.routed) {
-        const nextStage = s(refreshed?.snapshot?.meta?.nextStudioStage);
+        const nextStage = s(refreshed?.snapshot?.meta?.nextStudioStage).toLowerCase();
         if (nextStage !== "knowledge") {
           setShowKnowledge(false);
         }
@@ -1402,7 +1403,7 @@ export default function SetupStudioScreen() {
       primaryMissingStep: s(meta.primaryMissingStep || derived.primaryMissingStep),
       nextRoute: s(meta.nextRoute || derived.nextRoute || "/"),
       nextSetupRoute: s(meta.nextSetupRoute || derived.nextSetupRoute || "/setup/studio"),
-      nextStudioStage: s(meta.nextStudioStage || "entry"),
+      nextStudioStage: s(meta.nextStudioStage || ""),
       setupCompleted: !!(meta.setupCompleted ?? derived.setupCompleted),
     };
   }, [importingWebsite, discoveryState, meta]);
