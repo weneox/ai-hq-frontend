@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { RotateCw } from "lucide-react";
@@ -214,7 +215,9 @@ function SetupStudioModalLayer({
   backdropClass = "bg-slate-950/45 backdrop-blur-md",
   children,
 }) {
-  return (
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <AnimatePresence>
       {open ? (
         <motion.div
@@ -222,25 +225,24 @@ function SetupStudioModalLayer({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={overlayTransition}
-          className={`fixed inset-0 ${zIndexClass} isolate`}
+          className={`fixed inset-0 ${zIndexClass} overflow-y-auto overscroll-contain`}
         >
           <div className={`absolute inset-0 ${backdropClass}`} />
-          <div className="relative z-[1] h-full w-full overflow-y-auto overscroll-contain">
-            <div className="flex min-h-full items-center justify-center px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-10">
-              <motion.div
-                initial={{ opacity: 0, y: 14, scale: 0.985 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 10, scale: 0.985 }}
-                transition={overlayTransition}
-                className="w-full max-w-[1380px]"
-              >
-                {children}
-              </motion.div>
-            </div>
+          <div className="relative z-[1] min-h-screen w-full px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
+            <motion.div
+              initial={{ opacity: 0, y: 14, scale: 0.985 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.985 }}
+              transition={overlayTransition}
+              className="mx-auto w-full max-w-[1380px] pointer-events-auto"
+            >
+              {children}
+            </motion.div>
           </div>
         </motion.div>
       ) : null}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }
 
@@ -434,10 +436,14 @@ export default function SetupStudioScene({
   const wantsKnowledgeOverlay = overlayIntent === "knowledge";
 
   const hasRefineModalContent =
-    wantsRefineOverlay && refineContentAvailable;
+    wantsRefineOverlay &&
+    !!showRefine &&
+    refineContentAvailable;
 
   const hasKnowledgeModalContent =
-    wantsKnowledgeOverlay && knowledgeContentAvailable;
+    wantsKnowledgeOverlay &&
+    !!showKnowledge &&
+    knowledgeContentAvailable;
 
   const activeOverlay = hasKnowledgeModalContent
     ? "knowledge"
@@ -474,6 +480,18 @@ export default function SetupStudioScene({
       document.body.style.paddingRight = "";
     };
   }, [hasOverlay]);
+
+  useEffect(() => {
+    if (overlayIntent === "refine" && !showRefine) {
+      setOverlayIntent("");
+    }
+  }, [overlayIntent, showRefine]);
+
+  useEffect(() => {
+    if (overlayIntent === "knowledge" && !showKnowledge) {
+      setOverlayIntent("");
+    }
+  }, [overlayIntent, showKnowledge]);
 
   useEffect(() => {
     if (importingWebsite) {
@@ -556,7 +574,13 @@ export default function SetupStudioScene({
 
   function handleOpenRefine() {
     if (!refineContentAvailable) return;
+
+    if (showKnowledge && typeof onToggleKnowledge === "function") {
+      onToggleKnowledge();
+    }
+
     setOverlayIntent("refine");
+
     if (!showRefine && typeof onToggleRefine === "function") {
       onToggleRefine();
     }
@@ -564,6 +588,7 @@ export default function SetupStudioScene({
 
   function handleCloseRefine() {
     setOverlayIntent("");
+
     if (showRefine && typeof onToggleRefine === "function") {
       onToggleRefine();
     }
@@ -571,7 +596,13 @@ export default function SetupStudioScene({
 
   function handleOpenKnowledge() {
     if (!knowledgeContentAvailable) return;
+
+    if (showRefine && typeof onToggleRefine === "function") {
+      onToggleRefine();
+    }
+
     setOverlayIntent("knowledge");
+
     if (!showKnowledge && typeof onToggleKnowledge === "function") {
       onToggleKnowledge();
     }
@@ -579,6 +610,7 @@ export default function SetupStudioScene({
 
   function handleCloseKnowledge() {
     setOverlayIntent("");
+
     if (showKnowledge && typeof onToggleKnowledge === "function") {
       onToggleKnowledge();
     }
@@ -714,7 +746,7 @@ export default function SetupStudioScene({
     >
       <div
         aria-hidden={hasOverlay ? "true" : "false"}
-        className={`flex h-full flex-col transition-[filter,opacity,transform] duration-200 ${
+        className={`flex h-full flex-col transition-[filter,opacity] duration-200 ${
           hasOverlay ? "pointer-events-none select-none opacity-[0.96] blur-[1px]" : ""
         }`}
       >
