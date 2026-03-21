@@ -1,6 +1,4 @@
-// src/features/setup-studio/stages/SetupStudioIdentityStage.jsx
-
-import { Brain, ChevronRight } from "lucide-react";
+import { Brain, ChevronRight, FileSearch } from "lucide-react";
 import SetupStudioStageShell from "../components/SetupStudioStageShell.jsx";
 import { GhostButton } from "../components/SetupStudioUi.jsx";
 
@@ -26,31 +24,36 @@ export default function SetupStudioIdentityStage({
       eyebrow="identity"
       title={
         <>
-          We think your business
+          We mapped the business
           <br />
-          is this.
+          into a usable draft.
         </>
       }
-      body="İlk çıxarılan form budur. Düzdürsə davam et. Lazımdırsa dərhal refine et."
+      body="Sistem source-u analiz edib ilkin biznes draftını çıxarıb. İndi bunu yoxlayıb təsdiqləyə və ya refine edə bilərsən."
     >
       <div className="grid gap-8 lg:grid-cols-[1fr_0.82fr] lg:items-end">
         <div>
-          <div className="text-4xl font-semibold tracking-[-0.06em] text-slate-950 sm:text-5xl">
+          <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] uppercase tracking-[0.22em] text-slate-500">
+            <FileSearch className="h-3.5 w-3.5" />
+            review draft
+          </div>
+
+          <div className="mt-5 text-4xl font-semibold tracking-[-0.06em] text-slate-950 sm:text-5xl">
             {s(currentTitle) || "Business identity"}
           </div>
 
           <div className="mt-4 max-w-[680px] text-lg leading-8 text-slate-600">
             {s(currentDescription) ||
-              "We extracted a first draft of the business direction from the source signals."}
+              "We extracted a first business summary from the source and prepared it for approval."}
           </div>
 
           <div className="mt-8 flex flex-wrap gap-3">
             <GhostButton onClick={onNext} icon={ChevronRight} active>
-              Looks right
+              Continue review
             </GhostButton>
 
             <GhostButton onClick={onToggleRefine} icon={Brain}>
-              Refine it
+              Refine draft
             </GhostButton>
           </div>
         </div>
