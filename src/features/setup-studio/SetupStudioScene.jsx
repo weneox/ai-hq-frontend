@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { RotateCw } from "lucide-react";
 import { isSuccessMode, s, arr, obj } from "./lib/setupStudioHelpers.js";
 import SetupStudioRefineModal from "./components/SetupStudioRefineModal.jsx";
@@ -19,6 +19,11 @@ const STEP_LABELS = {
   knowledge: "Knowledge",
   service: "Service",
   ready: "Launch",
+};
+
+const overlayTransition = {
+  duration: 0.22,
+  ease: [0.22, 1, 0.36, 1],
 };
 
 function findProfileRowValue(rows = [], wantedKeys = []) {
@@ -99,6 +104,42 @@ function buildStatusLabel({
   }
 
   return discoveryModeLabel(discoveryState?.mode);
+}
+
+function SetupStudioModalLayer({
+  open,
+  zIndexClass = "z-[140]",
+  backdropClass = "bg-slate-950/45 backdrop-blur-md",
+  children,
+}) {
+  return (
+    <AnimatePresence>
+      {open ? (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={overlayTransition}
+          className={`fixed inset-0 ${zIndexClass} isolate`}
+        >
+          <div className={`absolute inset-0 ${backdropClass}`} />
+          <div className="relative z-[1] h-full w-full overflow-y-auto overscroll-contain">
+            <div className="flex min-h-full items-center justify-center px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-10">
+              <motion.div
+                initial={{ opacity: 0, y: 14, scale: 0.985 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 10, scale: 0.985 }}
+                transition={overlayTransition}
+                className="w-full max-w-[1380px]"
+              >
+                {children}
+              </motion.div>
+            </div>
+          </div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
+  );
 }
 
 export default function SetupStudioScene({
@@ -187,6 +228,9 @@ export default function SetupStudioScene({
     "Detecting service structure",
   ];
 
+  const activeOverlay = showKnowledge ? "knowledge" : showRefine ? "refine" : "";
+  const hasOverlay = !!activeOverlay;
+
   useEffect(() => {
     document.documentElement.classList.add("setup-studio-lock");
     document.body.classList.add("setup-studio-lock");
@@ -196,6 +240,34 @@ export default function SetupStudioScene({
       document.body.classList.remove("setup-studio-lock");
     };
   }, []);
+
+  useEffect(() => {
+    if (!hasOverlay) {
+      document.documentElement.style.overflow = "";
+      document.body.style.overflow = "";
+      document.body.style.touchAction = "";
+      document.body.style.paddingRight = "";
+      return;
+    }
+
+    const scrollbarWidth =
+      window.innerWidth - document.documentElement.clientWidth;
+
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    document.body.style.touchAction = "none";
+
+    if (scrollbarWidth > 0) {
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+    }
+
+    return () => {
+      document.documentElement.style.overflow = "";
+      document.body.style.overflow = "";
+      document.body.style.touchAction = "";
+      document.body.style.paddingRight = "";
+    };
+  }, [hasOverlay]);
 
   useEffect(() => {
     const recovered = buildRecoveredStage({
@@ -385,227 +457,232 @@ export default function SetupStudioScene({
 
   return (
     <div
-      className={`setup-studio-scene ${isEntryStage ? "is-entry-stage" : ""}`}
+      className={`setup-studio-scene ${isEntryStage ? "is-entry-stage" : ""} ${
+        hasOverlay ? "is-overlay-open" : ""
+      }`}
       data-stage={stage}
       data-scan-url={hasScannedUrl ? "yes" : "no"}
     >
-      <header className="setup-studio-scene__topbar">
-        <div className="setup-studio-scene__brand">
-          <span className="setup-studio-scene__brand-mark" />
-          <span className="setup-studio-scene__brand-text">AI SETUP STUDIO</span>
-        </div>
+      <div
+        aria-hidden={hasOverlay ? "true" : "false"}
+        className={`transition-[filter,opacity,transform] duration-200 ${
+          hasOverlay ? "pointer-events-none select-none opacity-95 blur-[1px]" : ""
+        }`}
+      >
+        <header className="setup-studio-scene__topbar">
+          <div className="setup-studio-scene__brand">
+            <span className="setup-studio-scene__brand-mark" />
+            <span className="setup-studio-scene__brand-text">AI SETUP STUDIO</span>
+          </div>
 
-        <div className="setup-studio-scene__progress" aria-label="Setup progress">
-          {progressSteps.map((item, index) => {
-            const isActive = index === progressCurrentIndex;
-            const isDone = index < progressCurrentIndex;
+          <div className="setup-studio-scene__progress" aria-label="Setup progress">
+            {progressSteps.map((item, index) => {
+              const isActive = index === progressCurrentIndex;
+              const isDone = index < progressCurrentIndex;
 
-            return (
+              return (
+                <div
+                  key={item}
+                  className={[
+                    "setup-studio-scene__progress-item",
+                    isActive ? "is-active" : "",
+                    isDone ? "is-done" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
+                  <span className="setup-studio-scene__progress-dot" />
+                  <span className="setup-studio-scene__progress-label">
+                    {STEP_LABELS[item]}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="setup-studio-scene__topbar-actions">
+            {!isEntryStage ? (
               <div
-                key={item}
-                className={[
-                  "setup-studio-scene__progress-item",
-                  isActive ? "is-active" : "",
-                  isDone ? "is-done" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
+                className="setup-studio-scene__status"
+                data-mode={importingWebsite ? "running" : s(discoveryState.mode || "idle")}
               >
-                <span className="setup-studio-scene__progress-dot" />
-                <span className="setup-studio-scene__progress-label">
-                  {STEP_LABELS[item]}
-                </span>
+                <span className="setup-studio-scene__status-dot" />
+                <span>{statusLabel}</span>
               </div>
-            );
-          })}
-        </div>
+            ) : null}
 
-        <div className="setup-studio-scene__topbar-actions">
-          {!isEntryStage ? (
-            <div
-              className="setup-studio-scene__status"
-              data-mode={importingWebsite ? "running" : s(discoveryState.mode || "idle")}
+            <button
+              type="button"
+              className="setup-studio-scene__refresh"
+              onClick={onRefresh}
+              disabled={refreshing}
+              aria-label="Refresh"
             >
-              <span className="setup-studio-scene__status-dot" />
-              <span>{statusLabel}</span>
-            </div>
-          ) : null}
-
-          <button
-            type="button"
-            className="setup-studio-scene__refresh"
-            onClick={onRefresh}
-            disabled={refreshing}
-            aria-label="Refresh"
-          >
-            <RotateCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-          </button>
-        </div>
-      </header>
-
-      {!isEntryStage && (error || sourceLabel || stageWarnings.length > 0) ? (
-        <div className="setup-studio-scene__meta-strip">
-          {sourceLabel ? (
-            <span className="setup-studio-scene__meta-chip">
-              Source: {sourceLabel}
-            </span>
-          ) : null}
-
-          {nextStudioStage ? (
-            <span className="setup-studio-scene__meta-chip">
-              Next: {nextStudioStage}
-            </span>
-          ) : null}
-
-          {reviewDraft?.stats?.pendingReviewCount ? (
-            <span className="setup-studio-scene__meta-chip">
-              Pending review: {Number(reviewDraft.stats.pendingReviewCount || 0)}
-            </span>
-          ) : null}
-
-          {discoveryState?.shouldReview ? (
-            <span className="setup-studio-scene__meta-chip">
-              Review required
-            </span>
-          ) : null}
-
-          {stageWarnings.length > 0 ? (
-            <span className="setup-studio-scene__meta-chip">
-              {stageWarnings[0]}
-            </span>
-          ) : null}
-
-          {error ? (
-            <span className="setup-studio-scene__meta-chip is-error">
-              {error}
-            </span>
-          ) : null}
-        </div>
-      ) : null}
-
-      {isEntryStage ? (
-        <main className="setup-studio-entry-page">
-          <div className="setup-studio-entry-page__shell">
-            <AnimatePresence mode="wait" initial={false}>
-              <SetupStudioEntryStage
-                key="entry"
-                discoveryForm={discoveryForm}
-                error={error}
-                importingWebsite={importingWebsite}
-                onSetDiscoveryField={onSetDiscoveryField}
-                onScanBusiness={onScanBusiness}
-              />
-            </AnimatePresence>
+              <RotateCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+            </button>
           </div>
-        </main>
-      ) : (
-        <main className="setup-studio-flow-page">
-          <div className="setup-studio-flow-page__host">
-            <AnimatePresence mode="wait" initial={false}>
-              {stage === "scanning" ? (
-                <SetupStudioScanningStage
-                  key="scanning"
-                  lastUrl={discoveryState.lastUrl}
-                  sourceLabel={sourceLabel}
-                  scanLines={scanLines}
-                  scanLineIndex={scanLineIndex}
-                  requestId={s(discoveryState.requestId)}
-                />
-              ) : null}
+        </header>
 
-              {stage === "identity" ? (
-                <SetupStudioIdentityStage
-                  key="identity"
-                  currentTitle={resolvedCurrentTitle}
-                  currentDescription={resolvedCurrentDescription}
-                  discoveryProfileRows={discoveryProfileRows}
-                  discoveryWarnings={stageWarnings}
-                  sourceLabel={sourceLabel}
-                  onNext={goNextStage}
-                  onToggleRefine={onToggleRefine}
-                />
-              ) : null}
+        {!isEntryStage && (error || sourceLabel || stageWarnings.length > 0) ? (
+          <div className="setup-studio-scene__meta-strip">
+            {sourceLabel ? (
+              <span className="setup-studio-scene__meta-chip">
+                Source: {sourceLabel}
+              </span>
+            ) : null}
 
-              {stage === "knowledge" ? (
-                <SetupStudioKnowledgeStage
-                  key="knowledge"
-                  knowledgePreview={knowledgePreview}
-                  actingKnowledgeId={actingKnowledgeId}
-                  sourceLabel={sourceLabel}
-                  warnings={stageWarnings}
-                  onApproveKnowledge={onApproveKnowledge}
-                  onRejectKnowledge={onRejectKnowledge}
-                  onNext={goNextStage}
-                  onToggleKnowledge={onToggleKnowledge}
-                />
-              ) : null}
+            {nextStudioStage ? (
+              <span className="setup-studio-scene__meta-chip">
+                Next: {nextStudioStage}
+              </span>
+            ) : null}
 
-              {stage === "service" ? (
-                <SetupStudioServiceStage
-                  key="service"
-                  serviceSuggestionTitle={serviceSuggestionTitle}
-                  meta={meta}
-                  services={services}
-                  sourceLabel={sourceLabel}
-                  savingServiceSuggestion={savingServiceSuggestion}
-                  onCreateSeed={handleCreateServiceAndNext}
-                  onSkip={goNextStage}
-                />
-              ) : null}
+            {reviewDraft?.stats?.pendingReviewCount ? (
+              <span className="setup-studio-scene__meta-chip">
+                Pending review: {Number(reviewDraft.stats.pendingReviewCount || 0)}
+              </span>
+            ) : null}
 
-              {stage === "ready" ? (
-                <SetupStudioReadyStage
-                  key="ready"
-                  meta={meta}
-                  studioProgress={studioProgress}
-                  hasKnowledge={hasKnowledge}
-                  sourceLabel={sourceLabel}
-                  warnings={stageWarnings}
-                  onToggleRefine={onToggleRefine}
-                  onToggleKnowledge={onToggleKnowledge}
-                  onOpenWorkspace={handleOpenWorkspace}
-                />
-              ) : null}
-            </AnimatePresence>
-          </div>
-        </main>
-      )}
+            {discoveryState?.shouldReview ? (
+              <span className="setup-studio-scene__meta-chip">
+                Review required
+              </span>
+            ) : null}
 
-      <AnimatePresence>
-        {showRefine ? (
-          <div className="fixed inset-0 z-[120] overflow-y-auto bg-slate-950/20 px-4 py-4 backdrop-blur-[3px] sm:px-6 sm:py-6 lg:px-8 lg:py-8">
-            <div className="flex min-h-full items-start justify-center">
-              <SetupStudioRefineModal
-                savingBusiness={savingBusiness}
-                businessForm={businessForm}
-                discoveryProfileRows={discoveryProfileRows}
-                manualSections={manualSections}
-                onSetBusinessField={onSetBusinessField}
-                onSetManualSection={onSetManualSection}
-                onSaveBusiness={onSaveBusiness}
-                onClose={onToggleRefine}
-              />
-            </div>
+            {stageWarnings.length > 0 ? (
+              <span className="setup-studio-scene__meta-chip">
+                {stageWarnings[0]}
+              </span>
+            ) : null}
+
+            {error ? (
+              <span className="setup-studio-scene__meta-chip is-error">
+                {error}
+              </span>
+            ) : null}
           </div>
         ) : null}
-      </AnimatePresence>
 
-      <AnimatePresence>
-        {showKnowledge ? (
-          <div className="fixed inset-0 z-[130] overflow-y-auto bg-slate-950/30 px-4 py-4 backdrop-blur-[4px] sm:px-6 sm:py-6 lg:px-8 lg:py-8">
-            <div className="flex min-h-full items-start justify-center">
-              <SetupStudioIntakeModal
-                knowledgeItems={intakeItems}
-                actingKnowledgeId={actingKnowledgeId}
-                onApproveKnowledge={onApproveKnowledge}
-                onRejectKnowledge={onRejectKnowledge}
-                onClose={onToggleKnowledge}
-                onRefresh={onReloadReviewDraft}
-              />
+        {isEntryStage ? (
+          <main className="setup-studio-entry-page">
+            <div className="setup-studio-entry-page__shell">
+              <AnimatePresence mode="wait" initial={false}>
+                <SetupStudioEntryStage
+                  key="entry"
+                  discoveryForm={discoveryForm}
+                  error={error}
+                  importingWebsite={importingWebsite}
+                  onSetDiscoveryField={onSetDiscoveryField}
+                  onScanBusiness={onScanBusiness}
+                />
+              </AnimatePresence>
             </div>
-          </div>
-        ) : null}
-      </AnimatePresence>
+          </main>
+        ) : (
+          <main className="setup-studio-flow-page">
+            <div className="setup-studio-flow-page__host">
+              <AnimatePresence mode="wait" initial={false}>
+                {stage === "scanning" ? (
+                  <SetupStudioScanningStage
+                    key="scanning"
+                    lastUrl={discoveryState.lastUrl}
+                    sourceLabel={sourceLabel}
+                    scanLines={scanLines}
+                    scanLineIndex={scanLineIndex}
+                    requestId={s(discoveryState.requestId)}
+                  />
+                ) : null}
+
+                {stage === "identity" ? (
+                  <SetupStudioIdentityStage
+                    key="identity"
+                    currentTitle={resolvedCurrentTitle}
+                    currentDescription={resolvedCurrentDescription}
+                    discoveryProfileRows={discoveryProfileRows}
+                    discoveryWarnings={stageWarnings}
+                    sourceLabel={sourceLabel}
+                    onNext={goNextStage}
+                    onToggleRefine={onToggleRefine}
+                  />
+                ) : null}
+
+                {stage === "knowledge" ? (
+                  <SetupStudioKnowledgeStage
+                    key="knowledge"
+                    knowledgePreview={knowledgePreview}
+                    actingKnowledgeId={actingKnowledgeId}
+                    sourceLabel={sourceLabel}
+                    warnings={stageWarnings}
+                    onApproveKnowledge={onApproveKnowledge}
+                    onRejectKnowledge={onRejectKnowledge}
+                    onNext={goNextStage}
+                    onToggleKnowledge={onToggleKnowledge}
+                  />
+                ) : null}
+
+                {stage === "service" ? (
+                  <SetupStudioServiceStage
+                    key="service"
+                    serviceSuggestionTitle={serviceSuggestionTitle}
+                    meta={meta}
+                    services={services}
+                    sourceLabel={sourceLabel}
+                    savingServiceSuggestion={savingServiceSuggestion}
+                    onCreateSeed={handleCreateServiceAndNext}
+                    onSkip={goNextStage}
+                  />
+                ) : null}
+
+                {stage === "ready" ? (
+                  <SetupStudioReadyStage
+                    key="ready"
+                    meta={meta}
+                    studioProgress={studioProgress}
+                    hasKnowledge={hasKnowledge}
+                    sourceLabel={sourceLabel}
+                    warnings={stageWarnings}
+                    onToggleRefine={onToggleRefine}
+                    onToggleKnowledge={onToggleKnowledge}
+                    onOpenWorkspace={handleOpenWorkspace}
+                  />
+                ) : null}
+              </AnimatePresence>
+            </div>
+          </main>
+        )}
+      </div>
+
+      <SetupStudioModalLayer
+        open={showRefine && !showKnowledge}
+        zIndexClass="z-[160]"
+        backdropClass="bg-slate-950/42 backdrop-blur-md"
+      >
+        <SetupStudioRefineModal
+          savingBusiness={savingBusiness}
+          businessForm={businessForm}
+          discoveryProfileRows={discoveryProfileRows}
+          manualSections={manualSections}
+          onSetBusinessField={onSetBusinessField}
+          onSetManualSection={onSetManualSection}
+          onSaveBusiness={onSaveBusiness}
+          onClose={onToggleRefine}
+        />
+      </SetupStudioModalLayer>
+
+      <SetupStudioModalLayer
+        open={showKnowledge}
+        zIndexClass="z-[170]"
+        backdropClass="bg-slate-950/52 backdrop-blur-lg"
+      >
+        <SetupStudioIntakeModal
+          knowledgeItems={intakeItems}
+          actingKnowledgeId={actingKnowledgeId}
+          onApproveKnowledge={onApproveKnowledge}
+          onRejectKnowledge={onRejectKnowledge}
+          onClose={onToggleKnowledge}
+          onRefresh={onReloadReviewDraft}
+        />
+      </SetupStudioModalLayer>
     </div>
   );
 }
