@@ -38,27 +38,114 @@ function findProfileRowValue(rows = [], wantedKeys = []) {
 
 function normalizeStageCandidate(
   stage = "",
-  { hasKnowledge, hasServices, scanSucceeded } = {}
+  { hasKnowledge, hasServices, hasIdentityData, hasScanEvidence } = {}
 ) {
-  const x = s(stage);
+  const x = s(stage).toLowerCase();
 
   if (x === "scanning") return "scanning";
-  if (x === "ready") return "ready";
-  if (x === "service") return "service";
-  if (x === "knowledge") {
-    return hasKnowledge ? "knowledge" : hasServices ? "ready" : "service";
+  if (x === "ready" || x === "launch" || x === "complete") return "ready";
+  if (x === "service" || x === "services") return "service";
+  if (x === "knowledge" || x === "review") {
+    if (hasKnowledge) return "knowledge";
+    if (hasServices) return "service";
+    if (hasIdentityData || hasScanEvidence) return "identity";
+    return "entry";
   }
-  if (x === "identity") return scanSucceeded ? "identity" : "entry";
+  if (x === "identity" || x === "business" || x === "business_profile") {
+    return hasIdentityData || hasScanEvidence ? "identity" : "entry";
+  }
+  if (x === "entry" || x === "source") return "entry";
+
+  if (hasServices) return "ready";
+  if (hasKnowledge) return "knowledge";
+  if (hasIdentityData || hasScanEvidence) return "identity";
   return "entry";
+}
+
+function hasMeaningfulReviewDraft(reviewDraft = {}) {
+  const rd = obj(reviewDraft);
+  const draft = obj(
+    rd.draft ||
+      rd.reviewDraft ||
+      rd.review_draft ||
+      rd.currentDraft ||
+      rd.current_draft
+  );
+  const session = obj(rd.session || rd.reviewSession || rd.review_session);
+  const stats = obj(rd.stats);
+  const sources = arr(rd.sources || draft.sources);
+  const events = arr(rd.events || draft.events);
+  const queue = arr(
+    rd.reviewQueue ||
+      rd.review_queue ||
+      rd.queue ||
+      rd.candidates ||
+      draft.reviewQueue ||
+      draft.review_queue ||
+      draft.candidates
+  );
+
+  const textSignals = [
+    session.id,
+    session.reviewSessionId,
+    session.review_session_id,
+    rd.reviewSessionId,
+    rd.review_session_id,
+    draft.companyName,
+    draft.businessName,
+    draft.name,
+    draft.title,
+    draft.companyTitle,
+    draft.description,
+    draft.summary,
+    draft.companySummaryShort,
+    draft.companySummaryLong,
+    draft.aboutSection,
+  ]
+    .map((x) => s(x))
+    .filter(Boolean);
+
+  return (
+    textSignals.length > 0 ||
+    sources.length > 0 ||
+    events.length > 0 ||
+    queue.length > 0 ||
+    Number(stats.pendingReviewCount || stats.pending_review_count || 0) > 0
+  );
+}
+
+function hasMeaningfulIdentityData({
+  currentTitle,
+  currentDescription,
+  discoveryProfileRows,
+  meta,
+  businessForm,
+}) {
+  const m = obj(meta);
+  const bf = obj(businessForm);
+
+  return !!(
+    s(currentTitle) ||
+    s(currentDescription) ||
+    arr(discoveryProfileRows).length > 0 ||
+    s(m.companyName) ||
+    s(m.companySummaryShort) ||
+    s(m.companySummaryLong) ||
+    s(m.description) ||
+    s(bf.companyName) ||
+    s(bf.description)
+  );
 }
 
 function buildRecoveredStage({
   importingWebsite,
   scanSucceeded,
+  hasScannedUrl,
   hasKnowledge,
   hasServices,
+  hasIdentityData,
+  hasReviewPayload,
   studioProgress,
-  hasScannedUrl,
 }) {
   if (importingWebsite) return "scanning";
 
@@ -70,7 +157,16 @@ function buildRecoveredStage({
     return "ready";
   }
 
-  if (!scanSucceeded && !hasScannedUrl) {
+  const hasScanEvidence =
+    scanSucceeded ||
+    hasScannedUrl ||
+    hasIdentityData ||
+    hasReviewPayload ||
+    hasKnowledge ||
+    hasServices ||
+    !!nextStudioStage;
+
+  if (!hasScanEvidence) {
     return "entry";
   }
 
@@ -78,14 +174,18 @@ function buildRecoveredStage({
     return normalizeStageCandidate(nextStudioStage, {
       hasKnowledge,
       hasServices,
-      scanSucceeded,
+      hasIdentityData,
+      hasScanEvidence,
     });
   }
 
-  if (!scanSucceeded) return "entry";
-  if (hasKnowledge) return "knowledge";
   if (hasServices) return "ready";
-  return "identity";
+  if (hasKnowledge) return "knowledge";
+  if (hasIdentityData || hasReviewPayload || scanSucceeded || hasScannedUrl) {
+    return "identity";
+  }
+
+  return "entry";
 }
 
 function buildStatusLabel({
@@ -190,10 +290,22 @@ export default function SetupStudioScene({
   const safeWarnings = arr(discoveryState?.warnings).filter(Boolean);
 
   const scanSucceeded = isSuccessMode(discoveryState?.mode);
-  const hasScannedUrl = !!s(discoveryState?.lastUrl);
+  const hasScannedUrl = !!s(
+    discoveryState?.lastUrl ||
+      discoveryState?.last_url ||
+      discoveryState?.url ||
+      discoveryState?.sourceUrl ||
+      discoveryState?.source_url
+  );
 
-  const draftQueue = arr(reviewDraft?.reviewQueue);
-  const hasKnowledge = draftQueue.length > 0 || safeKnowledgePreview.length > 0;
+  const draftQueue = arr(
+    reviewDraft?.reviewQueue || reviewDraft?.review_queue
+  );
+
+  const hasKnowledge =
+    draftQueue.length > 0 ||
+    safeKnowledgePreview.length > 0 ||
+    safeKnowledgeItems.length > 0;
 
   const intakeItems =
     safeKnowledgeItems.length > 0
@@ -203,6 +315,16 @@ export default function SetupStudioScene({
         : safeKnowledgePreview;
 
   const hasServices = safeServices.length > 0;
+
+  const hasReviewPayload = hasMeaningfulReviewDraft(reviewDraft);
+
+  const hasIdentityData = hasMeaningfulIdentityData({
+    currentTitle,
+    currentDescription,
+    discoveryProfileRows: safeDiscoveryProfileRows,
+    meta,
+    businessForm,
+  });
 
   const stageSequence = useMemo(() => {
     const list = ["identity"];
@@ -218,17 +340,31 @@ export default function SetupStudioScene({
     return list;
   }, [hasKnowledge]);
 
-  const [stage, setStage] = useState(() =>
-    buildRecoveredStage({
+  const recoveredStage = useMemo(
+    () =>
+      buildRecoveredStage({
+        importingWebsite,
+        scanSucceeded,
+        hasScannedUrl,
+        hasKnowledge,
+        hasServices,
+        hasIdentityData,
+        hasReviewPayload,
+        studioProgress,
+      }),
+    [
       importingWebsite,
       scanSucceeded,
+      hasScannedUrl,
       hasKnowledge,
       hasServices,
+      hasIdentityData,
+      hasReviewPayload,
       studioProgress,
-      hasScannedUrl,
-    })
+    ]
   );
 
+  const [stage, setStage] = useState(recoveredStage);
   const [scanLineIndex, setScanLineIndex] = useState(0);
   const [overlayIntent, setOverlayIntent] = useState("");
 
@@ -294,76 +430,34 @@ export default function SetupStudioScene({
   }, [hasOverlay]);
 
   useEffect(() => {
-    const recovered = buildRecoveredStage({
-      importingWebsite,
-      scanSucceeded,
-      hasKnowledge,
-      hasServices,
-      studioProgress,
-      hasScannedUrl,
-    });
-
     if (importingWebsite) {
-      setStage("scanning");
+      if (stage !== "scanning") setStage("scanning");
       return;
     }
 
     if (stage === "entry" || stage === "scanning") {
-      setStage(recovered);
+      if (stage !== recoveredStage) setStage(recoveredStage);
       return;
     }
 
-    if (studioProgress?.setupCompleted && stage !== "ready") {
+    if (recoveredStage === "entry") {
+      return;
+    }
+
+    if (stage === "identity" && ["knowledge", "service", "ready"].includes(recoveredStage)) {
+      setStage(recoveredStage);
+      return;
+    }
+
+    if (stage === "knowledge" && ["service", "ready"].includes(recoveredStage)) {
+      setStage(recoveredStage);
+      return;
+    }
+
+    if (stage === "service" && recoveredStage === "ready") {
       setStage("ready");
-      return;
     }
-
-    if (!hasKnowledge && stage === "knowledge") {
-      setStage(hasServices ? "ready" : "service");
-      return;
-    }
-
-    const requestedStage = normalizeStageCandidate(
-      s(studioProgress?.nextStudioStage),
-      {
-        hasKnowledge,
-        hasServices,
-        scanSucceeded,
-      }
-    );
-
-    if (
-      requestedStage &&
-      requestedStage !== "entry" &&
-      requestedStage !== "scanning"
-    ) {
-      if (stage === "identity" && requestedStage === "knowledge" && hasKnowledge) {
-        setStage("knowledge");
-        return;
-      }
-
-      if (stage === "knowledge" && requestedStage === "service") {
-        setStage("service");
-        return;
-      }
-
-      if (
-        (stage === "service" || stage === "identity" || stage === "knowledge") &&
-        requestedStage === "ready" &&
-        (hasServices || studioProgress?.setupCompleted)
-      ) {
-        setStage("ready");
-      }
-    }
-  }, [
-    importingWebsite,
-    scanSucceeded,
-    hasKnowledge,
-    hasServices,
-    studioProgress,
-    stage,
-    hasScannedUrl,
-  ]);
+  }, [importingWebsite, recoveredStage, stage]);
 
   useEffect(() => {
     if (!importingWebsite) {
@@ -499,13 +593,7 @@ export default function SetupStudioScene({
     discoveredDescription ||
     "We extracted a first draft of the business direction from the source signals.";
 
-  const progressCurrentStage = importingWebsite
-    ? normalizeStageCandidate(s(studioProgress?.nextStudioStage || "identity"), {
-        hasKnowledge,
-        hasServices,
-        scanSucceeded: true,
-      })
-    : stage;
+  const progressCurrentStage = importingWebsite ? "identity" : stage;
 
   const progressCurrentIndex = Math.max(
     0,
@@ -522,9 +610,10 @@ export default function SetupStudioScene({
 
   const sourceLabel = s(
     discoveryState?.sourceLabel ||
-      (s(discoveryState?.lastSourceType) === "google_maps"
+      discoveryState?.source_label ||
+      (s(discoveryState?.lastSourceType || discoveryState?.last_source_type) === "google_maps"
         ? "Google Maps"
-        : s(discoveryState?.lastSourceType) === "website"
+        : s(discoveryState?.lastSourceType || discoveryState?.last_source_type) === "website"
           ? "Website"
           : "")
   );
@@ -551,7 +640,13 @@ export default function SetupStudioScene({
         hasOverlay ? "is-overlay-open" : ""
       }`}
       data-stage={stage}
+      data-recovered-stage={recoveredStage}
       data-scan-url={hasScannedUrl ? "yes" : "no"}
+      data-scan-succeeded={scanSucceeded ? "yes" : "no"}
+      data-has-identity={hasIdentityData ? "yes" : "no"}
+      data-has-review={hasReviewPayload ? "yes" : "no"}
+      data-has-knowledge={hasKnowledge ? "yes" : "no"}
+      data-has-services={hasServices ? "yes" : "no"}
       data-overlay-intent={overlayIntent || "none"}
       data-overlay-open={hasOverlay ? "yes" : "no"}
     >
@@ -690,11 +785,16 @@ export default function SetupStudioScene({
                   {stage === "scanning" ? (
                     <SetupStudioScanningStage
                       key="scanning"
-                      lastUrl={discoveryState?.lastUrl}
+                      lastUrl={
+                        discoveryState?.lastUrl ||
+                        discoveryState?.last_url ||
+                        discoveryState?.url ||
+                        ""
+                      }
                       sourceLabel={sourceLabel}
                       scanLines={scanLines}
                       scanLineIndex={scanLineIndex}
-                      requestId={s(discoveryState?.requestId)}
+                      requestId={s(discoveryState?.requestId || discoveryState?.request_id)}
                     />
                   ) : null}
 
