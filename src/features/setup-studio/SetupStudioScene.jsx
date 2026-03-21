@@ -462,15 +462,15 @@ export default function SetupStudioScene({
         }`}
       >
         <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/72 backdrop-blur-xl">
-          <div className="mx-auto flex h-[84px] w-full max-w-[1600px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-10">
+          <div className="mx-auto flex h-[72px] w-full max-w-[1600px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-10">
             <div className="flex min-w-0 items-center gap-3">
-              <span className="h-5 w-5 rounded-full bg-[radial-gradient(circle_at_35%_35%,rgba(255,255,255,.95),rgba(191,219,254,.95)_40%,rgba(148,163,184,.85)_70%,rgba(148,163,184,.18)_100%)] shadow-[0_0_0_1px_rgba(148,163,184,.18),0_10px_30px_rgba(15,23,42,.08)]" />
-              <span className="truncate text-[15px] font-semibold tracking-[0.28em] text-slate-950">
+              <span className="h-4.5 w-4.5 rounded-full bg-[radial-gradient(circle_at_35%_35%,rgba(255,255,255,.95),rgba(191,219,254,.95)_40%,rgba(148,163,184,.85)_70%,rgba(148,163,184,.18)_100%)] shadow-[0_0_0_1px_rgba(148,163,184,.18),0_10px_30px_rgba(15,23,42,.08)]" />
+              <span className="truncate text-[14px] font-semibold tracking-[0.26em] text-slate-950">
                 AI SETUP STUDIO
               </span>
             </div>
 
-            <div className="hidden items-center gap-6 md:flex">
+            <div className="hidden items-center gap-5 md:flex">
               {progressSteps.map((item, index) => {
                 const isActive = index === progressCurrentIndex;
                 const isDone = index < progressCurrentIndex;
@@ -478,7 +478,7 @@ export default function SetupStudioScene({
                 return (
                   <div
                     key={item}
-                    className={`flex items-center gap-2 text-sm ${
+                    className={`flex items-center gap-2 text-[13px] ${
                       isActive
                         ? "text-slate-950"
                         : isDone
@@ -514,7 +514,7 @@ export default function SetupStudioScene({
 
               <button
                 type="button"
-                className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white/90 text-slate-600 shadow-sm transition hover:border-slate-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white/90 text-slate-600 shadow-sm transition hover:border-slate-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
                 onClick={onRefresh}
                 disabled={refreshing}
                 aria-label="Refresh"
@@ -527,7 +527,7 @@ export default function SetupStudioScene({
 
         {!isEntryStage && (error || sourceLabel || stageWarnings.length > 0) ? (
           <div className="border-b border-slate-200/60 bg-white/55 backdrop-blur-sm">
-            <div className="mx-auto flex w-full max-w-[1600px] flex-wrap gap-2 px-4 py-3 sm:px-6 lg:px-10">
+            <div className="mx-auto flex w-full max-w-[1600px] flex-wrap gap-2 px-4 py-2.5 sm:px-6 lg:px-10">
               {sourceLabel ? (
                 <span className="rounded-full border border-slate-200 bg-white/85 px-3 py-1.5 text-sm font-medium text-slate-700">
                   Source: {sourceLabel}
@@ -568,7 +568,7 @@ export default function SetupStudioScene({
         ) : null}
 
         {isEntryStage ? (
-          <main className="px-4 pb-10 pt-6 sm:px-6 sm:pb-12 lg:px-10 lg:pt-8">
+          <main className="px-4 pb-6 pt-4 sm:px-6 sm:pb-8 lg:px-10 lg:pt-5">
             <div className="mx-auto w-full max-w-[1600px]">
               <AnimatePresence mode="wait" initial={false}>
                 <SetupStudioEntryStage
@@ -583,9 +583,9 @@ export default function SetupStudioScene({
             </div>
           </main>
         ) : (
-          <main className="px-4 pb-10 pt-6 sm:px-6 sm:pb-12 lg:px-10 lg:pt-8">
+          <main className="px-4 pb-8 pt-4 sm:px-6 sm:pb-10 lg:px-10 lg:pt-5">
             <div className="mx-auto w-full max-w-[1600px]">
-              <div className="rounded-[32px] border border-white/60 bg-white/60 p-4 shadow-[0_20px_60px_rgba(15,23,42,.07)] backdrop-blur-xl sm:p-6 lg:p-8">
+              <div className="rounded-[28px] border border-white/60 bg-white/60 p-4 shadow-[0_20px_60px_rgba(15,23,42,.07)] backdrop-blur-xl sm:p-5 lg:p-6">
                 <AnimatePresence mode="wait" initial={false}>
                   {stage === "scanning" ? (
                     <SetupStudioScanningStage

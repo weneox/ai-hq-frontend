@@ -390,14 +390,14 @@ function SourceMark({ item, className = "" }) {
 }
 
 const cardVariants = {
-  hidden: { opacity: 0, y: 16, scale: 0.985 },
+  hidden: { opacity: 0, y: 14, scale: 0.985 },
   visible: (index) => ({
     opacity: 1,
     y: 0,
     scale: 1,
     transition: {
-      duration: 0.42,
-      delay: 0.08 + index * 0.05,
+      duration: 0.36,
+      delay: 0.05 + index * 0.04,
       ease: [0.22, 1, 0.36, 1],
     },
   }),
@@ -658,27 +658,27 @@ export default function SetupStudioEntryStage({
   return (
     <motion.form
       onSubmit={handleSubmit}
-      initial={{ opacity: 0, y: 16 }}
+      initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
-      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-      className="mx-auto flex w-full max-w-[1480px] flex-col gap-8"
+      transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+      className="mx-auto flex w-full max-w-[1520px] flex-col gap-5"
     >
-      <div className="mx-auto flex w-full max-w-[980px] flex-col items-center gap-4 pt-2 text-center">
-        <div className="rounded-full border border-slate-200 bg-white/80 px-4 py-2 text-[13px] font-semibold uppercase tracking-[0.24em] text-slate-500 shadow-sm">
+      <div className="mx-auto flex w-full max-w-[1240px] flex-col items-center gap-3 pt-1 text-center">
+        <div className="rounded-full border border-slate-200 bg-white/85 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500 shadow-sm sm:text-[12px]">
           Source setup
         </div>
 
-        <h1 className="max-w-[900px] text-[clamp(52px,8vw,92px)] font-semibold leading-[0.92] tracking-[-0.06em] text-slate-950">
+        <h1 className="max-w-[1180px] text-[clamp(36px,5.6vw,72px)] font-semibold leading-[0.9] tracking-[-0.065em] text-slate-950">
           Connect what already exists
         </h1>
 
-        <p className="max-w-[760px] text-[18px] leading-8 text-slate-500 sm:text-[20px]">
+        <p className="max-w-[760px] text-[15px] leading-7 text-slate-500 sm:text-[17px] sm:leading-8">
           Start with your public business sources, then analyze everything we can find.
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         {primarySources.map((item, index) => (
           <motion.button
             key={item.key}
@@ -687,17 +687,17 @@ export default function SetupStudioEntryStage({
             variants={cardVariants}
             initial="hidden"
             animate="visible"
-            className={`group relative rounded-[28px] border bg-white/80 p-5 text-left shadow-[0_18px_50px_rgba(15,23,42,.05)] backdrop-blur transition-all duration-200 ${
+            className={`group relative min-h-[154px] rounded-[24px] border bg-white/80 p-4 text-left shadow-[0_14px_36px_rgba(15,23,42,.05)] backdrop-blur transition-all duration-200 ${
               activeKey === item.key
                 ? "border-slate-300 ring-2 ring-blue-200/60"
                 : "border-slate-200 hover:border-slate-300"
             }`}
             onClick={() => handlePickSource(item.key)}
           >
-            <div className="mb-6 flex items-start justify-between gap-3">
-              <SourceMark item={item} className="h-10 w-10 rounded-2xl object-contain" />
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <SourceMark item={item} className="h-9 w-9 rounded-xl object-contain" />
               <span
-                className={`rounded-full border px-3 py-1 text-[12px] font-semibold uppercase tracking-[0.16em] ${
+                className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.15em] ${
                   isSourceAdded(item.key)
                     ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                     : "border-slate-200 bg-slate-50 text-slate-500"
@@ -707,9 +707,9 @@ export default function SetupStudioEntryStage({
               </span>
             </div>
 
-            <div className="space-y-2">
-              <div className="text-[18px] font-semibold text-slate-900">{item.label}</div>
-              <div className="min-h-[24px] text-sm text-slate-500">
+            <div className="space-y-1.5">
+              <div className="text-[17px] font-semibold text-slate-900">{item.label}</div>
+              <div className="min-h-[20px] text-sm text-slate-500">
                 {isSourceAdded(item.key)
                   ? formatSourceValue(item.key, sources[item.key])
                   : item.actionLabel}
@@ -717,7 +717,7 @@ export default function SetupStudioEntryStage({
             </div>
 
             <div
-              className={`mt-6 h-[3px] rounded-full transition-all ${
+              className={`mt-4 h-[3px] rounded-full transition-all ${
                 activeKey === item.key ? "bg-blue-500" : "bg-transparent"
               }`}
             />
@@ -730,27 +730,27 @@ export default function SetupStudioEntryStage({
           variants={cardVariants}
           initial="hidden"
           animate="visible"
-          className={`group relative rounded-[28px] border border-slate-200 bg-white/80 p-5 text-left shadow-[0_18px_50px_rgba(15,23,42,.05)] backdrop-blur transition-all duration-200 hover:border-slate-300 ${
+          className={`group relative min-h-[154px] rounded-[24px] border border-slate-200 bg-white/80 p-4 text-left shadow-[0_14px_36px_rgba(15,23,42,.05)] backdrop-blur transition-all duration-200 hover:border-slate-300 ${
             secondaryOpen ? "ring-2 ring-blue-200/60" : ""
           }`}
           onClick={() => setSecondaryOpen((prev) => !prev)}
         >
-          <div className="mb-6 flex items-start justify-between gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-50 text-3xl leading-none text-slate-900">
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-50 text-2xl leading-none text-slate-900">
               +
             </div>
-            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[12px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-slate-500">
               Optional
             </span>
           </div>
 
-          <div className="space-y-2">
-            <div className="text-[18px] font-semibold text-slate-900">More sources</div>
+          <div className="space-y-1.5">
+            <div className="text-[17px] font-semibold text-slate-900">More sources</div>
             <div className="text-sm text-slate-500">TikTok · YouTube</div>
           </div>
 
           <ChevronDown
-            className={`absolute bottom-5 right-5 h-5 w-5 text-slate-400 transition ${
+            className={`absolute bottom-4 right-4 h-5 w-5 text-slate-400 transition ${
               secondaryOpen ? "rotate-180" : ""
             }`}
           />
@@ -761,20 +761,20 @@ export default function SetupStudioEntryStage({
         {secondaryOpen ? (
           <motion.div
             className="flex flex-wrap gap-3"
-            initial={{ opacity: 0, y: -12, height: 0 }}
+            initial={{ opacity: 0, y: -10, height: 0 }}
             animate={{ opacity: 1, y: 0, height: "auto" }}
-            exit={{ opacity: 0, y: -10, height: 0 }}
-            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+            exit={{ opacity: 0, y: -8, height: 0 }}
+            transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
           >
             {secondarySources.map((item, index) => (
               <motion.button
                 key={item.key}
                 type="button"
-                initial={{ opacity: 0, x: -16 }}
+                initial={{ opacity: 0, x: -14 }}
                 animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -12 }}
-                transition={{ duration: 0.32, delay: index * 0.06, ease: [0.22, 1, 0.36, 1] }}
-                className={`inline-flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm font-medium shadow-sm transition ${
+                exit={{ opacity: 0, x: -10 }}
+                transition={{ duration: 0.26, delay: index * 0.05, ease: [0.22, 1, 0.36, 1] }}
+                className={`inline-flex items-center gap-3 rounded-2xl border px-4 py-2.5 text-sm font-medium shadow-sm transition ${
                   activeKey === item.key
                     ? "border-slate-300 bg-white text-slate-900 ring-2 ring-blue-200/60"
                     : "border-slate-200 bg-white/80 text-slate-600 hover:border-slate-300"
@@ -792,35 +792,35 @@ export default function SetupStudioEntryStage({
 
       <motion.div
         layout
-        transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-        className="overflow-hidden rounded-[34px] border border-slate-200 bg-white/85 shadow-[0_30px_90px_rgba(15,23,42,.08)] backdrop-blur-xl"
+        transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+        className="overflow-hidden rounded-[28px] border border-slate-200 bg-white/85 shadow-[0_24px_70px_rgba(15,23,42,.08)] backdrop-blur-xl"
       >
-        <div className="border-b border-slate-200/80 px-5 py-5 sm:px-6 lg:px-8">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-4">
-              <SourceMark item={activeSource} className="h-11 w-11 rounded-2xl object-contain" />
+        <div className="border-b border-slate-200/80 px-4 py-4 sm:px-5 lg:px-6">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-3">
+              <SourceMark item={activeSource} className="h-10 w-10 rounded-2xl object-contain" />
               <div>
                 <div className="text-[15px] font-semibold text-slate-900">{activeSource.label}</div>
-                <div className="text-sm font-medium uppercase tracking-[0.14em] text-slate-400">
+                <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400 sm:text-[12px]">
                   {isSourceAdded(activeKey) ? "Connected" : "Ready to connect"}
                 </div>
               </div>
             </div>
 
-            <div className="inline-flex items-center gap-2 self-start rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-[13px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+            <div className="inline-flex items-center gap-2 self-start rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-[12px] font-semibold uppercase tracking-[0.14em] text-slate-500">
               <Link2 className="h-4 w-4" />
               Handle or link
             </div>
           </div>
         </div>
 
-        <div className="space-y-6 px-5 py-5 sm:px-6 sm:py-6 lg:px-8">
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_180px]">
+        <div className="space-y-4 px-4 py-4 sm:px-5 sm:py-5 lg:px-6">
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_170px]">
             <input
               value={activeDraft}
               onChange={(e) => handleDraftChange(e.target.value)}
               onKeyDown={handleInputKeyDown}
-              className="h-[78px] rounded-[24px] border border-slate-200 bg-slate-50/80 px-7 text-[28px] font-semibold tracking-[-0.04em] text-slate-900 outline-none transition placeholder:text-slate-300 focus:border-slate-300 focus:bg-white"
+              className="h-[64px] rounded-[20px] border border-slate-200 bg-slate-50/80 px-5 text-[22px] font-semibold tracking-[-0.04em] text-slate-900 outline-none transition placeholder:text-slate-300 focus:border-slate-300 focus:bg-white sm:text-[24px]"
               placeholder={activeSource.placeholder}
               autoComplete="off"
               spellCheck={false}
@@ -828,7 +828,7 @@ export default function SetupStudioEntryStage({
 
             <button
               type="button"
-              className="inline-flex h-[78px] items-center justify-center gap-2 rounded-[24px] bg-slate-900 px-6 text-[18px] font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+              className="inline-flex h-[64px] items-center justify-center gap-2 rounded-[20px] bg-slate-900 px-6 text-[16px] font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 sm:text-[17px]"
               onClick={handleAddSource}
               disabled={!s(activeDraft)}
             >
@@ -838,7 +838,7 @@ export default function SetupStudioEntryStage({
           </div>
 
           {addedSources.length > 0 ? (
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-2.5">
               <AnimatePresence initial={false}>
                 {addedSources.map((item) => (
                   <motion.div
@@ -847,7 +847,7 @@ export default function SetupStudioEntryStage({
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -8 }}
-                    transition={{ duration: 0.2 }}
+                    transition={{ duration: 0.18 }}
                     className="inline-flex max-w-full items-center gap-3 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700"
                   >
                     <SourceMark item={item} className="h-5 w-5 rounded-md object-contain" />
@@ -868,18 +868,18 @@ export default function SetupStudioEntryStage({
             </div>
           ) : null}
 
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-end">
-            <div className="rounded-[24px] border border-slate-200 bg-slate-50/70 px-5 py-4">
-              <div className="mb-2 text-[13px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_280px] xl:items-end">
+            <div className="rounded-[20px] border border-slate-200 bg-slate-50/70 px-4 py-3.5">
+              <div className="mb-1.5 text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                 Scan strategy
               </div>
-              <div className="text-sm leading-7 text-slate-600">{dockNote}</div>
+              <div className="text-sm leading-6 text-slate-600">{dockNote}</div>
             </div>
 
             <button
               type="submit"
               disabled={!canAnalyze}
-              className="inline-flex h-[72px] items-center justify-center gap-2 rounded-[24px] bg-[linear-gradient(135deg,#7bb2ff_0%,#4f8cff_45%,#4b79ff_100%)] px-6 text-[18px] font-semibold text-white shadow-[0_20px_50px_rgba(79,140,255,.28)] transition hover:translate-y-[-1px] hover:shadow-[0_24px_55px_rgba(79,140,255,.34)] disabled:cursor-not-allowed disabled:opacity-55 disabled:shadow-none"
+              className="inline-flex h-[64px] items-center justify-center gap-2 rounded-[20px] bg-[linear-gradient(135deg,#7bb2ff_0%,#4f8cff_45%,#4b79ff_100%)] px-6 text-[16px] font-semibold text-white shadow-[0_16px_40px_rgba(79,140,255,.28)] transition hover:translate-y-[-1px] hover:shadow-[0_20px_44px_rgba(79,140,255,.34)] disabled:cursor-not-allowed disabled:opacity-55 disabled:shadow-none sm:text-[17px]"
             >
               {importingWebsite ? (
                 <>
