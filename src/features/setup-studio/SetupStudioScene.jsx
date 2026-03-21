@@ -26,10 +26,30 @@ const overlayTransition = {
   ease: [0.22, 1, 0.36, 1],
 };
 
+function n(value, fallback = 0) {
+  const x = Number(value);
+  return Number.isFinite(x) ? x : fallback;
+}
+
+function truncateText(value = "", max = 96) {
+  const x = s(value);
+  if (!x) return "";
+  if (x.length <= max) return x;
+  return `${x.slice(0, max - 1)}…`;
+}
+
+function firstNonEmpty(...values) {
+  for (const value of values) {
+    const x = s(value);
+    if (x) return x;
+  }
+  return "";
+}
+
 function findProfileRowValue(rows = [], wantedKeys = []) {
   const normalizedWanted = wantedKeys.map((x) => s(x).toLowerCase());
 
-  const match = rows.find(([label]) =>
+  const match = arr(rows).find(([label]) =>
     normalizedWanted.includes(s(label).toLowerCase())
   );
 
@@ -43,21 +63,34 @@ function normalizeStageCandidate(
   const x = s(stage).toLowerCase();
 
   if (x === "scanning") return "scanning";
-  if (x === "ready" || x === "launch" || x === "complete") return "ready";
-  if (x === "service" || x === "services") return "service";
+
+  if (x === "ready" || x === "launch" || x === "complete") {
+    if (hasServices) return "service";
+    if (hasKnowledge) return "knowledge";
+    if (hasIdentityData || hasScanEvidence) return "identity";
+    return "entry";
+  }
+
+  if (x === "service" || x === "services") {
+    if (hasIdentityData || hasScanEvidence || hasServices) return "service";
+    return "entry";
+  }
+
   if (x === "knowledge" || x === "review") {
     if (hasKnowledge) return "knowledge";
     if (hasServices) return "service";
     if (hasIdentityData || hasScanEvidence) return "identity";
     return "entry";
   }
+
   if (x === "identity" || x === "business" || x === "business_profile") {
     return hasIdentityData || hasScanEvidence ? "identity" : "entry";
   }
+
   if (x === "entry" || x === "source") return "entry";
 
-  if (hasServices) return "ready";
   if (hasKnowledge) return "knowledge";
+  if (hasServices) return "service";
   if (hasIdentityData || hasScanEvidence) return "identity";
   return "entry";
 }
@@ -133,7 +166,11 @@ function hasMeaningfulIdentityData({
     s(m.companySummaryLong) ||
     s(m.description) ||
     s(bf.companyName) ||
-    s(bf.description)
+    s(bf.description) ||
+    s(bf.websiteUrl) ||
+    s(bf.primaryPhone) ||
+    s(bf.primaryEmail) ||
+    s(bf.primaryAddress)
   );
 }
 
@@ -145,7 +182,9 @@ function buildRecoveredStage({
   hasServices,
   hasIdentityData,
   hasReviewPayload,
+  hasVisibleResults,
   studioProgress,
+  discoveryState,
 }) {
   if (importingWebsite) return "scanning";
 
@@ -157,7 +196,15 @@ function buildRecoveredStage({
     return "ready";
   }
 
+  const hasFreshScanSession = !!(
+    s(discoveryState?.requestId || discoveryState?.request_id) ||
+    s(discoveryState?.sourceRunId || discoveryState?.source_run_id) ||
+    s(discoveryState?.snapshotId || discoveryState?.snapshot_id) ||
+    hasScannedUrl
+  );
+
   const hasScanEvidence =
+    hasVisibleResults ||
     scanSucceeded ||
     hasScannedUrl ||
     hasIdentityData ||
@@ -165,6 +212,12 @@ function buildRecoveredStage({
     hasKnowledge ||
     hasServices ||
     !!nextStudioStage;
+
+  const shouldPreferPostScanReviewFlow = hasFreshScanSession && hasScanEvidence;
+
+  if (shouldPreferPostScanReviewFlow) {
+    return "identity";
+  }
 
   if (!hasScanEvidence) {
     return "entry";
@@ -179,8 +232,8 @@ function buildRecoveredStage({
     });
   }
 
-  if (hasServices) return "ready";
   if (hasKnowledge) return "knowledge";
+  if (hasServices) return "service";
   if (hasIdentityData || hasReviewPayload || scanSucceeded || hasScannedUrl) {
     return "identity";
   }
@@ -266,6 +319,11 @@ export default function SetupStudioScene({
   serviceSuggestionTitle,
   studioProgress,
   services,
+  reviewSources = [],
+  reviewEvents = [],
+  hasVisibleResults = false,
+  visibleKnowledgeCount = 0,
+  visibleServiceCount = 0,
   onSetBusinessField,
   onSetManualSection,
   onSetDiscoveryField,
@@ -288,6 +346,8 @@ export default function SetupStudioScene({
   const safeServices = arr(services);
   const safeDiscoveryProfileRows = arr(discoveryProfileRows);
   const safeWarnings = arr(discoveryState?.warnings).filter(Boolean);
+  const safeReviewSources = arr(reviewSources);
+  const safeReviewEvents = arr(reviewEvents);
 
   const scanSucceeded = isSuccessMode(discoveryState?.mode);
   const hasScannedUrl = !!s(
@@ -298,14 +358,7 @@ export default function SetupStudioScene({
       discoveryState?.source_url
   );
 
-  const draftQueue = arr(
-    reviewDraft?.reviewQueue || reviewDraft?.review_queue
-  );
-
-  const hasKnowledge =
-    draftQueue.length > 0 ||
-    safeKnowledgePreview.length > 0 ||
-    safeKnowledgeItems.length > 0;
+  const draftQueue = arr(reviewDraft?.reviewQueue || reviewDraft?.review_queue);
 
   const intakeItems =
     safeKnowledgeItems.length > 0
@@ -314,7 +367,14 @@ export default function SetupStudioScene({
         ? draftQueue
         : safeKnowledgePreview;
 
-  const hasServices = safeServices.length > 0;
+  const hasKnowledge =
+    safeKnowledgeItems.length > 0 ||
+    draftQueue.length > 0 ||
+    safeKnowledgePreview.length > 0 ||
+    n(visibleKnowledgeCount) > 0;
+
+  const hasServices =
+    safeServices.length > 0 || n(visibleServiceCount) > 0;
 
   const hasReviewPayload = hasMeaningfulReviewDraft(reviewDraft);
 
@@ -350,7 +410,9 @@ export default function SetupStudioScene({
         hasServices,
         hasIdentityData,
         hasReviewPayload,
+        hasVisibleResults,
         studioProgress,
+        discoveryState,
       }),
     [
       importingWebsite,
@@ -360,7 +422,9 @@ export default function SetupStudioScene({
       hasServices,
       hasIdentityData,
       hasReviewPayload,
+      hasVisibleResults,
       studioProgress,
+      discoveryState,
     ]
   );
 
@@ -380,7 +444,11 @@ export default function SetupStudioScene({
     !!s(currentTitle) ||
     !!s(currentDescription) ||
     !!s(businessForm?.companyName) ||
-    !!s(businessForm?.description);
+    !!s(businessForm?.description) ||
+    !!s(businessForm?.websiteUrl) ||
+    !!s(businessForm?.primaryPhone) ||
+    !!s(businessForm?.primaryEmail) ||
+    !!s(businessForm?.primaryAddress);
 
   const knowledgeContentAvailable = intakeItems.length > 0;
 
@@ -400,6 +468,55 @@ export default function SetupStudioScene({
       : "";
 
   const hasOverlay = !!activeOverlay;
+
+  const sourceLabel = s(
+    discoveryState?.sourceLabel ||
+      discoveryState?.source_label ||
+      (s(discoveryState?.lastSourceType || discoveryState?.last_source_type) ===
+      "google_maps"
+        ? "Google Maps"
+        : s(discoveryState?.lastSourceType || discoveryState?.last_source_type) ===
+            "website"
+          ? "Website"
+          : "")
+  );
+
+  const primarySourceUrl = s(
+    discoveryState?.lastUrl ||
+      discoveryState?.last_url ||
+      discoveryState?.url ||
+      discoveryState?.sourceUrl ||
+      discoveryState?.source_url
+  );
+
+  const resultKnowledgeCount = Math.max(
+    n(visibleKnowledgeCount),
+    safeKnowledgeItems.length,
+    safeKnowledgePreview.length
+  );
+
+  const resultServiceCount = Math.max(
+    n(visibleServiceCount),
+    safeServices.length
+  );
+
+  const resultSourceCount = safeReviewSources.length + (primarySourceUrl ? 1 : 0);
+  const resultEventCount = safeReviewEvents.length;
+
+  const summaryVisible = !(
+    stage === "entry" ||
+    (stage === "scanning" && !hasVisibleResults)
+  ) && !!(
+    primarySourceUrl ||
+    sourceLabel ||
+    hasVisibleResults ||
+    resultKnowledgeCount > 0 ||
+    resultServiceCount > 0 ||
+    resultSourceCount > 0 ||
+    resultEventCount > 0 ||
+    safeWarnings.length > 0 ||
+    s(discoveryState?.message)
+  );
 
   useEffect(() => {
     if (!hasOverlay) {
@@ -608,21 +725,20 @@ export default function SetupStudioScene({
     discoveryModeLabel,
   });
 
-  const sourceLabel = s(
-    discoveryState?.sourceLabel ||
-      discoveryState?.source_label ||
-      (s(discoveryState?.lastSourceType || discoveryState?.last_source_type) === "google_maps"
-        ? "Google Maps"
-        : s(discoveryState?.lastSourceType || discoveryState?.last_source_type) === "website"
-          ? "Website"
-          : "")
-  );
-
   const stageMeta = obj(meta);
   const stageWarnings = safeWarnings;
   const nextStudioStage = s(
     stageMeta?.nextStudioStage || studioProgress?.nextStudioStage || ""
   );
+
+  const reviewStatusLabel = firstNonEmpty(
+    discoveryState?.reviewSessionStatus,
+    reviewDraft?.session?.status,
+    reviewDraft?.status
+  );
+
+  const firstReviewSource = obj(safeReviewSources[0]);
+  const firstEvent = obj(safeReviewEvents[0]);
 
   if (loading) {
     return (
@@ -649,6 +765,7 @@ export default function SetupStudioScene({
       data-has-services={hasServices ? "yes" : "no"}
       data-overlay-intent={overlayIntent || "none"}
       data-overlay-open={hasOverlay ? "yes" : "no"}
+      data-visible-results={hasVisibleResults ? "yes" : "no"}
     >
       <div
         aria-hidden={hasOverlay ? "true" : "false"}
@@ -659,7 +776,7 @@ export default function SetupStudioScene({
         <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/72 backdrop-blur-xl">
           <div className="mx-auto flex h-[72px] w-full max-w-[1600px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-10">
             <div className="flex min-w-0 items-center gap-3">
-              <span className="h-4.5 w-4.5 rounded-full bg-[radial-gradient(circle_at_35%_35%,rgba(255,255,255,.95),rgba(191,219,254,.95)_40%,rgba(148,163,184,.85)_70%,rgba(148,163,184,.18)_100%)] shadow-[0_0_0_1px_rgba(148,163,184,.18),0_10px_30px_rgba(15,23,42,.08)]" />
+              <span className="h-4 w-4 rounded-full bg-[radial-gradient(circle_at_35%_35%,rgba(255,255,255,.95),rgba(191,219,254,.95)_40%,rgba(148,163,184,.85)_70%,rgba(148,163,184,.18)_100%)] shadow-[0_0_0_1px_rgba(148,163,184,.18),0_10px_30px_rgba(15,23,42,.08)]" />
               <span className="truncate text-[14px] font-semibold tracking-[0.26em] text-slate-950">
                 AI SETUP STUDIO
               </span>
@@ -758,6 +875,152 @@ export default function SetupStudioScene({
                   {error}
                 </span>
               ) : null}
+            </div>
+          </div>
+        ) : null}
+
+        {summaryVisible ? (
+          <div className="border-b border-slate-200/60 bg-[linear-gradient(180deg,rgba(255,255,255,.86),rgba(248,250,252,.82))] backdrop-blur-sm">
+            <div className="mx-auto w-full max-w-[1600px] px-4 py-4 sm:px-6 lg:px-10">
+              <div className="grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,.85fr)_minmax(0,1fr)]">
+                <div className="rounded-[22px] border border-slate-200/70 bg-white/86 p-4 shadow-[0_12px_40px_rgba(15,23,42,.05)]">
+                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-600">
+                      Analysis snapshot
+                    </span>
+                    {sourceLabel ? (
+                      <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700">
+                        {sourceLabel}
+                      </span>
+                    ) : null}
+                    {reviewStatusLabel ? (
+                      <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700">
+                        {reviewStatusLabel}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="text-sm font-semibold text-slate-950">
+                      {resolvedCurrentTitle}
+                    </div>
+
+                    <p className="text-sm leading-6 text-slate-600">
+                      {truncateText(
+                        s(discoveryState?.message) ||
+                          resolvedCurrentDescription,
+                        220
+                      )}
+                    </p>
+
+                    {primarySourceUrl ? (
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-xs text-slate-600">
+                        <span className="font-medium text-slate-700">URL:</span>{" "}
+                        <span className="break-all">{primarySourceUrl}</span>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="rounded-[22px] border border-slate-200/70 bg-white/86 p-4 shadow-[0_12px_40px_rgba(15,23,42,.05)]">
+                  <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Extracted signals
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3">
+                      <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">
+                        Knowledge
+                      </div>
+                      <div className="mt-1 text-xl font-semibold text-slate-950">
+                        {resultKnowledgeCount}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3">
+                      <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">
+                        Services
+                      </div>
+                      <div className="mt-1 text-xl font-semibold text-slate-950">
+                        {resultServiceCount}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3">
+                      <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">
+                        Sources
+                      </div>
+                      <div className="mt-1 text-xl font-semibold text-slate-950">
+                        {resultSourceCount}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3">
+                      <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">
+                        Events
+                      </div>
+                      <div className="mt-1 text-xl font-semibold text-slate-950">
+                        {resultEventCount}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-[22px] border border-slate-200/70 bg-white/86 p-4 shadow-[0_12px_40px_rgba(15,23,42,.05)]">
+                  <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Evidence
+                  </div>
+
+                  <div className="space-y-2">
+                    {firstReviewSource?.label || firstReviewSource?.url ? (
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-2.5">
+                        <div className="text-xs font-medium text-slate-700">
+                          {s(firstReviewSource.label || firstReviewSource.sourceType || "Source")}
+                        </div>
+                        {firstReviewSource.url ? (
+                          <div className="mt-1 break-all text-xs text-slate-500">
+                            {truncateText(firstReviewSource.url, 140)}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : primarySourceUrl ? (
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-2.5">
+                        <div className="text-xs font-medium text-slate-700">
+                          Primary source
+                        </div>
+                        <div className="mt-1 break-all text-xs text-slate-500">
+                          {truncateText(primarySourceUrl, 140)}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {firstEvent?.message || firstEvent?.title ? (
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-2.5">
+                        <div className="text-xs font-medium text-slate-700">
+                          {s(firstEvent.title || firstEvent.type || "Latest event")}
+                        </div>
+                        <div className="mt-1 text-xs text-slate-500">
+                          {truncateText(
+                            s(firstEvent.message || firstEvent.status || ""),
+                            140
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {safeWarnings[0] ? (
+                      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2.5">
+                        <div className="text-xs font-medium text-amber-800">
+                          Warning
+                        </div>
+                        <div className="mt-1 text-xs text-amber-700">
+                          {truncateText(safeWarnings[0], 140)}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         ) : null}

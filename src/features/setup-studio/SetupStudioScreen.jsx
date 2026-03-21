@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getAppBootstrap } from "../../api/app.js";
 import {
@@ -140,7 +140,12 @@ function normalizeIncomingSourceType(value = "") {
   const x = s(value).toLowerCase().replace(/[\s-]+/g, "_");
 
   if (x === "website" || x === "site" || x === "web") return "website";
-  if (x === "google_maps" || x === "googlemaps" || x === "maps" || x === "gmaps") {
+  if (
+    x === "google_maps" ||
+    x === "googlemaps" ||
+    x === "maps" ||
+    x === "gmaps"
+  ) {
     return "google_maps";
   }
 
@@ -232,7 +237,12 @@ function formFromProfile(profile = {}, prev = {}) {
   return {
     ...prev,
     companyName: s(
-      x.companyName || x.company_name || x.displayName || x.display_name || x.name || prev.companyName
+      x.companyName ||
+        x.company_name ||
+        x.displayName ||
+        x.display_name ||
+        x.name ||
+        prev.companyName
     ),
     description: s(
       x.summaryShort ||
@@ -278,11 +288,14 @@ function normalizeDraftServiceItem(item = {}) {
     key: s(x.key),
     title: s(x.title || x.name || x.label),
     valueText: s(x.description || x.valueText || x.value_text),
+    description: s(x.description || x.valueText || x.value_text),
     category: s(x.category || "service"),
     sourceType: s(x.sourceType || x.source_type),
     status: s(x.status || "pending"),
     confidence:
-      typeof x.confidence === "number" ? x.confidence : Number(x.confidence || 0) || 0,
+      typeof x.confidence === "number"
+        ? x.confidence
+        : Number(x.confidence || 0) || 0,
     confidenceLabel: s(x.confidenceLabel || x.confidence_label),
     evidence: arr(x.evidence),
     metadataJson: obj(x.metadataJson || x.metadata_json),
@@ -309,12 +322,118 @@ function normalizeDraftKnowledgeItem(item = {}) {
     sourceType: s(x.sourceType || x.source_type),
     status: s(x.status || "pending"),
     confidence:
-      typeof x.confidence === "number" ? x.confidence : Number(x.confidence || 0) || 0,
+      typeof x.confidence === "number"
+        ? x.confidence
+        : Number(x.confidence || 0) || 0,
     confidenceLabel: s(x.confidenceLabel || x.confidence_label),
     evidence: arr(x.evidence),
     sourceEvidenceJson: arr(x.evidence),
     metadataJson: obj(x.metadataJson || x.metadata_json),
     origin: s(x.origin || "setup_review_session"),
+  };
+}
+
+function normalizeVisibleKnowledgeItem(item = {}) {
+  const x = obj(item);
+  const fallbackEvidence = arr(x.evidence || x.sourceEvidenceJson || x.source_evidence_json);
+  const helperEvidence = arr(evidenceList(x));
+  const allEvidence = fallbackEvidence.length ? fallbackEvidence : helperEvidence;
+
+  return {
+    id: s(x.id || x.candidateId || x.key || x.title),
+    candidateId: s(x.candidateId || x.id),
+    key: s(x.key || x.itemKey || x.item_key),
+    title: s(x.title || x.label || candidateTitle(x)),
+    valueText: s(
+      x.valueText ||
+        x.value_text ||
+        x.normalizedText ||
+        x.normalized_text ||
+        x.description ||
+        candidateValue(x)
+    ),
+    category: s(x.category || candidateCategory(x) || "general"),
+    sourceType: s(x.sourceType || x.source_type),
+    source: s(x.source || candidateSource(x) || x.sourceType || x.source_type),
+    status: s(x.status || "pending"),
+    confidence:
+      typeof x.confidence === "number"
+        ? x.confidence
+        : Number(x.confidence || candidateConfidence(x) || 0) || 0,
+    confidenceLabel: s(x.confidenceLabel || x.confidence_label),
+    evidence: allEvidence,
+    evidenceUrl: s(
+      allEvidence[0]?.url ||
+        allEvidence[0]?.source_url ||
+        allEvidence[0]?.link ||
+        allEvidence[0]?.pageUrl
+    ),
+    metadataJson: obj(x.metadataJson || x.metadata_json),
+    origin: s(x.origin || "setup_review_session"),
+  };
+}
+
+function normalizeVisibleServiceItem(item = {}) {
+  const x = obj(item);
+
+  return {
+    id: s(x.id || x.serviceId || x.key || x.title || x.name),
+    key:
+      s(x.key) ||
+      safeDraftKey(s(x.title || x.name || x.label), "service"),
+    title: s(x.title || x.name || x.label),
+    valueText: s(x.valueText || x.description || x.summary || x.notes),
+    description: s(x.description || x.valueText || x.summary || x.notes),
+    category: s(x.category || "service"),
+    sourceType: s(x.sourceType || x.source_type),
+    status: s(x.status || "pending"),
+    confidence:
+      typeof x.confidence === "number"
+        ? x.confidence
+        : Number(x.confidence || 0) || 0,
+    confidenceLabel: s(x.confidenceLabel || x.confidence_label),
+    evidence: arr(x.evidence),
+    metadataJson: obj(x.metadataJson || x.metadata_json),
+    origin: s(x.origin || "setup_review_session"),
+  };
+}
+
+function normalizeVisibleSourceItem(item = {}) {
+  const x = obj(item);
+
+  return {
+    id: s(
+      x.id || x.sourceId || x.source_id || x.key || x.url || x.sourceUrl
+    ),
+    sourceType: s(x.sourceType || x.source_type || x.type),
+    label: s(
+      x.label ||
+        x.title ||
+        x.name ||
+        x.sourceLabel ||
+        x.source_label ||
+        x.sourceType ||
+        x.source_type
+    ),
+    url: s(x.url || x.sourceUrl || x.source_url),
+    status: s(x.status),
+    runId: s(x.runId || x.run_id),
+    snapshotId: s(x.snapshotId || x.snapshot_id),
+    metadataJson: obj(x.metadataJson || x.metadata_json || x.metadata),
+  };
+}
+
+function normalizeVisibleEventItem(item = {}) {
+  const x = obj(item);
+
+  return {
+    id: s(x.id || x.eventId || x.event_id || x.createdAt || x.type),
+    type: s(x.type),
+    title: s(x.title || x.name || x.type),
+    message: s(x.message || x.description || x.summary),
+    status: s(x.status),
+    createdAt: s(x.createdAt || x.created_at),
+    metadataJson: obj(x.metadataJson || x.metadata_json || x.metadata),
   };
 }
 
@@ -359,7 +478,11 @@ function mapCurrentReviewToLegacyDraft(review = {}) {
   }).length;
 
   return {
-    sourceId: s(session?.primarySourceId || sourceSummary?.latestSourceId || latestImport?.sourceId),
+    sourceId: s(
+      session?.primarySourceId ||
+        sourceSummary?.latestSourceId ||
+        latestImport?.sourceId
+    ),
     sourceRunId: s(sourceSummary?.latestRunId || latestImport?.runId),
     snapshotId: s(draft?.lastSnapshotId),
     quickSummary: s(
@@ -412,18 +535,23 @@ function buildManualSectionsFromReview(review = {}) {
 }
 
 function safeDraftKey(value = "", fallback = "item") {
-  return s(value)
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "")
-    .slice(0, 80) || fallback;
+  return (
+    s(value)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 80) || fallback
+  );
 }
 
 function mergeItemsByKey(existing = [], incoming = [], keys = ["key", "title", "category"]) {
   const map = new Map();
 
   const buildKey = (item = {}) =>
-    keys.map((key) => s(item?.[key]).toLowerCase()).filter(Boolean).join("|");
+    keys
+      .map((key) => s(item?.[key]).toLowerCase())
+      .filter(Boolean)
+      .join("|");
 
   for (const item of arr(existing)) {
     const stableKey = buildKey(item) || JSON.stringify(item);
@@ -518,7 +646,12 @@ function buildKnowledgeDraftItemsFromManual({
 }) {
   const preserved = arr(existing).filter((item) => {
     const category = s(item.category).toLowerCase();
-    return category !== "faq" && category !== "faqs" && category !== "policy" && category !== "policies";
+    return (
+      category !== "faq" &&
+      category !== "faqs" &&
+      category !== "policy" &&
+      category !== "policies"
+    );
   });
 
   const faqItems = parseFaqsText(faqsText).map((item) => ({
@@ -567,9 +700,7 @@ function buildBusinessProfilePatch({
     language: s(businessForm.language || "az"),
     timezone: s(businessForm.timezone || "Asia/Baku"),
     websiteUrl: s(
-      businessForm.websiteUrl ||
-        existing.websiteUrl ||
-        discoveryState?.lastUrl
+      businessForm.websiteUrl || existing.websiteUrl || discoveryState?.lastUrl
     ),
     primaryPhone: s(businessForm.primaryPhone),
     primaryEmail: s(businessForm.primaryEmail),
@@ -605,7 +736,13 @@ function hasMeaningfulProfile(profile = {}) {
   const x = obj(profile);
   return !!(
     extractProfileName(x) ||
-    s(x.summaryShort || x.summary_short || x.description || x.summaryLong || x.summary_long) ||
+    s(
+      x.summaryShort ||
+        x.summary_short ||
+        x.description ||
+        x.summaryLong ||
+        x.summary_long
+    ) ||
     s(x.websiteUrl || x.website_url) ||
     s(x.primaryPhone || x.primary_phone) ||
     s(x.primaryEmail || x.primary_email) ||
@@ -618,14 +755,9 @@ function isPlaceholderBusinessName(value = "") {
 
   if (!x) return true;
 
-  return [
-    "google maps",
-    "maps",
-    "website",
-    "source",
-    "business",
-    "company",
-  ].includes(x);
+  return ["google maps", "maps", "website", "source", "business", "company"].includes(
+    x
+  );
 }
 
 function shouldPreferCandidateCompanyName(currentValue = "", nextValue = "") {
@@ -634,7 +766,9 @@ function shouldPreferCandidateCompanyName(currentValue = "", nextValue = "") {
 
   if (!next) return false;
   if (!current) return true;
-  if (isPlaceholderBusinessName(current) && !isPlaceholderBusinessName(next)) return true;
+  if (isPlaceholderBusinessName(current) && !isPlaceholderBusinessName(next)) {
+    return true;
+  }
   return false;
 }
 
@@ -688,8 +822,129 @@ function chooseBestProfileForForm(...profiles) {
   return {};
 }
 
+function deriveVisibleKnowledgeItems({
+  knowledgeCandidates = [],
+  reviewDraft = {},
+  currentReview = {},
+  discoveryState = {},
+}) {
+  const apiItems = arr(knowledgeCandidates).map((item) =>
+    normalizeVisibleKnowledgeItem(item)
+  );
+
+  const reviewQueueItems = arr(reviewDraft?.reviewQueue).map((item) =>
+    normalizeVisibleKnowledgeItem(item)
+  );
+
+  const currentDraftItems = arr(currentReview?.draft?.knowledgeItems).map((item) =>
+    normalizeVisibleKnowledgeItem(item)
+  );
+
+  const snapshotItems = arr(
+    discoveryState?.snapshot?.knowledgeItems || discoveryState?.snapshot?.items
+  ).map((item) => normalizeVisibleKnowledgeItem(item));
+
+  const merged = mergeItemsByKey(
+    apiItems,
+    [...reviewQueueItems, ...currentDraftItems, ...snapshotItems],
+    ["candidateId", "key", "title", "category"]
+  );
+
+  return merged.map((item) => normalizeVisibleKnowledgeItem(item));
+}
+
+function deriveVisibleServiceItems({
+  services = [],
+  reviewDraft = {},
+  currentReview = {},
+  discoveryState = {},
+}) {
+  const savedServices = arr(services).map((item) =>
+    normalizeVisibleServiceItem(item)
+  );
+
+  const sectionServices = arr(reviewDraft?.sections?.services).map((item) =>
+    normalizeVisibleServiceItem(item)
+  );
+
+  const currentDraftServices = arr(currentReview?.draft?.services).map((item) =>
+    normalizeVisibleServiceItem(item)
+  );
+
+  const snapshotServices = arr(
+    discoveryState?.snapshot?.services ||
+      discoveryState?.profile?.services ||
+      discoveryState?.signals?.sourceFusion?.profile?.services ||
+      discoveryState?.signals?.website?.offerings?.services
+  ).map((item) =>
+    typeof item === "string"
+      ? normalizeVisibleServiceItem({ title: item, description: item })
+      : normalizeVisibleServiceItem(item)
+  );
+
+  const merged = mergeItemsByKey(
+    savedServices,
+    [...sectionServices, ...currentDraftServices, ...snapshotServices],
+    ["id", "key", "title", "category"]
+  );
+
+  return merged.map((item) => normalizeVisibleServiceItem(item));
+}
+
+function deriveVisibleSources({ currentReview = {}, discoveryState = {} }) {
+  const reviewSources = arr(currentReview?.sources).map((item) =>
+    normalizeVisibleSourceItem(item)
+  );
+
+  const intakeSources = arr(discoveryState?.intakeContext?.sources).map((item) =>
+    normalizeVisibleSourceItem(item)
+  );
+
+  const primarySource = obj(discoveryState?.intakeContext?.primarySource);
+  const directStateSource =
+    s(discoveryState?.lastUrl) || s(discoveryState?.sourceId)
+      ? [
+          normalizeVisibleSourceItem({
+            id: discoveryState?.sourceId,
+            sourceType: discoveryState?.lastSourceType,
+            label: discoveryState?.sourceLabel,
+            url: discoveryState?.lastUrl,
+            runId: discoveryState?.sourceRunId,
+            snapshotId: discoveryState?.snapshotId,
+            status: discoveryState?.mode,
+          }),
+        ]
+      : [];
+
+  const incoming = [
+    ...intakeSources,
+    ...(Object.keys(primarySource).length
+      ? [normalizeVisibleSourceItem(primarySource)]
+      : []),
+    ...directStateSource,
+  ];
+
+  const merged = mergeItemsByKey(reviewSources, incoming, [
+    "id",
+    "sourceType",
+    "url",
+    "label",
+  ]);
+
+  return merged
+    .map((item) => normalizeVisibleSourceItem(item))
+    .filter((item) => item.id || item.url || item.label || item.sourceType);
+}
+
+function deriveVisibleEvents(currentReview = {}) {
+  return arr(currentReview?.events)
+    .map((item) => normalizeVisibleEventItem(item))
+    .filter((item) => item.id || item.type || item.message || item.createdAt);
+}
+
 export default function SetupStudioScreen() {
   const navigate = useNavigate();
+  const autoRevealRef = useRef("");
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -766,6 +1021,8 @@ export default function SetupStudioScreen() {
     snapshotId: "",
     reviewSessionId: "",
     reviewSessionStatus: "",
+    hasResults: false,
+    resultCount: 0,
   });
 
   const [knowledgeCandidates, setKnowledgeCandidates] = useState([]);
@@ -843,15 +1100,18 @@ export default function SetupStudioScreen() {
     });
 
     setManualSections((prev) => ({
-      servicesText: preserveBusinessForm && s(prev.servicesText)
-        ? s(prev.servicesText)
-        : s(nextManualSections.servicesText),
-      faqsText: preserveBusinessForm && s(prev.faqsText)
-        ? s(prev.faqsText)
-        : s(nextManualSections.faqsText),
-      policiesText: preserveBusinessForm && s(prev.policiesText)
-        ? s(prev.policiesText)
-        : s(nextManualSections.policiesText),
+      servicesText:
+        preserveBusinessForm && s(prev.servicesText)
+          ? s(prev.servicesText)
+          : s(nextManualSections.servicesText),
+      faqsText:
+        preserveBusinessForm && s(prev.faqsText)
+          ? s(prev.faqsText)
+          : s(nextManualSections.faqsText),
+      policiesText:
+        preserveBusinessForm && s(prev.policiesText)
+          ? s(prev.policiesText)
+          : s(nextManualSections.policiesText),
     }));
 
     return {
@@ -898,12 +1158,13 @@ export default function SetupStudioScreen() {
 
       setError("");
 
-      const [boot, knowledgePayload, servicesPayload, reviewPayload] = await Promise.all([
-        getAppBootstrap(),
-        getKnowledgeCandidates(),
-        getSetupServices(),
-        getCurrentSetupReview({ eventLimit: 30 }).catch(() => ({ review: {} })),
-      ]);
+      const [boot, knowledgePayload, servicesPayload, reviewPayload] =
+        await Promise.all([
+          getAppBootstrap(),
+          getKnowledgeCandidates(),
+          getSetupServices(),
+          getCurrentSetupReview({ eventLimit: 30 }).catch(() => ({ review: {} })),
+        ]);
 
       const workspace = obj(boot?.workspace);
       const setup = obj(boot?.setup);
@@ -922,10 +1183,7 @@ export default function SetupStudioScreen() {
       const legacyDraft = mapCurrentReviewToLegacyDraft(reviewState);
       setReviewDraft(legacyDraft);
 
-      const baseProfile = chooseBestProfileForForm(
-        legacyDraft?.overview,
-        profile
-      );
+      const baseProfile = chooseBestProfileForForm(legacyDraft?.overview, profile);
 
       setBusinessForm((prev) => {
         if (!preserveBusinessForm) {
@@ -1016,7 +1274,10 @@ export default function SetupStudioScreen() {
   useEffect(() => {
     if (meta.setupCompleted) return;
 
-    if (s(meta.nextStudioStage).toLowerCase() === "knowledge" && knowledgeCandidates.length > 0) {
+    if (
+      s(meta.nextStudioStage).toLowerCase() === "knowledge" &&
+      knowledgeCandidates.length > 0
+    ) {
       setShowKnowledge(true);
     }
   }, [meta.nextStudioStage, meta.setupCompleted, knowledgeCandidates.length]);
@@ -1078,6 +1339,8 @@ export default function SetupStudioScreen() {
         message: scanStartLabel(sourceType),
         warnings: [],
         shouldReview: false,
+        hasResults: false,
+        resultCount: 0,
       }));
 
       const result = await importSourceForSetup({
@@ -1118,27 +1381,68 @@ export default function SetupStudioScreen() {
         });
       }
 
-      const resultWarnings = arr(result?.warnings).map((x) => s(x)).filter(Boolean);
+      const resultWarnings = arr(result?.warnings)
+        .map((x) => s(x))
+        .filter(Boolean);
 
-      const sourceId = s(
-        result?.source?.id ||
-          legacyImportedDraft?.sourceId
+      const sourceId = s(result?.source?.id || legacyImportedDraft?.sourceId);
+      const sourceRunId = s(result?.run?.id || legacyImportedDraft?.sourceRunId);
+      const snapshotId = s(legacyImportedDraft?.snapshotId || result?.snapshot?.id);
+
+      const immediateDiscoveryState = {
+        lastUrl: sourceUrl,
+        lastSourceType: sourceType,
+        sourceLabel: s(
+          result?.sourceLabel ||
+            (sourceType === "google_maps" ? "Google Maps" : "Website")
+        ),
+        intakeContext: obj(result?.intakeContext),
+        snapshot: obj(result?.snapshot),
+        profile: discoveredProfile,
+        signals: obj(result?.signals),
+        sourceId,
+        sourceRunId,
+        snapshotId,
+      };
+
+      const importedVisibleKnowledgeItems = deriveVisibleKnowledgeItems({
+        knowledgeCandidates: arr(result?.candidates || result?.knowledgeItems),
+        reviewDraft: legacyImportedDraft,
+        currentReview: importedReview,
+        discoveryState: immediateDiscoveryState,
+      });
+
+      const importedVisibleServiceItems = deriveVisibleServiceItems({
+        services: arr(result?.services),
+        reviewDraft: legacyImportedDraft,
+        currentReview: importedReview,
+        discoveryState: immediateDiscoveryState,
+      });
+
+      const importedVisibleSources = deriveVisibleSources({
+        currentReview: importedReview,
+        discoveryState: immediateDiscoveryState,
+      });
+
+      const importedProfileRows = profilePreviewRows(
+        chooseBestProfileForForm(bestIncomingProfile, reviewBackedProfile)
       );
-      const sourceRunId = s(
-        result?.run?.id ||
-          legacyImportedDraft?.sourceRunId
-      );
-      const snapshotId = s(
-        legacyImportedDraft?.snapshotId ||
-          result?.snapshot?.id
-      );
+
+      const hasImmediateVisibleResults =
+        importedVisibleKnowledgeItems.length > 0 ||
+        importedVisibleServiceItems.length > 0 ||
+        importedVisibleSources.length > 0 ||
+        importedProfileRows.length > 0 ||
+        resultWarnings.length > 0 ||
+        hasMeaningfulProfile(bestIncomingProfile);
 
       setDiscoveryState({
         mode: s(result?.mode) || "success",
         lastUrl: sourceUrl,
         lastSourceType: sourceType,
         sourceLabel: s(
-          result?.sourceLabel || (sourceType === "google_maps" ? "Google Maps" : "Website")
+          result?.sourceLabel ||
+            (sourceType === "google_maps" ? "Google Maps" : "Website")
         ),
         message:
           resultWarnings.length > 0
@@ -1157,7 +1461,15 @@ export default function SetupStudioScreen() {
         sourceRunId,
         snapshotId,
         reviewSessionId: s(result?.reviewSessionId || importedReview?.session?.id),
-        reviewSessionStatus: s(result?.reviewSessionStatus || importedReview?.session?.status),
+        reviewSessionStatus: s(
+          result?.reviewSessionStatus || importedReview?.session?.status
+        ),
+        hasResults: hasImmediateVisibleResults,
+        resultCount:
+          importedVisibleKnowledgeItems.length +
+          importedVisibleServiceItems.length +
+          importedVisibleSources.length +
+          importedProfileRows.length,
       });
 
       const refreshResult = await refreshAndMaybeRouteHome({
@@ -1173,10 +1485,18 @@ export default function SetupStudioScreen() {
           !!result?.shouldReview ||
           Number(result?.candidateCount || 0) > 0 ||
           refreshedPendingKnowledge.length > 0 ||
-          s(refreshResult?.snapshot?.meta?.nextStudioStage).toLowerCase() === "knowledge";
+          importedVisibleKnowledgeItems.length > 0 ||
+          importedVisibleServiceItems.length > 0 ||
+          s(refreshResult?.snapshot?.meta?.nextStudioStage).toLowerCase() ===
+            "knowledge";
+
+        const shouldOpenRefine =
+          hasImmediateVisibleResults ||
+          hasMeaningfulProfile(bestIncomingProfile) ||
+          importedProfileRows.length > 0;
 
         setShowKnowledge(shouldOpenKnowledge);
-        setShowRefine(true);
+        setShowRefine(shouldOpenRefine);
       }
     } catch (e2) {
       const message = String(e2?.message || e2 || "Source scan alınmadı.");
@@ -1187,6 +1507,8 @@ export default function SetupStudioScreen() {
         lastSourceType: sourceType,
         sourceLabel: sourceType === "google_maps" ? "Google Maps" : "Website",
         message,
+        hasResults: false,
+        resultCount: 0,
       }));
       setError(message);
     } finally {
@@ -1258,7 +1580,9 @@ export default function SetupStudioScreen() {
 
       return { ok: true };
     } catch (e2) {
-      setError(String(e2?.message || e2 || "Business twin finalize edilə bilmədi."));
+      setError(
+        String(e2?.message || e2 || "Business twin finalize edilə bilmədi.")
+      );
       return { ok: false };
     } finally {
       setSavingBusiness(false);
@@ -1275,7 +1599,9 @@ export default function SetupStudioScreen() {
 
       await approveKnowledgeCandidate(id, {});
       await loadCurrentReview({ preserveBusinessForm: true });
-      const refreshed = await refreshAndMaybeRouteHome({ preserveBusinessForm: true });
+      const refreshed = await refreshAndMaybeRouteHome({
+        preserveBusinessForm: true,
+      });
 
       if (!refreshed?.routed) {
         const nextStage = s(refreshed?.snapshot?.meta?.nextStudioStage).toLowerCase();
@@ -1303,10 +1629,14 @@ export default function SetupStudioScreen() {
 
       await rejectKnowledgeCandidate(id, {});
       await loadCurrentReview({ preserveBusinessForm: true });
-      const refreshed = await refreshAndMaybeRouteHome({ preserveBusinessForm: true });
+      const refreshed = await refreshAndMaybeRouteHome({
+        preserveBusinessForm: true,
+      });
 
       if (!refreshed?.routed) {
-        const remaining = Number(refreshed?.snapshot?.meta?.pendingCandidateCount || 0);
+        const remaining = Number(
+          refreshed?.snapshot?.meta?.pendingCandidateCount || 0
+        );
         if (remaining <= 0) {
           setShowKnowledge(false);
         }
@@ -1321,6 +1651,32 @@ export default function SetupStudioScreen() {
     }
   }
 
+  const visibleKnowledgeItems = useMemo(() => {
+    return deriveVisibleKnowledgeItems({
+      knowledgeCandidates,
+      reviewDraft,
+      currentReview,
+      discoveryState,
+    });
+  }, [knowledgeCandidates, reviewDraft, currentReview, discoveryState]);
+
+  const visibleServiceItems = useMemo(() => {
+    return deriveVisibleServiceItems({
+      services,
+      reviewDraft,
+      currentReview,
+      discoveryState,
+    });
+  }, [services, reviewDraft, currentReview, discoveryState]);
+
+  const visibleSources = useMemo(() => {
+    return deriveVisibleSources({ currentReview, discoveryState });
+  }, [currentReview, discoveryState]);
+
+  const visibleEvents = useMemo(() => {
+    return deriveVisibleEvents(currentReview);
+  }, [currentReview]);
+
   async function onCreateSuggestedService() {
     try {
       setSavingServiceSuggestion("creating");
@@ -1329,7 +1685,7 @@ export default function SetupStudioScreen() {
       const payload = deriveSuggestedServicePayload({
         discoveryForm,
         discoveryState,
-        knowledgeCandidates,
+        knowledgeCandidates: visibleKnowledgeItems,
       });
 
       await createSetupService(payload);
@@ -1337,7 +1693,9 @@ export default function SetupStudioScreen() {
 
       return { ok: true };
     } catch (e) {
-      setError(String(e?.message || e || "Suggested service could not be created."));
+      setError(
+        String(e?.message || e || "Suggested service could not be created.")
+      );
       return { ok: false, error: String(e?.message || e || "") };
     } finally {
       setSavingServiceSuggestion("");
@@ -1348,7 +1706,10 @@ export default function SetupStudioScreen() {
     try {
       setError("");
 
-      const snapshot = await loadData({ silent: true, preserveBusinessForm: true });
+      const snapshot = await loadData({
+        silent: true,
+        preserveBusinessForm: true,
+      });
       const nextMeta = obj(snapshot?.meta);
 
       if (nextMeta.setupCompleted) {
@@ -1365,7 +1726,9 @@ export default function SetupStudioScreen() {
 
       navigate("/setup/studio", { replace: true });
     } catch (e) {
-      setError(String(e?.message || e || "Workspace status could not be checked."));
+      setError(
+        String(e?.message || e || "Workspace status could not be checked.")
+      );
     }
   }
 
@@ -1381,54 +1744,103 @@ export default function SetupStudioScreen() {
     [draftBackedProfile]
   );
 
+  const hasVisibleResults = useMemo(() => {
+    return !!(
+      hasMeaningfulProfile(draftBackedProfile) ||
+      discoveryProfileRows.length > 0 ||
+      visibleKnowledgeItems.length > 0 ||
+      visibleServiceItems.length > 0 ||
+      visibleSources.length > 0 ||
+      visibleEvents.length > 0 ||
+      arr(discoveryState?.warnings).length > 0 ||
+      s(reviewDraft?.quickSummary)
+    );
+  }, [
+    draftBackedProfile,
+    discoveryProfileRows,
+    visibleKnowledgeItems,
+    visibleServiceItems,
+    visibleSources,
+    visibleEvents,
+    discoveryState?.warnings,
+    reviewDraft?.quickSummary,
+  ]);
+
+  const effectiveMeta = useMemo(() => {
+    const pendingVisibleCount = visibleKnowledgeItems.filter((item) => {
+      const status = s(item.status).toLowerCase();
+      return !status || status === "pending" || status === "review";
+    }).length;
+
+    return {
+      ...meta,
+      pendingCandidateCount: Math.max(
+        Number(meta.pendingCandidateCount || 0),
+        pendingVisibleCount
+      ),
+      serviceCount: Math.max(
+        Number(meta.serviceCount || 0),
+        visibleServiceItems.length
+      ),
+    };
+  }, [meta, visibleKnowledgeItems, visibleServiceItems]);
+
   const serviceSuggestionTitle = useMemo(() => {
     const derived = deriveSuggestedServicePayload({
       discoveryForm,
       discoveryState,
-      knowledgeCandidates,
+      knowledgeCandidates: visibleKnowledgeItems,
     });
     return s(derived.title);
-  }, [discoveryForm, discoveryState, knowledgeCandidates]);
+  }, [discoveryForm, discoveryState, visibleKnowledgeItems]);
 
   const studioProgress = useMemo(() => {
-    const derived = obj(deriveStudioProgress({ importingWebsite, discoveryState, meta }));
+    const derived = obj(
+      deriveStudioProgress({
+        importingWebsite,
+        discoveryState,
+        meta: effectiveMeta,
+      })
+    );
 
     return {
       ...derived,
-      readinessScore: Number(meta.readinessScore || derived.readinessScore || 0),
-      readinessLabel: s(meta.readinessLabel || derived.readinessLabel),
-      missingSteps: arr(meta.missingSteps).length
-        ? arr(meta.missingSteps)
+      readinessScore: Number(
+        effectiveMeta.readinessScore || derived.readinessScore || 0
+      ),
+      readinessLabel: s(effectiveMeta.readinessLabel || derived.readinessLabel),
+      missingSteps: arr(effectiveMeta.missingSteps).length
+        ? arr(effectiveMeta.missingSteps)
         : arr(derived.missingSteps),
-      primaryMissingStep: s(meta.primaryMissingStep || derived.primaryMissingStep),
-      nextRoute: s(meta.nextRoute || derived.nextRoute || "/"),
-      nextSetupRoute: s(meta.nextSetupRoute || derived.nextSetupRoute || "/setup/studio"),
-      nextStudioStage: s(meta.nextStudioStage || ""),
-      setupCompleted: !!(meta.setupCompleted ?? derived.setupCompleted),
+      primaryMissingStep: s(
+        effectiveMeta.primaryMissingStep || derived.primaryMissingStep
+      ),
+      nextRoute: s(effectiveMeta.nextRoute || derived.nextRoute || "/"),
+      nextSetupRoute: s(
+        effectiveMeta.nextSetupRoute || derived.nextSetupRoute || "/setup/studio"
+      ),
+      nextStudioStage: s(effectiveMeta.nextStudioStage || ""),
+      setupCompleted: !!(
+        effectiveMeta.setupCompleted ?? derived.setupCompleted
+      ),
     };
-  }, [importingWebsite, discoveryState, meta]);
+  }, [importingWebsite, discoveryState, effectiveMeta]);
 
   const knowledgePreview = useMemo(() => {
-    const sourceItems = arr(knowledgeCandidates).length
-      ? knowledgeCandidates
-      : arr(reviewDraft?.reviewQueue);
-
-    return sourceItems.slice(0, 6).map((item) => ({
+    return visibleKnowledgeItems.slice(0, 6).map((item) => ({
       id: s(item.id || item.candidateId),
-      title: s(item.title || candidateTitle(item)),
-      value: s(item.valueText || candidateValue(item)),
-      category: s(item.category || candidateCategory(item)),
-      source: candidateSource(item),
-      confidence: candidateConfidence(item),
+      title: s(item.title),
+      value: s(item.valueText),
+      category: s(item.category),
+      source: s(item.source || item.sourceType),
+      confidence:
+        typeof item.confidence === "number"
+          ? item.confidence
+          : Number(item.confidence || 0) || 0,
       status: s(item.status || "pending"),
-      evidenceUrl: s(
-        evidenceList(item)[0]?.url ||
-          evidenceList(item)[0]?.source_url ||
-          evidenceList(item)[0]?.link ||
-          arr(item?.evidence)[0]?.pageUrl
-      ),
+      evidenceUrl: s(item.evidenceUrl),
     }));
-  }, [knowledgeCandidates, reviewDraft]);
+  }, [visibleKnowledgeItems]);
 
   const currentTitle = useMemo(() => {
     const businessName = s(businessForm.companyName);
@@ -1442,10 +1854,7 @@ export default function SetupStudioScreen() {
       return reviewName;
     }
 
-    return s(
-      businessName ||
-        reviewName
-    );
+    return s(businessName || reviewName);
   }, [businessForm.companyName, reviewDraft]);
 
   const currentDescription = useMemo(
@@ -1458,6 +1867,60 @@ export default function SetupStudioScreen() {
       ),
     [reviewDraft, businessForm.description, discoveryState]
   );
+
+  const autoRevealKey = useMemo(() => {
+    return [
+      s(discoveryState.requestId),
+      s(discoveryState.sourceRunId),
+      s(reviewDraft.sourceRunId),
+      String(discoveryProfileRows.length),
+      String(visibleKnowledgeItems.length),
+      String(visibleServiceItems.length),
+      String(visibleSources.length),
+      String(visibleEvents.length),
+      s(discoveryState.mode),
+    ]
+      .filter(Boolean)
+      .join("|");
+  }, [
+    discoveryState.requestId,
+    discoveryState.sourceRunId,
+    reviewDraft.sourceRunId,
+    discoveryProfileRows.length,
+    visibleKnowledgeItems.length,
+    visibleServiceItems.length,
+    visibleSources.length,
+    visibleEvents.length,
+    discoveryState.mode,
+  ]);
+
+  useEffect(() => {
+    const mode = s(discoveryState.mode).toLowerCase();
+
+    if (!hasVisibleResults) return;
+    if (mode === "idle" || mode === "running") return;
+    if (!autoRevealKey) return;
+    if (autoRevealRef.current === autoRevealKey) return;
+
+    autoRevealRef.current = autoRevealKey;
+
+    setShowRefine(true);
+
+    if (
+      visibleKnowledgeItems.length > 0 ||
+      visibleServiceItems.length > 0 ||
+      discoveryProfileRows.length > 0
+    ) {
+      setShowKnowledge(true);
+    }
+  }, [
+    autoRevealKey,
+    hasVisibleResults,
+    discoveryState.mode,
+    visibleKnowledgeItems.length,
+    visibleServiceItems.length,
+    discoveryProfileRows.length,
+  ]);
 
   return (
     <SetupStudioScene
@@ -1475,15 +1938,20 @@ export default function SetupStudioScreen() {
       discoveryState={discoveryState}
       reviewDraft={reviewDraft}
       manualSections={manualSections}
-      meta={meta}
+      meta={effectiveMeta}
       currentTitle={currentTitle}
       currentDescription={currentDescription}
       discoveryProfileRows={discoveryProfileRows}
       knowledgePreview={knowledgePreview}
-      knowledgeItems={knowledgeCandidates}
+      knowledgeItems={visibleKnowledgeItems}
       serviceSuggestionTitle={serviceSuggestionTitle}
       studioProgress={studioProgress}
-      services={services}
+      services={visibleServiceItems}
+      reviewSources={visibleSources}
+      reviewEvents={visibleEvents}
+      hasVisibleResults={hasVisibleResults}
+      visibleKnowledgeCount={visibleKnowledgeItems.length}
+      visibleServiceCount={visibleServiceItems.length}
       onSetBusinessField={setBusinessField}
       onSetManualSection={setManualSection}
       onSetDiscoveryField={setDiscoveryField}
