@@ -103,6 +103,26 @@ function s(v) {
   return String(v ?? "").trim();
 }
 
+function arr(v) {
+  return Array.isArray(v) ? v : [];
+}
+
+function obj(v) {
+  return v && typeof v === "object" && !Array.isArray(v) ? v : {};
+}
+
+function n(v, fallback = 0) {
+  const x = Number(v);
+  return Number.isFinite(x) ? x : fallback;
+}
+
+function truncateText(value = "", max = 180) {
+  const x = s(value);
+  if (!x) return "";
+  if (x.length <= max) return x;
+  return `${x.slice(0, max - 1)}…`;
+}
+
 function cleanHandle(v) {
   return s(v)
     .replace(/^@+/, "")
@@ -378,6 +398,25 @@ function formatSourceValue(key, raw) {
   return x.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
 }
 
+function normalizeAnalysisRows(rows = []) {
+  return arr(rows)
+    .map((item) => {
+      if (Array.isArray(item)) {
+        return {
+          label: s(item[0]),
+          value: s(item[1]),
+        };
+      }
+
+      const x = obj(item);
+      return {
+        label: s(x.label || x.key || x.title || x.name),
+        value: s(x.value || x.text || x.description || x.content),
+      };
+    })
+    .filter((item) => item.label || item.value);
+}
+
 function SourceMark({ item, className = "" }) {
   return (
     <img
@@ -386,6 +425,19 @@ function SourceMark({ item, className = "" }) {
       aria-hidden="true"
       className={className || "h-8 w-8 rounded-xl object-contain"}
     />
+  );
+}
+
+function ResultRow({ label, value }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+        {label || "Field"}
+      </div>
+      <div className="mt-1.5 break-words text-sm leading-6 text-slate-700">
+        {value || "—"}
+      </div>
+    </div>
   );
 }
 
@@ -409,6 +461,26 @@ export default function SetupStudioEntryStage({
   importingWebsite,
   onSetDiscoveryField,
   onScanBusiness,
+
+  hasAnalysis = false,
+  analysisLoading = false,
+  analysisSourceLabel = "",
+  analysisUrl = "",
+  analysisTitle = "",
+  analysisDescription = "",
+  analysisMessage = "",
+  analysisWarnings = [],
+  analysisProfileRows = [],
+  analysisKnowledgeCount = 0,
+  analysisServiceCount = 0,
+  analysisSourceCount = 0,
+  analysisEventCount = 0,
+  analysisReviewStatusLabel = "",
+  analysisReviewSources = [],
+  analysisReviewEvents = [],
+  onOpenRefine,
+  onOpenKnowledge,
+  onContinueFlow,
 }) {
   const primarySeed = useMemo(
     () => seedSourcesFromPrimary(discoveryForm?.websiteUrl),
@@ -585,6 +657,14 @@ export default function SetupStudioEntryStage({
   const primarySources = SOURCE_OPTIONS.filter((item) => item.priority === "primary");
   const secondarySources = SOURCE_OPTIONS.filter((item) => item.priority === "secondary");
 
+  const safeAnalysisWarnings = arr(analysisWarnings).filter(Boolean);
+  const normalizedAnalysisRows = useMemo(
+    () => normalizeAnalysisRows(analysisProfileRows),
+    [analysisProfileRows]
+  );
+  const firstReviewSource = obj(arr(analysisReviewSources)[0]);
+  const firstReviewEvent = obj(arr(analysisReviewEvents)[0]);
+
   function handlePickSource(key) {
     setActiveKey(key);
   }
@@ -654,6 +734,8 @@ export default function SetupStudioEntryStage({
       ? "Website will be used for the first scan. Other connected sources are attached as context."
       : "Google Maps will be used for the first scan. Other connected sources are attached as context."
     : "Add a Website or Google Maps source to start the first scan. Other sources can already be attached as context.";
+
+  const shouldShowResults = analysisLoading || hasAnalysis;
 
   return (
     <motion.form
@@ -896,6 +978,232 @@ export default function SetupStudioEntryStage({
           </div>
         </div>
       </motion.div>
+
+      {shouldShowResults ? (
+        <motion.div
+          layout
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="overflow-hidden rounded-[28px] border border-slate-200 bg-white/88 shadow-[0_24px_70px_rgba(15,23,42,.08)] backdrop-blur-xl"
+        >
+          <div className="border-b border-slate-200/80 px-4 py-4 sm:px-5 lg:px-6">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <div className="text-[15px] font-semibold text-slate-900">
+                  {analysisLoading ? "Analyzing source" : "Analysis results"}
+                </div>
+                <div className="mt-1 text-sm text-slate-500">
+                  {analysisLoading
+                    ? "We are reading the source and building the first business draft."
+                    : "Everything found from the connected source is shown below."}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {analysisSourceLabel ? (
+                  <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-700">
+                    {analysisSourceLabel}
+                  </span>
+                ) : null}
+
+                {analysisReviewStatusLabel ? (
+                  <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-700">
+                    {analysisReviewStatusLabel}
+                  </span>
+                ) : null}
+
+                {safeAnalysisWarnings[0] ? (
+                  <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700">
+                    {safeAnalysisWarnings[0]}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4 px-4 py-4 sm:px-5 sm:py-5 lg:px-6">
+            {analysisLoading ? (
+              <div className="rounded-[24px] border border-blue-100 bg-blue-50/70 px-5 py-5">
+                <div className="flex items-center gap-3 text-sm font-medium text-blue-900">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  Analyze is running...
+                </div>
+                <div className="mt-3 text-sm leading-6 text-blue-800/80">
+                  Source is being scanned now. Result cards will appear here automatically.
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,.85fr)_minmax(0,1fr)]">
+                  <div className="rounded-[22px] border border-slate-200/80 bg-slate-50/60 p-4">
+                    <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Snapshot
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="text-lg font-semibold text-slate-950">
+                        {s(analysisTitle) || "Business identity"}
+                      </div>
+
+                      <p className="text-sm leading-6 text-slate-600">
+                        {truncateText(s(analysisMessage) || s(analysisDescription), 260) ||
+                          "No summary was returned yet."}
+                      </p>
+
+                      {analysisUrl ? (
+                        <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
+                          <span className="font-medium text-slate-700">URL:</span>{" "}
+                          <span className="break-all">{analysisUrl}</span>
+                        </div>
+                      ) : null}
+
+                      <div className="flex flex-wrap gap-2 pt-2">
+                        <button
+                          type="button"
+                          onClick={onOpenRefine}
+                          className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
+                        >
+                          Refine draft
+                        </button>
+
+                        {typeof onOpenKnowledge === "function" ? (
+                          <button
+                            type="button"
+                            onClick={onOpenKnowledge}
+                            className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
+                          >
+                            Review knowledge
+                          </button>
+                        ) : null}
+
+                        {typeof onContinueFlow === "function" ? (
+                          <button
+                            type="button"
+                            onClick={onContinueFlow}
+                            className="inline-flex items-center justify-center rounded-full border border-slate-950 bg-slate-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+                          >
+                            Continue flow
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[22px] border border-slate-200/80 bg-slate-50/60 p-4">
+                    <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Extracted signals
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3">
+                        <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">
+                          Knowledge
+                        </div>
+                        <div className="mt-1 text-xl font-semibold text-slate-950">
+                          {n(analysisKnowledgeCount)}
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3">
+                        <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">
+                          Services
+                        </div>
+                        <div className="mt-1 text-xl font-semibold text-slate-950">
+                          {n(analysisServiceCount)}
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3">
+                        <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">
+                          Sources
+                        </div>
+                        <div className="mt-1 text-xl font-semibold text-slate-950">
+                          {n(analysisSourceCount)}
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3">
+                        <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">
+                          Events
+                        </div>
+                        <div className="mt-1 text-xl font-semibold text-slate-950">
+                          {n(analysisEventCount)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[22px] border border-slate-200/80 bg-slate-50/60 p-4">
+                    <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Evidence
+                    </div>
+
+                    <div className="space-y-2">
+                      {firstReviewSource?.label || firstReviewSource?.url ? (
+                        <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5">
+                          <div className="text-xs font-medium text-slate-700">
+                            {s(firstReviewSource.label || firstReviewSource.sourceType || "Source")}
+                          </div>
+                          {firstReviewSource.url ? (
+                            <div className="mt-1 break-all text-xs text-slate-500">
+                              {truncateText(firstReviewSource.url, 140)}
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+
+                      {firstReviewEvent?.message || firstReviewEvent?.title ? (
+                        <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5">
+                          <div className="text-xs font-medium text-slate-700">
+                            {s(firstReviewEvent.title || firstReviewEvent.type || "Latest event")}
+                          </div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            {truncateText(
+                              s(firstReviewEvent.message || firstReviewEvent.status || ""),
+                              140
+                            )}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {safeAnalysisWarnings[0] ? (
+                        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2.5">
+                          <div className="text-xs font-medium text-amber-800">Warning</div>
+                          <div className="mt-1 text-xs text-amber-700">
+                            {truncateText(safeAnalysisWarnings[0], 140)}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-[24px] border border-slate-200/80 bg-slate-50/60 p-4 sm:p-5">
+                  <div className="mb-3 text-sm font-semibold text-slate-900">
+                    Extracted details
+                  </div>
+
+                  {normalizedAnalysisRows.length ? (
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                      {normalizedAnalysisRows.map((row, index) => (
+                        <ResultRow
+                          key={`${row.label}-${index}`}
+                          label={row.label}
+                          value={row.value}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-4 text-sm text-slate-500">
+                      Structured extracted fields are not available yet for this scan.
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </motion.div>
+      ) : null}
 
       {error ? (
         <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
