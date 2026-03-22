@@ -88,6 +88,10 @@ function SectionHeader({ title, count, hint }) {
   );
 }
 
+function EmptySectionHint({ text }) {
+  return <div className="mt-2 text-xs leading-6 text-slate-400">{text}</div>;
+}
+
 export default function SetupStudioRefineModal({
   savingBusiness,
   businessForm,
@@ -173,11 +177,7 @@ export default function SetupStudioRefineModal({
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="grid gap-8 px-5 py-5 sm:px-6 xl:grid-cols-[minmax(0,1.08fr)_minmax(360px,0.92fr)]">
-          <form
-            id={FORM_ID}
-            onSubmit={onSaveBusiness}
-            className="min-w-0 space-y-6"
-          >
+          <form id={FORM_ID} onSubmit={onSaveBusiness} className="min-w-0 space-y-6">
             <div className="rounded-[28px] border border-slate-200/80 bg-slate-50/60 p-4 sm:p-5">
               <div className="mb-4 text-sm font-semibold text-slate-900">
                 Core business identity
@@ -275,7 +275,7 @@ export default function SetupStudioRefineModal({
                   value={s(form.description)}
                   onChange={(e) => onSetBusinessField("description", e.target.value)}
                   className={textAreaClassName("min-h-[148px]")}
-                  placeholder="Short business summary"
+                  placeholder=""
                 />
               </div>
             </div>
@@ -297,8 +297,11 @@ export default function SetupStudioRefineModal({
                     value={sections.servicesText}
                     onChange={(e) => onSetManualSection?.("servicesText", e.target.value)}
                     className={textAreaClassName("min-h-[110px]")}
-                    placeholder="Hair coloring | Professional coloring service&#10;Haircut | Men's and women's haircut"
+                    placeholder=""
                   />
+                  {serviceCount === 0 ? (
+                    <EmptySectionHint text="Boşdur. Format: Name | Description" />
+                  ) : null}
                 </div>
 
                 <div>
@@ -311,8 +314,11 @@ export default function SetupStudioRefineModal({
                     value={sections.faqsText}
                     onChange={(e) => onSetManualSection?.("faqsText", e.target.value)}
                     className={textAreaClassName("min-h-[110px]")}
-                    placeholder="Do you accept walk-ins? | Yes, based on availability"
+                    placeholder=""
                   />
+                  {faqCount === 0 ? (
+                    <EmptySectionHint text="Boşdur. Format: Question | Answer" />
+                  ) : null}
                 </div>
 
                 <div>
@@ -325,8 +331,11 @@ export default function SetupStudioRefineModal({
                     value={sections.policiesText}
                     onChange={(e) => onSetManualSection?.("policiesText", e.target.value)}
                     className={textAreaClassName("min-h-[110px]")}
-                    placeholder="Cancellation policy | Please notify us 24 hours in advance"
+                    placeholder=""
                   />
+                  {policyCount === 0 ? (
+                    <EmptySectionHint text="Boşdur. Format: Title | Description" />
+                  ) : null}
                 </div>
               </div>
             </div>
