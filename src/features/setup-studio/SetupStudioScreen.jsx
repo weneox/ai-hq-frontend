@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+
 import { getAppBootstrap } from "../../api/app.js";
 import {
   importSourceForSetup,
@@ -13,7 +14,9 @@ import {
   rejectKnowledgeCandidate,
 } from "../../api/knowledge.js";
 import { createSetupService, getSetupServices } from "../../api/services.js";
+
 import SetupStudioScene from "./SetupStudioScene.jsx";
+
 import {
   arr,
   obj,
@@ -27,6 +30,7 @@ import {
   discoveryModeLabel,
   deriveStudioProgress,
 } from "./lib/setupStudioHelpers.js";
+
 import {
   createEmptyReviewState,
   createEmptyLegacyDraft,
@@ -43,6 +47,7 @@ import {
   applyUiHintsFromMeta,
   normalizeReviewState,
 } from "./screen/shared.js";
+
 import {
   deriveSuggestedServicePayload,
   formFromProfile,
@@ -56,6 +61,7 @@ import {
   hydrateBusinessFormFromProfile,
   chooseBestProfileForForm,
 } from "./screen/profile.js";
+
 import {
   mapCurrentReviewToLegacyDraft,
   buildManualSectionsFromReview,
@@ -206,6 +212,7 @@ function buildSafeUiProfile({
 
 export default function SetupStudioScreen() {
   const navigate = useNavigate();
+
   const autoRevealRef = useRef("");
   const activeSourceRef = useRef(createEmptySourceScope());
 
@@ -221,7 +228,6 @@ export default function SetupStudioScreen() {
   const [showKnowledge, setShowKnowledge] = useState(false);
 
   const [freshEntryMode, setFreshEntryMode] = useState(true);
-
   const [error, setError] = useState("");
 
   const [businessForm, setBusinessForm] = useState({
@@ -368,10 +374,7 @@ export default function SetupStudioScreen() {
     }));
   }
 
-  function syncDiscoveryStateFromReview(
-    review = {},
-    { preserveCounts = true } = {}
-  ) {
+  function syncDiscoveryStateFromReview(review = {}, { preserveCounts = true } = {}) {
     const normalized = normalizeReviewState(review);
     const legacy = mapCurrentReviewToLegacyDraft(normalized);
     const profile = obj(legacy.overview);
@@ -732,6 +735,7 @@ export default function SetupStudioScreen() {
         e?.message || e || "Setup studio data could not be loaded."
       );
       setError(message);
+
       return {
         boot: {},
         workspace: {},
@@ -867,6 +871,7 @@ export default function SetupStudioScreen() {
 
       const importedReview = normalizeReviewState(result?.review || {});
       const legacyImportedDraft = mapCurrentReviewToLegacyDraft(importedReview);
+
       const incomingReviewAligned = reviewStateMatchesSource(
         importedReview,
         legacyImportedDraft,
@@ -1271,6 +1276,7 @@ export default function SetupStudioScreen() {
         const nextStage = s(
           refreshed?.snapshot?.meta?.nextStudioStage
         ).toLowerCase();
+
         if (nextStage !== "knowledge") {
           setShowKnowledge(false);
         }
@@ -1313,6 +1319,7 @@ export default function SetupStudioScreen() {
         const remaining = Number(
           refreshed?.snapshot?.meta?.pendingCandidateCount || 0
         );
+
         if (remaining <= 0) {
           setShowKnowledge(false);
         }
@@ -1324,6 +1331,74 @@ export default function SetupStudioScreen() {
       return { ok: false };
     } finally {
       setActingKnowledgeId("");
+    }
+  }
+
+  async function onCreateSuggestedService() {
+    try {
+      setFreshEntryMode(false);
+      setSavingServiceSuggestion("creating");
+      setError("");
+
+      const payload = deriveSuggestedServicePayload({
+        discoveryForm,
+        discoveryState,
+        knowledgeCandidates: visibleKnowledgeItems,
+      });
+
+      await createSetupService(payload);
+
+      await refreshAndMaybeRouteHome({
+        preserveBusinessForm: true,
+        hydrateReview: true,
+        activeSourceType: activeSourceScope.sourceType,
+        activeSourceUrl: activeSourceScope.sourceUrl,
+      });
+
+      return { ok: true };
+    } catch (e) {
+      setError(
+        String(e?.message || e || "Suggested service could not be created.")
+      );
+      return { ok: false, error: String(e?.message || e || "") };
+    } finally {
+      setSavingServiceSuggestion("");
+    }
+  }
+
+  async function onOpenWorkspace() {
+    try {
+      setError("");
+
+      const snapshot = await loadData({
+        silent: true,
+        preserveBusinessForm: true,
+        hydrateReview: !freshEntryMode,
+        activeSourceType: activeSourceScope.sourceType,
+        activeSourceUrl: activeSourceScope.sourceUrl,
+      });
+
+      const nextMeta = obj(snapshot?.meta);
+
+      if (nextMeta.setupCompleted) {
+        navigate(s(nextMeta.nextRoute || "/"), { replace: true });
+        return;
+      }
+
+      if (!freshEntryMode) {
+        applyUiHintsFromMeta({
+          nextMeta,
+          pendingKnowledge: arr(snapshot?.pendingKnowledge),
+          setShowKnowledge,
+          setShowRefine,
+        });
+      }
+
+      navigate("/setup/studio", { replace: true });
+    } catch (e) {
+      setError(
+        String(e?.message || e || "Workspace status could not be checked.")
+      );
     }
   }
 
@@ -1396,78 +1471,13 @@ export default function SetupStudioScreen() {
     return deriveVisibleEvents(scopedCurrentReview);
   }, [freshEntryMode, scopedCurrentReview]);
 
-  async function onCreateSuggestedService() {
-    try {
-      setFreshEntryMode(false);
-      setSavingServiceSuggestion("creating");
-      setError("");
-
-      const payload = deriveSuggestedServicePayload({
-        discoveryForm,
-        discoveryState,
-        knowledgeCandidates: visibleKnowledgeItems,
-      });
-
-      await createSetupService(payload);
-      await refreshAndMaybeRouteHome({
-        preserveBusinessForm: true,
-        hydrateReview: true,
-        activeSourceType: activeSourceScope.sourceType,
-        activeSourceUrl: activeSourceScope.sourceUrl,
-      });
-
-      return { ok: true };
-    } catch (e) {
-      setError(
-        String(e?.message || e || "Suggested service could not be created.")
-      );
-      return { ok: false, error: String(e?.message || e || "") };
-    } finally {
-      setSavingServiceSuggestion("");
-    }
-  }
-
-  async function onOpenWorkspace() {
-    try {
-      setError("");
-
-      const snapshot = await loadData({
-        silent: true,
-        preserveBusinessForm: true,
-        hydrateReview: !freshEntryMode,
-        activeSourceType: activeSourceScope.sourceType,
-        activeSourceUrl: activeSourceScope.sourceUrl,
-      });
-      const nextMeta = obj(snapshot?.meta);
-
-      if (nextMeta.setupCompleted) {
-        navigate(s(nextMeta.nextRoute || "/"), { replace: true });
-        return;
-      }
-
-      if (!freshEntryMode) {
-        applyUiHintsFromMeta({
-          nextMeta,
-          pendingKnowledge: arr(snapshot?.pendingKnowledge),
-          setShowKnowledge,
-          setShowRefine,
-        });
-      }
-
-      navigate("/setup/studio", { replace: true });
-    } catch (e) {
-      setError(
-        String(e?.message || e || "Workspace status could not be checked.")
-      );
-    }
-  }
-
   const draftBackedProfile = useMemo(() => {
     if (freshEntryMode) return obj(discoveryState.profile);
 
     if (Object.keys(obj(scopedReviewDraft?.overview)).length) {
       return obj(scopedReviewDraft?.overview);
     }
+
     return obj(discoveryState.profile);
   }, [freshEntryMode, scopedReviewDraft, discoveryState.profile]);
 
@@ -1608,7 +1618,11 @@ export default function SetupStudioScreen() {
   const currentTitle = useMemo(() => {
     const warningSet = arr(discoveryState.warnings);
 
-    const businessName = sanitizeUiIdentityText(businessForm.companyName, warningSet);
+    const businessName = sanitizeUiIdentityText(
+      businessForm.companyName,
+      warningSet
+    );
+
     const reviewName = sanitizeUiIdentityText(
       scopedReviewDraft?.overview?.companyName ||
         scopedReviewDraft?.overview?.displayName ||
@@ -1673,6 +1687,7 @@ export default function SetupStudioScreen() {
     if (!hasVisibleResults) return;
     if (mode === "idle" || mode === "running") return;
     if (!autoRevealKey) return;
+
     if (
       !activeReviewAligned &&
       !hasExtractedIdentityProfile(discoveryState.profile) &&
@@ -1680,8 +1695,8 @@ export default function SetupStudioScreen() {
     ) {
       return;
     }
-    if (autoRevealRef.current === autoRevealKey) return;
 
+    if (autoRevealRef.current === autoRevealKey) return;
     autoRevealRef.current = autoRevealKey;
 
     const barrierOnly =

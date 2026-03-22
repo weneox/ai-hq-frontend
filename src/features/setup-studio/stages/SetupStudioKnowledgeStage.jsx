@@ -1,7 +1,7 @@
 import {
+  AlertTriangle,
   BadgeCheck,
   ChevronRight,
-  CircleAlert,
   FileSearch,
   Sparkles,
 } from "lucide-react";
@@ -50,6 +50,7 @@ function humanConfidence(item = {}) {
 
 function normalizeEvidenceList(item = {}) {
   const x = obj(item);
+
   return arr(
     x.evidence ||
       x.sourceEvidenceJson ||
@@ -134,6 +135,20 @@ function groupLabel(category = "") {
   return "Knowledge";
 }
 
+function humanizeWarning(value = "") {
+  const x = s(value).toLowerCase();
+
+  if (x === "http_403") return "This website blocked direct access.";
+  if (x === "http_429") return "This website rate-limited the request.";
+  if (x === "fetch_failed") return "The website could not be read.";
+  if (x === "non_html_response") return "The source did not return a readable webpage.";
+  if (x === "website_fetch_timeout") return "The website took too long to respond.";
+  if (x === "website_entry_timeout") return "The first page took too long to load.";
+  if (x === "sitemap_fetch_timeout") return "The sitemap timed out, but some draft data may still exist.";
+
+  return s(value).replaceAll("_", " ");
+}
+
 export default function SetupStudioKnowledgeStage({
   knowledgePreview,
   knowledgeItems = [],
@@ -172,134 +187,174 @@ export default function SetupStudioKnowledgeStage({
       )
     : 0;
 
+  const highConfidenceCount = items.filter((item) => n(item.confidence, 0) >= 0.85).length;
+
   return (
     <SetupStudioStageShell
-      eyebrow="knowledge"
+      eyebrow="build draft"
       title={
         <>
-          Here’s what we found
+          Review what AI should
           <br />
-          worth remembering.
+          remember from the source.
         </>
       }
-      body="Bu hissədə sistemin source-lardan çıxardığı faydalı biliklər görünür. Lazımlı olanları saxlayır, səs-küyü isə içəri buraxmırıq."
+      body="This stage shows the knowledge signals worth keeping. Approve what should shape runtime behavior, reject the noise, and keep the business draft clean."
     >
-      <div className="mx-auto max-w-[1080px]">
+      <div className="mx-auto max-w-[1120px] space-y-6">
         {(sourceLabel || warningList.length || items.length) ? (
-          <div className="mb-6 grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,.8fr)]">
-            <div className="rounded-[24px] border border-slate-200/80 bg-white/85 p-4 shadow-[0_14px_40px_rgba(15,23,42,.05)]">
-              <div className="mb-2 flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-500">
-                  <FileSearch className="h-3.5 w-3.5" />
-                  intake preview
-                </span>
-
-                {sourceLabel ? (
-                  <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-600">
-                    {sourceLabel}
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.12fr)_360px]">
+            <div className="overflow-hidden rounded-[28px] border border-white/70 bg-white/84 shadow-[0_20px_60px_rgba(15,23,42,.07)] backdrop-blur-xl">
+              <div className="border-b border-slate-200/70 px-5 py-4.5">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500 shadow-sm">
+                    <FileSearch className="h-3.5 w-3.5" />
+                    knowledge review
                   </span>
+
+                  {sourceLabel ? (
+                    <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-600">
+                      <Sparkles className="h-3.5 w-3.5" />
+                      {sourceLabel}
+                    </span>
+                  ) : null}
+
+                  <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-600">
+                    {items.length} visible item{items.length === 1 ? "" : "s"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-4 px-5 py-5">
+                <div className="text-sm leading-7 text-slate-600">
+                  The system prepared these knowledge candidates from the source.
+                  Keep what should influence replies and review behavior, and leave
+                  out anything weak, noisy, or overly generic.
+                </div>
+
+                {categoryBadges.length ? (
+                  <div className="flex flex-wrap gap-2">
+                    {categoryBadges.map(([key, count]) => (
+                      <span
+                        key={key}
+                        className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-700"
+                      >
+                        {groupLabel(key)} · {count}
+                      </span>
+                    ))}
+                  </div>
                 ) : null}
 
-                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-600">
-                  {items.length} visible items
-                </span>
+                {warningList.length ? (
+                  <div className="flex items-start gap-3 rounded-[22px] border border-amber-200 bg-amber-50 px-4 py-3.5 text-sm text-amber-800">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>{humanizeWarning(warningList[0])}</span>
+                  </div>
+                ) : null}
               </div>
-
-              <div className="text-sm leading-6 text-slate-600">
-                Sistem source-dan çıxan knowledge elementlərini review üçün hazırlayıb.
-                Bunlar approve/reject edilə və ya full intake içində daha detallı baxıla bilər.
-              </div>
-
-              {categoryBadges.length ? (
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {categoryBadges.map(([key, count]) => (
-                    <span
-                      key={key}
-                      className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-700"
-                    >
-                      {groupLabel(key)} · {count}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
             </div>
 
-            <div className="rounded-[24px] border border-slate-200/80 bg-white/85 p-4 shadow-[0_14px_40px_rgba(15,23,42,.05)]">
-              <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                Signal quality
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3">
-                  <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">
-                    Preview
-                  </div>
-                  <div className="mt-1 text-xl font-semibold text-slate-950">
-                    {items.length}
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3">
-                  <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">
-                    Avg confidence
-                  </div>
-                  <div className="mt-1 text-xl font-semibold text-slate-950">
-                    {avgConfidence}%
-                  </div>
+            <div className="overflow-hidden rounded-[28px] border border-white/70 bg-white/84 shadow-[0_20px_60px_rgba(15,23,42,.07)] backdrop-blur-xl">
+              <div className="border-b border-slate-200/70 px-5 py-4.5">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">
+                  Signal quality
                 </div>
               </div>
 
-              {warningList.length ? (
-                <div className="mt-3 flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800">
-                  <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />
-                  <span>{warningList[0]}</span>
+              <div className="grid gap-3 px-5 py-5">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-[22px] border border-slate-200/80 bg-slate-50/72 px-4 py-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                      Preview
+                    </div>
+                    <div className="mt-2 text-[28px] font-semibold tracking-[-0.04em] text-slate-950">
+                      {items.length}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[22px] border border-slate-200/80 bg-slate-50/72 px-4 py-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                      Avg confidence
+                    </div>
+                    <div className="mt-2 text-[28px] font-semibold tracking-[-0.04em] text-slate-950">
+                      {avgConfidence}%
+                    </div>
+                  </div>
                 </div>
-              ) : null}
+
+                <div className="rounded-[22px] border border-slate-200/80 bg-slate-50/72 px-4 py-4">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    High-confidence items
+                  </div>
+                  <div className="mt-2 text-[28px] font-semibold tracking-[-0.04em] text-slate-950">
+                    {highConfidenceCount}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         ) : null}
 
         {items.length ? (
-          <div className="space-y-1 rounded-[28px] border border-slate-200/80 bg-white/72 p-2 shadow-[0_16px_50px_rgba(15,23,42,.05)] backdrop-blur-xl">
-            {items.map((item) => (
-              <SetupStudioKnowledgeLine
-                key={item.id || item.title || item.index}
-                item={item}
-                busy={actingKnowledgeId === item.id}
-                onApprove={() =>
-                  onApproveKnowledge?.({
-                    ...item,
-                    id: item.id,
-                    candidateId: item.candidateId || item.id,
-                  })
-                }
-                onReject={() =>
-                  onRejectKnowledge?.({
-                    ...item,
-                    id: item.id,
-                    candidateId: item.candidateId || item.id,
-                  })
-                }
-              />
-            ))}
+          <div className="overflow-hidden rounded-[30px] border border-white/70 bg-white/82 shadow-[0_24px_70px_rgba(15,23,42,.08)] backdrop-blur-xl">
+            <div className="border-b border-slate-200/70 px-5 py-4.5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">
+                    Candidate memory
+                  </div>
+                  <div className="mt-1 text-sm leading-6 text-slate-600">
+                    Approve useful knowledge and reject anything that should not enter runtime.
+                  </div>
+                </div>
+
+                <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
+                  top {items.length}
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-1 p-2">
+              {items.map((item) => (
+                <SetupStudioKnowledgeLine
+                  key={item.id || item.title || item.index}
+                  item={item}
+                  busy={actingKnowledgeId === item.id}
+                  onApprove={() =>
+                    onApproveKnowledge?.({
+                      ...item,
+                      id: item.id,
+                      candidateId: item.candidateId || item.id,
+                    })
+                  }
+                  onReject={() =>
+                    onRejectKnowledge?.({
+                      ...item,
+                      id: item.id,
+                      candidateId: item.candidateId || item.id,
+                    })
+                  }
+                />
+              ))}
+            </div>
           </div>
         ) : (
-          <div className="rounded-[28px] border border-slate-200/80 bg-white/75 px-6 py-8 text-center shadow-[0_16px_50px_rgba(15,23,42,.05)] backdrop-blur-xl">
-            <div className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-500">
+          <div className="rounded-[30px] border border-white/70 bg-white/82 px-6 py-10 text-center shadow-[0_24px_70px_rgba(15,23,42,.08)] backdrop-blur-xl">
+            <div className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-500 shadow-sm">
               <BadgeCheck className="h-5 w-5" />
             </div>
 
             <div className="mt-4 text-base font-semibold text-slate-900">
-              Review üçün hazır knowledge tapılmadı
+              No knowledge items are ready for review yet
             </div>
 
             <div className="mt-2 text-sm leading-6 text-slate-500">
-              Pending knowledge görünmür. Full intake-a baxa və ya növbəti mərhələyə keçə bilərsən.
+              There is nothing meaningful to approve here right now. You can open the full intake or continue to the next stage.
             </div>
           </div>
         )}
 
-        <div className="mt-8 flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-3">
           <GhostButton onClick={onNext} icon={ChevronRight} active>
             Continue
           </GhostButton>
