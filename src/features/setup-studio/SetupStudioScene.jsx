@@ -27,9 +27,40 @@ const overlayTransition = {
   ease: [0.22, 1, 0.36, 1],
 };
 
+const LANGUAGE_LABELS = {
+  az: "Azərbaycan dili",
+  en: "English",
+  tr: "Türkçe",
+  ru: "Русский",
+};
+
 function n(value, fallback = 0) {
   const x = Number(value);
   return Number.isFinite(x) ? x : fallback;
+}
+
+function lower(value) {
+  return s(value).toLowerCase();
+}
+
+function uniqText(values = [], maxItems = 24) {
+  const out = [];
+  const seen = new Set();
+
+  for (const raw of arr(values)) {
+    const value = s(raw);
+    if (!value) continue;
+
+    const key = lower(value);
+    if (!key || seen.has(key)) continue;
+
+    seen.add(key);
+    out.push(value);
+
+    if (out.length >= maxItems) break;
+  }
+
+  return out;
 }
 
 function firstNonEmpty(...values) {
@@ -38,6 +69,14 @@ function firstNonEmpty(...values) {
     if (x) return x;
   }
   return "";
+}
+
+function firstArrayWithItems(...values) {
+  for (const value of values) {
+    const list = arr(value).filter(Boolean);
+    if (list.length) return list;
+  }
+  return [];
 }
 
 function findProfileRowValue(rows = [], wantedKeys = []) {
@@ -74,6 +113,19 @@ function hasMeaningfulReviewDraft(reviewDraft = {}) {
       draft.candidates
   );
 
+  const profile = obj(draft.profile || draft.businessProfile || draft.business_profile);
+  const fieldConfidence = obj(
+    draft.fieldConfidence || draft.field_confidence || profile.fieldConfidence
+  );
+  const reviewFlags = firstArrayWithItems(
+    rd.reviewFlags,
+    rd.review_flags,
+    draft.reviewFlags,
+    draft.review_flags,
+    profile.reviewFlags,
+    profile.review_flags
+  );
+
   const textSignals = [
     session.id,
     session.reviewSessionId,
@@ -90,6 +142,10 @@ function hasMeaningfulReviewDraft(reviewDraft = {}) {
     draft.companySummaryShort,
     draft.companySummaryLong,
     draft.aboutSection,
+    profile.companyName,
+    profile.companyTitle,
+    profile.companySummaryShort,
+    profile.companySummaryLong,
   ]
     .map((x) => s(x))
     .filter(Boolean);
@@ -99,6 +155,8 @@ function hasMeaningfulReviewDraft(reviewDraft = {}) {
     sources.length > 0 ||
     events.length > 0 ||
     queue.length > 0 ||
+    reviewFlags.length > 0 ||
+    Object.keys(fieldConfidence).length > 0 ||
     Number(stats.pendingReviewCount || stats.pending_review_count || 0) > 0
   );
 }
@@ -121,6 +179,9 @@ function hasMeaningfulIdentityData({
     s(m.companySummaryShort) ||
     s(m.companySummaryLong) ||
     s(m.description) ||
+    s(m.mainLanguage) ||
+    s(m.primaryLanguage) ||
+    s(m.language) ||
     s(bf.companyName) ||
     s(bf.description) ||
     s(bf.websiteUrl) ||
@@ -173,8 +234,10 @@ function buildStatusLabel({
   importingWebsite,
   discoveryState,
   discoveryModeLabel,
+  reviewRequired,
 }) {
   if (importingWebsite) return "Analyzing";
+  if (reviewRequired) return "Needs review";
 
   if (arr(discoveryState?.warnings).length > 0) {
     return "Review needed";
@@ -207,6 +270,197 @@ function inferSourceLabel(type = "", url = "") {
   }
 
   return "";
+}
+
+function resolveLanguageValue({ discoveryState = {}, reviewDraft = {}, businessForm = {}, meta = {} }) {
+  const rd = obj(reviewDraft);
+  const draft = obj(
+    rd.draft ||
+      rd.reviewDraft ||
+      rd.review_draft ||
+      rd.currentDraft ||
+      rd.current_draft
+  );
+  const profile = obj(draft.profile || draft.businessProfile || draft.business_profile);
+  const m = obj(meta);
+  const bf = obj(businessForm);
+
+  const candidates = [
+    discoveryState?.mainLanguage,
+    discoveryState?.primaryLanguage,
+    discoveryState?.sourceLanguage,
+    discoveryState?.language,
+    rd?.mainLanguage,
+    rd?.primaryLanguage,
+    draft?.mainLanguage,
+    draft?.primaryLanguage,
+    draft?.language,
+    profile?.mainLanguage,
+    profile?.primaryLanguage,
+    profile?.language,
+    profile?.sourceLanguage,
+    m?.mainLanguage,
+    m?.primaryLanguage,
+    m?.language,
+    bf?.mainLanguage,
+    bf?.primaryLanguage,
+    bf?.language,
+  ]
+    .map((x) => lower(x))
+    .filter(Boolean);
+
+  for (const value of candidates) {
+    if (LANGUAGE_LABELS[value]) return value;
+  }
+
+  return "";
+}
+
+function resolveLanguageLabel(language = "") {
+  return LANGUAGE_LABELS[lower(language)] || s(language).toUpperCase();
+}
+
+function collectReviewFlags({ discoveryState = {}, reviewDraft = {}, businessForm = {}, meta = {} }) {
+  const rd = obj(reviewDraft);
+  const draft = obj(
+    rd.draft ||
+      rd.reviewDraft ||
+      rd.review_draft ||
+      rd.currentDraft ||
+      rd.current_draft
+  );
+  const profile = obj(draft.profile || draft.businessProfile || draft.business_profile);
+  const m = obj(meta);
+  const bf = obj(businessForm);
+
+  return uniqText(
+    [
+      ...arr(discoveryState?.reviewFlags),
+      ...arr(discoveryState?.review_flags),
+      ...arr(rd?.reviewFlags),
+      ...arr(rd?.review_flags),
+      ...arr(draft?.reviewFlags),
+      ...arr(draft?.review_flags),
+      ...arr(profile?.reviewFlags),
+      ...arr(profile?.review_flags),
+      ...arr(m?.reviewFlags),
+      ...arr(m?.review_flags),
+      ...arr(bf?.reviewFlags),
+      ...arr(bf?.review_flags),
+    ],
+    16
+  );
+}
+
+function resolveReviewRequired({ discoveryState = {}, reviewDraft = {}, businessForm = {}, meta = {}, reviewFlags = [] }) {
+  const rd = obj(reviewDraft);
+  const draft = obj(
+    rd.draft ||
+      rd.reviewDraft ||
+      rd.review_draft ||
+      rd.currentDraft ||
+      rd.current_draft
+  );
+  const profile = obj(draft.profile || draft.businessProfile || draft.business_profile);
+  const m = obj(meta);
+  const bf = obj(businessForm);
+
+  return !!(
+    discoveryState?.reviewRequired ||
+    discoveryState?.review_required ||
+    discoveryState?.shouldReview ||
+    rd?.reviewRequired ||
+    rd?.review_required ||
+    draft?.reviewRequired ||
+    draft?.review_required ||
+    profile?.reviewRequired ||
+    profile?.review_required ||
+    m?.reviewRequired ||
+    m?.review_required ||
+    bf?.reviewRequired ||
+    bf?.review_required ||
+    arr(reviewFlags).length > 0
+  );
+}
+
+function resolveFieldConfidence({ discoveryState = {}, reviewDraft = {}, meta = {}, businessForm = {} }) {
+  const rd = obj(reviewDraft);
+  const draft = obj(
+    rd.draft ||
+      rd.reviewDraft ||
+      rd.review_draft ||
+      rd.currentDraft ||
+      rd.current_draft
+  );
+  const profile = obj(draft.profile || draft.businessProfile || draft.business_profile);
+  const m = obj(meta);
+  const bf = obj(businessForm);
+
+  return obj(
+    discoveryState?.fieldConfidence ||
+      discoveryState?.field_confidence ||
+      rd?.fieldConfidence ||
+      rd?.field_confidence ||
+      draft?.fieldConfidence ||
+      draft?.field_confidence ||
+      profile?.fieldConfidence ||
+      profile?.field_confidence ||
+      m?.fieldConfidence ||
+      m?.field_confidence ||
+      bf?.fieldConfidence ||
+      bf?.field_confidence
+  );
+}
+
+function buildTopFieldConfidenceBadges(fieldConfidence = {}) {
+  const entries = Object.entries(obj(fieldConfidence))
+    .map(([key, value]) => ({
+      key: s(key),
+      score: Number(value?.score ?? value),
+      label: s(value?.label),
+    }))
+    .filter((item) => item.key && Number.isFinite(item.score))
+    .sort((a, b) => a.score - b.score);
+
+  return entries.slice(0, 3);
+}
+
+function formatFieldLabel(key = "") {
+  const map = {
+    companyName: "Name",
+    websiteUrl: "Website",
+    summaryShort: "Short summary",
+    summaryLong: "Description",
+    primaryEmail: "Email",
+    primaryPhone: "Phone",
+    primaryAddress: "Address",
+    services: "Services",
+    pricingHints: "Pricing",
+    socialLinks: "Social",
+    faqItems: "FAQ",
+  };
+
+  return map[key] || s(key);
+}
+
+function countDistinctSources(reviewSources = [], primarySourceUrl = "") {
+  const keys = new Set();
+
+  if (s(primarySourceUrl)) {
+    keys.add(lower(primarySourceUrl));
+  }
+
+  for (const item of arr(reviewSources)) {
+    const key =
+      lower(item?.url) ||
+      lower(item?.sourceUrl) ||
+      lower(item?.source_url) ||
+      lower(item?.id);
+    if (!key) continue;
+    keys.add(key);
+  }
+
+  return keys.size;
 }
 
 function SetupStudioModalLayer({
@@ -367,6 +621,37 @@ export default function SetupStudioScene({
     );
 
   const hasScannedUrl = !!primarySourceUrl;
+
+  const resolvedLanguage = resolveLanguageValue({
+    discoveryState,
+    reviewDraft,
+    businessForm,
+    meta,
+  });
+
+  const reviewFlags = collectReviewFlags({
+    discoveryState,
+    reviewDraft,
+    businessForm,
+    meta,
+  });
+
+  const reviewRequired = resolveReviewRequired({
+    discoveryState,
+    reviewDraft,
+    businessForm,
+    meta,
+    reviewFlags,
+  });
+
+  const fieldConfidence = resolveFieldConfidence({
+    discoveryState,
+    reviewDraft,
+    meta,
+    businessForm,
+  });
+
+  const weakestFieldBadges = buildTopFieldConfidenceBadges(fieldConfidence);
 
   const progressSteps = useMemo(() => {
     const list = ["entry", "identity"];
@@ -675,6 +960,7 @@ export default function SetupStudioScene({
     importingWebsite,
     discoveryState,
     discoveryModeLabel,
+    reviewRequired,
   });
 
   const stageMeta = obj(meta);
@@ -700,7 +986,11 @@ export default function SetupStudioScene({
     safeServices.length
   );
 
-  const resultSourceCount = safeReviewSources.length + (primarySourceUrl ? 1 : 0);
+  const resultSourceCount = countDistinctSources(
+    safeReviewSources,
+    primarySourceUrl
+  );
+
   const resultEventCount = safeReviewEvents.length;
 
   const summaryVisible = !!(
@@ -713,6 +1003,9 @@ export default function SetupStudioScene({
     resultSourceCount > 0 ||
     resultEventCount > 0 ||
     safeWarnings.length > 0 ||
+    reviewRequired ||
+    reviewFlags.length > 0 ||
+    resolvedLanguage ||
     s(discoveryState?.message)
   );
 
@@ -743,6 +1036,8 @@ export default function SetupStudioScene({
       data-overlay-open={hasOverlay ? "yes" : "no"}
       data-visible-results={hasVisibleResults ? "yes" : "no"}
       data-stay-on-source-stage={stayOnSourceStage ? "yes" : "no"}
+      data-main-language={resolvedLanguage || "unknown"}
+      data-review-required={reviewRequired ? "yes" : "no"}
     >
       <div
         aria-hidden={hasOverlay ? "true" : "false"}
@@ -796,7 +1091,11 @@ export default function SetupStudioScene({
                   className="hidden rounded-full border border-slate-200 bg-white/90 px-3 py-2 text-sm font-medium text-slate-600 shadow-sm sm:flex"
                   data-mode={importingWebsite ? "running" : s(discoveryState?.mode || "idle")}
                 >
-                  <span className="mr-2 mt-[1px] inline-block h-2 w-2 rounded-full bg-slate-400" />
+                  <span
+                    className={`mr-2 mt-[1px] inline-block h-2 w-2 rounded-full ${
+                      reviewRequired ? "bg-amber-500" : "bg-slate-400"
+                    }`}
+                  />
                   {statusLabel}
                 </div>
               ) : null}
@@ -824,12 +1123,24 @@ export default function SetupStudioScene({
           </div>
         </header>
 
-        {(error || sourceLabel || stageWarnings.length > 0) ? (
+        {(error ||
+          sourceLabel ||
+          stageWarnings.length > 0 ||
+          reviewRequired ||
+          reviewFlags.length > 0 ||
+          resolvedLanguage ||
+          weakestFieldBadges.length > 0) ? (
           <div className="shrink-0 border-b border-slate-200/60 bg-white/55 backdrop-blur-sm">
             <div className="mx-auto flex w-full max-w-[1600px] flex-wrap gap-2 px-4 py-2.5 sm:px-6 lg:px-10">
               {sourceLabel ? (
                 <span className="rounded-full border border-slate-200 bg-white/85 px-3 py-1.5 text-sm font-medium text-slate-700">
                   Source: {sourceLabel}
+                </span>
+              ) : null}
+
+              {resolvedLanguage ? (
+                <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-sm font-medium text-sky-700">
+                  Language: {resolveLanguageLabel(resolvedLanguage)}
                 </span>
               ) : null}
 
@@ -845,11 +1156,35 @@ export default function SetupStudioScene({
                 </span>
               ) : null}
 
-              {discoveryState?.shouldReview ? (
-                <span className="rounded-full border border-slate-200 bg-white/85 px-3 py-1.5 text-sm font-medium text-slate-700">
+              {reviewRequired ? (
+                <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-700">
                   Review required
                 </span>
               ) : null}
+
+              {reviewStatusLabel ? (
+                <span className="rounded-full border border-slate-200 bg-white/85 px-3 py-1.5 text-sm font-medium text-slate-700">
+                  Session: {reviewStatusLabel}
+                </span>
+              ) : null}
+
+              {weakestFieldBadges.map((item) => (
+                <span
+                  key={item.key}
+                  className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-sm font-medium text-rose-700"
+                >
+                  {formatFieldLabel(item.key)}: {item.label || `${Math.round(item.score * 100)}%`}
+                </span>
+              ))}
+
+              {reviewFlags.slice(0, 4).map((flag) => (
+                <span
+                  key={flag}
+                  className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-700"
+                >
+                  {flag}
+                </span>
+              ))}
 
               {stageWarnings.length > 0 ? (
                 <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-700">
@@ -904,80 +1239,78 @@ export default function SetupStudioScene({
           ) : (
             <main className="px-4 pb-8 pt-4 sm:px-6 sm:pb-10 lg:px-10 lg:pt-5">
               <div className="mx-auto w-full max-w-[1600px]">
-                <div className="rounded-[28px] border border-white/60 bg-white/60 p-4 shadow-[0_20px_60px_rgba(15,23,42,.07)] backdrop-blur-xl sm:p-5 lg:p-6">
-                  <AnimatePresence mode="wait" initial={false}>
-                    {stage === "scanning" ? (
-                      <SetupStudioScanningStage
-                        key="scanning"
-                        lastUrl={
-                          discoveryState?.lastUrl ||
-                          discoveryState?.last_url ||
-                          discoveryState?.url ||
-                          ""
-                        }
-                        sourceLabel={sourceLabel}
-                        scanLines={scanLines}
-                        scanLineIndex={scanLineIndex}
-                        requestId={s(discoveryState?.requestId || discoveryState?.request_id)}
-                      />
-                    ) : null}
+                <AnimatePresence mode="wait" initial={false}>
+                  {stage === "scanning" ? (
+                    <SetupStudioScanningStage
+                      key="scanning"
+                      lastUrl={
+                        discoveryState?.lastUrl ||
+                        discoveryState?.last_url ||
+                        discoveryState?.url ||
+                        ""
+                      }
+                      sourceLabel={sourceLabel}
+                      scanLines={scanLines}
+                      scanLineIndex={scanLineIndex}
+                      requestId={s(discoveryState?.requestId || discoveryState?.request_id)}
+                    />
+                  ) : null}
 
-                    {stage === "identity" ? (
-                      <SetupStudioIdentityStage
-                        key="identity"
-                        currentTitle={resolvedCurrentTitle}
-                        currentDescription={resolvedCurrentDescription}
-                        discoveryProfileRows={safeDiscoveryProfileRows}
-                        discoveryWarnings={stageWarnings}
-                        sourceLabel={sourceLabel}
-                        onNext={goNextStage}
-                        onToggleRefine={handleOpenRefine}
-                      />
-                    ) : null}
+                  {stage === "identity" ? (
+                    <SetupStudioIdentityStage
+                      key="identity"
+                      currentTitle={resolvedCurrentTitle}
+                      currentDescription={resolvedCurrentDescription}
+                      discoveryProfileRows={safeDiscoveryProfileRows}
+                      discoveryWarnings={stageWarnings}
+                      sourceLabel={sourceLabel}
+                      onNext={goNextStage}
+                      onToggleRefine={handleOpenRefine}
+                    />
+                  ) : null}
 
-                    {stage === "knowledge" ? (
-                      <SetupStudioKnowledgeStage
-                        key="knowledge"
-                        knowledgePreview={stageKnowledgeItems}
-                        knowledgeItems={stageKnowledgeItems}
-                        actingKnowledgeId={actingKnowledgeId}
-                        sourceLabel={sourceLabel}
-                        warnings={stageWarnings}
-                        onApproveKnowledge={onApproveKnowledge}
-                        onRejectKnowledge={onRejectKnowledge}
-                        onNext={goNextStage}
-                        onToggleKnowledge={handleOpenKnowledge}
-                      />
-                    ) : null}
+                  {stage === "knowledge" ? (
+                    <SetupStudioKnowledgeStage
+                      key="knowledge"
+                      knowledgePreview={stageKnowledgeItems}
+                      knowledgeItems={stageKnowledgeItems}
+                      actingKnowledgeId={actingKnowledgeId}
+                      sourceLabel={sourceLabel}
+                      warnings={stageWarnings}
+                      onApproveKnowledge={onApproveKnowledge}
+                      onRejectKnowledge={onRejectKnowledge}
+                      onNext={goNextStage}
+                      onToggleKnowledge={handleOpenKnowledge}
+                    />
+                  ) : null}
 
-                    {stage === "service" ? (
-                      <SetupStudioServiceStage
-                        key="service"
-                        serviceSuggestionTitle={serviceSuggestionTitle}
-                        meta={meta}
-                        services={safeServices}
-                        sourceLabel={sourceLabel}
-                        savingServiceSuggestion={savingServiceSuggestion}
-                        onCreateSeed={handleCreateServiceAndNext}
-                        onSkip={goNextStage}
-                      />
-                    ) : null}
+                  {stage === "service" ? (
+                    <SetupStudioServiceStage
+                      key="service"
+                      serviceSuggestionTitle={serviceSuggestionTitle}
+                      meta={meta}
+                      services={safeServices}
+                      sourceLabel={sourceLabel}
+                      savingServiceSuggestion={savingServiceSuggestion}
+                      onCreateSeed={handleCreateServiceAndNext}
+                      onSkip={goNextStage}
+                    />
+                  ) : null}
 
-                    {stage === "ready" ? (
-                      <SetupStudioReadyStage
-                        key="ready"
-                        meta={meta}
-                        studioProgress={studioProgress}
-                        hasKnowledge={hasKnowledge}
-                        sourceLabel={sourceLabel}
-                        warnings={stageWarnings}
-                        onToggleRefine={handleOpenRefine}
-                        onToggleKnowledge={handleOpenKnowledge}
-                        onOpenWorkspace={handleOpenWorkspace}
-                      />
-                    ) : null}
-                  </AnimatePresence>
-                </div>
+                  {stage === "ready" ? (
+                    <SetupStudioReadyStage
+                      key="ready"
+                      meta={meta}
+                      studioProgress={studioProgress}
+                      hasKnowledge={hasKnowledge}
+                      sourceLabel={sourceLabel}
+                      warnings={stageWarnings}
+                      onToggleRefine={handleOpenRefine}
+                      onToggleKnowledge={handleOpenKnowledge}
+                      onOpenWorkspace={handleOpenWorkspace}
+                    />
+                  ) : null}
+                </AnimatePresence>
               </div>
             </main>
           )}

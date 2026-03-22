@@ -34,6 +34,8 @@ import {
   deriveStudioProgress,
 } from "./lib/setupStudioHelpers.js";
 
+const KNOWN_LANGS = new Set(["az", "en", "tr", "ru"]);
+
 function createEmptyReviewState() {
   return {
     session: null,
@@ -59,6 +61,15 @@ function createEmptyLegacyDraft() {
     completeness: {},
     confidenceSummary: {},
     rawDraft: {},
+    session: null,
+    draft: {},
+    sources: [],
+    events: [],
+    reviewRequired: false,
+    reviewFlags: [],
+    fieldConfidence: {},
+    mainLanguage: "",
+    primaryLanguage: "",
   };
 }
 
@@ -87,6 +98,11 @@ function createIdleDiscoveryState() {
     resultCount: 0,
     importedKnowledgeItems: [],
     importedServices: [],
+    mainLanguage: "",
+    primaryLanguage: "",
+    reviewRequired: false,
+    reviewFlags: [],
+    fieldConfidence: {},
   };
 }
 
@@ -137,6 +153,72 @@ function normalizeBootMeta(boot = {}, pendingKnowledge = [], serviceItems = []) 
     runtimeKnowledgeCount: Number(runtime?.knowledgeCount || 0),
     runtimeServiceCount: Number(runtime?.serviceCount || 0),
     runtimePlaybookCount: Number(runtime?.playbookCount || 0),
+  };
+}
+
+function resolveMainLanguageValue(...candidates) {
+  for (const candidate of candidates) {
+    const value = s(candidate).toLowerCase();
+    if (KNOWN_LANGS.has(value)) return value;
+  }
+  return "";
+}
+
+function normalizeFieldConfidenceMap(value = {}) {
+  const out = {};
+  const map = obj(value);
+
+  for (const [key, raw] of Object.entries(map)) {
+    if (!s(key)) continue;
+
+    if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+      const score = Number(raw.score ?? raw.value ?? raw.confidence);
+      out[key] = {
+        score: Number.isFinite(score) ? score : 0,
+        label: s(raw.label || raw.confidenceLabel),
+      };
+      continue;
+    }
+
+    const score = Number(raw);
+    out[key] = {
+      score: Number.isFinite(score) ? score : 0,
+      label: "",
+    };
+  }
+
+  return out;
+}
+
+function extractReviewMetadata(value = {}) {
+  const x = obj(value);
+
+  const reviewFlags = arr(
+    x.reviewFlags || x.review_flags || x.flags || x.review_flags_list
+  )
+    .map((item) => s(item))
+    .filter(Boolean);
+
+  const fieldConfidence = normalizeFieldConfidenceMap(
+    x.fieldConfidence || x.field_confidence
+  );
+
+  const mainLanguage = resolveMainLanguageValue(
+    x.mainLanguage,
+    x.main_language,
+    x.primaryLanguage,
+    x.primary_language,
+    x.language,
+    x.sourceLanguage,
+    x.source_language
+  );
+
+  return {
+    reviewRequired: !!(x.reviewRequired ?? x.review_required ?? false),
+    reviewFlags,
+    fieldConfidence,
+    mainLanguage,
+    primaryLanguage: mainLanguage,
   };
 }
 
@@ -289,6 +371,16 @@ function applyUiHintsFromMeta({
 
 function formFromProfile(profile = {}, prev = {}) {
   const x = obj(profile);
+  const resolvedLanguage =
+    resolveMainLanguageValue(
+      x.mainLanguage,
+      x.main_language,
+      x.primaryLanguage,
+      x.primary_language,
+      x.language,
+      x.sourceLanguage,
+      x.source_language
+    ) || s(prev.language || "az");
 
   return {
     ...prev,
@@ -309,9 +401,7 @@ function formFromProfile(profile = {}, prev = {}) {
         prev.description
     ),
     timezone: s(x.timezone || prev.timezone || "Asia/Baku"),
-    language: s(
-      x.mainLanguage || x.main_language || x.language || prev.language || "az"
-    ),
+    language: resolvedLanguage,
     websiteUrl: s(
       x.websiteUrl ||
         x.website_url ||
@@ -511,10 +601,21 @@ function draftItemsToText(items = [], mode = "default") {
 function mapCurrentReviewToLegacyDraft(review = {}) {
   const session = review?.session || null;
   const draft = obj(review?.draft);
-  const profile = obj(draft?.businessProfile);
+
+  const payloadProfile = obj(draft?.draftPayload?.profile);
+  const businessProfile = obj(draft?.businessProfile);
+  const mergedProfile = {
+    ...businessProfile,
+    ...payloadProfile,
+  };
+
+  const profileMeta = extractReviewMetadata(mergedProfile);
+  const draftMeta = extractReviewMetadata(draft);
+
   const capabilities = obj(draft?.capabilities);
   const sourceSummary = obj(draft?.sourceSummary);
   const latestImport = obj(sourceSummary?.latestImport);
+
   const services = arr(draft?.services).map((item) =>
     normalizeDraftServiceItem(item)
   );
@@ -544,12 +645,13 @@ function mapCurrentReviewToLegacyDraft(review = {}) {
     sourceRunId: s(sourceSummary?.latestRunId || latestImport?.runId),
     snapshotId: s(draft?.lastSnapshotId),
     quickSummary: s(
-      draft?.draftPayload?.profile?.summaryShort ||
-        profile?.summaryShort ||
-        profile?.description ||
-        profile?.summaryLong
+      payloadProfile?.summaryShort ||
+        payloadProfile?.companySummaryShort ||
+        mergedProfile?.summaryShort ||
+        mergedProfile?.description ||
+        mergedProfile?.summaryLong
     ),
-    overview: profile,
+    overview: mergedProfile,
     capabilities,
     sections: {
       services,
@@ -568,6 +670,23 @@ function mapCurrentReviewToLegacyDraft(review = {}) {
     confidenceSummary: obj(draft?.confidenceSummary),
     warnings: arr(draft?.warnings),
     rawDraft: draft,
+    session,
+    draft,
+    sources: arr(review?.sources),
+    events: arr(review?.events),
+    reviewRequired: !!(
+      draftMeta.reviewRequired || profileMeta.reviewRequired
+    ),
+    reviewFlags: arr(draftMeta.reviewFlags).length
+      ? arr(draftMeta.reviewFlags)
+      : arr(profileMeta.reviewFlags),
+    fieldConfidence: Object.keys(draftMeta.fieldConfidence).length
+      ? obj(draftMeta.fieldConfidence)
+      : obj(profileMeta.fieldConfidence),
+    mainLanguage:
+      draftMeta.mainLanguage || profileMeta.mainLanguage || "",
+    primaryLanguage:
+      draftMeta.primaryLanguage || profileMeta.primaryLanguage || "",
   };
 }
 
@@ -748,6 +867,21 @@ function buildBusinessProfilePatch({
 }) {
   const existing = obj(currentReview?.draft?.businessProfile);
 
+  const resolvedLanguage =
+    resolveMainLanguageValue(
+      businessForm.language,
+      existing.mainLanguage,
+      existing.primaryLanguage,
+      existing.language,
+      discoveryState.mainLanguage,
+      discoveryState.primaryLanguage,
+      discoveryState.language
+    ) || "en";
+
+  const supportedLanguages = arr(existing.supportedLanguages).length
+    ? arr(existing.supportedLanguages)
+    : [resolvedLanguage];
+
   return {
     ...existing,
     companyName: s(businessForm.companyName),
@@ -756,8 +890,10 @@ function buildBusinessProfilePatch({
     summaryShort: s(businessForm.description),
     summaryLong: s(businessForm.description || existing.summaryLong),
     description: s(businessForm.description),
-    mainLanguage: s(businessForm.language || "az"),
-    language: s(businessForm.language || "az"),
+    mainLanguage: resolvedLanguage,
+    primaryLanguage: resolvedLanguage,
+    language: resolvedLanguage,
+    supportedLanguages,
     timezone: s(businessForm.timezone || "Asia/Baku"),
     websiteUrl: s(
       businessForm.websiteUrl || existing.websiteUrl || discoveryState?.lastUrl
@@ -765,19 +901,39 @@ function buildBusinessProfilePatch({
     primaryPhone: s(businessForm.primaryPhone),
     primaryEmail: s(businessForm.primaryEmail),
     primaryAddress: s(businessForm.primaryAddress),
+    reviewRequired: !!(
+      existing.reviewRequired ?? discoveryState.reviewRequired ?? false
+    ),
+    reviewFlags: arr(existing.reviewFlags).length
+      ? arr(existing.reviewFlags)
+      : arr(discoveryState.reviewFlags),
+    fieldConfidence: Object.keys(obj(existing.fieldConfidence)).length
+      ? obj(existing.fieldConfidence)
+      : obj(discoveryState.fieldConfidence),
   };
 }
 
 function buildCapabilitiesPatch({ currentReview = {}, businessForm = {} }) {
   const existing = obj(currentReview?.draft?.capabilities);
-  const language = s(businessForm.language || "az");
+
+  const language =
+    resolveMainLanguageValue(
+      businessForm.language,
+      existing.primaryLanguage,
+      existing.mainLanguage,
+      existing.language
+    ) || "en";
+
+  const supportedLanguages = arr(existing.supportedLanguages).length
+    ? arr(existing.supportedLanguages)
+    : [language];
 
   return {
     ...existing,
     primaryLanguage: language,
     mainLanguage: language,
-    supportedLanguages: language ? [language] : [],
-    supportsMultilanguage: false,
+    supportedLanguages,
+    supportsMultilanguage: supportedLanguages.length > 1,
   };
 }
 
@@ -1093,6 +1249,57 @@ export default function SetupStudioScreen() {
     }));
   }
 
+  function syncDiscoveryStateFromReview(review = {}, { preserveCounts = true } = {}) {
+    const normalized = normalizeReviewState(review);
+    const legacy = mapCurrentReviewToLegacyDraft(normalized);
+    const profile = obj(legacy.overview);
+    const metadata = extractReviewMetadata({
+      ...legacy,
+      ...profile,
+      reviewRequired: legacy.reviewRequired,
+      reviewFlags: legacy.reviewFlags,
+      fieldConfidence: legacy.fieldConfidence,
+      mainLanguage: legacy.mainLanguage || profile.mainLanguage,
+      primaryLanguage: legacy.primaryLanguage || profile.primaryLanguage,
+    });
+
+    setDiscoveryState((prev) => ({
+      ...prev,
+      mainLanguage:
+        metadata.mainLanguage || prev.mainLanguage || "",
+      primaryLanguage:
+        metadata.primaryLanguage || prev.primaryLanguage || "",
+      reviewRequired: metadata.reviewRequired,
+      reviewFlags: arr(metadata.reviewFlags),
+      fieldConfidence: obj(metadata.fieldConfidence),
+      reviewSessionId: s(normalized?.session?.id || prev.reviewSessionId),
+      reviewSessionStatus: s(
+        normalized?.session?.status || prev.reviewSessionStatus
+      ),
+      hasResults:
+        prev.hasResults ||
+        hasMeaningfulProfile(profile) ||
+        arr(normalized?.sources).length > 0 ||
+        arr(normalized?.events).length > 0 ||
+        arr(legacy.reviewQueue).length > 0 ||
+        arr(legacy.sections?.services).length > 0,
+      resultCount: preserveCounts
+        ? prev.resultCount
+        : arr(legacy.reviewQueue).length +
+          arr(legacy.sections?.services).length +
+          arr(normalized?.sources).length +
+          arr(normalized?.events).length,
+      profile: Object.keys(profile).length ? profile : obj(prev.profile),
+      warnings: arr(legacy.warnings).length ? arr(legacy.warnings) : arr(prev.warnings),
+      candidateCount: preserveCounts
+        ? prev.candidateCount
+        : Number(legacy.stats?.knowledgeCount || prev.candidateCount || 0),
+      sourceRunId: s(legacy.sourceRunId || prev.sourceRunId),
+      snapshotId: s(legacy.snapshotId || prev.snapshotId),
+      sourceId: s(legacy.sourceId || prev.sourceId),
+    }));
+  }
+
   function applyReviewState(
     reviewPayload = {},
     { preserveBusinessForm = false, fallbackProfile = {} } = {}
@@ -1139,6 +1346,8 @@ export default function SetupStudioScreen() {
           ? s(prev.policiesText)
           : s(nextManualSections.policiesText),
     }));
+
+    syncDiscoveryStateFromReview(normalized, { preserveCounts: false });
 
     return {
       currentReview: normalized,
@@ -1230,7 +1439,13 @@ export default function SetupStudioScreen() {
                 companyName: s(profile?.companyName),
                 description: s(profile?.description),
                 timezone: s(profile?.timezone || "Asia/Baku"),
-                language: firstLanguage(profile),
+                language:
+                  resolveMainLanguageValue(
+                    profile?.mainLanguage,
+                    profile?.primaryLanguage,
+                    profile?.language,
+                    firstLanguage(profile)
+                  ) || "az",
                 websiteUrl: s(profile?.websiteUrl || profile?.website_url),
                 primaryPhone: s(profile?.primaryPhone || profile?.primary_phone),
                 primaryEmail: s(profile?.primaryEmail || profile?.primary_email),
@@ -1261,6 +1476,8 @@ export default function SetupStudioScreen() {
               ? s(prev.policiesText)
               : s(nextManualSections.policiesText),
         }));
+
+        syncDiscoveryStateFromReview(reviewState, { preserveCounts: false });
 
         applyUiHintsFromMeta({
           nextMeta,
@@ -1295,7 +1512,13 @@ export default function SetupStudioScreen() {
           companyName: s(profile?.companyName),
           description: s(profile?.description),
           timezone: s(profile?.timezone || "Asia/Baku"),
-          language: firstLanguage(profile),
+          language:
+            resolveMainLanguageValue(
+              profile?.mainLanguage,
+              profile?.primaryLanguage,
+              profile?.language,
+              firstLanguage(profile)
+            ) || "az",
           websiteUrl: s(profile?.websiteUrl || profile?.website_url),
           primaryPhone: s(profile?.primaryPhone || profile?.primary_phone),
           primaryEmail: s(profile?.primaryEmail || profile?.primary_email),
@@ -1424,6 +1647,9 @@ export default function SetupStudioScreen() {
         message: scanStartLabel(sourceType),
         warnings: [],
         shouldReview: false,
+        reviewRequired: false,
+        reviewFlags: [],
+        fieldConfidence: {},
         hasResults: false,
         resultCount: 0,
         importedKnowledgeItems: [],
@@ -1452,13 +1678,33 @@ export default function SetupStudioScreen() {
         helperProfilePatch
       );
 
+      const resultMetadata = extractReviewMetadata({
+        ...discoveredProfile,
+        reviewRequired:
+          result?.reviewRequired ?? legacyImportedDraft?.reviewRequired ?? false,
+        reviewFlags:
+          result?.reviewFlags || legacyImportedDraft?.reviewFlags || [],
+        fieldConfidence:
+          result?.fieldConfidence || legacyImportedDraft?.fieldConfidence || {},
+        mainLanguage:
+          result?.mainLanguage ||
+          legacyImportedDraft?.mainLanguage ||
+          discoveredProfile?.mainLanguage,
+      });
+
       setBusinessForm((prev) => {
         const mergedFromHelper = mergeBusinessForm(prev, helperProfilePatch);
-        return hydrateBusinessFormFromProfile(
+        const next = hydrateBusinessFormFromProfile(
           mergedFromHelper,
           bestIncomingProfile,
           { force: false }
         );
+
+        if (!s(next.language) && resultMetadata.mainLanguage) {
+          next.language = resultMetadata.mainLanguage;
+        }
+
+        return next;
       });
 
       if (result?.review) {
@@ -1492,6 +1738,23 @@ export default function SetupStudioScreen() {
         snapshotId,
         importedKnowledgeItems: arr(result?.candidates || result?.knowledgeItems),
         importedServices: arr(result?.services),
+        mainLanguage:
+          resultMetadata.mainLanguage ||
+          resolveMainLanguageValue(
+            discoveredProfile?.mainLanguage,
+            discoveredProfile?.primaryLanguage,
+            discoveredProfile?.language
+          ),
+        primaryLanguage:
+          resultMetadata.primaryLanguage ||
+          resolveMainLanguageValue(
+            discoveredProfile?.primaryLanguage,
+            discoveredProfile?.mainLanguage,
+            discoveredProfile?.language
+          ),
+        reviewRequired: !!(result?.shouldReview || resultMetadata.reviewRequired),
+        reviewFlags: arr(resultMetadata.reviewFlags),
+        fieldConfidence: obj(resultMetadata.fieldConfidence),
       };
 
       const importedVisibleKnowledgeItems = deriveVisibleKnowledgeItems({
@@ -1541,7 +1804,18 @@ export default function SetupStudioScreen() {
         warnings: resultWarnings,
         requestId: s(result?.requestId),
         intakeContext: obj(result?.intakeContext),
-        profile: discoveredProfile,
+        profile: {
+          ...bestIncomingProfile,
+          mainLanguage:
+            immediateDiscoveryState.mainLanguage ||
+            bestIncomingProfile.mainLanguage,
+          primaryLanguage:
+            immediateDiscoveryState.primaryLanguage ||
+            bestIncomingProfile.primaryLanguage,
+          reviewRequired: immediateDiscoveryState.reviewRequired,
+          reviewFlags: arr(immediateDiscoveryState.reviewFlags),
+          fieldConfidence: obj(immediateDiscoveryState.fieldConfidence),
+        },
         signals: obj(result?.signals),
         snapshot: obj(result?.snapshot),
         sourceId,
@@ -1559,6 +1833,11 @@ export default function SetupStudioScreen() {
           importedProfileRows.length,
         importedKnowledgeItems: arr(result?.candidates || result?.knowledgeItems),
         importedServices: arr(result?.services),
+        mainLanguage: immediateDiscoveryState.mainLanguage,
+        primaryLanguage: immediateDiscoveryState.primaryLanguage,
+        reviewRequired: immediateDiscoveryState.reviewRequired,
+        reviewFlags: arr(immediateDiscoveryState.reviewFlags),
+        fieldConfidence: obj(immediateDiscoveryState.fieldConfidence),
       });
 
       const refreshResult = await refreshAndMaybeRouteHome({
@@ -1879,6 +2158,7 @@ export default function SetupStudioScreen() {
       visibleSources.length > 0 ||
       visibleEvents.length > 0 ||
       arr(discoveryState?.warnings).length > 0 ||
+      arr(discoveryState?.reviewFlags).length > 0 ||
       s(reviewDraft?.quickSummary)
     );
   }, [
@@ -1890,6 +2170,7 @@ export default function SetupStudioScreen() {
     visibleSources,
     visibleEvents,
     discoveryState?.warnings,
+    discoveryState?.reviewFlags,
     reviewDraft?.quickSummary,
   ]);
 
@@ -1898,6 +2179,10 @@ export default function SetupStudioScreen() {
       const status = s(item.status).toLowerCase();
       return !status || status === "pending" || status === "review";
     }).length;
+
+    const mergedReviewFlags = arr(reviewDraft?.reviewFlags).length
+      ? arr(reviewDraft.reviewFlags)
+      : arr(discoveryState.reviewFlags);
 
     return {
       ...meta,
@@ -1909,8 +2194,22 @@ export default function SetupStudioScreen() {
         Number(meta.serviceCount || 0),
         visibleServiceItems.length
       ),
+      mainLanguage:
+        resolveMainLanguageValue(
+          reviewDraft?.mainLanguage,
+          draftBackedProfile?.mainLanguage,
+          discoveryState?.mainLanguage,
+          businessForm?.language
+        ) || "",
+      reviewRequired: !!(
+        reviewDraft?.reviewRequired || discoveryState?.reviewRequired
+      ),
+      reviewFlags: mergedReviewFlags,
+      fieldConfidence: Object.keys(obj(reviewDraft?.fieldConfidence)).length
+        ? obj(reviewDraft.fieldConfidence)
+        : obj(discoveryState.fieldConfidence),
     };
-  }, [meta, visibleKnowledgeItems, visibleServiceItems]);
+  }, [meta, visibleKnowledgeItems, visibleServiceItems, reviewDraft, discoveryState, draftBackedProfile, businessForm]);
 
   const serviceSuggestionTitle = useMemo(() => {
     const derived = deriveSuggestedServicePayload({
@@ -2006,6 +2305,8 @@ export default function SetupStudioScreen() {
       String(visibleSources.length),
       String(visibleEvents.length),
       s(discoveryState.mode),
+      s(discoveryState.mainLanguage),
+      String(arr(discoveryState.reviewFlags).length),
     ]
       .filter(Boolean)
       .join("|");
@@ -2019,6 +2320,8 @@ export default function SetupStudioScreen() {
     visibleSources.length,
     visibleEvents.length,
     discoveryState.mode,
+    discoveryState.mainLanguage,
+    discoveryState.reviewFlags,
   ]);
 
   useEffect(() => {
