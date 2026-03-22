@@ -1,12 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  AlertTriangle,
   ArrowRight,
   Check,
   ChevronDown,
+  Globe2,
   Link2,
   Loader2,
+  MapPinned,
+  Mic,
+  PencilLine,
   Plus,
+  Sparkles,
 } from "lucide-react";
 
 import websiteIcon from "../../../assets/setup-studio/channels/weblink.webp";
@@ -24,32 +30,10 @@ const SOURCE_OPTIONS = [
     label: "Website",
     placeholder: "yourbusiness.com",
     imageSrc: websiteIcon,
-    theme: "website",
     priority: "primary",
     actionLabel: "Add",
     canStartScan: true,
-  },
-  {
-    key: "instagram",
-    apiSourceType: "instagram",
-    label: "Instagram",
-    placeholder: "@yourbrand",
-    imageSrc: instagramIcon,
-    theme: "instagram",
-    priority: "primary",
-    actionLabel: "Connect",
-    canStartScan: false,
-  },
-  {
-    key: "facebook",
-    apiSourceType: "facebook",
-    label: "Facebook",
-    placeholder: "facebook.com/yourbrand",
-    imageSrc: facebookIcon,
-    theme: "facebook",
-    priority: "primary",
-    actionLabel: "Connect",
-    canStartScan: false,
+    helper: "Use your main website as the first source.",
   },
   {
     key: "googleMaps",
@@ -57,10 +41,32 @@ const SOURCE_OPTIONS = [
     label: "Google Maps",
     placeholder: "maps link or business name",
     imageSrc: googleMapsIcon,
-    theme: "google-maps",
     priority: "primary",
     actionLabel: "Add",
     canStartScan: true,
+    helper: "Use a Maps link or business name to start.",
+  },
+  {
+    key: "instagram",
+    apiSourceType: "instagram",
+    label: "Instagram",
+    placeholder: "@yourbrand",
+    imageSrc: instagramIcon,
+    priority: "primary",
+    actionLabel: "Connect",
+    canStartScan: false,
+    helper: "Attach as context for later.",
+  },
+  {
+    key: "facebook",
+    apiSourceType: "facebook",
+    label: "Facebook",
+    placeholder: "facebook.com/yourbrand",
+    imageSrc: facebookIcon,
+    priority: "primary",
+    actionLabel: "Connect",
+    canStartScan: false,
+    helper: "Attach as context for later.",
   },
   {
     key: "linkedin",
@@ -68,10 +74,10 @@ const SOURCE_OPTIONS = [
     label: "LinkedIn",
     placeholder: "linkedin.com/company/yourbrand",
     imageSrc: linkedinIcon,
-    theme: "linkedin",
     priority: "primary",
     actionLabel: "Connect",
     canStartScan: false,
+    helper: "Attach as context for later.",
   },
   {
     key: "tiktok",
@@ -79,10 +85,10 @@ const SOURCE_OPTIONS = [
     label: "TikTok",
     placeholder: "@yourbrand",
     imageSrc: tiktokIcon,
-    theme: "tiktok",
     priority: "secondary",
     actionLabel: "Connect",
     canStartScan: false,
+    helper: "Optional context source.",
   },
   {
     key: "youtube",
@@ -90,10 +96,10 @@ const SOURCE_OPTIONS = [
     label: "YouTube",
     placeholder: "@yourbrand",
     imageSrc: youtubeIcon,
-    theme: "youtube",
     priority: "secondary",
     actionLabel: "Connect",
     canStartScan: false,
+    helper: "Optional context source.",
   },
 ];
 
@@ -142,7 +148,6 @@ function normalizeInstagram(v) {
   const x = s(v);
   if (!x) return "";
   if (/^https?:\/\//i.test(x)) return x;
-
   return `https://instagram.com/${cleanHandle(x).replace(/^instagram\.com\//i, "")}`;
 }
 
@@ -266,7 +271,6 @@ function parseStudioSources(raw) {
     const [label, ...rest] = line.split(":");
     const value = rest.join(":").trim();
     const key = normalizeSourceKey(label);
-
     if (!key || !value) continue;
     out[key] = value;
   }
@@ -280,23 +284,16 @@ function parseStudioPrimary(raw) {
   const idx = text.indexOf(marker);
 
   if (idx === -1) {
-    return {
-      sourceType: "",
-      url: "",
-    };
+    return { sourceType: "", url: "" };
   }
 
   const block = text.slice(idx + marker.length).trim();
-  const out = {
-    sourceType: "",
-    url: "",
-  };
+  const out = { sourceType: "", url: "" };
 
   for (const line of block.split(/\r?\n/)) {
     const [label, ...rest] = line.split(":");
     const value = rest.join(":").trim();
     const key = s(label).toLowerCase();
-
     if (key === "sourcetype") out.sourceType = value;
     if (key === "url") out.url = value;
   }
@@ -358,7 +355,6 @@ function buildInitialSourceOrder(values, primaryUrl, primarySourceType = "") {
   const primaryKey = normalizedPrimaryType || detectPrimaryKey(primaryUrl);
 
   if (!primaryKey || !filled.includes(primaryKey)) return filled;
-
   return [primaryKey, ...filled.filter((key) => key !== primaryKey)];
 }
 
@@ -417,6 +413,53 @@ function normalizeAnalysisRows(rows = []) {
     .filter((item) => item.label || item.value);
 }
 
+function isBarrierWarning(value = "") {
+  const x = s(value).toLowerCase();
+  return [
+    "http_403",
+    "http_429",
+    "fetch_failed",
+    "non_html_response",
+    "website_fetch_timeout",
+    "website_entry_timeout",
+  ].includes(x);
+}
+
+function humanizeWarning(value = "") {
+  const x = s(value).toLowerCase();
+
+  if (x === "http_403") return "This website blocked direct access.";
+  if (x === "http_429") return "This website rate-limited the request.";
+  if (x === "fetch_failed") return "The website could not be read.";
+  if (x === "non_html_response") return "The source did not return a readable webpage.";
+  if (x === "website_fetch_timeout") return "The website took too long to respond.";
+  if (x === "website_entry_timeout") return "The first page took too long to load.";
+  if (x === "sitemap_fetch_timeout") return "The sitemap took too long, but some analysis may still exist.";
+  if (x === "some_pages_rejected_as_weak_or_placeholder") return "Weak or placeholder pages were ignored.";
+
+  return s(value).replaceAll("_", " ");
+}
+
+function isBlockedLikeTitle(value = "") {
+  const x = s(value).toLowerCase();
+  return (
+    !x ||
+    x === "business identity" ||
+    x === "http_403" ||
+    x === "http_429" ||
+    x === "fetch_failed" ||
+    x === "non_html_response"
+  );
+}
+
+function hasMeaningfulText(value = "") {
+  const x = s(value);
+  if (!x) return false;
+  if (/^(http_403|http_429|fetch_failed|non_html_response)$/i.test(x)) return false;
+  if (x.length < 8) return false;
+  return true;
+}
+
 function SourceMark({ item, className = "" }) {
   return (
     <img
@@ -428,10 +471,10 @@ function SourceMark({ item, className = "" }) {
   );
 }
 
-function ResultRow({ label, value }) {
+function DetailRow({ label, value }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+    <div className="rounded-[20px] border border-slate-200/80 bg-white/88 px-4 py-3.5 shadow-[0_10px_24px_rgba(15,23,42,.03)]">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
         {label || "Field"}
       </div>
       <div className="mt-1.5 break-words text-sm leading-6 text-slate-700">
@@ -441,15 +484,15 @@ function ResultRow({ label, value }) {
   );
 }
 
-const cardVariants = {
-  hidden: { opacity: 0, y: 14, scale: 0.985 },
+const enterVariants = {
+  hidden: { opacity: 0, y: 12, scale: 0.988 },
   visible: (index) => ({
     opacity: 1,
     y: 0,
     scale: 1,
     transition: {
-      duration: 0.36,
-      delay: 0.05 + index * 0.04,
+      duration: 0.34,
+      delay: 0.04 + index * 0.04,
       ease: [0.22, 1, 0.36, 1],
     },
   }),
@@ -545,11 +588,13 @@ export default function SetupStudioEntryStage({
   const [drafts, setDrafts] = useState(initialValues);
   const [sources, setSources] = useState(initialValues);
   const [sourceOrder, setSourceOrder] = useState(initialOrder);
+  const [briefNote, setBriefNote] = useState(plainNote);
 
   useEffect(() => {
     setDrafts(initialValues);
     setSources(initialValues);
     setSourceOrder(initialOrder);
+    setBriefNote(plainNote);
 
     const firstFilled =
       initialOrder[0] ||
@@ -558,9 +603,11 @@ export default function SetupStudioEntryStage({
 
     setActiveKey(firstFilled);
     setSecondaryOpen(
-      SOURCE_OPTIONS.some((item) => item.priority === "secondary" && s(initialValues[item.key]))
+      SOURCE_OPTIONS.some(
+        (item) => item.priority === "secondary" && s(initialValues[item.key])
+      )
     );
-  }, [initialValues, initialOrder]);
+  }, [initialValues, initialOrder, plainNote]);
 
   const normalizedMap = useMemo(
     () => ({
@@ -608,8 +655,8 @@ export default function SetupStudioEntryStage({
     const parts = [];
     const sourceLines = addedSources.map((item) => `${item.key}: ${item.url}`);
 
-    if (plainNote) {
-      parts.push(plainNote);
+    if (briefNote) {
+      parts.push(briefNote);
     }
 
     if (primaryScannableSource?.apiSourceType && primaryScannableSource?.url) {
@@ -627,7 +674,7 @@ export default function SetupStudioEntryStage({
     }
 
     return parts.join("\n\n").trim();
-  }, [addedSources, plainNote, primaryScannableSource]);
+  }, [addedSources, briefNote, primaryScannableSource]);
 
   useEffect(() => {
     const nextPrimaryUrl = primaryScanUrl;
@@ -662,8 +709,54 @@ export default function SetupStudioEntryStage({
     () => normalizeAnalysisRows(analysisProfileRows),
     [analysisProfileRows]
   );
+
   const firstReviewSource = obj(arr(analysisReviewSources)[0]);
   const firstReviewEvent = obj(arr(analysisReviewEvents)[0]);
+
+  const barrierWarning = safeAnalysisWarnings.find(isBarrierWarning) || "";
+  const barrierState = !!barrierWarning;
+
+  const detailRows = useMemo(() => {
+    if (!barrierState) return normalizedAnalysisRows;
+
+    return normalizedAnalysisRows.filter((row) => {
+      const label = s(row.label).toLowerCase();
+      return !["website", "url", "language"].includes(label);
+    });
+  }, [normalizedAnalysisRows, barrierState]);
+
+  const hasReviewableDraft = !!(
+    !barrierState &&
+    (
+      detailRows.length > 0 ||
+      n(analysisKnowledgeCount) > 0 ||
+      n(analysisServiceCount) > 0 ||
+      n(analysisSourceCount) > 0 ||
+      n(analysisEventCount) > 0 ||
+      hasMeaningfulText(analysisDescription) ||
+      hasMeaningfulText(analysisMessage) ||
+      !isBlockedLikeTitle(analysisTitle)
+    )
+  );
+
+  const resultHeadline = barrierState
+    ? "This source needs a different starting point."
+    : !isBlockedLikeTitle(analysisTitle)
+      ? analysisTitle
+      : "Your first business draft is taking shape.";
+
+  const resultSummary = barrierState
+    ? humanizeWarning(barrierWarning)
+    : truncateText(
+        s(analysisMessage) || s(analysisDescription) || "Review the first pass, refine anything important, then continue into launch setup.",
+        240
+      );
+
+  const strategyLabel = primaryScannableSource
+    ? primaryScannableSource.key === "website"
+      ? "Website will be scanned first. Other connected sources stay attached as context."
+      : "Google Maps will be scanned first. Other connected sources stay attached as context."
+    : "Add a Website or Google Maps source to start the first pass. Other sources can already be attached as context.";
 
   function handlePickSource(key) {
     setActiveKey(key);
@@ -729,11 +822,12 @@ export default function SetupStudioEntryStage({
     return !!s(sources[key]);
   }
 
-  const dockNote = primaryScannableSource
-    ? primaryScannableSource.key === "website"
-      ? "Website will be used for the first scan. Other connected sources are attached as context."
-      : "Google Maps will be used for the first scan. Other connected sources are attached as context."
-    : "Add a Website or Google Maps source to start the first scan. Other sources can already be attached as context.";
+  function sourceAccentClasses(itemKey, selected) {
+    if (selected) {
+      return "border-slate-300 bg-white shadow-[0_16px_34px_rgba(15,23,42,.06)] ring-1 ring-sky-200/70";
+    }
+    return "border-slate-200/80 bg-white/78 hover:border-slate-300 hover:bg-white";
+  }
 
   const shouldShowResults = analysisLoading || hasAnalysis;
 
@@ -744,229 +838,317 @@ export default function SetupStudioEntryStage({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
       transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
-      className="mx-auto flex w-full max-w-[1520px] flex-col gap-5"
+      className="flex w-full flex-col gap-5"
     >
-      <div className="mx-auto flex w-full max-w-[1240px] flex-col items-center gap-3 pt-1 text-center">
-        <div className="rounded-full border border-slate-200 bg-white/85 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500 shadow-sm sm:text-[12px]">
-          Source setup
-        </div>
-
-        <h1 className="max-w-[1180px] text-[clamp(36px,5.6vw,72px)] font-semibold leading-[0.9] tracking-[-0.065em] text-slate-950">
-          Connect what already exists
-        </h1>
-
-        <p className="max-w-[760px] text-[15px] leading-7 text-slate-500 sm:text-[17px] sm:leading-8">
-          Start with your public business sources, then analyze everything we can find.
-        </p>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-        {primarySources.map((item, index) => (
-          <motion.button
-            key={item.key}
-            type="button"
-            custom={index}
-            variants={cardVariants}
-            initial="hidden"
-            animate="visible"
-            className={`group relative min-h-[154px] rounded-[24px] border bg-white/80 p-4 text-left shadow-[0_14px_36px_rgba(15,23,42,.05)] backdrop-blur transition-all duration-200 ${
-              activeKey === item.key
-                ? "border-slate-300 ring-2 ring-blue-200/60"
-                : "border-slate-200 hover:border-slate-300"
-            }`}
-            onClick={() => handlePickSource(item.key)}
-          >
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <SourceMark item={item} className="h-9 w-9 rounded-xl object-contain" />
-              <span
-                className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.15em] ${
-                  isSourceAdded(item.key)
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                    : "border-slate-200 bg-slate-50 text-slate-500"
-                }`}
-              >
-                {isSourceAdded(item.key) ? "Added" : "Select"}
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.08fr)_minmax(420px,.92fr)]">
+        <div className="overflow-hidden rounded-[30px] border border-white/70 bg-white/78 shadow-[0_24px_70px_rgba(15,23,42,.08)] backdrop-blur-xl">
+          <div className="border-b border-slate-200/70 px-5 py-5 sm:px-6">
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-sky-100 bg-sky-50 text-sky-700">
+                <Globe2 className="h-5 w-5" />
               </span>
-            </div>
 
-            <div className="space-y-1.5">
-              <div className="text-[17px] font-semibold text-slate-900">{item.label}</div>
-              <div className="min-h-[20px] text-sm text-slate-500">
-                {isSourceAdded(item.key)
-                  ? formatSourceValue(item.key, sources[item.key])
-                  : item.actionLabel}
-              </div>
-            </div>
-
-            <div
-              className={`mt-4 h-[3px] rounded-full transition-all ${
-                activeKey === item.key ? "bg-blue-500" : "bg-transparent"
-              }`}
-            />
-          </motion.button>
-        ))}
-
-        <motion.button
-          type="button"
-          custom={primarySources.length}
-          variants={cardVariants}
-          initial="hidden"
-          animate="visible"
-          className={`group relative min-h-[154px] rounded-[24px] border border-slate-200 bg-white/80 p-4 text-left shadow-[0_14px_36px_rgba(15,23,42,.05)] backdrop-blur transition-all duration-200 hover:border-slate-300 ${
-            secondaryOpen ? "ring-2 ring-blue-200/60" : ""
-          }`}
-          onClick={() => setSecondaryOpen((prev) => !prev)}
-        >
-          <div className="mb-4 flex items-start justify-between gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-50 text-2xl leading-none text-slate-900">
-              +
-            </div>
-            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-slate-500">
-              Optional
-            </span>
-          </div>
-
-          <div className="space-y-1.5">
-            <div className="text-[17px] font-semibold text-slate-900">More sources</div>
-            <div className="text-sm text-slate-500">TikTok · YouTube</div>
-          </div>
-
-          <ChevronDown
-            className={`absolute bottom-4 right-4 h-5 w-5 text-slate-400 transition ${
-              secondaryOpen ? "rotate-180" : ""
-            }`}
-          />
-        </motion.button>
-      </div>
-
-      <AnimatePresence initial={false}>
-        {secondaryOpen ? (
-          <motion.div
-            className="flex flex-wrap gap-3"
-            initial={{ opacity: 0, y: -10, height: 0 }}
-            animate={{ opacity: 1, y: 0, height: "auto" }}
-            exit={{ opacity: 0, y: -8, height: 0 }}
-            transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
-          >
-            {secondarySources.map((item, index) => (
-              <motion.button
-                key={item.key}
-                type="button"
-                initial={{ opacity: 0, x: -14 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -10 }}
-                transition={{ duration: 0.26, delay: index * 0.05, ease: [0.22, 1, 0.36, 1] }}
-                className={`inline-flex items-center gap-3 rounded-2xl border px-4 py-2.5 text-sm font-medium shadow-sm transition ${
-                  activeKey === item.key
-                    ? "border-slate-300 bg-white text-slate-900 ring-2 ring-blue-200/60"
-                    : "border-slate-200 bg-white/80 text-slate-600 hover:border-slate-300"
-                }`}
-                onClick={() => handlePickSource(item.key)}
-              >
-                <SourceMark item={item} className="h-6 w-6 rounded-lg object-contain" />
-                <span>{item.label}</span>
-                {isSourceAdded(item.key) ? <Check className="h-4 w-4 text-emerald-600" /> : null}
-              </motion.button>
-            ))}
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-
-      <motion.div
-        layout
-        transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
-        className="overflow-hidden rounded-[28px] border border-slate-200 bg-white/85 shadow-[0_24px_70px_rgba(15,23,42,.08)] backdrop-blur-xl"
-      >
-        <div className="border-b border-slate-200/80 px-4 py-4 sm:px-5 lg:px-6">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-3">
-              <SourceMark item={activeSource} className="h-10 w-10 rounded-2xl object-contain" />
               <div>
-                <div className="text-[15px] font-semibold text-slate-900">{activeSource.label}</div>
-                <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400 sm:text-[12px]">
-                  {isSourceAdded(activeKey) ? "Connected" : "Ready to connect"}
+                <div className="text-[15px] font-semibold text-slate-950">
+                  Choose a starting point
+                </div>
+                <div className="mt-1 max-w-[620px] text-sm leading-6 text-slate-600">
+                  Add one source to begin, then attach anything else that helps the draft feel closer to the real business.
                 </div>
               </div>
             </div>
+          </div>
 
-            <div className="inline-flex items-center gap-2 self-start rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-[12px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-              <Link2 className="h-4 w-4" />
-              Handle or link
+          <div className="space-y-5 px-5 py-5 sm:px-6">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {primarySources.map((item, index) => (
+                <motion.button
+                  key={item.key}
+                  type="button"
+                  custom={index}
+                  variants={enterVariants}
+                  initial="hidden"
+                  animate="visible"
+                  onClick={() => handlePickSource(item.key)}
+                  className={`group min-h-[138px] rounded-[24px] border p-4 text-left transition-all duration-200 ${sourceAccentClasses(
+                    item.key,
+                    activeKey === item.key
+                  )}`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <SourceMark item={item} className="h-10 w-10 rounded-2xl object-contain" />
+
+                    <span
+                      className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${
+                        isSourceAdded(item.key)
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                          : activeKey === item.key
+                            ? "border-sky-200 bg-sky-50 text-sky-700"
+                            : "border-slate-200 bg-slate-50 text-slate-500"
+                      }`}
+                    >
+                      {isSourceAdded(item.key) ? "Added" : item.canStartScan ? "Primary" : "Context"}
+                    </span>
+                  </div>
+
+                  <div className="mt-5">
+                    <div className="text-[16px] font-semibold text-slate-950">
+                      {item.label}
+                    </div>
+                    <div className="mt-1 text-sm leading-6 text-slate-500">
+                      {isSourceAdded(item.key)
+                        ? formatSourceValue(item.key, sources[item.key])
+                        : item.helper}
+                    </div>
+                  </div>
+                </motion.button>
+              ))}
+
+              <motion.button
+                type="button"
+                custom={primarySources.length}
+                variants={enterVariants}
+                initial="hidden"
+                animate="visible"
+                onClick={() => setSecondaryOpen((prev) => !prev)}
+                className={`min-h-[138px] rounded-[24px] border p-4 text-left transition-all duration-200 ${
+                  secondaryOpen
+                    ? "border-slate-300 bg-white ring-1 ring-sky-200/70"
+                    : "border-slate-200/80 bg-white/78 hover:border-slate-300 hover:bg-white"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-700">
+                    <Plus className="h-5 w-5" />
+                  </span>
+
+                  <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    Optional
+                  </span>
+                </div>
+
+                <div className="mt-5">
+                  <div className="text-[16px] font-semibold text-slate-950">
+                    More context
+                  </div>
+                  <div className="mt-1 text-sm leading-6 text-slate-500">
+                    Add TikTok or YouTube later as extra signal.
+                  </div>
+                </div>
+
+                <ChevronDown
+                  className={`mt-4 h-5 w-5 text-slate-400 transition ${
+                    secondaryOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </motion.button>
+            </div>
+
+            <AnimatePresence initial={false}>
+              {secondaryOpen ? (
+                <motion.div
+                  initial={{ opacity: 0, y: -8, height: 0 }}
+                  animate={{ opacity: 1, y: 0, height: "auto" }}
+                  exit={{ opacity: 0, y: -8, height: 0 }}
+                  transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                  className="overflow-hidden"
+                >
+                  <div className="flex flex-wrap gap-2.5">
+                    {secondarySources.map((item) => (
+                      <button
+                        key={item.key}
+                        type="button"
+                        onClick={() => handlePickSource(item.key)}
+                        className={`inline-flex items-center gap-2.5 rounded-full border px-4 py-2.5 text-sm font-medium transition ${
+                          activeKey === item.key
+                            ? "border-slate-300 bg-white text-slate-950 ring-1 ring-sky-200/70"
+                            : "border-slate-200 bg-white/86 text-slate-600 hover:border-slate-300"
+                        }`}
+                      >
+                        <SourceMark item={item} className="h-5 w-5 rounded-lg object-contain" />
+                        <span>{item.label}</span>
+                        {isSourceAdded(item.key) ? (
+                          <Check className="h-4 w-4 text-emerald-600" />
+                        ) : null}
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
+
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-[22px] border border-slate-200/80 bg-slate-50/72 p-4">
+                <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                  <Sparkles className="h-4 w-4" />
+                  Smart draft
+                </div>
+                <div className="mt-2 text-sm leading-6 text-slate-600">
+                  The system should prepare the first draft, then let you confirm it.
+                </div>
+              </div>
+
+              <div className="rounded-[22px] border border-slate-200/80 bg-slate-50/72 p-4">
+                <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                  <PencilLine className="h-4 w-4" />
+                  Assisted manual
+                </div>
+                <div className="mt-2 text-sm leading-6 text-slate-600">
+                  Add one source, then describe the business in a few lines if anything important is missing.
+                </div>
+              </div>
+
+              <div className="rounded-[22px] border border-slate-200/80 bg-slate-50/72 p-4">
+                <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                  <Mic className="h-4 w-4" />
+                  Voice later
+                </div>
+                <div className="mt-2 text-sm leading-6 text-slate-600">
+                  Voice intake can come later. For now, type a short brief and keep the first launch stable.
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="space-y-4 px-4 py-4 sm:px-5 sm:py-5 lg:px-6">
-          <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_170px]">
-            <input
-              value={activeDraft}
-              onChange={(e) => handleDraftChange(e.target.value)}
-              onKeyDown={handleInputKeyDown}
-              className="h-[64px] rounded-[20px] border border-slate-200 bg-slate-50/80 px-5 text-[22px] font-semibold tracking-[-0.04em] text-slate-900 outline-none transition placeholder:text-slate-300 focus:border-slate-300 focus:bg-white sm:text-[24px]"
-              placeholder={activeSource.placeholder}
-              autoComplete="off"
-              spellCheck={false}
-            />
+        <div className="overflow-hidden rounded-[30px] border border-white/70 bg-white/82 shadow-[0_24px_70px_rgba(15,23,42,.08)] backdrop-blur-xl">
+          <div className="border-b border-slate-200/70 px-5 py-5 sm:px-6">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-3">
+                  <SourceMark item={activeSource} className="h-10 w-10 rounded-2xl object-contain" />
+                  <div>
+                    <div className="text-[15px] font-semibold text-slate-950">
+                      Build the first draft
+                    </div>
+                    <div className="mt-1 text-sm text-slate-500">
+                      Add a source, then give a short business brief if needed.
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-            <button
-              type="button"
-              className="inline-flex h-[64px] items-center justify-center gap-2 rounded-[20px] bg-slate-900 px-6 text-[16px] font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 sm:text-[17px]"
-              onClick={handleAddSource}
-              disabled={!s(activeDraft)}
-            >
-              {!sources[activeKey] ? <Plus className="h-5 w-5" /> : null}
-              <span>{getActionLabel()}</span>
-            </button>
+              <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                <Link2 className="h-3.5 w-3.5" />
+                {activeSource.label}
+              </span>
+            </div>
           </div>
 
-          {addedSources.length > 0 ? (
-            <div className="flex flex-wrap gap-2.5">
-              <AnimatePresence initial={false}>
-                {addedSources.map((item) => (
-                  <motion.div
-                    key={item.key}
-                    layout
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                    transition={{ duration: 0.18 }}
-                    className="inline-flex max-w-full items-center gap-3 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700"
-                  >
-                    <SourceMark item={item} className="h-5 w-5 rounded-md object-contain" />
-                    <span className="font-semibold">{item.label}</span>
-                    <span className="truncate text-slate-500">{item.value}</span>
+          <div className="space-y-5 px-5 py-5 sm:px-6">
+            <div>
+              <label className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                Source handle or link
+              </label>
 
-                    <button
-                      type="button"
-                      className="ml-1 inline-flex h-6 w-6 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
-                      onClick={() => handleRemoveSource(item.key)}
-                      aria-label={`Remove ${item.label}`}
-                    >
-                      ×
-                    </button>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </div>
-          ) : null}
+              <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_168px]">
+                <input
+                  value={activeDraft}
+                  onChange={(e) => handleDraftChange(e.target.value)}
+                  onKeyDown={handleInputKeyDown}
+                  placeholder={activeSource.placeholder}
+                  autoComplete="off"
+                  spellCheck={false}
+                  className="h-[62px] rounded-[20px] border border-slate-200 bg-slate-50/75 px-5 text-[18px] font-semibold tracking-[-0.03em] text-slate-950 outline-none transition placeholder:text-slate-300 focus:border-slate-300 focus:bg-white"
+                />
 
-          <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_280px] xl:items-end">
-            <div className="rounded-[20px] border border-slate-200 bg-slate-50/70 px-4 py-3.5">
-              <div className="mb-1.5 text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                Scan strategy
+                <button
+                  type="button"
+                  onClick={handleAddSource}
+                  disabled={!s(activeDraft)}
+                  className="inline-flex h-[62px] items-center justify-center gap-2 rounded-[20px] border border-slate-200 bg-slate-950 px-5 text-[15px] font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                >
+                  {!sources[activeKey] ? <Plus className="h-4.5 w-4.5" /> : null}
+                  {getActionLabel()}
+                </button>
               </div>
-              <div className="text-sm leading-6 text-slate-600">{dockNote}</div>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                Optional business brief
+              </label>
+
+              <textarea
+                value={briefNote}
+                onChange={(e) => setBriefNote(e.target.value)}
+                rows={5}
+                placeholder="Describe the business in a few lines. What do you sell, who do you serve, what do customers ask most, and when should AI hand off to a human?"
+                className="w-full resize-none rounded-[22px] border border-slate-200 bg-slate-50/75 px-4 py-4 text-[15px] leading-7 text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-slate-300 focus:bg-white"
+              />
+            </div>
+
+            {addedSources.length > 0 ? (
+              <div>
+                <div className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                  Connected sources
+                </div>
+
+                <div className="flex flex-wrap gap-2.5">
+                  <AnimatePresence initial={false}>
+                    {addedSources.map((item) => {
+                      const isPrimary =
+                        s(item.apiSourceType) === s(primaryScannableSource?.apiSourceType) &&
+                        s(item.url) === s(primaryScannableSource?.url);
+
+                      return (
+                        <motion.div
+                          key={item.key}
+                          layout
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -8 }}
+                          transition={{ duration: 0.18 }}
+                          className={`inline-flex max-w-full items-center gap-3 rounded-full border px-3 py-2 text-sm ${
+                            isPrimary
+                              ? "border-sky-200 bg-sky-50 text-sky-800"
+                              : "border-slate-200 bg-slate-50 text-slate-700"
+                          }`}
+                        >
+                          <SourceMark item={item} className="h-5 w-5 rounded-md object-contain" />
+                          <span className="font-semibold">{item.label}</span>
+                          <span className="truncate text-current/80">{item.value}</span>
+
+                          {isPrimary ? (
+                            <span className="rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em]">
+                              first scan
+                            </span>
+                          ) : null}
+
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveSource(item.key)}
+                            aria-label={`Remove ${item.label}`}
+                            className="ml-1 inline-flex h-6 w-6 items-center justify-center rounded-full text-current/60 transition hover:bg-black/5 hover:text-current"
+                          >
+                            ×
+                          </button>
+                        </motion.div>
+                      );
+                    })}
+                  </AnimatePresence>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="rounded-[24px] border border-slate-200/80 bg-slate-50/72 p-4">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                First pass strategy
+              </div>
+              <div className="mt-2 text-sm leading-6 text-slate-600">
+                {strategyLabel}
+              </div>
             </div>
 
             <button
               type="submit"
               disabled={!canAnalyze}
-              className="inline-flex h-[64px] items-center justify-center gap-2 rounded-[20px] bg-[linear-gradient(135deg,#7bb2ff_0%,#4f8cff_45%,#4b79ff_100%)] px-6 text-[16px] font-semibold text-white shadow-[0_16px_40px_rgba(79,140,255,.28)] transition hover:translate-y-[-1px] hover:shadow-[0_20px_44px_rgba(79,140,255,.34)] disabled:cursor-not-allowed disabled:opacity-55 disabled:shadow-none sm:text-[17px]"
+              className="inline-flex h-[64px] w-full items-center justify-center gap-2 rounded-[22px] bg-[linear-gradient(135deg,#93c5fd_0%,#4f8cff_42%,#3b5fff_100%)] px-6 text-[16px] font-semibold text-white shadow-[0_18px_40px_rgba(79,140,255,.30)] transition hover:translate-y-[-1px] hover:shadow-[0_24px_46px_rgba(79,140,255,.36)] disabled:cursor-not-allowed disabled:opacity-55 disabled:shadow-none"
             >
               {importingWebsite ? (
                 <>
                   <Loader2 className="h-5 w-5 animate-spin" />
-                  Analyzing
+                  Preparing draft
                 </>
               ) : (
                 <>
@@ -977,29 +1159,31 @@ export default function SetupStudioEntryStage({
             </button>
           </div>
         </div>
-      </motion.div>
+      </section>
 
       {shouldShowResults ? (
-        <motion.div
+        <motion.section
           layout
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="overflow-hidden rounded-[28px] border border-slate-200 bg-white/88 shadow-[0_24px_70px_rgba(15,23,42,.08)] backdrop-blur-xl"
+          className="overflow-hidden rounded-[30px] border border-white/70 bg-white/84 shadow-[0_24px_70px_rgba(15,23,42,.08)] backdrop-blur-xl"
         >
-          <div className="border-b border-slate-200/80 px-4 py-4 sm:px-5 lg:px-6">
+          <div className="border-b border-slate-200/70 px-5 py-5 sm:px-6">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <div className="text-[15px] font-semibold text-slate-900">
-                  {analysisLoading ? "Analyzing source" : "Analysis results"}
+                <div className="text-[16px] font-semibold text-slate-950">
+                  {analysisLoading ? "Building the first draft" : "First pass result"}
                 </div>
-                <div className="mt-1 text-sm text-slate-500">
+                <div className="mt-1 text-sm leading-6 text-slate-500">
                   {analysisLoading
-                    ? "We are reading the source and building the first business draft."
-                    : "Everything found from the connected source is shown below."}
+                    ? "The source is being processed now. This area updates automatically when the first pass is ready."
+                    : barrierState
+                      ? "This source did not give enough readable signal. You can switch the source or continue more manually."
+                      : "Review the business snapshot, refine the draft, then continue into launch setup."}
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap gap-2">
                 {analysisSourceLabel ? (
                   <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-700">
                     {analysisSourceLabel}
@@ -1013,60 +1197,85 @@ export default function SetupStudioEntryStage({
                 ) : null}
 
                 {safeAnalysisWarnings[0] ? (
-                  <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700">
-                    {safeAnalysisWarnings[0]}
+                  <span
+                    className={`rounded-full border px-3 py-1.5 text-xs font-medium ${
+                      barrierState
+                        ? "border-amber-200 bg-amber-50 text-amber-700"
+                        : "border-slate-200 bg-slate-50 text-slate-700"
+                    }`}
+                  >
+                    {humanizeWarning(safeAnalysisWarnings[0])}
                   </span>
                 ) : null}
               </div>
             </div>
           </div>
 
-          <div className="space-y-4 px-4 py-4 sm:px-5 sm:py-5 lg:px-6">
+          <div className="space-y-5 px-5 py-5 sm:px-6">
             {analysisLoading ? (
-              <div className="rounded-[24px] border border-blue-100 bg-blue-50/70 px-5 py-5">
-                <div className="flex items-center gap-3 text-sm font-medium text-blue-900">
+              <div className="rounded-[24px] border border-sky-100 bg-sky-50/70 px-5 py-5">
+                <div className="flex items-center gap-3 text-sm font-medium text-sky-900">
                   <Loader2 className="h-5 w-5 animate-spin" />
                   Analyze is running...
                 </div>
-                <div className="mt-3 text-sm leading-6 text-blue-800/80">
-                  Source is being scanned now. Result cards will appear here automatically.
+                <div className="mt-3 text-sm leading-6 text-sky-800/80">
+                  We’re reading the primary source and shaping the first reviewable draft.
                 </div>
               </div>
             ) : (
               <>
-                <div className="grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,.85fr)_minmax(0,1fr)]">
-                  <div className="rounded-[22px] border border-slate-200/80 bg-slate-50/60 p-4">
-                    <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,.85fr)]">
+                  <div className="rounded-[24px] border border-slate-200/80 bg-slate-50/65 p-5">
+                    <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                       Snapshot
                     </div>
 
-                    <div className="space-y-2">
-                      <div className="text-lg font-semibold text-slate-950">
-                        {s(analysisTitle) || "Business identity"}
+                    <div className="space-y-3">
+                      <div className="text-[26px] font-semibold tracking-[-0.04em] text-slate-950">
+                        {resultHeadline}
                       </div>
 
-                      <p className="text-sm leading-6 text-slate-600">
-                        {truncateText(s(analysisMessage) || s(analysisDescription), 260) ||
-                          "No summary was returned yet."}
+                      <p className="max-w-[760px] text-sm leading-7 text-slate-600">
+                        {resultSummary || "No summary is available yet."}
                       </p>
 
                       {analysisUrl ? (
-                        <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
-                          <span className="font-medium text-slate-700">URL:</span>{" "}
-                          <span className="break-all">{analysisUrl}</span>
+                        <div className="inline-flex max-w-full rounded-full border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
+                          <span className="mr-1 font-medium text-slate-700">Source:</span>
+                          <span className="truncate">{analysisUrl}</span>
                         </div>
                       ) : null}
 
-                      <div className="flex flex-wrap gap-2 pt-2">
-                        <button
-                          type="button"
-                          onClick={onOpenRefine}
-                          className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
-                        >
-                          Refine draft
-                        </button>
+                      {barrierState ? (
+                        <div className="rounded-[22px] border border-amber-200 bg-amber-50 px-4 py-4">
+                          <div className="flex items-start gap-3">
+                            <span className="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-white text-amber-700">
+                              <AlertTriangle className="h-5 w-5" />
+                            </span>
+                            <div>
+                              <div className="text-sm font-semibold text-amber-900">
+                                Limited access
+                              </div>
+                              <div className="mt-1 text-sm leading-6 text-amber-800/90">
+                                This source should not be treated like a real business draft yet. Try another source, or continue with a more manual review path.
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
 
-                        {typeof onOpenKnowledge === "function" ? (
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {hasReviewableDraft && typeof onOpenRefine === "function" ? (
+                          <button
+                            type="button"
+                            onClick={onOpenRefine}
+                            className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
+                          >
+                            Refine draft
+                          </button>
+                        ) : null}
+
+                        {!barrierState && typeof onOpenKnowledge === "function" && n(analysisKnowledgeCount) > 0 ? (
                           <button
                             type="button"
                             onClick={onOpenKnowledge}
@@ -1082,111 +1291,127 @@ export default function SetupStudioEntryStage({
                             onClick={onContinueFlow}
                             className="inline-flex items-center justify-center rounded-full border border-slate-950 bg-slate-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
                           >
-                            Continue flow
+                            {barrierState ? "Continue manually" : "Continue flow"}
                           </button>
                         ) : null}
                       </div>
                     </div>
                   </div>
 
-                  <div className="rounded-[22px] border border-slate-200/80 bg-slate-50/60 p-4">
-                    <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                      Extracted signals
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3">
-                        <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">
-                          Knowledge
-                        </div>
-                        <div className="mt-1 text-xl font-semibold text-slate-950">
-                          {n(analysisKnowledgeCount)}
-                        </div>
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-2">
+                    <div className="rounded-[24px] border border-slate-200/80 bg-slate-50/65 p-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                        Knowledge
                       </div>
-
-                      <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3">
-                        <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">
-                          Services
-                        </div>
-                        <div className="mt-1 text-xl font-semibold text-slate-950">
-                          {n(analysisServiceCount)}
-                        </div>
-                      </div>
-
-                      <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3">
-                        <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">
-                          Sources
-                        </div>
-                        <div className="mt-1 text-xl font-semibold text-slate-950">
-                          {n(analysisSourceCount)}
-                        </div>
-                      </div>
-
-                      <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3">
-                        <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">
-                          Events
-                        </div>
-                        <div className="mt-1 text-xl font-semibold text-slate-950">
-                          {n(analysisEventCount)}
-                        </div>
+                      <div className="mt-2 text-[28px] font-semibold tracking-[-0.04em] text-slate-950">
+                        {n(analysisKnowledgeCount)}
                       </div>
                     </div>
-                  </div>
 
-                  <div className="rounded-[22px] border border-slate-200/80 bg-slate-50/60 p-4">
-                    <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                      Evidence
+                    <div className="rounded-[24px] border border-slate-200/80 bg-slate-50/65 p-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                        Services
+                      </div>
+                      <div className="mt-2 text-[28px] font-semibold tracking-[-0.04em] text-slate-950">
+                        {n(analysisServiceCount)}
+                      </div>
                     </div>
 
-                    <div className="space-y-2">
-                      {firstReviewSource?.label || firstReviewSource?.url ? (
-                        <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5">
-                          <div className="text-xs font-medium text-slate-700">
-                            {s(firstReviewSource.label || firstReviewSource.sourceType || "Source")}
-                          </div>
-                          {firstReviewSource.url ? (
-                            <div className="mt-1 break-all text-xs text-slate-500">
-                              {truncateText(firstReviewSource.url, 140)}
-                            </div>
-                          ) : null}
-                        </div>
-                      ) : null}
+                    <div className="rounded-[24px] border border-slate-200/80 bg-slate-50/65 p-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                        Sources
+                      </div>
+                      <div className="mt-2 text-[28px] font-semibold tracking-[-0.04em] text-slate-950">
+                        {n(analysisSourceCount)}
+                      </div>
+                    </div>
 
-                      {firstReviewEvent?.message || firstReviewEvent?.title ? (
-                        <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5">
-                          <div className="text-xs font-medium text-slate-700">
-                            {s(firstReviewEvent.title || firstReviewEvent.type || "Latest event")}
-                          </div>
-                          <div className="mt-1 text-xs text-slate-500">
-                            {truncateText(
-                              s(firstReviewEvent.message || firstReviewEvent.status || ""),
-                              140
-                            )}
-                          </div>
-                        </div>
-                      ) : null}
-
-                      {safeAnalysisWarnings[0] ? (
-                        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2.5">
-                          <div className="text-xs font-medium text-amber-800">Warning</div>
-                          <div className="mt-1 text-xs text-amber-700">
-                            {truncateText(safeAnalysisWarnings[0], 140)}
-                          </div>
-                        </div>
-                      ) : null}
+                    <div className="rounded-[24px] border border-slate-200/80 bg-slate-50/65 p-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                        Events
+                      </div>
+                      <div className="mt-2 text-[28px] font-semibold tracking-[-0.04em] text-slate-950">
+                        {n(analysisEventCount)}
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="rounded-[24px] border border-slate-200/80 bg-slate-50/60 p-4 sm:p-5">
+                {(firstReviewSource?.label ||
+                  firstReviewSource?.url ||
+                  firstReviewEvent?.message ||
+                  firstReviewEvent?.title ||
+                  safeAnalysisWarnings[0]) ? (
+                  <div className="grid gap-4 xl:grid-cols-3">
+                    {(firstReviewSource?.label || firstReviewSource?.url) ? (
+                      <div className="rounded-[24px] border border-slate-200/80 bg-slate-50/65 p-4">
+                        <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                          Evidence source
+                        </div>
+                        <div className="text-sm font-medium text-slate-800">
+                          {s(firstReviewSource.label || firstReviewSource.sourceType || "Source")}
+                        </div>
+                        {firstReviewSource.url ? (
+                          <div className="mt-2 break-all text-sm leading-6 text-slate-500">
+                            {truncateText(firstReviewSource.url, 180)}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+
+                    {(firstReviewEvent?.message || firstReviewEvent?.title) ? (
+                      <div className="rounded-[24px] border border-slate-200/80 bg-slate-50/65 p-4">
+                        <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                          Latest event
+                        </div>
+                        <div className="text-sm font-medium text-slate-800">
+                          {s(firstReviewEvent.title || firstReviewEvent.type || "Event")}
+                        </div>
+                        <div className="mt-2 text-sm leading-6 text-slate-500">
+                          {truncateText(
+                            s(firstReviewEvent.message || firstReviewEvent.status || ""),
+                            180
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {safeAnalysisWarnings[0] ? (
+                      <div
+                        className={`rounded-[24px] border p-4 ${
+                          barrierState
+                            ? "border-amber-200 bg-amber-50"
+                            : "border-slate-200/80 bg-slate-50/65"
+                        }`}
+                      >
+                        <div
+                          className={`mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] ${
+                            barrierState ? "text-amber-700" : "text-slate-400"
+                          }`}
+                        >
+                          Warning
+                        </div>
+                        <div
+                          className={`text-sm leading-6 ${
+                            barrierState ? "text-amber-800" : "text-slate-600"
+                          }`}
+                        >
+                          {humanizeWarning(safeAnalysisWarnings[0])}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                <div className="rounded-[26px] border border-slate-200/80 bg-slate-50/65 p-4 sm:p-5">
                   <div className="mb-3 text-sm font-semibold text-slate-900">
-                    Extracted details
+                    Structured details
                   </div>
 
-                  {normalizedAnalysisRows.length ? (
+                  {detailRows.length ? (
                     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                      {normalizedAnalysisRows.map((row, index) => (
-                        <ResultRow
+                      {detailRows.map((row, index) => (
+                        <DetailRow
                           key={`${row.label}-${index}`}
                           label={row.label}
                           value={row.value}
@@ -1194,19 +1419,21 @@ export default function SetupStudioEntryStage({
                       ))}
                     </div>
                   ) : (
-                    <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-4 text-sm text-slate-500">
-                      Structured extracted fields are not available yet for this scan.
+                    <div className="rounded-[20px] border border-dashed border-slate-200 bg-white px-4 py-4 text-sm leading-6 text-slate-500">
+                      {barrierState
+                        ? "No reliable structured fields were available from this source yet."
+                        : "Structured extracted fields are not available yet for this scan."}
                     </div>
                   )}
                 </div>
               </>
             )}
           </div>
-        </motion.div>
+        </motion.section>
       ) : null}
 
       {error ? (
-        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+        <div className="rounded-[22px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
           {error}
         </div>
       ) : null}
