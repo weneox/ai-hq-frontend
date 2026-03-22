@@ -21,1324 +21,53 @@ import {
   firstLanguage,
   extractItems,
   isPendingKnowledge,
-  candidateTitle,
-  candidateCategory,
-  candidateValue,
-  candidateSource,
-  candidateConfidence,
-  evidenceList,
   profilePatchFromDiscovery,
   mergeBusinessForm,
   profilePreviewRows,
   discoveryModeLabel,
   deriveStudioProgress,
 } from "./lib/setupStudioHelpers.js";
-
-const KNOWN_LANGS = new Set(["az", "en", "tr", "ru"]);
-
-function createEmptyReviewState() {
-  return {
-    session: null,
-    draft: {},
-    sources: [],
-    events: [],
-  };
-}
-
-function createEmptyLegacyDraft() {
-  return {
-    sourceId: "",
-    sourceRunId: "",
-    snapshotId: "",
-    quickSummary: "",
-    overview: {},
-    capabilities: {},
-    sections: {},
-    reviewQueue: [],
-    existing: {},
-    stats: {},
-    warnings: [],
-    completeness: {},
-    confidenceSummary: {},
-    rawDraft: {},
-    session: null,
-    draft: {},
-    sources: [],
-    events: [],
-    reviewRequired: false,
-    reviewFlags: [],
-    fieldConfidence: {},
-    mainLanguage: "",
-    primaryLanguage: "",
-  };
-}
-
-function createIdleDiscoveryState() {
-  return {
-    mode: "idle",
-    lastUrl: "",
-    lastSourceType: "",
-    sourceLabel: "",
-    message: "",
-    candidateCount: 0,
-    profileApplied: false,
-    shouldReview: false,
-    warnings: [],
-    requestId: "",
-    intakeContext: {},
-    profile: {},
-    signals: {},
-    snapshot: {},
-    sourceId: "",
-    sourceRunId: "",
-    snapshotId: "",
-    reviewSessionId: "",
-    reviewSessionStatus: "",
-    hasResults: false,
-    resultCount: 0,
-    importedKnowledgeItems: [],
-    importedServices: [],
-    mainLanguage: "",
-    primaryLanguage: "",
-    reviewRequired: false,
-    reviewFlags: [],
-    fieldConfidence: {},
-  };
-}
-
-function createEmptySourceScope() {
-  return {
-    sourceType: "",
-    sourceUrl: "",
-  };
-}
-
-function pickSetupProfile(setup = {}, workspace = {}) {
-  return obj(
-    setup?.tenantProfile ||
-      setup?.businessProfile ||
-      workspace?.tenantProfile ||
-      workspace?.businessProfile
-  );
-}
-
-function normalizeBootMeta(boot = {}, pendingKnowledge = [], serviceItems = []) {
-  const workspace = obj(boot?.workspace);
-  const setup = obj(boot?.setup);
-  const knowledge = obj(setup?.knowledge || workspace?.knowledge);
-  const catalog = obj(setup?.catalog || workspace?.catalog);
-  const progress = obj(setup?.progress || workspace?.progress || workspace);
-  const runtime = obj(setup?.runtime || workspace?.runtime);
-
-  return {
-    readinessScore: Number(
-      progress?.readinessScore || workspace?.readinessScore || 0
-    ),
-    readinessLabel: s(
-      progress?.readinessLabel || workspace?.readinessLabel || ""
-    ),
-    missingSteps: arr(progress?.missingSteps || workspace?.missingSteps),
-    primaryMissingStep: s(
-      progress?.primaryMissingStep || workspace?.primaryMissingStep || ""
-    ),
-    nextRoute: s(progress?.nextRoute || workspace?.nextRoute || "/"),
-    nextSetupRoute: s(
-      progress?.nextSetupRoute || workspace?.nextSetupRoute || "/setup/studio"
-    ),
-    nextStudioStage: s(
-      progress?.nextStudioStage || workspace?.nextStudioStage || ""
-    ),
-    setupCompleted: !!(
-      progress?.setupCompleted ?? workspace?.setupCompleted ?? false
-    ),
-    pendingCandidateCount: Number(
-      knowledge?.pendingCandidateCount || pendingKnowledge.length || 0
-    ),
-    approvedKnowledgeCount: Number(knowledge?.approvedKnowledgeCount || 0),
-    serviceCount: Number(catalog?.serviceCount || serviceItems.length || 0),
-    playbookCount: Number(catalog?.playbookCount || 0),
-    runtimeKnowledgeCount: Number(runtime?.knowledgeCount || 0),
-    runtimeServiceCount: Number(runtime?.serviceCount || 0),
-    runtimePlaybookCount: Number(runtime?.playbookCount || 0),
-  };
-}
-
-function resolveMainLanguageValue(...candidates) {
-  for (const candidate of candidates) {
-    const value = s(candidate).toLowerCase();
-    if (KNOWN_LANGS.has(value)) return value;
-  }
-  return "";
-}
-
-function normalizeFieldConfidenceMap(value = {}) {
-  const out = {};
-  const map = obj(value);
-
-  for (const [key, raw] of Object.entries(map)) {
-    if (!s(key)) continue;
-
-    if (raw && typeof raw === "object" && !Array.isArray(raw)) {
-      const score = Number(raw.score ?? raw.value ?? raw.confidence);
-      out[key] = {
-        score: Number.isFinite(score) ? score : 0,
-        label: s(raw.label || raw.confidenceLabel),
-      };
-      continue;
-    }
-
-    const score = Number(raw);
-    out[key] = {
-      score: Number.isFinite(score) ? score : 0,
-      label: "",
-    };
-  }
-
-  return out;
-}
-
-function extractReviewMetadata(value = {}) {
-  const x = obj(value);
-
-  const reviewFlags = arr(
-    x.reviewFlags || x.review_flags || x.flags || x.review_flags_list
-  )
-    .map((item) => s(item))
-    .filter(Boolean);
-
-  const fieldConfidence = normalizeFieldConfidenceMap(
-    x.fieldConfidence || x.field_confidence
-  );
-
-  const mainLanguage = resolveMainLanguageValue(
-    x.mainLanguage,
-    x.main_language,
-    x.primaryLanguage,
-    x.primary_language,
-    x.language,
-    x.sourceLanguage,
-    x.source_language
-  );
-
-  return {
-    reviewRequired: !!(x.reviewRequired ?? x.review_required ?? false),
-    reviewFlags,
-    fieldConfidence,
-    mainLanguage,
-    primaryLanguage: mainLanguage,
-  };
-}
-
-function deriveSuggestedServicePayload({
-  discoveryForm,
-  discoveryState,
-  knowledgeCandidates,
-}) {
-  const serviceCandidate = knowledgeCandidates.find((item) => {
-    const category = s(candidateCategory(item)).toLowerCase();
-    return category === "service" || category === "product";
-  });
-
-  const discoveredServices = arr(
-    discoveryState?.profile?.services ||
-      discoveryState?.signals?.sourceFusion?.profile?.services ||
-      discoveryState?.signals?.website?.offerings?.services
-  );
-
-  const fallbackTitle =
-    s(candidateTitle(serviceCandidate)) ||
-    s(discoveredServices[0]) ||
-    s(discoveryForm.note.split(".")[0]) ||
-    "Discovered service";
-
-  const fallbackDescription =
-    s(candidateValue(serviceCandidate)) ||
-    s(discoveryForm.note) ||
-    s(
-      discoveryState?.profile?.summaryShort ||
-        discoveryState?.profile?.companySummaryShort ||
-        discoveryState?.profile?.description
-    ) ||
-    `Service discovered from ${s(discoveryState?.lastUrl || "source import")}.`;
-
-  const category = (() => {
-    const raw = s(candidateCategory(serviceCandidate)).toLowerCase();
-    if (raw === "service" || raw === "product") return raw;
-    return "general";
-  })();
-
-  return {
-    title: fallbackTitle,
-    description: fallbackDescription,
-    category,
-    priceFrom: "",
-    currency: "AZN",
-    pricingModel: "custom_quote",
-    durationMinutes: "",
-    sortOrder: 0,
-    highlightsText: "",
-    isActive: true,
-  };
-}
-
-function normalizeIncomingSourceType(value = "") {
-  const x = s(value).toLowerCase().replace(/[\s-]+/g, "_");
-
-  if (x === "website" || x === "site" || x === "web") return "website";
-  if (
-    x === "google_maps" ||
-    x === "googlemaps" ||
-    x === "maps" ||
-    x === "gmaps"
-  ) {
-    return "google_maps";
-  }
-
-  return "";
-}
-
-function detectSourceTypeFromUrl(url = "") {
-  const value = s(url).toLowerCase();
-
-  if (
-    value.includes("google.com/maps") ||
-    value.includes("maps.app.goo.gl") ||
-    value.includes("g.co/kgs")
-  ) {
-    return "google_maps";
-  }
-
-  return "website";
-}
-
-function normalizeScanRequest(input, discoveryForm = {}) {
-  if (input && typeof input.preventDefault === "function") {
-    input.preventDefault();
-
-    const fallbackUrl = s(discoveryForm.websiteUrl);
-    return {
-      sourceType: detectSourceTypeFromUrl(fallbackUrl),
-      url: fallbackUrl,
-      note: s(discoveryForm.note),
-      sources: [],
-      primarySource: null,
-    };
-  }
-
-  const payload = obj(input);
-  const url = s(payload.url || payload.sourceUrl || discoveryForm.websiteUrl);
-  const sourceType =
-    normalizeIncomingSourceType(payload.sourceType || payload.type) ||
-    detectSourceTypeFromUrl(url);
-
-  return {
-    sourceType,
-    url,
-    note: s(payload.note || discoveryForm.note),
-    sources: arr(payload.sources),
-    primarySource: payload.primarySource || null,
-  };
-}
-
-function scanStartLabel(sourceType = "") {
-  return sourceType === "google_maps"
-    ? "Google Maps scan başladı..."
-    : "Website scan başladı...";
-}
-
-function scanCompleteLabel(sourceType = "", candidateCount = 0) {
-  const count = Number(candidateCount || 0);
-
-  if (count > 0) {
-    return `${count} discovery hazırlandı.`;
-  }
-
-  return sourceType === "google_maps"
-    ? "Google Maps import tamamlandı."
-    : "Website import tamamlandı.";
-}
-
-function applyUiHintsFromMeta({
-  nextMeta = {},
-  pendingKnowledge = [],
-  setShowKnowledge,
-  setShowRefine,
-}) {
-  const stage = s(nextMeta?.nextStudioStage).toLowerCase();
-
-  if (stage === "knowledge" && arr(pendingKnowledge).length > 0) {
-    setShowKnowledge(true);
-    return;
-  }
-
-  if (stage === "identity" || stage === "business_profile") {
-    setShowRefine(true);
-  }
-}
-
-function formFromProfile(profile = {}, prev = {}) {
-  const x = obj(profile);
-  const resolvedLanguage =
-    resolveMainLanguageValue(
-      x.mainLanguage,
-      x.main_language,
-      x.primaryLanguage,
-      x.primary_language,
-      x.language,
-      x.sourceLanguage,
-      x.source_language
-    ) || s(prev.language || "az");
-
-  return {
-    ...prev,
-    companyName: s(
-      x.companyName ||
-        x.company_name ||
-        x.displayName ||
-        x.display_name ||
-        x.name ||
-        prev.companyName
-    ),
-    description: s(
-      x.summaryShort ||
-        x.summary_short ||
-        x.summaryLong ||
-        x.summary_long ||
-        x.description ||
-        prev.description
-    ),
-    timezone: s(x.timezone || prev.timezone || "Asia/Baku"),
-    language: resolvedLanguage,
-    websiteUrl: s(
-      x.websiteUrl ||
-        x.website_url ||
-        x.siteUrl ||
-        x.site_url ||
-        prev.websiteUrl
-    ),
-    primaryPhone: s(x.primaryPhone || x.primary_phone || prev.primaryPhone),
-    primaryEmail: s(x.primaryEmail || x.primary_email || prev.primaryEmail),
-    primaryAddress: s(
-      x.primaryAddress || x.primary_address || prev.primaryAddress
-    ),
-  };
-}
-
-function normalizeReviewState(payload = {}) {
-  const review = obj(payload?.review || payload);
-
-  return {
-    session: review?.session || null,
-    draft: obj(review?.draft),
-    sources: arr(review?.sources),
-    events: arr(review?.events),
-  };
-}
-
-function safeNormalizeUrl(input = "") {
-  const raw = s(input);
-  if (!raw) return "";
-  if (/^[a-z][a-z0-9+.-]*:/i.test(raw)) return raw;
-  if (raw.startsWith("//")) return `https:${raw}`;
-  return `https://${raw.replace(/^\/+/, "")}`;
-}
-
-function comparableHost(input = "") {
-  const raw = s(input);
-  if (!raw) return "";
-
-  try {
-    const u = new URL(safeNormalizeUrl(raw));
-    return s(u.hostname).toLowerCase().replace(/^www\./, "");
-  } catch {
-    return s(raw)
-      .toLowerCase()
-      .replace(/^https?:\/\//, "")
-      .replace(/^www\./, "")
-      .split(/[/?#]/)[0];
-  }
-}
-
-function comparableUrl(input = "") {
-  const raw = s(input);
-  if (!raw) return "";
-
-  try {
-    const u = new URL(safeNormalizeUrl(raw));
-    const host = s(u.hostname).toLowerCase().replace(/^www\./, "");
-    const path = s(u.pathname || "/").replace(/\/+$/, "") || "/";
-    const search = s(u.search || "");
-    return `${host}${path}${search}`;
-  } catch {
-    return s(raw)
-      .toLowerCase()
-      .replace(/^https?:\/\//, "")
-      .replace(/^www\./, "")
-      .replace(/\/+$/, "");
-  }
-}
-
-function sourceIdentityKey(sourceType = "", sourceUrl = "") {
-  const normalizedType =
-    normalizeIncomingSourceType(sourceType) || detectSourceTypeFromUrl(sourceUrl);
-
-  if (!normalizedType && !s(sourceUrl)) return "";
-
-  if (normalizedType === "website") {
-    return `website|${comparableHost(sourceUrl)}`;
-  }
-
-  return `${normalizedType || "unknown"}|${comparableUrl(sourceUrl)}`;
-}
-
-function resolveReviewSourceInfo(review = {}, legacyDraft = {}) {
-  const normalizedReview = normalizeReviewState(review);
-  const draft = obj(normalizedReview?.draft);
-  const sourceSummary = obj(draft?.sourceSummary);
-  const latestImport = obj(sourceSummary?.latestImport);
-  const payload = obj(draft?.draftPayload);
-  const profile = obj(draft?.businessProfile || payload?.profile);
-  const primarySource = obj(payload?.intakeContext?.primarySource);
-  const firstSource = obj(arr(normalizedReview?.sources)[0]);
-
-  const sourceType = firstNonEmpty(
-    latestImport?.sourceType,
-    sourceSummary?.primarySourceType,
-    payload?.sourceType,
-    primarySource?.sourceType,
-    firstSource?.sourceType,
-    firstSource?.source_type,
-    profile?.sourceType,
-    profile?.source_type,
-    legacyDraft?.rawDraft?.sourceSummary?.latestImport?.sourceType
-  );
-
-  const sourceUrl = firstNonEmpty(
-    latestImport?.sourceUrl,
-    sourceSummary?.primarySourceUrl,
-    payload?.sourceUrl,
-    primarySource?.url,
-    primarySource?.sourceUrl,
-    firstSource?.url,
-    firstSource?.sourceUrl,
-    firstSource?.source_url,
-    profile?.sourceUrl,
-    profile?.source_url,
-    profile?.websiteUrl,
-    profile?.website_url,
-    legacyDraft?.rawDraft?.sourceSummary?.latestImport?.sourceUrl
-  );
-
-  return {
-    sourceType,
-    sourceUrl,
-  };
-}
-
-function reviewStateMatchesSource(
-  review = {},
-  legacyDraft = {},
-  sourceType = "",
-  sourceUrl = ""
-) {
-  const expectedKey = sourceIdentityKey(sourceType, sourceUrl);
-  const reviewInfo = resolveReviewSourceInfo(review, legacyDraft);
-  const reviewKey = sourceIdentityKey(reviewInfo.sourceType, reviewInfo.sourceUrl);
-
-  if (!expectedKey || !reviewKey) return false;
-  return expectedKey === reviewKey;
-}
-
-function hasExtractedIdentityProfile(profile = {}) {
-  const x = obj(profile);
-
-  return !!(
-    s(x.companyName || x.company_name || x.displayName || x.display_name || x.name) ||
-    s(x.summaryShort || x.summary_short || x.summaryLong || x.summary_long || x.description) ||
-    s(x.primaryPhone || x.primary_phone || x.phone) ||
-    s(x.primaryEmail || x.primary_email || x.email) ||
-    s(x.primaryAddress || x.primary_address || x.address) ||
-    arr(x.services).length > 0 ||
-    arr(x.socialLinks || x.social_links).length > 0 ||
-    arr(x.faqItems || x.faq_items).length > 0 ||
-    arr(x.pricingHints || x.pricing_hints).length > 0
-  );
-}
-
-function isWebsiteBarrierWarning(value = "") {
-  const code = s(value).toLowerCase();
-  return (
-    /^http_\d{3}$/.test(code) ||
-    [
-      "fetch_failed",
-      "backend_access_blocked_by_remote_site",
-      "remote_site_rate_limited_backend_access",
-      "remote_site_temporarily_unavailable",
-      "backend_could_not_reach_site",
-      "non_html_website_response",
-      "website_entry_not_found",
-      "website_fetch_barrier_detected",
-    ].includes(code)
-  );
-}
-
-function isBarrierOnlyImportResult(result = {}, sourceType = "") {
-  if (normalizeIncomingSourceType(sourceType) !== "website") return false;
-
-  const mode = s(result?.mode).toLowerCase();
-  const warnings = arr(result?.warnings).map((x) => s(x));
-  const profile = obj(result?.profile);
-
-  const hasBarrierWarning = warnings.some((item) => isWebsiteBarrierWarning(item));
-  const hasMeaningfulIdentity = hasExtractedIdentityProfile(profile);
-  const hasCandidates = Number(result?.candidateCount || 0) > 0;
-  const hasServices = arr(result?.services).length > 0;
-  const hasKnowledgeItems =
-    arr(result?.knowledgeItems).length > 0 || arr(result?.candidates).length > 0;
-
-  return (
-    mode === "partial" &&
-    hasBarrierWarning &&
-    !hasMeaningfulIdentity &&
-    !hasCandidates &&
-    !hasServices &&
-    !hasKnowledgeItems
-  );
-}
-
-function normalizeDraftServiceItem(item = {}) {
-  const x = obj(item);
-
-  return {
-    id: s(x.id || x.key || x.title),
-    key: s(x.key),
-    title: s(x.title || x.name || x.label),
-    valueText: s(x.description || x.valueText || x.value_text),
-    description: s(x.description || x.valueText || x.value_text),
-    category: s(x.category || "service"),
-    sourceType: s(x.sourceType || x.source_type),
-    status: s(x.status || "pending"),
-    confidence:
-      typeof x.confidence === "number"
-        ? x.confidence
-        : Number(x.confidence || 0) || 0,
-    confidenceLabel: s(x.confidenceLabel || x.confidence_label),
-    evidence: arr(x.evidence),
-    metadataJson: obj(x.metadataJson || x.metadata_json),
-    origin: s(x.origin || "setup_review_session"),
-  };
-}
-
-function normalizeDraftKnowledgeItem(item = {}) {
-  const x = obj(item);
-
-  return {
-    id: s(x.id || x.key || x.title),
-    candidateId: s(x.candidateId || x.id),
-    key: s(x.key || x.itemKey || x.item_key),
-    title: s(x.title || x.label || x.key),
-    valueText: s(
-      x.valueText ||
-        x.value_text ||
-        x.normalizedText ||
-        x.normalized_text ||
-        x.description
-    ),
-    category: s(x.category || "general"),
-    sourceType: s(x.sourceType || x.source_type),
-    status: s(x.status || "pending"),
-    confidence:
-      typeof x.confidence === "number"
-        ? x.confidence
-        : Number(x.confidence || 0) || 0,
-    confidenceLabel: s(x.confidenceLabel || x.confidence_label),
-    evidence: arr(x.evidence),
-    sourceEvidenceJson: arr(x.evidence),
-    metadataJson: obj(x.metadataJson || x.metadata_json),
-    origin: s(x.origin || "setup_review_session"),
-  };
-}
-
-function normalizeVisibleKnowledgeItem(item = {}) {
-  const x = obj(item);
-  const fallbackEvidence = arr(
-    x.evidence || x.sourceEvidenceJson || x.source_evidence_json
-  );
-  const helperEvidence = arr(evidenceList(x));
-  const allEvidence = fallbackEvidence.length ? fallbackEvidence : helperEvidence;
-
-  return {
-    id: s(x.id || x.candidateId || x.key || x.title),
-    candidateId: s(x.candidateId || x.id),
-    key: s(x.key || x.itemKey || x.item_key),
-    title: s(x.title || x.label || candidateTitle(x)),
-    valueText: s(
-      x.valueText ||
-        x.value_text ||
-        x.normalizedText ||
-        x.normalized_text ||
-        x.description ||
-        candidateValue(x)
-    ),
-    category: s(x.category || candidateCategory(x) || "general"),
-    sourceType: s(x.sourceType || x.source_type),
-    source: s(x.source || candidateSource(x) || x.sourceType || x.source_type),
-    status: s(x.status || "pending"),
-    confidence:
-      typeof x.confidence === "number"
-        ? x.confidence
-        : Number(x.confidence || candidateConfidence(x) || 0) || 0,
-    confidenceLabel: s(x.confidenceLabel || x.confidence_label),
-    evidence: allEvidence,
-    evidenceUrl: s(
-      allEvidence[0]?.url ||
-        allEvidence[0]?.source_url ||
-        allEvidence[0]?.link ||
-        allEvidence[0]?.pageUrl
-    ),
-    metadataJson: obj(x.metadataJson || x.metadata_json),
-    origin: s(x.origin || "setup_review_session"),
-  };
-}
-
-function normalizeVisibleServiceItem(item = {}) {
-  const x = obj(item);
-
-  return {
-    id: s(x.id || x.serviceId || x.key || x.title || x.name),
-    key: s(x.key) || safeDraftKey(s(x.title || x.name || x.label), "service"),
-    title: s(x.title || x.name || x.label),
-    valueText: s(x.valueText || x.description || x.summary || x.notes),
-    description: s(x.description || x.valueText || x.summary || x.notes),
-    category: s(x.category || "service"),
-    sourceType: s(x.sourceType || x.source_type),
-    status: s(x.status || "pending"),
-    confidence:
-      typeof x.confidence === "number"
-        ? x.confidence
-        : Number(x.confidence || 0) || 0,
-    confidenceLabel: s(x.confidenceLabel || x.confidence_label),
-    evidence: arr(x.evidence),
-    metadataJson: obj(x.metadataJson || x.metadata_json),
-    origin: s(x.origin || "setup_review_session"),
-  };
-}
-
-function normalizeVisibleSourceItem(item = {}) {
-  const x = obj(item);
-
-  return {
-    id: s(
-      x.id || x.sourceId || x.source_id || x.key || x.url || x.sourceUrl
-    ),
-    sourceType: s(x.sourceType || x.source_type || x.type),
-    label: s(
-      x.label ||
-        x.title ||
-        x.name ||
-        x.sourceLabel ||
-        x.source_label ||
-        x.sourceType ||
-        x.source_type
-    ),
-    url: s(x.url || x.sourceUrl || x.source_url),
-    status: s(x.status),
-    runId: s(x.runId || x.run_id),
-    snapshotId: s(x.snapshotId || x.snapshot_id),
-    metadataJson: obj(x.metadataJson || x.metadata_json || x.metadata),
-  };
-}
-
-function normalizeVisibleEventItem(item = {}) {
-  const x = obj(item);
-
-  return {
-    id: s(x.id || x.eventId || x.event_id || x.createdAt || x.type),
-    type: s(x.type),
-    title: s(x.title || x.name || x.type),
-    message: s(x.message || x.description || x.summary),
-    status: s(x.status),
-    createdAt: s(x.createdAt || x.created_at),
-    metadataJson: obj(x.metadataJson || x.metadata_json || x.metadata),
-  };
-}
-
-function draftItemsToText(items = [], mode = "default") {
-  return arr(items)
-    .map((item) => {
-      const x = obj(item);
-
-      if (mode === "service") {
-        return `${s(x.title)} | ${s(x.valueText || x.description)}`.trim();
-      }
-
-      return `${s(x.title)} | ${s(x.valueText)}`.trim();
-    })
-    .filter(Boolean)
-    .join("\n");
-}
-
-function mapCurrentReviewToLegacyDraft(review = {}) {
-  const session = review?.session || null;
-  const draft = obj(review?.draft);
-
-  const payloadProfile = obj(draft?.draftPayload?.profile);
-  const businessProfile = obj(draft?.businessProfile);
-  const mergedProfile = {
-    ...businessProfile,
-    ...payloadProfile,
-  };
-
-  const profileMeta = extractReviewMetadata(mergedProfile);
-  const draftMeta = extractReviewMetadata(draft);
-
-  const capabilities = obj(draft?.capabilities);
-  const sourceSummary = obj(draft?.sourceSummary);
-  const latestImport = obj(sourceSummary?.latestImport);
-
-  const services = arr(draft?.services).map((item) =>
-    normalizeDraftServiceItem(item)
-  );
-  const knowledgeItems = arr(draft?.knowledgeItems).map((item) =>
-    normalizeDraftKnowledgeItem(item)
-  );
-
-  const faqItems = knowledgeItems.filter((item) =>
-    ["faq", "faqs"].includes(s(item.category).toLowerCase())
-  );
-
-  const policyItems = knowledgeItems.filter((item) =>
-    ["policy", "policies"].includes(s(item.category).toLowerCase())
-  );
-
-  const pendingReviewCount = knowledgeItems.filter((item) => {
-    const status = s(item.status).toLowerCase();
-    return !status || status === "pending" || status === "review";
-  }).length;
-
-  return {
-    sourceId: s(
-      session?.primarySourceId ||
-        sourceSummary?.latestSourceId ||
-        latestImport?.sourceId
-    ),
-    sourceRunId: s(sourceSummary?.latestRunId || latestImport?.runId),
-    snapshotId: s(draft?.lastSnapshotId),
-    quickSummary: s(
-      payloadProfile?.summaryShort ||
-        payloadProfile?.companySummaryShort ||
-        mergedProfile?.summaryShort ||
-        mergedProfile?.description ||
-        mergedProfile?.summaryLong
-    ),
-    overview: mergedProfile,
-    capabilities,
-    sections: {
-      services,
-      faqs: faqItems,
-      policies: policyItems,
-    },
-    reviewQueue: knowledgeItems,
-    existing: {},
-    stats: {
-      pendingReviewCount,
-      knowledgeCount: knowledgeItems.length,
-      serviceCount: services.length,
-      warningCount: arr(draft?.warnings).length,
-    },
-    completeness: obj(draft?.completeness),
-    confidenceSummary: obj(draft?.confidenceSummary),
-    warnings: arr(draft?.warnings),
-    rawDraft: draft,
-    session,
-    draft,
-    sources: arr(review?.sources),
-    events: arr(review?.events),
-    reviewRequired: !!(
-      draftMeta.reviewRequired || profileMeta.reviewRequired
-    ),
-    reviewFlags: arr(draftMeta.reviewFlags).length
-      ? arr(draftMeta.reviewFlags)
-      : arr(profileMeta.reviewFlags),
-    fieldConfidence: Object.keys(draftMeta.fieldConfidence).length
-      ? obj(draftMeta.fieldConfidence)
-      : obj(profileMeta.fieldConfidence),
-    mainLanguage: draftMeta.mainLanguage || profileMeta.mainLanguage || "",
-    primaryLanguage:
-      draftMeta.primaryLanguage || profileMeta.primaryLanguage || "",
-  };
-}
-
-function buildManualSectionsFromReview(review = {}) {
-  const draft = obj(review?.draft);
-  const services = arr(draft?.services).map((item) =>
-    normalizeDraftServiceItem(item)
-  );
-  const knowledgeItems = arr(draft?.knowledgeItems).map((item) =>
-    normalizeDraftKnowledgeItem(item)
-  );
-
-  const faqs = knowledgeItems.filter((item) =>
-    ["faq", "faqs"].includes(s(item.category).toLowerCase())
-  );
-  const policies = knowledgeItems.filter((item) =>
-    ["policy", "policies"].includes(s(item.category).toLowerCase())
-  );
-
-  return {
-    servicesText: draftItemsToText(services, "service"),
-    faqsText: draftItemsToText(faqs, "faq"),
-    policiesText: draftItemsToText(policies, "policy"),
-  };
-}
-
-function safeDraftKey(value = "", fallback = "item") {
-  return (
-    s(value)
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "_")
-      .replace(/^_+|_+$/g, "")
-      .slice(0, 80) || fallback
-  );
-}
-
-function mergeItemsByKey(existing = [], incoming = [], keys = ["key", "title", "category"]) {
-  const map = new Map();
-
-  const buildKey = (item = {}) =>
-    keys
-      .map((key) => s(item?.[key]).toLowerCase())
-      .filter(Boolean)
-      .join("|");
-
-  for (const item of arr(existing)) {
-    const stableKey = buildKey(item) || JSON.stringify(item);
-    map.set(stableKey, { ...obj(item) });
-  }
-
-  for (const item of arr(incoming)) {
-    const stableKey = buildKey(item) || JSON.stringify(item);
-    if (!map.has(stableKey)) {
-      map.set(stableKey, { ...obj(item) });
-      continue;
-    }
-
-    map.set(stableKey, {
-      ...obj(map.get(stableKey)),
-      ...obj(item),
-    });
-  }
-
-  return [...map.values()];
-}
-
-function parseServicesText(value = "") {
-  return s(value)
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const [namePart, ...rest] = line.split("|");
-      const name = s(namePart);
-      const description = s(rest.join("|"));
-      return {
-        name: name || description,
-        description: description || name,
-      };
-    })
-    .filter((item) => s(item.name) || s(item.description));
-}
-
-function parseFaqsText(value = "") {
-  return s(value)
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const [questionPart, ...rest] = line.split("|");
-      const question = s(questionPart);
-      const answer = s(rest.join("|"));
-      return {
-        question: question || answer,
-        answer: answer || question,
-      };
-    })
-    .filter((item) => s(item.question) || s(item.answer));
-}
-
-function parsePoliciesText(value = "") {
-  return s(value)
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const [titlePart, ...rest] = line.split("|");
-      const title = s(titlePart);
-      const description = s(rest.join("|"));
-      return {
-        title: title || description,
-        description: description || title,
-      };
-    })
-    .filter((item) => s(item.title) || s(item.description));
-}
-
-function buildServiceDraftItemsFromManual(value = "", existing = []) {
-  const manual = parseServicesText(value).map((item) => ({
-    key: safeDraftKey(s(item.name), "service"),
-    title: s(item.name),
-    description: s(item.description),
-    valueText: s(item.description),
-    category: "service",
-    origin: "manual_setup",
-    status: "approved",
-  }));
-
-  return mergeItemsByKey(existing, manual, ["key", "title"]);
-}
-
-function buildKnowledgeDraftItemsFromManual({
-  faqsText = "",
-  policiesText = "",
-  existing = [],
-}) {
-  const preserved = arr(existing).filter((item) => {
-    const category = s(item.category).toLowerCase();
-    return (
-      category !== "faq" &&
-      category !== "faqs" &&
-      category !== "policy" &&
-      category !== "policies"
-    );
-  });
-
-  const faqItems = parseFaqsText(faqsText).map((item) => ({
-    key: safeDraftKey(s(item.question), "faq"),
-    title: s(item.question),
-    valueText: s(item.answer),
-    normalizedText: s(item.answer),
-    category: "faq",
-    origin: "manual_setup",
-    status: "approved",
-  }));
-
-  const policyItems = parsePoliciesText(policiesText).map((item) => ({
-    key: safeDraftKey(s(item.title), "policy"),
-    title: s(item.title),
-    valueText: s(item.description),
-    normalizedText: s(item.description),
-    category: "policy",
-    origin: "manual_setup",
-    status: "approved",
-  }));
-
-  return mergeItemsByKey(preserved, [...faqItems, ...policyItems], [
-    "key",
-    "title",
-    "category",
-  ]);
-}
-
-function buildBusinessProfilePatch({
-  businessForm = {},
-  currentReview = {},
-  discoveryState = {},
-}) {
-  const existing = obj(currentReview?.draft?.businessProfile);
-
-  const resolvedLanguage =
-    resolveMainLanguageValue(
-      businessForm.language,
-      existing.mainLanguage,
-      existing.primaryLanguage,
-      existing.language,
-      discoveryState.mainLanguage,
-      discoveryState.primaryLanguage,
-      discoveryState.language
-    ) || "en";
-
-  const supportedLanguages = arr(existing.supportedLanguages).length
-    ? arr(existing.supportedLanguages)
-    : [resolvedLanguage];
-
-  return {
-    ...existing,
-    companyName: s(businessForm.companyName),
-    displayName: s(businessForm.companyName),
-    name: s(businessForm.companyName || existing.name),
-    summaryShort: s(businessForm.description),
-    summaryLong: s(businessForm.description || existing.summaryLong),
-    description: s(businessForm.description),
-    mainLanguage: resolvedLanguage,
-    primaryLanguage: resolvedLanguage,
-    language: resolvedLanguage,
-    supportedLanguages,
-    timezone: s(businessForm.timezone || "Asia/Baku"),
-    websiteUrl: s(
-      businessForm.websiteUrl || existing.websiteUrl || discoveryState?.lastUrl
-    ),
-    primaryPhone: s(businessForm.primaryPhone),
-    primaryEmail: s(businessForm.primaryEmail),
-    primaryAddress: s(businessForm.primaryAddress),
-    reviewRequired: !!(
-      existing.reviewRequired ?? discoveryState.reviewRequired ?? false
-    ),
-    reviewFlags: arr(existing.reviewFlags).length
-      ? arr(existing.reviewFlags)
-      : arr(discoveryState.reviewFlags),
-    fieldConfidence: Object.keys(obj(existing.fieldConfidence)).length
-      ? obj(existing.fieldConfidence)
-      : obj(discoveryState.fieldConfidence),
-  };
-}
-
-function buildCapabilitiesPatch({ currentReview = {}, businessForm = {} }) {
-  const existing = obj(currentReview?.draft?.capabilities);
-
-  const language =
-    resolveMainLanguageValue(
-      businessForm.language,
-      existing.primaryLanguage,
-      existing.mainLanguage,
-      existing.language
-    ) || "en";
-
-  const supportedLanguages = arr(existing.supportedLanguages).length
-    ? arr(existing.supportedLanguages)
-    : [language];
-
-  return {
-    ...existing,
-    primaryLanguage: language,
-    mainLanguage: language,
-    supportedLanguages,
-    supportsMultilanguage: supportedLanguages.length > 1,
-  };
-}
-
-function extractProfileName(profile = {}) {
-  const x = obj(profile);
-  return s(
-    x.companyName ||
-      x.company_name ||
-      x.displayName ||
-      x.display_name ||
-      x.name
-  );
-}
-
-function hasMeaningfulProfile(profile = {}) {
-  const x = obj(profile);
-  return !!(
-    extractProfileName(x) ||
-    s(
-      x.summaryShort ||
-        x.summary_short ||
-        x.description ||
-        x.summaryLong ||
-        x.summary_long
-    ) ||
-    s(x.websiteUrl || x.website_url) ||
-    s(x.primaryPhone || x.primary_phone) ||
-    s(x.primaryEmail || x.primary_email) ||
-    s(x.primaryAddress || x.primary_address)
-  );
-}
-
-function isPlaceholderBusinessName(value = "") {
-  const x = s(value).toLowerCase();
-
-  if (!x) return true;
-
-  return ["google maps", "maps", "website", "source", "business", "company"].includes(
-    x
-  );
-}
-
-function shouldPreferCandidateCompanyName(currentValue = "", nextValue = "") {
-  const current = s(currentValue);
-  const next = s(nextValue);
-
-  if (!next) return false;
-  if (!current) return true;
-  if (isPlaceholderBusinessName(current) && !isPlaceholderBusinessName(next)) {
-    return true;
-  }
-  return false;
-}
-
-function hydrateBusinessFormFromProfile(prev = {}, profile = {}, { force = false } = {}) {
-  const candidate = formFromProfile(profile, prev);
-
-  const next = { ...prev };
-
-  const prevCompanyName = s(prev.companyName);
-  const nextCompanyName = s(candidate.companyName);
-
-  if (force || shouldPreferCandidateCompanyName(prevCompanyName, nextCompanyName)) {
-    next.companyName = nextCompanyName;
-  }
-
-  if (force || !s(next.description)) {
-    next.description = s(candidate.description || prev.description);
-  }
-
-  if (force || !s(next.websiteUrl)) {
-    next.websiteUrl = s(candidate.websiteUrl || prev.websiteUrl);
-  }
-
-  if (force || !s(next.primaryPhone)) {
-    next.primaryPhone = s(candidate.primaryPhone || prev.primaryPhone);
-  }
-
-  if (force || !s(next.primaryEmail)) {
-    next.primaryEmail = s(candidate.primaryEmail || prev.primaryEmail);
-  }
-
-  if (force || !s(next.primaryAddress)) {
-    next.primaryAddress = s(candidate.primaryAddress || prev.primaryAddress);
-  }
-
-  if (force || !s(next.timezone)) {
-    next.timezone = s(candidate.timezone || prev.timezone || "Asia/Baku");
-  }
-
-  if (force || !s(next.language)) {
-    next.language = s(candidate.language || prev.language || "az");
-  }
-
-  return next;
-}
-
-function chooseBestProfileForForm(...profiles) {
-  for (const profile of profiles) {
-    if (hasMeaningfulProfile(profile)) return obj(profile);
-  }
-  return {};
-}
-
-function deriveVisibleKnowledgeItems({
-  reviewDraft = {},
-  currentReview = {},
-  discoveryState = {},
-}) {
-  const reviewQueueItems = arr(reviewDraft?.reviewQueue).map((item) =>
-    normalizeVisibleKnowledgeItem(item)
-  );
-
-  const currentDraftItems = arr(currentReview?.draft?.knowledgeItems).map((item) =>
-    normalizeVisibleKnowledgeItem(item)
-  );
-
-  const snapshotItems = arr(
-    discoveryState?.snapshot?.knowledgeItems ||
-      discoveryState?.snapshot?.items ||
-      discoveryState?.importedKnowledgeItems
-  ).map((item) => normalizeVisibleKnowledgeItem(item));
-
-  const merged = mergeItemsByKey(
-    reviewQueueItems,
-    [...currentDraftItems, ...snapshotItems],
-    ["candidateId", "key", "title", "category"]
-  );
-
-  return merged.map((item) => normalizeVisibleKnowledgeItem(item));
-}
-
-function deriveVisibleServiceItems({
-  reviewDraft = {},
-  currentReview = {},
-  discoveryState = {},
-}) {
-  const sectionServices = arr(reviewDraft?.sections?.services).map((item) =>
-    normalizeVisibleServiceItem(item)
-  );
-
-  const currentDraftServices = arr(currentReview?.draft?.services).map((item) =>
-    normalizeVisibleServiceItem(item)
-  );
-
-  const snapshotServices = [
-    ...arr(discoveryState?.importedServices),
-    ...arr(
-      discoveryState?.snapshot?.services ||
-        discoveryState?.profile?.services ||
-        discoveryState?.signals?.sourceFusion?.profile?.services ||
-        discoveryState?.signals?.website?.offerings?.services
-    ),
-  ].map((item) =>
-    typeof item === "string"
-      ? normalizeVisibleServiceItem({ title: item, description: item })
-      : normalizeVisibleServiceItem(item)
-  );
-
-  const merged = mergeItemsByKey(
-    sectionServices,
-    [...currentDraftServices, ...snapshotServices],
-    ["id", "key", "title", "category"]
-  );
-
-  return merged.map((item) => normalizeVisibleServiceItem(item));
-}
-
-function deriveVisibleSources({ currentReview = {}, discoveryState = {} }) {
-  const reviewSources = arr(currentReview?.sources).map((item) =>
-    normalizeVisibleSourceItem(item)
-  );
-
-  const intakeSources = arr(discoveryState?.intakeContext?.sources).map((item) =>
-    normalizeVisibleSourceItem(item)
-  );
-
-  const primarySource = obj(discoveryState?.intakeContext?.primarySource);
-  const directStateSource =
-    s(discoveryState?.lastUrl) || s(discoveryState?.sourceId)
-      ? [
-          normalizeVisibleSourceItem({
-            id: discoveryState?.sourceId,
-            sourceType: discoveryState?.lastSourceType,
-            label: discoveryState?.sourceLabel,
-            url: discoveryState?.lastUrl,
-            runId: discoveryState?.sourceRunId,
-            snapshotId: discoveryState?.snapshotId,
-            status: discoveryState?.mode,
-          }),
-        ]
-      : [];
-
-  const incoming = [
-    ...intakeSources,
-    ...(Object.keys(primarySource).length
-      ? [normalizeVisibleSourceItem(primarySource)]
-      : []),
-    ...directStateSource,
-  ];
-
-  const merged = mergeItemsByKey(reviewSources, incoming, [
-    "id",
-    "sourceType",
-    "url",
-    "label",
-  ]);
-
-  return merged
-    .map((item) => normalizeVisibleSourceItem(item))
-    .filter((item) => item.id || item.url || item.label || item.sourceType);
-}
-
-function deriveVisibleEvents(currentReview = {}) {
-  return arr(currentReview?.events)
-    .map((item) => normalizeVisibleEventItem(item))
-    .filter((item) => item.id || item.type || item.message || item.createdAt);
-}
-
-function firstNonEmpty(...values) {
-  for (const value of values) {
-    const x = s(value);
-    if (x) return x;
-  }
-  return "";
-}
+import {
+  createEmptyReviewState,
+  createEmptyLegacyDraft,
+  createIdleDiscoveryState,
+  createEmptySourceScope,
+  pickSetupProfile,
+  normalizeBootMeta,
+  resolveMainLanguageValue,
+  normalizeIncomingSourceType,
+  detectSourceTypeFromUrl,
+  normalizeScanRequest,
+  scanStartLabel,
+  scanCompleteLabel,
+  applyUiHintsFromMeta,
+  normalizeReviewState,
+} from "./screen/shared.js";
+import {
+  deriveSuggestedServicePayload,
+  formFromProfile,
+  hasExtractedIdentityProfile,
+  isWebsiteBarrierWarning,
+  isBarrierOnlyImportResult,
+  buildBusinessProfilePatch,
+  buildCapabilitiesPatch,
+  hasMeaningfulProfile,
+  shouldPreferCandidateCompanyName,
+  hydrateBusinessFormFromProfile,
+  chooseBestProfileForForm,
+} from "./screen/profile.js";
+import {
+  mapCurrentReviewToLegacyDraft,
+  buildManualSectionsFromReview,
+  resolveReviewSourceInfo,
+  reviewStateMatchesSource,
+  buildServiceDraftItemsFromManual,
+  buildKnowledgeDraftItemsFromManual,
+  deriveVisibleKnowledgeItems,
+  deriveVisibleServiceItems,
+  deriveVisibleSources,
+  deriveVisibleEvents,
+} from "./screen/reviewState.js";
 
 export default function SetupStudioScreen() {
   const navigate = useNavigate();
@@ -1380,7 +109,9 @@ export default function SetupStudioScreen() {
   const [currentReview, setCurrentReview] = useState(createEmptyReviewState);
   const [reviewDraft, setReviewDraft] = useState(createEmptyLegacyDraft);
   const [discoveryState, setDiscoveryState] = useState(createIdleDiscoveryState);
-  const [activeSourceScope, setActiveSourceScope] = useState(createEmptySourceScope);
+  const [activeSourceScope, setActiveSourceScope] = useState(
+    createEmptySourceScope
+  );
 
   const [discoveryForm, setDiscoveryForm] = useState({
     websiteUrl: "",
@@ -1502,20 +233,34 @@ export default function SetupStudioScreen() {
     }));
   }
 
-  function syncDiscoveryStateFromReview(review = {}, { preserveCounts = true } = {}) {
+  function syncDiscoveryStateFromReview(
+    review = {},
+    { preserveCounts = true } = {}
+  ) {
     const normalized = normalizeReviewState(review);
     const legacy = mapCurrentReviewToLegacyDraft(normalized);
     const profile = obj(legacy.overview);
     const reviewInfo = resolveReviewSourceInfo(normalized, legacy);
-    const metadata = extractReviewMetadata({
-      ...legacy,
-      ...profile,
-      reviewRequired: legacy.reviewRequired,
-      reviewFlags: legacy.reviewFlags,
-      fieldConfidence: legacy.fieldConfidence,
-      mainLanguage: legacy.mainLanguage || profile.mainLanguage,
-      primaryLanguage: legacy.primaryLanguage || profile.primaryLanguage,
-    });
+
+    const metadata = {
+      reviewRequired: !!legacy.reviewRequired,
+      reviewFlags: arr(legacy.reviewFlags),
+      fieldConfidence: obj(legacy.fieldConfidence),
+      mainLanguage:
+        legacy.mainLanguage ||
+        resolveMainLanguageValue(
+          profile.mainLanguage,
+          profile.primaryLanguage,
+          profile.language
+        ),
+      primaryLanguage:
+        legacy.primaryLanguage ||
+        resolveMainLanguageValue(
+          profile.primaryLanguage,
+          profile.mainLanguage,
+          profile.language
+        ),
+    };
 
     setDiscoveryState((prev) => ({
       ...prev,
@@ -1542,7 +287,9 @@ export default function SetupStudioScreen() {
           arr(normalized?.sources).length +
           arr(normalized?.events).length,
       profile: Object.keys(profile).length ? profile : obj(prev.profile),
-      warnings: arr(legacy.warnings).length ? arr(legacy.warnings) : arr(prev.warnings),
+      warnings: arr(legacy.warnings).length
+        ? arr(legacy.warnings)
+        : arr(prev.warnings),
       candidateCount: preserveCounts
         ? prev.candidateCount
         : Number(legacy.stats?.knowledgeCount || prev.candidateCount || 0),
@@ -1738,7 +485,10 @@ export default function SetupStudioScreen() {
             updateActiveSourceScope(reviewInfo.sourceType, reviewInfo.sourceUrl);
           }
 
-          const baseProfile = chooseBestProfileForForm(legacyDraft?.overview, profile);
+          const baseProfile = chooseBestProfileForForm(
+            legacyDraft?.overview,
+            profile
+          );
 
           setBusinessForm((prev) => {
             if (!preserveBusinessForm) {
@@ -1758,7 +508,9 @@ export default function SetupStudioScreen() {
                   websiteUrl: s(profile?.websiteUrl || profile?.website_url),
                   primaryPhone: s(profile?.primaryPhone || profile?.primary_phone),
                   primaryEmail: s(profile?.primaryEmail || profile?.primary_email),
-                  primaryAddress: s(profile?.primaryAddress || profile?.primary_address),
+                  primaryAddress: s(
+                    profile?.primaryAddress || profile?.primary_address
+                  ),
                 },
                 baseProfile,
                 { force: true }
@@ -1971,7 +723,7 @@ export default function SetupStudioScreen() {
       const result = await importSourceForSetup({
         sourceType,
         url: sourceUrl,
-        sourceUrl: sourceUrl,
+        sourceUrl,
         note: request.note,
         businessNote: request.note,
         sources: request.sources,
@@ -2003,19 +755,30 @@ export default function SetupStudioScreen() {
             helperProfilePatch
           );
 
-      const resultMetadata = extractReviewMetadata({
-        ...discoveredProfile,
+      const resultMetadata = {
         reviewRequired:
-          result?.reviewRequired ?? legacyImportedDraft?.reviewRequired ?? false,
-        reviewFlags:
-          result?.reviewFlags || legacyImportedDraft?.reviewFlags || [],
-        fieldConfidence:
-          result?.fieldConfidence || legacyImportedDraft?.fieldConfidence || {},
+          !!(result?.reviewRequired ?? legacyImportedDraft?.reviewRequired ?? false),
+        reviewFlags: arr(result?.reviewFlags || legacyImportedDraft?.reviewFlags || []),
+        fieldConfidence: obj(
+          result?.fieldConfidence || legacyImportedDraft?.fieldConfidence || {}
+        ),
         mainLanguage:
-          result?.mainLanguage ||
-          legacyImportedDraft?.mainLanguage ||
-          discoveredProfile?.mainLanguage,
-      });
+          s(result?.mainLanguage) ||
+          s(legacyImportedDraft?.mainLanguage) ||
+          resolveMainLanguageValue(
+            discoveredProfile?.mainLanguage,
+            discoveredProfile?.primaryLanguage,
+            discoveredProfile?.language
+          ),
+        primaryLanguage:
+          s(result?.primaryLanguage) ||
+          s(legacyImportedDraft?.primaryLanguage) ||
+          resolveMainLanguageValue(
+            discoveredProfile?.primaryLanguage,
+            discoveredProfile?.mainLanguage,
+            discoveredProfile?.language
+          ),
+      };
 
       setBusinessForm((prev) => {
         const blankBase = {
@@ -2078,20 +841,8 @@ export default function SetupStudioScreen() {
           ? []
           : arr(result?.candidates || result?.knowledgeItems),
         importedServices: barrierOnlyResult ? [] : arr(result?.services),
-        mainLanguage:
-          resultMetadata.mainLanguage ||
-          resolveMainLanguageValue(
-            discoveredProfile?.mainLanguage,
-            discoveredProfile?.primaryLanguage,
-            discoveredProfile?.language
-          ),
-        primaryLanguage:
-          resultMetadata.primaryLanguage ||
-          resolveMainLanguageValue(
-            discoveredProfile?.primaryLanguage,
-            discoveredProfile?.mainLanguage,
-            discoveredProfile?.language
-          ),
+        mainLanguage: resultMetadata.mainLanguage,
+        primaryLanguage: resultMetadata.primaryLanguage,
         reviewRequired: !!(result?.shouldReview || resultMetadata.reviewRequired),
         reviewFlags: arr(resultMetadata.reviewFlags),
         fieldConfidence: obj(resultMetadata.fieldConfidence),
@@ -2100,21 +851,31 @@ export default function SetupStudioScreen() {
       const importedVisibleKnowledgeItems = barrierOnlyResult
         ? []
         : deriveVisibleKnowledgeItems({
-            reviewDraft: incomingReviewAligned ? legacyImportedDraft : createEmptyLegacyDraft(),
-            currentReview: incomingReviewAligned ? importedReview : createEmptyReviewState(),
+            reviewDraft: incomingReviewAligned
+              ? legacyImportedDraft
+              : createEmptyLegacyDraft(),
+            currentReview: incomingReviewAligned
+              ? importedReview
+              : createEmptyReviewState(),
             discoveryState: immediateDiscoveryState,
           });
 
       const importedVisibleServiceItems = barrierOnlyResult
         ? []
         : deriveVisibleServiceItems({
-            reviewDraft: incomingReviewAligned ? legacyImportedDraft : createEmptyLegacyDraft(),
-            currentReview: incomingReviewAligned ? importedReview : createEmptyReviewState(),
+            reviewDraft: incomingReviewAligned
+              ? legacyImportedDraft
+              : createEmptyLegacyDraft(),
+            currentReview: incomingReviewAligned
+              ? importedReview
+              : createEmptyReviewState(),
             discoveryState: immediateDiscoveryState,
           });
 
       const importedVisibleSources = deriveVisibleSources({
-        currentReview: incomingReviewAligned ? importedReview : createEmptyReviewState(),
+        currentReview: incomingReviewAligned
+          ? importedReview
+          : createEmptyReviewState(),
         discoveryState: immediateDiscoveryState,
       });
 
