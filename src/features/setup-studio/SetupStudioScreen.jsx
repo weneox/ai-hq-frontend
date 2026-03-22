@@ -106,6 +106,13 @@ function createIdleDiscoveryState() {
   };
 }
 
+function createEmptySourceScope() {
+  return {
+    sourceType: "",
+    sourceUrl: "",
+  };
+}
+
 function pickSetupProfile(setup = {}, workspace = {}) {
   return obj(
     setup?.tenantProfile ||
@@ -379,7 +386,7 @@ function formFromProfile(profile = {}, prev = {}) {
       x.primary_language,
       x.language,
       x.sourceLanguage,
-      x.source_source_language
+      x.source_language
     ) || s(prev.language || "az");
 
   return {
@@ -411,7 +418,9 @@ function formFromProfile(profile = {}, prev = {}) {
     ),
     primaryPhone: s(x.primaryPhone || x.primary_phone || prev.primaryPhone),
     primaryEmail: s(x.primaryEmail || x.primary_email || prev.primaryEmail),
-    primaryAddress: s(x.primaryAddress || x.primary_address || prev.primaryAddress),
+    primaryAddress: s(
+      x.primaryAddress || x.primary_address || prev.primaryAddress
+    ),
   };
 }
 
@@ -854,8 +863,7 @@ function mapCurrentReviewToLegacyDraft(review = {}) {
     fieldConfidence: Object.keys(draftMeta.fieldConfidence).length
       ? obj(draftMeta.fieldConfidence)
       : obj(profileMeta.fieldConfidence),
-    mainLanguage:
-      draftMeta.mainLanguage || profileMeta.mainLanguage || "",
+    mainLanguage: draftMeta.mainLanguage || profileMeta.mainLanguage || "",
     primaryLanguage:
       draftMeta.primaryLanguage || profileMeta.primaryLanguage || "",
   };
@@ -1335,6 +1343,7 @@ function firstNonEmpty(...values) {
 export default function SetupStudioScreen() {
   const navigate = useNavigate();
   const autoRevealRef = useRef("");
+  const activeSourceRef = useRef(createEmptySourceScope());
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -1371,6 +1380,7 @@ export default function SetupStudioScreen() {
   const [currentReview, setCurrentReview] = useState(createEmptyReviewState);
   const [reviewDraft, setReviewDraft] = useState(createEmptyLegacyDraft);
   const [discoveryState, setDiscoveryState] = useState(createIdleDiscoveryState);
+  const [activeSourceScope, setActiveSourceScope] = useState(createEmptySourceScope);
 
   const [discoveryForm, setDiscoveryForm] = useState({
     websiteUrl: "",
@@ -1398,13 +1408,59 @@ export default function SetupStudioScreen() {
     runtimePlaybookCount: 0,
   });
 
-  function clearStudioReviewState() {
+  function updateActiveSourceScope(sourceType = "", sourceUrl = "") {
+    const normalizedUrl = s(sourceUrl);
+    const normalizedType =
+      normalizeIncomingSourceType(sourceType) ||
+      detectSourceTypeFromUrl(normalizedUrl);
+
+    const next =
+      normalizedUrl || normalizedType
+        ? {
+            sourceType: normalizedType,
+            sourceUrl: normalizedUrl,
+          }
+        : createEmptySourceScope();
+
+    activeSourceRef.current = next;
+    setActiveSourceScope(next);
+
+    return next;
+  }
+
+  function resolveActiveSourceScope(override = {}) {
+    const rawUrl = s(
+      override?.sourceUrl ||
+        activeSourceRef.current?.sourceUrl ||
+        activeSourceScope.sourceUrl ||
+        discoveryState.lastUrl
+    );
+
+    const rawType =
+      normalizeIncomingSourceType(
+        override?.sourceType ||
+          activeSourceRef.current?.sourceType ||
+          activeSourceScope.sourceType ||
+          discoveryState.lastSourceType
+      ) || detectSourceTypeFromUrl(rawUrl);
+
+    return {
+      sourceType: rawType,
+      sourceUrl: rawUrl,
+    };
+  }
+
+  function clearStudioReviewState({ preserveActiveSource = false } = {}) {
     autoRevealRef.current = "";
     setCurrentReview(createEmptyReviewState());
     setReviewDraft(createEmptyLegacyDraft());
     setDiscoveryState(createIdleDiscoveryState());
     setShowRefine(false);
     setShowKnowledge(false);
+
+    if (!preserveActiveSource) {
+      updateActiveSourceScope("", "");
+    }
   }
 
   function resetBusinessTwinDraftForNewScan(nextSourceUrl = "") {
@@ -1450,6 +1506,7 @@ export default function SetupStudioScreen() {
     const normalized = normalizeReviewState(review);
     const legacy = mapCurrentReviewToLegacyDraft(normalized);
     const profile = obj(legacy.overview);
+    const reviewInfo = resolveReviewSourceInfo(normalized, legacy);
     const metadata = extractReviewMetadata({
       ...legacy,
       ...profile,
@@ -1462,10 +1519,8 @@ export default function SetupStudioScreen() {
 
     setDiscoveryState((prev) => ({
       ...prev,
-      mainLanguage:
-        metadata.mainLanguage || prev.mainLanguage || "",
-      primaryLanguage:
-        metadata.primaryLanguage || prev.primaryLanguage || "",
+      mainLanguage: metadata.mainLanguage || prev.mainLanguage || "",
+      primaryLanguage: metadata.primaryLanguage || prev.primaryLanguage || "",
       reviewRequired: metadata.reviewRequired,
       reviewFlags: arr(metadata.reviewFlags),
       fieldConfidence: obj(metadata.fieldConfidence),
@@ -1494,12 +1549,8 @@ export default function SetupStudioScreen() {
       sourceRunId: s(legacy.sourceRunId || prev.sourceRunId),
       snapshotId: s(legacy.snapshotId || prev.snapshotId),
       sourceId: s(legacy.sourceId || prev.sourceId),
-      lastSourceType: s(
-        resolveReviewSourceInfo(normalized, legacy).sourceType || prev.lastSourceType
-      ),
-      lastUrl: s(
-        resolveReviewSourceInfo(normalized, legacy).sourceUrl || prev.lastUrl
-      ),
+      lastSourceType: s(reviewInfo.sourceType || prev.lastSourceType),
+      lastUrl: s(reviewInfo.sourceUrl || prev.lastUrl),
     }));
   }
 
@@ -1510,6 +1561,11 @@ export default function SetupStudioScreen() {
     const normalized = normalizeReviewState(reviewPayload);
     const legacy = mapCurrentReviewToLegacyDraft(normalized);
     const nextManualSections = buildManualSectionsFromReview(normalized);
+    const reviewInfo = resolveReviewSourceInfo(normalized, legacy);
+
+    if (s(reviewInfo.sourceUrl)) {
+      updateActiveSourceScope(reviewInfo.sourceType, reviewInfo.sourceUrl);
+    }
 
     setCurrentReview(normalized);
     setReviewDraft(legacy);
@@ -1561,20 +1617,26 @@ export default function SetupStudioScreen() {
   async function loadCurrentReview({
     preserveBusinessForm = false,
     activateReviewSession = true,
+    activeSourceType = "",
+    activeSourceUrl = "",
   } = {}) {
     try {
       const payload = await getCurrentSetupReview({ eventLimit: 30 });
       const normalized = normalizeReviewState(payload);
       const legacy = mapCurrentReviewToLegacyDraft(normalized);
+      const sourceScope = resolveActiveSourceScope({
+        sourceType: activeSourceType,
+        sourceUrl: activeSourceUrl,
+      });
 
       const shouldApplyIntoActiveStudio =
         !preserveBusinessForm ||
-        !s(discoveryState.lastUrl) ||
+        !s(sourceScope.sourceUrl) ||
         reviewStateMatchesSource(
           normalized,
           legacy,
-          discoveryState.lastSourceType,
-          discoveryState.lastUrl
+          sourceScope.sourceType,
+          sourceScope.sourceUrl
         );
 
       if (activateReviewSession && shouldApplyIntoActiveStudio) {
@@ -1607,6 +1669,8 @@ export default function SetupStudioScreen() {
     silent = false,
     preserveBusinessForm = false,
     hydrateReview = false,
+    activeSourceType = "",
+    activeSourceUrl = "",
   } = {}) {
     try {
       if (silent) setRefreshing(true);
@@ -1650,21 +1714,30 @@ export default function SetupStudioScreen() {
       if (hydrateReview) {
         const reviewState = normalizeReviewState(reviewPayload);
         const legacyDraft = mapCurrentReviewToLegacyDraft(reviewState);
+        const sourceScope = resolveActiveSourceScope({
+          sourceType: activeSourceType,
+          sourceUrl: activeSourceUrl,
+        });
 
         const shouldApplyIntoActiveStudio =
           !preserveBusinessForm ||
-          !s(discoveryState.lastUrl) ||
+          !s(sourceScope.sourceUrl) ||
           reviewStateMatchesSource(
             reviewState,
             legacyDraft,
-            discoveryState.lastSourceType,
-            discoveryState.lastUrl
+            sourceScope.sourceType,
+            sourceScope.sourceUrl
           );
 
         setCurrentReview(reviewState);
         setReviewDraft(legacyDraft);
 
         if (shouldApplyIntoActiveStudio) {
+          const reviewInfo = resolveReviewSourceInfo(reviewState, legacyDraft);
+          if (s(reviewInfo.sourceUrl)) {
+            updateActiveSourceScope(reviewInfo.sourceType, reviewInfo.sourceUrl);
+          }
+
           const baseProfile = chooseBestProfileForForm(legacyDraft?.overview, profile);
 
           setBusinessForm((prev) => {
@@ -1736,11 +1809,7 @@ export default function SetupStudioScreen() {
       }
 
       if (!preserveBusinessForm) {
-        setCurrentReview(createEmptyReviewState());
-        setReviewDraft(createEmptyLegacyDraft());
-        setDiscoveryState(createIdleDiscoveryState());
-        setShowRefine(false);
-        setShowKnowledge(false);
+        clearStudioReviewState({ preserveActiveSource: false });
 
         setBusinessForm((prev) => ({
           ...prev,
@@ -1820,11 +1889,15 @@ export default function SetupStudioScreen() {
   async function refreshAndMaybeRouteHome({
     preserveBusinessForm = false,
     hydrateReview = !freshEntryMode,
+    activeSourceType = "",
+    activeSourceUrl = "",
   } = {}) {
     const snapshot = await loadData({
       silent: true,
       preserveBusinessForm,
       hydrateReview,
+      activeSourceType,
+      activeSourceUrl,
     });
 
     const nextMeta = obj(snapshot?.meta);
@@ -1873,7 +1946,8 @@ export default function SetupStudioScreen() {
       setError("");
       autoRevealRef.current = "";
 
-      clearStudioReviewState();
+      updateActiveSourceScope(sourceType, sourceUrl);
+      clearStudioReviewState({ preserveActiveSource: true });
       resetBusinessTwinDraftForNewScan(sourceUrl);
 
       setDiscoveryState((prev) => ({
@@ -2117,6 +2191,8 @@ export default function SetupStudioScreen() {
       const refreshResult = await refreshAndMaybeRouteHome({
         preserveBusinessForm: true,
         hydrateReview: !barrierOnlyResult,
+        activeSourceType: sourceType,
+        activeSourceUrl: sourceUrl,
       });
 
       if (!refreshResult.routed) {
@@ -2225,12 +2301,16 @@ export default function SetupStudioScreen() {
       const refreshed = await refreshAndMaybeRouteHome({
         preserveBusinessForm: false,
         hydrateReview: true,
+        activeSourceType: activeSourceScope.sourceType,
+        activeSourceUrl: activeSourceScope.sourceUrl,
       });
 
       if (!refreshed?.routed) {
         await loadCurrentReview({
           preserveBusinessForm: false,
           activateReviewSession: true,
+          activeSourceType: activeSourceScope.sourceType,
+          activeSourceUrl: activeSourceScope.sourceUrl,
         });
       }
 
@@ -2258,11 +2338,15 @@ export default function SetupStudioScreen() {
       await loadCurrentReview({
         preserveBusinessForm: true,
         activateReviewSession: true,
+        activeSourceType: activeSourceScope.sourceType,
+        activeSourceUrl: activeSourceScope.sourceUrl,
       });
 
       const refreshed = await refreshAndMaybeRouteHome({
         preserveBusinessForm: true,
         hydrateReview: true,
+        activeSourceType: activeSourceScope.sourceType,
+        activeSourceUrl: activeSourceScope.sourceUrl,
       });
 
       if (!refreshed?.routed) {
@@ -2296,11 +2380,15 @@ export default function SetupStudioScreen() {
       await loadCurrentReview({
         preserveBusinessForm: true,
         activateReviewSession: true,
+        activeSourceType: activeSourceScope.sourceType,
+        activeSourceUrl: activeSourceScope.sourceUrl,
       });
 
       const refreshed = await refreshAndMaybeRouteHome({
         preserveBusinessForm: true,
         hydrateReview: true,
+        activeSourceType: activeSourceScope.sourceType,
+        activeSourceUrl: activeSourceScope.sourceUrl,
       });
 
       if (!refreshed?.routed) {
@@ -2323,16 +2411,24 @@ export default function SetupStudioScreen() {
 
   const activeReviewAligned = useMemo(() => {
     if (freshEntryMode) return false;
-    if (!s(discoveryState.lastUrl)) return true;
+
+    const scopedUrl = s(activeSourceScope.sourceUrl || discoveryState.lastUrl);
+    const scopedType =
+      normalizeIncomingSourceType(
+        activeSourceScope.sourceType || discoveryState.lastSourceType
+      ) || detectSourceTypeFromUrl(scopedUrl);
+
+    if (!scopedUrl) return false;
 
     return reviewStateMatchesSource(
       currentReview,
       reviewDraft,
-      discoveryState.lastSourceType,
-      discoveryState.lastUrl
+      scopedType,
+      scopedUrl
     );
   }, [
     freshEntryMode,
+    activeSourceScope,
     currentReview,
     reviewDraft,
     discoveryState.lastSourceType,
@@ -2398,6 +2494,8 @@ export default function SetupStudioScreen() {
       await refreshAndMaybeRouteHome({
         preserveBusinessForm: true,
         hydrateReview: true,
+        activeSourceType: activeSourceScope.sourceType,
+        activeSourceUrl: activeSourceScope.sourceUrl,
       });
 
       return { ok: true };
@@ -2419,6 +2517,8 @@ export default function SetupStudioScreen() {
         silent: true,
         preserveBusinessForm: true,
         hydrateReview: !freshEntryMode,
+        activeSourceType: activeSourceScope.sourceType,
+        activeSourceUrl: activeSourceScope.sourceUrl,
       });
       const nextMeta = obj(snapshot?.meta);
 
@@ -2651,7 +2751,11 @@ export default function SetupStudioScreen() {
     if (!hasVisibleResults) return;
     if (mode === "idle" || mode === "running") return;
     if (!autoRevealKey) return;
-    if (!activeReviewAligned && !hasExtractedIdentityProfile(discoveryState.profile) && arr(discoveryState.warnings).length === 0) {
+    if (
+      !activeReviewAligned &&
+      !hasExtractedIdentityProfile(discoveryState.profile) &&
+      arr(discoveryState.warnings).length === 0
+    ) {
       return;
     }
     if (autoRevealRef.current === autoRevealKey) return;
@@ -2733,6 +2837,8 @@ export default function SetupStudioScreen() {
         loadCurrentReview({
           preserveBusinessForm: true,
           activateReviewSession: true,
+          activeSourceType: activeSourceScope.sourceType,
+          activeSourceUrl: activeSourceScope.sourceUrl,
         })
       }
       onRefresh={() =>
@@ -2740,6 +2846,8 @@ export default function SetupStudioScreen() {
           silent: true,
           preserveBusinessForm: !freshEntryMode,
           hydrateReview: !freshEntryMode,
+          activeSourceType: activeSourceScope.sourceType,
+          activeSourceUrl: activeSourceScope.sourceUrl,
         })
       }
       onToggleRefine={() => setShowRefine((prev) => !prev)}
