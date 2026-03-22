@@ -1,5 +1,5 @@
 // src/features/setup-studio/lib/setupStudioHelpers.js
-// FINAL v2.1 — canonical setup studio helpers with session-review compatibility
+// FINAL v2.2 — canonical setup studio helpers with barrier/warning-safe projection
 
 export function arr(value) {
   return Array.isArray(value) ? value : [];
@@ -11,6 +11,82 @@ export function obj(value) {
 
 export function s(value, fallback = "") {
   return String(value ?? fallback).trim();
+}
+
+function lowerText(value = "") {
+  return s(value).toLowerCase();
+}
+
+export function isBarrierLikeDiscoveryText(value = "") {
+  const text = s(value);
+  if (!text) return false;
+
+  const normalized = lowerText(text);
+
+  if (
+    /^(website|google_maps|googlemaps|source)_(extract|fetch|entry|page|crawl|robots|sitemap|sync)_(timeout|failed|error)(?:_\d+ms)?$/i.test(
+      text
+    )
+  ) {
+    return true;
+  }
+
+  if (
+    /^(http_\d{3}|fetch_failed|non_html_response|robots_disallow_all_detected|sitemap_not_found_or_unreadable|partial_website_extraction)$/i.test(
+      text
+    )
+  ) {
+    return true;
+  }
+
+  if (
+    /\b(timeout|timed out|fetch failed|non html|non-html|robots|sitemap|http_403|http_404|http_429|http_500)\b/i.test(
+      text
+    )
+  ) {
+    return true;
+  }
+
+  if (normalized === "warning" || normalized === "review required") {
+    return true;
+  }
+
+  return false;
+}
+
+export function sanitizeDiscoveryText(value = "", fallback = "") {
+  const text = s(value, fallback);
+  if (!text) return "";
+  if (isBarrierLikeDiscoveryText(text)) return "";
+  return text;
+}
+
+function firstMeaningfulDiscoveryValue(...values) {
+  for (const value of values) {
+    const next = sanitizeDiscoveryText(value);
+    if (next) return next;
+  }
+  return "";
+}
+
+function sanitizePreviewCollection(list = [], mapper = null, maxItems = 4, separator = ", ") {
+  const out = [];
+
+  for (const item of arr(list)) {
+    const raw =
+      typeof mapper === "function"
+        ? mapper(item)
+        : typeof item === "string"
+          ? item
+          : s(item?.title || item?.name || item?.label || item?.value || item?.description);
+
+    const next = sanitizeDiscoveryText(raw);
+    if (!next) continue;
+    out.push(next);
+    if (out.length >= maxItems) break;
+  }
+
+  return out.join(separator);
 }
 
 export function truncateMiddle(value = "", start = 28, end = 18) {
@@ -90,7 +166,7 @@ export function parseJsonArray(value) {
 export function compactValue(value) {
   if (Array.isArray(value)) {
     return value
-      .map((item) => s(item))
+      .map((item) => sanitizeDiscoveryText(item))
       .filter(Boolean)
       .slice(0, 3)
       .join(" · ");
@@ -98,13 +174,13 @@ export function compactValue(value) {
 
   if (value && typeof value === "object") {
     return Object.values(value)
-      .map((item) => s(item))
+      .map((item) => sanitizeDiscoveryText(item))
       .filter(Boolean)
       .slice(0, 3)
       .join(" · ");
   }
 
-  return s(value);
+  return sanitizeDiscoveryText(value);
 }
 
 export function isPendingKnowledge(item = {}) {
@@ -124,13 +200,13 @@ export function isPendingKnowledge(item = {}) {
 
 export function candidateTitle(item = {}) {
   return (
-    s(item.title) ||
-    s(item.name) ||
-    s(item.label) ||
-    s(item.itemKey) ||
-    s(item.item_key) ||
-    s(item.key) ||
-    s(item.canonical_key) ||
+    sanitizeDiscoveryText(item.title) ||
+    sanitizeDiscoveryText(item.name) ||
+    sanitizeDiscoveryText(item.label) ||
+    sanitizeDiscoveryText(item.itemKey) ||
+    sanitizeDiscoveryText(item.item_key) ||
+    sanitizeDiscoveryText(item.key) ||
+    sanitizeDiscoveryText(item.canonical_key) ||
     "Untitled discovery"
   );
 }
@@ -140,7 +216,7 @@ export function candidateCategory(item = {}) {
 }
 
 export function candidateValue(item = {}) {
-  const text = s(
+  const text = sanitizeDiscoveryText(
     item.valueText ||
       item.value_text ||
       item.normalizedText ||
@@ -155,38 +231,38 @@ export function candidateValue(item = {}) {
   const normalizedJson = obj(item.normalizedJson || item.normalized_json);
 
   const combined =
-    s(valueJson.question || normalizedJson.question) &&
-    s(valueJson.answer || normalizedJson.answer)
-      ? `${s(valueJson.question || normalizedJson.question)} — ${s(
+    sanitizeDiscoveryText(valueJson.question || normalizedJson.question) &&
+    sanitizeDiscoveryText(valueJson.answer || normalizedJson.answer)
+      ? `${sanitizeDiscoveryText(valueJson.question || normalizedJson.question)} — ${sanitizeDiscoveryText(
           valueJson.answer || normalizedJson.answer
         )}`
-      : s(
-          valueJson.summary ||
-            normalizedJson.summary ||
-            valueJson.text ||
-            normalizedJson.text ||
-            valueJson.description ||
-            normalizedJson.description ||
-            valueJson.service ||
-            normalizedJson.service ||
-            valueJson.product ||
-            normalizedJson.product ||
-            valueJson.policy ||
-            normalizedJson.policy ||
-            valueJson.address ||
-            normalizedJson.address ||
-            valueJson.hours ||
-            normalizedJson.hours ||
-            valueJson.email ||
-            normalizedJson.email ||
-            valueJson.phone ||
-            normalizedJson.phone ||
-            valueJson.url ||
-            normalizedJson.url ||
-            valueJson.title ||
-            normalizedJson.title ||
-            valueJson.company_name ||
-            normalizedJson.company_name
+      : firstMeaningfulDiscoveryValue(
+          valueJson.summary,
+          normalizedJson.summary,
+          valueJson.text,
+          normalizedJson.text,
+          valueJson.description,
+          normalizedJson.description,
+          valueJson.service,
+          normalizedJson.service,
+          valueJson.product,
+          normalizedJson.product,
+          valueJson.policy,
+          normalizedJson.policy,
+          valueJson.address,
+          normalizedJson.address,
+          valueJson.hours,
+          normalizedJson.hours,
+          valueJson.email,
+          normalizedJson.email,
+          valueJson.phone,
+          normalizedJson.phone,
+          valueJson.url,
+          normalizedJson.url,
+          valueJson.title,
+          normalizedJson.title,
+          valueJson.company_name,
+          normalizedJson.company_name
         );
 
   if (combined) return combined;
@@ -198,7 +274,8 @@ export function candidateValue(item = {}) {
   if (compactNormalized) return compactNormalized;
 
   try {
-    return JSON.stringify(valueJson, null, 2);
+    const raw = JSON.stringify(valueJson, null, 2);
+    return sanitizeDiscoveryText(raw);
   } catch {
     return "";
   }
@@ -249,25 +326,25 @@ export function profilePatchFromDiscovery(profile = {}) {
   const supportedLanguagesLegacy = arr(p.supported_languages);
 
   return {
-    companyName: s(
-      p.companyName ||
-        p.displayName ||
-        p.businessName ||
-        p.name ||
-        p.title ||
-        p.brandName ||
-        p.companyTitle
+    companyName: firstMeaningfulDiscoveryValue(
+      p.companyName,
+      p.displayName,
+      p.businessName,
+      p.name,
+      p.title,
+      p.brandName,
+      p.companyTitle
     ),
-    description: s(
-      p.description ||
-        p.summaryShort ||
-        p.summary ||
-        p.businessDescription ||
-        p.about ||
-        p.companySummaryShort ||
-        p.companySummaryLong ||
-        p.summaryLong ||
-        p.aboutSection
+    description: firstMeaningfulDiscoveryValue(
+      p.description,
+      p.summaryShort,
+      p.summary,
+      p.businessDescription,
+      p.about,
+      p.companySummaryShort,
+      p.companySummaryLong,
+      p.summaryLong,
+      p.aboutSection
     ),
     timezone: s(p.timezone || p.timeZone),
     language: s(
@@ -306,61 +383,65 @@ export function mergeBusinessForm(prev, patch = {}) {
 export function profilePreviewRows(profile = {}) {
   const p = obj(profile);
 
-  const services = arr(p.services)
-    .map((item) => (typeof item === "string" ? item : s(item?.title || item?.name || item?.label)))
-    .filter(Boolean)
-    .slice(0, 4)
-    .join(", ");
+  const services = sanitizePreviewCollection(
+    arr(p.services),
+    (item) => (typeof item === "string" ? item : s(item?.title || item?.name || item?.label)),
+    4,
+    ", "
+  );
 
-  const products = arr(p.products)
-    .map((item) => (typeof item === "string" ? item : s(item?.title || item?.name || item?.label)))
-    .filter(Boolean)
-    .slice(0, 4)
-    .join(", ");
+  const products = sanitizePreviewCollection(
+    arr(p.products),
+    (item) => (typeof item === "string" ? item : s(item?.title || item?.name || item?.label)),
+    4,
+    ", "
+  );
 
-  const pricingHints = arr(p.pricingHints || p.pricing_hints)
-    .map((item) => (typeof item === "string" ? item : compactValue(item)))
-    .filter(Boolean)
-    .slice(0, 3)
-    .join(" · ");
+  const pricingHints = sanitizePreviewCollection(
+    arr(p.pricingHints || p.pricing_hints),
+    (item) => (typeof item === "string" ? item : compactValue(item)),
+    3,
+    " · "
+  );
 
-  const socialLinks = arr(p.socialLinks || p.social_links)
-    .map((item) => s(item?.platform || item?.url || item))
-    .filter(Boolean)
-    .slice(0, 4)
-    .join(", ");
+  const socialLinks = sanitizePreviewCollection(
+    arr(p.socialLinks || p.social_links),
+    (item) => s(item?.platform || item?.url || item),
+    4,
+    ", "
+  );
 
   return [
     [
       "Name",
-      s(
-        p.companyName ||
-          p.displayName ||
-          p.businessName ||
-          p.name ||
-          p.title ||
-          p.brandName ||
-          p.companyTitle
+      firstMeaningfulDiscoveryValue(
+        p.companyName,
+        p.displayName,
+        p.businessName,
+        p.name,
+        p.title,
+        p.brandName,
+        p.companyTitle
       ),
     ],
     [
       "Description",
-      s(
-        p.description ||
-          p.summaryShort ||
-          p.summary ||
-          p.businessDescription ||
-          p.about ||
-          p.companySummaryShort ||
-          p.companySummaryLong ||
-          p.summaryLong ||
-          p.aboutSection
+      firstMeaningfulDiscoveryValue(
+        p.description,
+        p.summaryShort,
+        p.summary,
+        p.businessDescription,
+        p.about,
+        p.companySummaryShort,
+        p.companySummaryLong,
+        p.summaryLong,
+        p.aboutSection
       ),
     ],
-    ["Timezone", s(p.timezone || p.timeZone)],
+    ["Timezone", sanitizeDiscoveryText(p.timezone || p.timeZone)],
     [
       "Language",
-      s(
+      sanitizeDiscoveryText(
         p.language ||
           p.mainLanguage ||
           p.main_language ||
@@ -369,10 +450,16 @@ export function profilePreviewRows(profile = {}) {
           arr(p.supported_languages)[0]
       ),
     ],
-    ["Website", s(p.websiteUrl || p.website || p.url || p.siteUrl || p.site_url)],
-    ["Phone", s(p.primaryPhone || p.primary_phone || arr(p.phones)[0])],
-    ["Email", s(p.primaryEmail || p.primary_email || arr(p.emails)[0])],
-    ["Address", s(p.primaryAddress || p.primary_address || arr(p.addresses)[0])],
+    [
+      "Website",
+      sanitizeDiscoveryText(p.websiteUrl || p.website || p.url || p.siteUrl || p.site_url),
+    ],
+    ["Phone", sanitizeDiscoveryText(p.primaryPhone || p.primary_phone || arr(p.phones)[0])],
+    ["Email", sanitizeDiscoveryText(p.primaryEmail || p.primary_email || arr(p.emails)[0])],
+    [
+      "Address",
+      sanitizeDiscoveryText(p.primaryAddress || p.primary_address || arr(p.addresses)[0]),
+    ],
     ["Services", services],
     ["Products", products],
     ["Pricing", pricingHints],

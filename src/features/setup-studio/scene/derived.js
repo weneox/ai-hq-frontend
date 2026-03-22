@@ -8,6 +8,51 @@ import {
   uniqText,
 } from "./shared.js";
 
+function isBarrierLikeText(value = "", warnings = []) {
+  const text = s(value);
+  if (!text) return false;
+
+  const normalized = lower(text);
+  const warningSet = new Set(arr(warnings).map((item) => lower(item)).filter(Boolean));
+
+  if (warningSet.has(normalized)) {
+    return true;
+  }
+
+  if (
+    /^(website|google_maps|googlemaps|source)_(extract|fetch|entry|page|crawl|robots|sitemap|sync)_(timeout|failed|error)(?:_\d+ms)?$/i.test(
+      text
+    )
+  ) {
+    return true;
+  }
+
+  if (
+    /^(http_\d{3}|fetch_failed|non_html_response|robots_disallow_all_detected|sitemap_not_found_or_unreadable|partial_website_extraction)$/i.test(
+      text
+    )
+  ) {
+    return true;
+  }
+
+  if (
+    /\b(timeout|timed out|fetch failed|non html|non-html|robots|sitemap|http_403|http_404|http_429|http_500)\b/i.test(
+      text
+    )
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function sanitizeIdentityText(value = "", warnings = []) {
+  const text = s(value);
+  if (!text) return "";
+  if (isBarrierLikeText(text, warnings)) return "";
+  return text;
+}
+
 export function hasMeaningfulReviewDraft(reviewDraft = {}) {
   const rd = obj(reviewDraft);
   const draft = obj(
@@ -87,23 +132,24 @@ export function hasMeaningfulIdentityData({
   discoveryProfileRows,
   meta,
   businessForm,
+  warnings = [],
 }) {
   const m = obj(meta);
   const bf = obj(businessForm);
 
   return !!(
-    s(currentTitle) ||
-    s(currentDescription) ||
+    sanitizeIdentityText(currentTitle, warnings) ||
+    sanitizeIdentityText(currentDescription, warnings) ||
     arr(discoveryProfileRows).length > 0 ||
-    s(m.companyName) ||
-    s(m.companySummaryShort) ||
-    s(m.companySummaryLong) ||
-    s(m.description) ||
+    sanitizeIdentityText(m.companyName, warnings) ||
+    sanitizeIdentityText(m.companySummaryShort, warnings) ||
+    sanitizeIdentityText(m.companySummaryLong, warnings) ||
+    sanitizeIdentityText(m.description, warnings) ||
     s(m.mainLanguage) ||
     s(m.primaryLanguage) ||
     s(m.language) ||
-    s(bf.companyName) ||
-    s(bf.description) ||
+    sanitizeIdentityText(bf.companyName, warnings) ||
+    sanitizeIdentityText(bf.description, warnings) ||
     s(bf.websiteUrl) ||
     s(bf.primaryPhone) ||
     s(bf.primaryEmail) ||
@@ -408,6 +454,7 @@ export function buildSceneSummaryState({
     discoveryProfileRows: safeDiscoveryProfileRows,
     meta,
     businessForm,
+    warnings: safeWarnings,
   });
 
   const scanSucceeded =
@@ -476,7 +523,7 @@ export function buildSceneSummaryState({
 
   const weakestFieldBadges = buildTopFieldConfidenceBadges(fieldConfidence);
 
-  const discoveredTitle =
+  const discoveredTitle = sanitizeIdentityText(
     firstNonEmpty(
       findProfileRowValue(safeDiscoveryProfileRows, [
         "name",
@@ -485,9 +532,11 @@ export function buildSceneSummaryState({
         "title",
       ]),
       meta?.companyName
-    );
+    ),
+    safeWarnings
+  );
 
-  const discoveredDescription =
+  const discoveredDescription = sanitizeIdentityText(
     firstNonEmpty(
       findProfileRowValue(safeDiscoveryProfileRows, [
         "description",
@@ -497,19 +546,23 @@ export function buildSceneSummaryState({
       ]),
       meta?.companySummaryShort,
       meta?.description
-    );
+    ),
+    safeWarnings
+  );
 
   const resolvedCurrentTitle =
-    s(currentTitle) ||
-    s(businessForm?.companyName) ||
+    sanitizeIdentityText(currentTitle, safeWarnings) ||
+    sanitizeIdentityText(businessForm?.companyName, safeWarnings) ||
     discoveredTitle ||
-    "Business identity";
+    "";
 
   const resolvedCurrentDescription =
-    s(currentDescription) ||
-    s(businessForm?.description) ||
+    sanitizeIdentityText(currentDescription, safeWarnings) ||
+    sanitizeIdentityText(businessForm?.description, safeWarnings) ||
     discoveredDescription ||
-    "We extracted a first draft of the business direction from the source signals.";
+    (safeWarnings.length > 0
+      ? "Analysis completed with warnings. Review the source details before continuing."
+      : "We extracted a first draft of the business direction from the source signals.");
 
   const reviewStatusLabel = firstNonEmpty(
     discoveryState?.reviewSessionStatus,
