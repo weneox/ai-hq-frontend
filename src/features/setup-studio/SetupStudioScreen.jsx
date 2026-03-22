@@ -69,6 +69,141 @@ import {
   deriveVisibleEvents,
 } from "./screen/reviewState.js";
 
+function lowerText(value = "") {
+  return s(value).toLowerCase();
+}
+
+function isBarrierLikeIdentityText(value = "", warnings = []) {
+  const text = s(value);
+  if (!text) return false;
+
+  const normalized = lowerText(text);
+
+  if (arr(warnings).some((item) => lowerText(item) === normalized)) {
+    return true;
+  }
+
+  if (isWebsiteBarrierWarning(text)) {
+    return true;
+  }
+
+  if (
+    /^(website|google_maps|googlemaps|source)_(extract|fetch|entry|page|crawl|robots|sitemap|sync)_(timeout|failed|error)(?:_\d+ms)?$/i.test(
+      text
+    )
+  ) {
+    return true;
+  }
+
+  if (
+    /^(http_\d{3}|fetch_failed|non_html_response|robots_disallow_all_detected|sitemap_not_found_or_unreadable|partial_website_extraction)$/i.test(
+      text
+    )
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function sanitizeUiIdentityText(value = "", warnings = []) {
+  const text = s(value);
+  if (!text) return "";
+  if (isBarrierLikeIdentityText(text, warnings)) return "";
+  return text;
+}
+
+function buildSafeUiProfile({
+  rawProfile = {},
+  sourceType = "",
+  sourceUrl = "",
+  warnings = [],
+  mainLanguage = "",
+  primaryLanguage = "",
+  reviewRequired = false,
+  reviewFlags = [],
+  fieldConfidence = {},
+  barrierOnly = false,
+} = {}) {
+  const profile = obj(rawProfile);
+
+  const safeWebsiteUrl = s(
+    profile.websiteUrl ||
+      profile.website ||
+      (sourceType === "website" ? sourceUrl : "")
+  );
+
+  const safeName = barrierOnly
+    ? ""
+    : sanitizeUiIdentityText(
+        profile.companyName ||
+          profile.displayName ||
+          profile.companyTitle ||
+          profile.name,
+        warnings
+      );
+
+  const safeDisplayName = barrierOnly
+    ? ""
+    : sanitizeUiIdentityText(profile.displayName || safeName, warnings);
+
+  const safeCompanyTitle = barrierOnly
+    ? ""
+    : sanitizeUiIdentityText(profile.companyTitle || safeName, warnings);
+
+  const safeSummaryShort = sanitizeUiIdentityText(
+    profile.companySummaryShort ||
+      profile.summaryShort ||
+      profile.shortDescription,
+    warnings
+  );
+
+  const safeSummaryLong = sanitizeUiIdentityText(
+    profile.companySummaryLong ||
+      profile.summaryLong ||
+      profile.description ||
+      safeSummaryShort,
+    warnings
+  );
+
+  const safeMainLanguage =
+    s(
+      mainLanguage ||
+        profile.mainLanguage ||
+        profile.primaryLanguage ||
+        profile.language
+    ) || "";
+
+  const safePrimaryLanguage =
+    s(
+      primaryLanguage ||
+        profile.primaryLanguage ||
+        profile.mainLanguage ||
+        profile.language
+    ) || safeMainLanguage;
+
+  return {
+    ...profile,
+    companyName: safeName,
+    displayName: safeDisplayName,
+    companyTitle: safeCompanyTitle,
+    name: safeName,
+    companySummaryShort: safeSummaryShort,
+    summaryShort: safeSummaryShort,
+    companySummaryLong: safeSummaryLong,
+    summaryLong: safeSummaryLong,
+    description: safeSummaryLong || safeSummaryShort,
+    websiteUrl: safeWebsiteUrl,
+    website: safeWebsiteUrl,
+    mainLanguage: safeMainLanguage,
+    primaryLanguage: safePrimaryLanguage,
+    language: safeMainLanguage || s(profile.language),
+    reviewRequired: !!reviewRequired,
+    reviewFlags: arr(reviewFlags),
+    fieldConfidence: obj(fieldConfidence),
+  };
+}
+
 export default function SetupStudioScreen() {
   const navigate = useNavigate();
   const autoRevealRef = useRef("");
@@ -747,13 +882,9 @@ export default function SetupStudioScreen() {
       const helperProfilePatch = profilePatchFromDiscovery(discoveredProfile);
       const barrierOnlyResult = isBarrierOnlyImportResult(result, sourceType);
 
-      const bestIncomingProfile = barrierOnlyResult
-        ? chooseBestProfileForForm(discoveredProfile, helperProfilePatch)
-        : chooseBestProfileForForm(
-            reviewBackedProfile,
-            discoveredProfile,
-            helperProfilePatch
-          );
+      const resultWarnings = arr(result?.warnings)
+        .map((x) => s(x))
+        .filter(Boolean);
 
       const resultMetadata = {
         reviewRequired:
@@ -780,6 +911,30 @@ export default function SetupStudioScreen() {
           ),
       };
 
+      const rawBestIncomingProfile = barrierOnlyResult
+        ? chooseBestProfileForForm(discoveredProfile, helperProfilePatch)
+        : chooseBestProfileForForm(
+            reviewBackedProfile,
+            discoveredProfile,
+            helperProfilePatch
+          );
+
+      const bestIncomingProfile = buildSafeUiProfile({
+        rawProfile: rawBestIncomingProfile,
+        sourceType,
+        sourceUrl,
+        warnings: resultWarnings,
+        mainLanguage: resultMetadata.mainLanguage,
+        primaryLanguage: resultMetadata.primaryLanguage,
+        reviewRequired: resultMetadata.reviewRequired,
+        reviewFlags: resultMetadata.reviewFlags,
+        fieldConfidence: resultMetadata.fieldConfidence,
+        barrierOnly: barrierOnlyResult,
+      });
+
+      const shouldApplyExtractedIdentityToForm =
+        !barrierOnlyResult && hasExtractedIdentityProfile(bestIncomingProfile);
+
       setBusinessForm((prev) => {
         const blankBase = {
           ...prev,
@@ -791,12 +946,18 @@ export default function SetupStudioScreen() {
           primaryAddress: "",
         };
 
-        const mergedFromHelper = mergeBusinessForm(blankBase, helperProfilePatch);
-        const next = hydrateBusinessFormFromProfile(
-          mergedFromHelper,
-          bestIncomingProfile,
-          { force: false }
-        );
+        const mergedFromHelper = shouldApplyExtractedIdentityToForm
+          ? mergeBusinessForm(blankBase, helperProfilePatch)
+          : blankBase;
+
+        const next = shouldApplyExtractedIdentityToForm
+          ? hydrateBusinessFormFromProfile(mergedFromHelper, bestIncomingProfile, {
+              force: false,
+            })
+          : {
+              ...mergedFromHelper,
+              websiteUrl: sourceUrl,
+            };
 
         if (!s(next.language) && resultMetadata.mainLanguage) {
           next.language = resultMetadata.mainLanguage;
@@ -808,16 +969,12 @@ export default function SetupStudioScreen() {
       if (result?.review && !barrierOnlyResult && incomingReviewAligned) {
         applyReviewState(result.review, {
           preserveBusinessForm: true,
-          fallbackProfile: discoveredProfile,
+          fallbackProfile: bestIncomingProfile,
         });
       } else {
         setCurrentReview(createEmptyReviewState());
         setReviewDraft(createEmptyLegacyDraft());
       }
-
-      const resultWarnings = arr(result?.warnings)
-        .map((x) => s(x))
-        .filter(Boolean);
 
       const sourceId = s(result?.source?.id || legacyImportedDraft?.sourceId);
       const sourceRunId = s(result?.run?.id || legacyImportedDraft?.sourceRunId);
@@ -832,7 +989,7 @@ export default function SetupStudioScreen() {
         ),
         intakeContext: obj(result?.intakeContext),
         snapshot: obj(result?.snapshot),
-        profile: discoveredProfile,
+        profile: bestIncomingProfile,
         signals: obj(result?.signals),
         sourceId,
         sourceRunId,
@@ -1449,11 +1606,14 @@ export default function SetupStudioScreen() {
   }, [visibleKnowledgeItems]);
 
   const currentTitle = useMemo(() => {
-    const businessName = s(businessForm.companyName);
-    const reviewName = s(
+    const warningSet = arr(discoveryState.warnings);
+
+    const businessName = sanitizeUiIdentityText(businessForm.companyName, warningSet);
+    const reviewName = sanitizeUiIdentityText(
       scopedReviewDraft?.overview?.companyName ||
         scopedReviewDraft?.overview?.displayName ||
-        scopedReviewDraft?.overview?.name
+        scopedReviewDraft?.overview?.name,
+      warningSet
     );
 
     if (shouldPreferCandidateCompanyName(businessName, reviewName)) {
@@ -1461,15 +1621,16 @@ export default function SetupStudioScreen() {
     }
 
     return s(businessName || reviewName);
-  }, [businessForm.companyName, scopedReviewDraft]);
+  }, [businessForm.companyName, scopedReviewDraft, discoveryState.warnings]);
 
   const currentDescription = useMemo(
     () =>
-      s(
+      sanitizeUiIdentityText(
         scopedReviewDraft?.quickSummary ||
           businessForm.description ||
           scopedReviewDraft?.overview?.summaryShort ||
-          discoveryState?.profile?.summaryShort
+          discoveryState?.profile?.summaryShort,
+        arr(discoveryState.warnings)
       ),
     [scopedReviewDraft, businessForm.description, discoveryState]
   );
