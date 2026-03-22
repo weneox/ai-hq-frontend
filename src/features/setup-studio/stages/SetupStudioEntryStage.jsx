@@ -6,10 +6,8 @@ import {
   Check,
   ChevronRight,
   Ellipsis,
-  Globe2,
   Link2,
   Loader2,
-  PencilLine,
   X,
 } from "lucide-react";
 
@@ -250,56 +248,62 @@ function normalizeAnalysisRows(rows = []) {
     .filter((item) => item.label || item.value);
 }
 
-function SourceMark({ item, size = "h-11 w-11" }) {
+function SourceMark({ item, size = "h-10 w-10" }) {
   return (
-    <span className={`inline-flex items-center justify-center rounded-[16px] ${size}`}>
+    <span className={`inline-flex items-center justify-center rounded-[15px] ${size}`}>
       <img
         src={item.imageSrc}
         alt=""
         aria-hidden="true"
-        className="h-full w-full rounded-[16px] object-contain"
+        className="h-full w-full rounded-[15px] object-contain"
       />
     </span>
   );
 }
 
-function SwirlCore({ tint = "blue", active = false }) {
-  const ring =
+function OrbitalSwirl({ tint = "blue", active = false }) {
+  const glowClass =
     tint === "violet"
-      ? "border-violet-200/70 bg-[radial-gradient(circle_at_center,rgba(196,181,253,.2),transparent_60%)]"
-      : "border-sky-200/70 bg-[radial-gradient(circle_at_center,rgba(125,211,252,.18),transparent_60%)]";
+      ? "from-violet-200/30 via-violet-100/10 to-transparent"
+      : "from-sky-200/30 via-cyan-100/10 to-transparent";
+
+  const ringClass =
+    tint === "violet"
+      ? "border-violet-200/45"
+      : "border-sky-200/45";
 
   return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[34px]">
+    <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[36px]">
+      <div className={`absolute inset-x-0 bottom-0 h-[46%] bg-gradient-to-t ${glowClass}`} />
       <motion.div
         animate={{ rotate: active ? 360 : 0 }}
         transition={{
-          duration: active ? 10 : 0,
-          ease: "linear",
+          duration: 12,
           repeat: active ? Infinity : 0,
+          ease: "linear",
         }}
-        className="absolute left-1/2 top-[64%] h-[210px] w-[210px] -translate-x-1/2 -translate-y-1/2"
+        className="absolute bottom-[-34px] left-[54%] h-[290px] w-[290px] -translate-x-1/2"
       >
-        <div className={`absolute inset-0 rounded-full border ${ring} blur-[1px]`} />
-        <div className={`absolute inset-[18px] rounded-full border ${ring} opacity-80`} />
-        <div className={`absolute inset-[38px] rounded-full border ${ring} opacity-60`} />
-        <div className="absolute inset-[62px] rounded-full border border-white/40 opacity-60" />
+        <div className={`absolute inset-[8px] rounded-full border ${ringClass} opacity-70`} />
+        <div className={`absolute inset-[34px] rounded-full border ${ringClass} opacity-55`} />
+        <div className={`absolute inset-[60px] rounded-full border ${ringClass} opacity-40`} />
+        <div className={`absolute inset-[88px] rounded-full border ${ringClass} opacity-28`} />
       </motion.div>
 
       <motion.div
         animate={{ rotate: active ? -360 : 0 }}
         transition={{
-          duration: active ? 14 : 0,
-          ease: "linear",
+          duration: 18,
           repeat: active ? Infinity : 0,
+          ease: "linear",
         }}
-        className="absolute left-1/2 top-[64%] h-[250px] w-[250px] -translate-x-1/2 -translate-y-1/2"
+        className="absolute bottom-[14px] left-[54%] h-[220px] w-[220px] -translate-x-1/2"
       >
-        <div className="absolute inset-[20px] rounded-full border border-white/20" />
-        <div className="absolute inset-[42px] rounded-full border border-white/15" />
+        <div className="absolute inset-0 rounded-full border border-white/25" />
+        <div className="absolute inset-[26px] rounded-full border border-white/20" />
       </motion.div>
 
-      <div className="absolute inset-x-8 bottom-8 h-24 rounded-full bg-white/10 blur-3xl" />
+      <div className="absolute bottom-[62px] left-1/2 h-[92px] w-[92px] -translate-x-1/2 rounded-full bg-white/30 blur-[42px]" />
     </div>
   );
 }
@@ -317,38 +321,72 @@ function DetailRow({ label, value }) {
   );
 }
 
-function SourceChoiceChip({
-  item,
-  selected,
-  added,
-  onClick,
-  delay = 0,
-}) {
+function ClosedSourcePreview({ hovered }) {
   return (
-    <motion.button
-      type="button"
-      onClick={onClick}
-      initial={{ opacity: 0, y: 10, scale: 0.96 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: 0.34, delay, ease: [0.22, 1, 0.36, 1] }}
-      className={`group inline-flex items-center gap-3 rounded-full border px-4 py-3 text-left transition-all duration-200 ${
-        selected
-          ? "border-slate-900 bg-slate-950 text-white shadow-[0_18px_40px_rgba(15,23,42,.2)]"
-          : "border-white/70 bg-white/74 text-slate-700 hover:border-slate-300 hover:bg-white"
-      }`}
-    >
-      <SourceMark item={item} size="h-8 w-8" />
-      <span className="text-sm font-semibold">{item.label}</span>
-      {added ? (
-        <span
-          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] ${
-            selected ? "bg-white/14 text-white/90" : "bg-emerald-50 text-emerald-700"
-          }`}
-        >
-          added
-        </span>
-      ) : null}
-    </motion.button>
+    <div className="mt-auto flex flex-col items-start gap-5 pt-10">
+      <motion.div
+        initial={false}
+        animate={{
+          opacity: hovered ? 1 : 0.94,
+          y: hovered ? 0 : 4,
+        }}
+        className="flex flex-wrap gap-2.5"
+      >
+        {SOURCE_OPTIONS.map((item, index) => (
+          <motion.div
+            key={item.key}
+            animate={{
+              y: hovered ? [0, -5, 0] : 0,
+            }}
+            transition={{
+              duration: 2.6,
+              delay: index * 0.14,
+              repeat: hovered ? Infinity : 0,
+              ease: "easeInOut",
+            }}
+            className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/68 px-3 py-2 shadow-[0_12px_28px_rgba(15,23,42,.05)]"
+          >
+            <SourceMark item={item} size="h-7 w-7" />
+            <span className="text-[13px] font-medium text-slate-700">{item.label}</span>
+          </motion.div>
+        ))}
+
+        <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/62 px-3 py-2 text-slate-600 shadow-[0_12px_28px_rgba(15,23,42,.05)]">
+          <Ellipsis className="h-4 w-4" />
+        </div>
+      </motion.div>
+
+      <button
+        type="button"
+        className="inline-flex items-center gap-2 rounded-full border border-slate-950 bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_40px_rgba(15,23,42,.2)] transition hover:translate-y-[-1px] hover:bg-slate-900"
+      >
+        Open sources
+        <ChevronRight className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
+
+function ClosedManualPreview() {
+  return (
+    <div className="mt-auto flex flex-col items-start gap-5 pt-10">
+      <div className="flex flex-wrap gap-2.5">
+        <div className="rounded-full border border-white/80 bg-white/68 px-4 py-2.5 text-sm font-medium text-slate-700 shadow-[0_12px_28px_rgba(15,23,42,.05)]">
+          Business name
+        </div>
+        <div className="rounded-full border border-white/80 bg-white/62 px-4 py-2.5 text-sm font-medium text-slate-600 shadow-[0_12px_28px_rgba(15,23,42,.05)]">
+          Short description
+        </div>
+      </div>
+
+      <button
+        type="button"
+        className="inline-flex items-center gap-2 rounded-full border border-slate-950 bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_40px_rgba(15,23,42,.2)] transition hover:translate-y-[-1px] hover:bg-slate-900"
+      >
+        Open manual
+        <ChevronRight className="h-4 w-4" />
+      </button>
+    </div>
   );
 }
 
@@ -583,120 +621,77 @@ export default function SetupStudioEntryStage({
 
   return (
     <div className="flex w-full flex-col gap-6">
-      <section className="overflow-hidden rounded-[36px] border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,.70),rgba(255,255,255,.50))] px-5 py-6 shadow-[0_30px_90px_rgba(15,23,42,.08)] backdrop-blur-xl sm:px-7 sm:py-8 lg:px-10 lg:py-10">
-        <div className="mx-auto max-w-[940px] text-center">
-          <div className="inline-flex items-center rounded-full border border-white/80 bg-white/65 px-4 py-2 text-[12px] font-semibold uppercase tracking-[0.24em] text-slate-500 shadow-[0_10px_30px_rgba(15,23,42,.05)]">
+      <section className="overflow-hidden rounded-[40px] border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,.58),rgba(255,255,255,.42))] px-5 py-7 shadow-[0_30px_90px_rgba(15,23,42,.07)] backdrop-blur-xl sm:px-7 sm:py-8 lg:px-10 lg:py-10">
+        <div className="mx-auto max-w-[920px] text-center">
+          <div className="inline-flex items-center rounded-full border border-white/80 bg-white/52 px-5 py-2.5 text-[12px] font-semibold uppercase tracking-[0.24em] text-slate-500 shadow-[0_10px_30px_rgba(15,23,42,.04)]">
             AI Setup Studio
           </div>
 
-          <h2 className="mt-6 text-[40px] font-semibold leading-[1.02] tracking-[-0.06em] text-slate-950 sm:text-[52px]">
-            Let’s shape your business draft
+          <h2 className="mt-7 text-[42px] font-semibold leading-[1.02] tracking-[-0.065em] text-slate-950 sm:text-[58px]">
+            Let’s build your business draft
           </h2>
 
-          <p className="mx-auto mt-4 max-w-[720px] text-[16px] leading-8 text-slate-500 sm:text-[18px]">
-            Start from real sources or describe the business manually.
+          <p className="mx-auto mt-5 max-w-[780px] text-[17px] leading-8 text-slate-500 sm:text-[18px]">
+            Begin with some existing sources or a few business details.
           </p>
         </div>
 
-        <div className="mx-auto mt-10 max-w-[1240px]">
+        <div className="mx-auto mt-12 max-w-[1250px]">
           <AnimatePresence mode="popLayout" initial={false}>
-            <div
-              className={`grid gap-5 ${
-                activeMode ? "grid-cols-1" : "grid-cols-1 xl:grid-cols-2"
-              }`}
-            >
+            <div className={`grid gap-6 ${activeMode ? "grid-cols-1" : "grid-cols-1 xl:grid-cols-2"}`}>
               {cardVisible("source") ? (
-                <motion.div
+                <motion.button
                   key="source-card"
+                  type="button"
                   layout
-                  initial={{ opacity: 0, y: 20, scale: 0.96, filter: "blur(8px)" }}
+                  initial={{ opacity: 0, y: 18, scale: 0.97, filter: "blur(8px)" }}
                   animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
-                  exit={{ opacity: 0, y: -10, scale: 0.9, filter: "blur(16px)" }}
+                  exit={{ opacity: 0, y: -10, scale: 0.92, filter: "blur(14px)" }}
                   transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
                   onHoverStart={() => setHoveredMode("source")}
                   onHoverEnd={() => setHoveredMode(null)}
-                  className={`relative overflow-hidden rounded-[34px] border border-white/80 bg-[linear-gradient(135deg,rgba(229,248,255,.95),rgba(247,248,255,.82))] shadow-[0_28px_80px_rgba(71,123,255,.12)] ${
-                    activeMode === "source" ? "min-h-[620px]" : "min-h-[430px]"
+                  onClick={() => {
+                    if (!activeMode) setActiveMode("source");
+                  }}
+                  className={`relative overflow-hidden rounded-[38px] border border-white/75 bg-[linear-gradient(135deg,rgba(221,243,255,.88),rgba(243,248,255,.72))] text-left shadow-[0_26px_80px_rgba(91,158,255,.11)] transition ${
+                    activeMode === "source" ? "min-h-[640px] cursor-default" : "min-h-[455px] cursor-pointer"
                   }`}
                 >
-                  <SwirlCore tint="blue" active={hoveredMode === "source" || activeMode === "source"} />
+                  <OrbitalSwirl tint="blue" active={hoveredMode === "source" || activeMode === "source"} />
 
-                  <div className="relative z-[2] flex h-full flex-col p-6 sm:p-7 lg:p-8">
+                  <div className="relative z-[2] flex h-full flex-col p-7 sm:p-8 lg:p-9">
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <div className="text-[34px] font-semibold tracking-[-0.05em] text-slate-950 sm:text-[42px]">
+                        <div className="text-[34px] font-semibold leading-[1.06] tracking-[-0.055em] text-slate-950 sm:text-[38px]">
                           Add your business sources
                         </div>
-                        <div className="mt-3 max-w-[520px] text-[16px] leading-8 text-slate-600">
-                          Start with what already exists. Website first, then brand context.
+                        <div className="mt-4 max-w-[520px] text-[16px] leading-8 text-slate-600">
+                          We’ll start your draft with real business info.
                         </div>
                       </div>
 
                       {activeMode === "source" ? (
                         <button
                           type="button"
-                          onClick={() => setActiveMode(null)}
-                          className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/80 bg-white/72 text-slate-600 transition hover:bg-white"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveMode(null);
+                          }}
+                          className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/80 bg-white/68 text-slate-600 transition hover:bg-white"
                         >
                           <X className="h-5 w-5" />
                         </button>
                       ) : null}
                     </div>
 
-                    {!activeMode ? (
-                      <>
-                        <div className="mt-auto flex items-center gap-3 pt-10">
-                          <motion.div
-                            initial={false}
-                            animate={{
-                              opacity: hoveredMode === "source" ? 1 : 0.78,
-                              y: hoveredMode === "source" ? 0 : 8,
-                            }}
-                            className="flex flex-wrap gap-2"
-                          >
-                            {SOURCE_OPTIONS.map((item, index) => (
-                              <motion.div
-                                key={item.key}
-                                animate={{
-                                  y: hoveredMode === "source" ? [0, -4, 0] : 0,
-                                  opacity: hoveredMode === "source" ? 1 : 0.82,
-                                }}
-                                transition={{
-                                  duration: 2.4,
-                                  delay: index * 0.12,
-                                  repeat: hoveredMode === "source" ? Infinity : 0,
-                                  ease: "easeInOut",
-                                }}
-                                className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/65 px-3 py-2 shadow-[0_12px_28px_rgba(15,23,42,.05)]"
-                              >
-                                <SourceMark item={item} size="h-7 w-7" />
-                                <span className="text-[13px] font-medium text-slate-700">
-                                  {item.label}
-                                </span>
-                              </motion.div>
-                            ))}
-
-                            <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/60 px-3 py-2 text-slate-600 shadow-[0_12px_28px_rgba(15,23,42,.05)]">
-                              <Ellipsis className="h-4 w-4" />
-                            </div>
-                          </motion.div>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => setActiveMode("source")}
-                          className="mt-7 inline-flex w-fit items-center gap-2 rounded-full border border-slate-900 bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_40px_rgba(15,23,42,.22)] transition hover:translate-y-[-1px] hover:bg-slate-900"
-                        >
-                          Open sources
-                          <ChevronRight className="h-4 w-4" />
-                        </button>
-                      </>
+                    {activeMode !== "source" ? (
+                      <ClosedSourcePreview hovered={hoveredMode === "source"} />
                     ) : (
                       <motion.div
                         initial={{ opacity: 0, y: 16 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.34, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
-                        className="mt-10 grid gap-6 xl:grid-cols-[minmax(0,.92fr)_minmax(0,1.08fr)]"
+                        transition={{ duration: 0.34, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+                        className="mt-10 grid gap-6 xl:grid-cols-[minmax(0,.96fr)_minmax(0,1.04fr)]"
                       >
                         <div className="space-y-4">
                           <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">
@@ -704,61 +699,60 @@ export default function SetupStudioEntryStage({
                           </div>
 
                           <div className="flex flex-wrap gap-3">
-                            <SourceChoiceChip
-                              item={SOURCE_OPTIONS[0]}
-                              selected={selectedSourceKey === "website"}
-                              added={!!s(sources.website)}
-                              onClick={() => setSelectedSourceKey("website")}
-                              delay={0.04}
-                            />
+                            {SOURCE_OPTIONS.map((item, index) => {
+                              const selected = selectedSourceKey === item.key;
+                              const added = !!s(sources[item.key]);
 
-                            <SourceChoiceChip
-                              item={SOURCE_OPTIONS[1]}
-                              selected={selectedSourceKey === "instagram"}
-                              added={!!s(sources.instagram)}
-                              onClick={() => setSelectedSourceKey("instagram")}
-                              delay={0.1}
-                            />
+                              return (
+                                <motion.button
+                                  key={item.key}
+                                  type="button"
+                                  onClick={() => setSelectedSourceKey(item.key)}
+                                  initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                                  transition={{
+                                    duration: 0.3,
+                                    delay: 0.04 + index * 0.06,
+                                    ease: [0.22, 1, 0.36, 1],
+                                  }}
+                                  className={`inline-flex items-center gap-3 rounded-full border px-4 py-3 transition ${
+                                    selected
+                                      ? "border-slate-950 bg-slate-950 text-white shadow-[0_18px_40px_rgba(15,23,42,.18)]"
+                                      : "border-white/80 bg-white/72 text-slate-700 hover:bg-white"
+                                  }`}
+                                >
+                                  <SourceMark item={item} size="h-8 w-8" />
+                                  <span className="text-sm font-semibold">{item.label}</span>
+                                  {added ? (
+                                    <span
+                                      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] ${
+                                        selected ? "bg-white/14 text-white/90" : "bg-emerald-50 text-emerald-700"
+                                      }`}
+                                    >
+                                      added
+                                    </span>
+                                  ) : null}
+                                </motion.button>
+                              );
+                            })}
 
-                            <SourceChoiceChip
-                              item={SOURCE_OPTIONS[2]}
-                              selected={selectedSourceKey === "linkedin"}
-                              added={!!s(sources.linkedin)}
-                              onClick={() => setSelectedSourceKey("linkedin")}
-                              delay={0.16}
-                            />
-
-                            <motion.div
-                              initial={{ opacity: 0, y: 10, scale: 0.96 }}
-                              animate={{ opacity: 1, y: 0, scale: 1 }}
-                              transition={{ duration: 0.34, delay: 0.22, ease: [0.22, 1, 0.36, 1] }}
-                              className="inline-flex items-center gap-3 rounded-full border border-white/70 bg-white/68 px-4 py-3 text-slate-500"
-                            >
+                            <div className="inline-flex items-center gap-3 rounded-full border border-white/70 bg-white/62 px-4 py-3 text-slate-500">
                               <Ellipsis className="h-4 w-4" />
-                            </motion.div>
+                            </div>
                           </div>
 
-                          <div className="rounded-[28px] border border-white/75 bg-white/68 p-5 shadow-[0_18px_46px_rgba(15,23,42,.06)]">
+                          <div className="rounded-[30px] border border-white/75 bg-white/68 p-5 shadow-[0_18px_46px_rgba(15,23,42,.05)]">
                             <div className="flex items-center gap-3">
                               <SourceMark
-                                item={
-                                  SOURCE_OPTIONS.find((item) => item.key === selectedSourceKey) ||
-                                  SOURCE_OPTIONS[0]
-                                }
+                                item={SOURCE_OPTIONS.find((item) => item.key === selectedSourceKey) || SOURCE_OPTIONS[0]}
                                 size="h-10 w-10"
                               />
                               <div>
                                 <div className="text-[18px] font-semibold text-slate-950">
-                                  {
-                                    SOURCE_OPTIONS.find((item) => item.key === selectedSourceKey)
-                                      ?.label
-                                  }
+                                  {SOURCE_OPTIONS.find((item) => item.key === selectedSourceKey)?.label}
                                 </div>
                                 <div className="mt-1 text-sm text-slate-500">
-                                  {
-                                    SOURCE_OPTIONS.find((item) => item.key === selectedSourceKey)
-                                      ?.helper
-                                  }
+                                  {SOURCE_OPTIONS.find((item) => item.key === selectedSourceKey)?.helper}
                                 </div>
                               </div>
                             </div>
@@ -769,21 +763,21 @@ export default function SetupStudioEntryStage({
                                 <input
                                   value={sourceDrafts[selectedSourceKey]}
                                   onChange={(e) => handleDraftChange(selectedSourceKey, e.target.value)}
-                                  placeholder={
-                                    SOURCE_OPTIONS.find((item) => item.key === selectedSourceKey)
-                                      ?.placeholder
-                                  }
+                                  placeholder={SOURCE_OPTIONS.find((item) => item.key === selectedSourceKey)?.placeholder}
                                   autoComplete="off"
                                   spellCheck={false}
-                                  className="h-[64px] w-full rounded-[22px] border border-white/80 bg-white/88 pl-14 pr-5 text-[17px] font-medium tracking-[-0.03em] text-slate-950 outline-none transition placeholder:text-slate-300 focus:border-slate-300"
+                                  className="h-[66px] w-full rounded-[22px] border border-white/85 bg-white/88 pl-14 pr-5 text-[17px] font-medium tracking-[-0.03em] text-slate-950 outline-none transition placeholder:text-slate-300 focus:border-slate-300"
                                 />
                               </div>
 
                               <button
                                 type="button"
-                                onClick={handleAddSource}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleAddSource();
+                                }}
                                 disabled={!s(sourceDrafts[selectedSourceKey])}
-                                className="inline-flex h-[64px] items-center justify-center rounded-[22px] border border-slate-950 bg-slate-950 px-5 text-[15px] font-semibold text-white transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-300"
+                                className="inline-flex h-[66px] items-center justify-center rounded-[22px] border border-slate-950 bg-slate-950 px-5 text-[15px] font-semibold text-white transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-300"
                               >
                                 {s(sources[selectedSourceKey]) ? "Update" : "Add"}
                               </button>
@@ -805,7 +799,10 @@ export default function SetupStudioEntryStage({
                                     <span className="truncate text-current/80">{item.value}</span>
                                     <button
                                       type="button"
-                                      onClick={() => handleRemoveSource(item.key)}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleRemoveSource(item.key);
+                                      }}
                                       className="inline-flex h-5 w-5 items-center justify-center rounded-full text-current/60 transition hover:bg-black/5"
                                     >
                                       ×
@@ -817,27 +814,30 @@ export default function SetupStudioEntryStage({
                           </div>
                         </div>
 
-                        <div className="flex flex-col justify-between rounded-[28px] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,.62),rgba(255,255,255,.42))] p-5 shadow-[0_18px_46px_rgba(15,23,42,.05)]">
+                        <div className="flex flex-col justify-between rounded-[30px] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,.60),rgba(255,255,255,.42))] p-5 shadow-[0_18px_46px_rgba(15,23,42,.05)]">
                           <div>
                             <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">
                               First pass
                             </div>
 
-                            <div className="mt-4 text-[28px] font-semibold leading-[1.08] tracking-[-0.05em] text-slate-950">
-                              Build from website, enrich with brand context.
+                            <div className="mt-4 text-[29px] font-semibold leading-[1.08] tracking-[-0.05em] text-slate-950">
+                              Build from website, then layer context.
                             </div>
 
-                            <div className="mt-4 max-w-[480px] text-[15px] leading-7 text-slate-600">
-                              Instagram and LinkedIn can already be attached, but the first real draft is created from your website.
+                            <div className="mt-4 max-w-[500px] text-[15px] leading-7 text-slate-600">
+                              Website is the real starting point. Instagram and LinkedIn can already be attached around it.
                             </div>
                           </div>
 
                           <div className="mt-8">
                             <button
                               type="button"
-                              onClick={handleAnalyze}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAnalyze(e);
+                              }}
                               disabled={!canAnalyze}
-                              className="inline-flex h-[68px] w-full items-center justify-center gap-3 rounded-[24px] bg-slate-950 px-6 text-[16px] font-semibold text-white shadow-[0_22px_46px_rgba(15,23,42,.22)] transition hover:translate-y-[-1px] hover:bg-slate-900 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
+                              className="inline-flex h-[68px] w-full items-center justify-center gap-3 rounded-[24px] bg-slate-950 px-6 text-[16px] font-semibold text-white shadow-[0_22px_46px_rgba(15,23,42,.2)] transition hover:translate-y-[-1px] hover:bg-slate-900 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
                             >
                               {importingWebsite ? (
                                 <>
@@ -854,98 +854,83 @@ export default function SetupStudioEntryStage({
 
                             <div className="mt-3 text-center text-sm text-slate-500">
                               {!websiteSource?.url
-                                ? "Add a website to start the first pass."
-                                : "Website ready. You can start the first draft now."}
+                                ? "Add a website to start."
+                                : "Website ready for the first pass."}
                             </div>
                           </div>
                         </div>
                       </motion.div>
                     )}
                   </div>
-                </motion.div>
+                </motion.button>
               ) : null}
 
               {cardVisible("manual") ? (
-                <motion.div
+                <motion.button
                   key="manual-card"
+                  type="button"
                   layout
-                  initial={{ opacity: 0, y: 20, scale: 0.96, filter: "blur(8px)" }}
+                  initial={{ opacity: 0, y: 18, scale: 0.97, filter: "blur(8px)" }}
                   animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
-                  exit={{ opacity: 0, y: -10, scale: 0.9, filter: "blur(16px)" }}
+                  exit={{ opacity: 0, y: -10, scale: 0.92, filter: "blur(14px)" }}
                   transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
                   onHoverStart={() => setHoveredMode("manual")}
                   onHoverEnd={() => setHoveredMode(null)}
-                  className={`relative overflow-hidden rounded-[34px] border border-white/80 bg-[linear-gradient(135deg,rgba(245,240,255,.94),rgba(251,249,255,.82))] shadow-[0_28px_80px_rgba(137,92,255,.12)] ${
-                    activeMode === "manual" ? "min-h-[620px]" : "min-h-[430px]"
+                  onClick={() => {
+                    if (!activeMode) setActiveMode("manual");
+                  }}
+                  className={`relative overflow-hidden rounded-[38px] border border-white/75 bg-[linear-gradient(135deg,rgba(245,239,255,.88),rgba(250,246,255,.72))] text-left shadow-[0_26px_80px_rgba(164,124,255,.10)] transition ${
+                    activeMode === "manual" ? "min-h-[640px] cursor-default" : "min-h-[455px] cursor-pointer"
                   }`}
                 >
-                  <SwirlCore
-                    tint="violet"
-                    active={hoveredMode === "manual" || activeMode === "manual"}
-                  />
+                  <OrbitalSwirl tint="violet" active={hoveredMode === "manual" || activeMode === "manual"} />
 
-                  <div className="relative z-[2] flex h-full flex-col p-6 sm:p-7 lg:p-8">
+                  <div className="relative z-[2] flex h-full flex-col p-7 sm:p-8 lg:p-9">
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <div className="text-[34px] font-semibold tracking-[-0.05em] text-slate-950 sm:text-[42px]">
+                        <div className="text-[34px] font-semibold leading-[1.06] tracking-[-0.055em] text-slate-950 sm:text-[38px]">
                           Describe your business
                         </div>
-                        <div className="mt-3 max-w-[520px] text-[16px] leading-8 text-slate-600">
-                          No website yet? Open the card and start manually.
+                        <div className="mt-4 max-w-[520px] text-[16px] leading-8 text-slate-600">
+                          Tell us about your business in a few words...
                         </div>
                       </div>
 
                       {activeMode === "manual" ? (
                         <button
                           type="button"
-                          onClick={() => setActiveMode(null)}
-                          className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/80 bg-white/72 text-slate-600 transition hover:bg-white"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveMode(null);
+                          }}
+                          className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/80 bg-white/68 text-slate-600 transition hover:bg-white"
                         >
                           <X className="h-5 w-5" />
                         </button>
                       ) : null}
                     </div>
 
-                    {!activeMode ? (
-                      <>
-                        <div className="mt-auto flex items-end justify-between gap-4 pt-10">
-                          <div className="flex flex-wrap gap-2">
-                            <div className="rounded-full border border-white/80 bg-white/66 px-4 py-2.5 text-sm font-medium text-slate-700 shadow-[0_12px_28px_rgba(15,23,42,.05)]">
-                              Business name
-                            </div>
-                            <div className="rounded-full border border-white/80 bg-white/60 px-4 py-2.5 text-sm font-medium text-slate-600 shadow-[0_12px_28px_rgba(15,23,42,.05)]">
-                              Short description
-                            </div>
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => setActiveMode("manual")}
-                          className="mt-7 inline-flex w-fit items-center gap-2 rounded-full border border-slate-900 bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_40px_rgba(15,23,42,.22)] transition hover:translate-y-[-1px] hover:bg-slate-900"
-                        >
-                          Open manual
-                          <ChevronRight className="h-4 w-4" />
-                        </button>
-                      </>
+                    {activeMode !== "manual" ? (
+                      <ClosedManualPreview />
                     ) : (
                       <motion.div
                         initial={{ opacity: 0, y: 16 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.34, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
-                        className="mt-10 grid gap-6 xl:grid-cols-[minmax(0,1.06fr)_minmax(0,.94fr)]"
+                        transition={{ duration: 0.34, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+                        className="mt-10 grid gap-6 xl:grid-cols-[minmax(0,1.02fr)_minmax(0,.98fr)]"
                       >
-                        <div className="rounded-[28px] border border-white/75 bg-white/72 p-5 shadow-[0_18px_46px_rgba(15,23,42,.06)]">
+                        <div className="rounded-[30px] border border-white/75 bg-white/72 p-5 shadow-[0_18px_46px_rgba(15,23,42,.05)]">
                           <div className="flex items-center gap-3">
-                            <span className="inline-flex h-11 w-11 items-center justify-center rounded-[16px] border border-violet-100 bg-violet-50 text-violet-700">
+                            <span className="inline-flex h-10 w-10 items-center justify-center rounded-[15px] border border-violet-100 bg-violet-50 text-violet-700">
                               <Building2 className="h-5 w-5" />
                             </span>
+
                             <div>
                               <div className="text-[18px] font-semibold text-slate-950">
                                 Manual starting point
                               </div>
                               <div className="mt-1 text-sm text-slate-500">
-                                This opens the draft without relying on website scan.
+                                Open the draft by writing it yourself first.
                               </div>
                             </div>
                           </div>
@@ -955,54 +940,53 @@ export default function SetupStudioEntryStage({
                               value={manualName}
                               onChange={(e) => setManualName(e.target.value)}
                               placeholder="Business name"
-                              className="h-[64px] w-full rounded-[22px] border border-white/80 bg-white/90 px-5 text-[17px] font-medium tracking-[-0.03em] text-slate-950 outline-none transition placeholder:text-slate-300 focus:border-slate-300"
+                              className="h-[66px] w-full rounded-[22px] border border-white/85 bg-white/90 px-5 text-[17px] font-medium tracking-[-0.03em] text-slate-950 outline-none transition placeholder:text-slate-300 focus:border-slate-300"
                             />
 
                             <textarea
                               value={manualBrief}
                               onChange={(e) => setManualBrief(e.target.value)}
                               rows={7}
-                              placeholder="Describe the business in a few clear lines..."
-                              className="w-full resize-none rounded-[24px] border border-white/80 bg-white/90 px-5 py-4 text-[15px] leading-7 text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-slate-300"
+                              placeholder="Describe your business in a few words..."
+                              className="w-full resize-none rounded-[24px] border border-white/85 bg-white/90 px-5 py-4 text-[15px] leading-7 text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-slate-300"
                             />
                           </div>
                         </div>
 
-                        <div className="flex flex-col justify-between rounded-[28px] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,.62),rgba(255,255,255,.42))] p-5 shadow-[0_18px_46px_rgba(15,23,42,.05)]">
+                        <div className="flex flex-col justify-between rounded-[30px] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,.60),rgba(255,255,255,.42))] p-5 shadow-[0_18px_46px_rgba(15,23,42,.05)]">
                           <div>
                             <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">
-                              Manual path
+                              Manual draft
                             </div>
 
-                            <div className="mt-4 text-[28px] font-semibold leading-[1.08] tracking-[-0.05em] text-slate-950">
-                              Start from scratch, refine after.
+                            <div className="mt-4 text-[29px] font-semibold leading-[1.08] tracking-[-0.05em] text-slate-950">
+                              Start from your own wording.
                             </div>
 
-                            <div className="mt-4 max-w-[460px] text-[15px] leading-7 text-slate-600">
-                              Write the business name and a short explanation. The next steps can still refine services, knowledge, and launch setup.
+                            <div className="mt-4 max-w-[470px] text-[15px] leading-7 text-slate-600">
+                              Add the business name and a short description, then continue into the next step.
                             </div>
                           </div>
 
                           <div className="mt-8">
                             <button
                               type="button"
-                              onClick={handleManualContinue}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleManualContinue();
+                              }}
                               disabled={!manualName && !manualBrief}
-                              className="inline-flex h-[68px] w-full items-center justify-center gap-3 rounded-[24px] bg-slate-950 px-6 text-[16px] font-semibold text-white shadow-[0_22px_46px_rgba(15,23,42,.22)] transition hover:translate-y-[-1px] hover:bg-slate-900 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
+                              className="inline-flex h-[68px] w-full items-center justify-center gap-3 rounded-[24px] bg-[#dbe7ff] px-6 text-[16px] font-semibold text-[#4c6fbd] shadow-[inset_0_1px_0_rgba(255,255,255,.5)] transition hover:translate-y-[-1px] hover:bg-[#d4e2ff] disabled:cursor-not-allowed disabled:opacity-55"
                             >
-                              Continue manually
+                              Build draft manually
                               <ArrowRight className="h-5 w-5" />
                             </button>
-
-                            <div className="mt-3 text-center text-sm text-slate-500">
-                              Manual text stays saved for the next step.
-                            </div>
                           </div>
                         </div>
                       </motion.div>
                     )}
                   </div>
-                </motion.div>
+                </motion.button>
               ) : null}
             </div>
           </AnimatePresence>
