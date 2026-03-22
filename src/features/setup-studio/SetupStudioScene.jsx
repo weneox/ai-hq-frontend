@@ -13,7 +13,7 @@ import SetupStudioServiceStage from "./stages/SetupStudioServiceStage.jsx";
 import SetupStudioReadyStage from "./stages/SetupStudioReadyStage.jsx";
 import { discoveryModeLabel as defaultDiscoveryModeLabel } from "./lib/setupStudioHelpers.js";
 import SetupStudioModalLayer from "./scene/SetupStudioModalLayer.jsx";
-import { STEP_LABELS, n, firstNonEmpty, formatFieldLabel } from "./scene/shared.js";
+import { STEP_LABELS, n, formatFieldLabel } from "./scene/shared.js";
 import {
   buildRecoveredStage,
   buildStatusLabel,
@@ -225,6 +225,72 @@ export default function SetupStudioScene({
 
   const hasOverlay = !!activeOverlay;
 
+  const stageMeta = obj(meta);
+  const stageWarnings = safeWarnings;
+  const nextStudioStage = s(
+    stageMeta?.nextStudioStage || studioProgress?.nextStudioStage || ""
+  );
+
+  const discoveryMode = s(discoveryState?.mode).toLowerCase();
+  const hasTerminalDiscoveryMode =
+    !!discoveryMode && !["idle", "running"].includes(discoveryMode);
+
+  const hasAnalysisPayload =
+    safeDiscoveryProfileRows.length > 0 ||
+    stageWarnings.length > 0 ||
+    resultKnowledgeCount > 0 ||
+    resultServiceCount > 0 ||
+    resultSourceCount > 0 ||
+    resultEventCount > 0 ||
+    safeReviewSources.length > 0 ||
+    safeReviewEvents.length > 0 ||
+    !!reviewStatusLabel ||
+    reviewFlags.length > 0 ||
+    reviewRequired ||
+    !!s(primarySourceUrl) ||
+    !!s(resolvedCurrentTitle) ||
+    !!s(resolvedCurrentDescription) ||
+    !!s(discoveryState?.message);
+
+  const entryAnalysisVisible = !!(
+    !importingWebsite &&
+    hasScannedUrl &&
+    hasTerminalDiscoveryMode &&
+    hasAnalysisPayload &&
+    (hasVisibleResults || hasAnalysisPayload || summaryVisible)
+  );
+
+  const entryAnalysisSourceLabel = entryAnalysisVisible ? sourceLabel : "";
+  const entryAnalysisUrl = entryAnalysisVisible ? primarySourceUrl : "";
+  const entryAnalysisTitle = entryAnalysisVisible ? resolvedCurrentTitle : "";
+  const entryAnalysisDescription = entryAnalysisVisible
+    ? resolvedCurrentDescription
+    : "";
+  const entryAnalysisMessage = entryAnalysisVisible
+    ? s(discoveryState?.message)
+    : "";
+  const entryAnalysisWarnings = entryAnalysisVisible ? stageWarnings : [];
+  const entryAnalysisProfileRows = entryAnalysisVisible
+    ? safeDiscoveryProfileRows
+    : [];
+  const entryAnalysisKnowledgeCount = entryAnalysisVisible
+    ? resultKnowledgeCount
+    : 0;
+  const entryAnalysisServiceCount = entryAnalysisVisible
+    ? resultServiceCount
+    : 0;
+  const entryAnalysisSourceCount = entryAnalysisVisible ? resultSourceCount : 0;
+  const entryAnalysisEventCount = entryAnalysisVisible ? resultEventCount : 0;
+  const entryAnalysisReviewStatusLabel = entryAnalysisVisible
+    ? reviewStatusLabel
+    : "";
+  const entryAnalysisReviewSources = entryAnalysisVisible
+    ? safeReviewSources
+    : [];
+  const entryAnalysisReviewEvents = entryAnalysisVisible
+    ? safeReviewEvents
+    : [];
+
   useEffect(() => {
     if (!hasOverlay) {
       document.documentElement.style.overflow = "";
@@ -422,12 +488,6 @@ export default function SetupStudioScene({
     reviewRequired,
   });
 
-  const stageMeta = obj(meta);
-  const stageWarnings = safeWarnings;
-  const nextStudioStage = s(
-    stageMeta?.nextStudioStage || studioProgress?.nextStudioStage || ""
-  );
-
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center px-6">
@@ -505,7 +565,7 @@ export default function SetupStudioScene({
             </div>
 
             <div className="flex items-center gap-3">
-              {summaryVisible || !isEntryStage ? (
+              {entryAnalysisVisible || !isEntryStage ? (
                 <div
                   className="hidden rounded-full border border-slate-200 bg-white/90 px-3 py-2 text-sm font-medium text-slate-600 shadow-sm sm:flex"
                   data-mode={importingWebsite ? "running" : s(discoveryState?.mode || "idle")}
@@ -543,7 +603,7 @@ export default function SetupStudioScene({
         </header>
 
         {(error ||
-          sourceLabel ||
+          entryAnalysisSourceLabel ||
           stageWarnings.length > 0 ||
           reviewRequired ||
           reviewFlags.length > 0 ||
@@ -551,9 +611,9 @@ export default function SetupStudioScene({
           weakestFieldBadges.length > 0) ? (
           <div className="shrink-0 border-b border-slate-200/60 bg-white/55 backdrop-blur-sm">
             <div className="mx-auto flex w-full max-w-[1600px] flex-wrap gap-2 px-4 py-2.5 sm:px-6 lg:px-10">
-              {sourceLabel ? (
+              {entryAnalysisSourceLabel ? (
                 <span className="rounded-full border border-slate-200 bg-white/85 px-3 py-1.5 text-sm font-medium text-slate-700">
-                  Source: {sourceLabel}
+                  Source: {entryAnalysisSourceLabel}
                 </span>
               ) : null}
 
@@ -632,22 +692,22 @@ export default function SetupStudioScene({
                     importingWebsite={importingWebsite}
                     onSetDiscoveryField={onSetDiscoveryField}
                     onScanBusiness={onScanBusiness}
-                    hasAnalysis={summaryVisible}
+                    hasAnalysis={entryAnalysisVisible}
                     analysisLoading={importingWebsite}
-                    analysisSourceLabel={sourceLabel}
-                    analysisUrl={primarySourceUrl}
-                    analysisTitle={resolvedCurrentTitle}
-                    analysisDescription={resolvedCurrentDescription}
-                    analysisMessage={s(discoveryState?.message)}
-                    analysisWarnings={stageWarnings}
-                    analysisProfileRows={safeDiscoveryProfileRows}
-                    analysisKnowledgeCount={resultKnowledgeCount}
-                    analysisServiceCount={resultServiceCount}
-                    analysisSourceCount={resultSourceCount}
-                    analysisEventCount={resultEventCount}
-                    analysisReviewStatusLabel={reviewStatusLabel}
-                    analysisReviewSources={safeReviewSources}
-                    analysisReviewEvents={safeReviewEvents}
+                    analysisSourceLabel={entryAnalysisSourceLabel}
+                    analysisUrl={entryAnalysisUrl}
+                    analysisTitle={entryAnalysisTitle}
+                    analysisDescription={entryAnalysisDescription}
+                    analysisMessage={entryAnalysisMessage}
+                    analysisWarnings={entryAnalysisWarnings}
+                    analysisProfileRows={entryAnalysisProfileRows}
+                    analysisKnowledgeCount={entryAnalysisKnowledgeCount}
+                    analysisServiceCount={entryAnalysisServiceCount}
+                    analysisSourceCount={entryAnalysisSourceCount}
+                    analysisEventCount={entryAnalysisEventCount}
+                    analysisReviewStatusLabel={entryAnalysisReviewStatusLabel}
+                    analysisReviewSources={entryAnalysisReviewSources}
+                    analysisReviewEvents={entryAnalysisReviewEvents}
                     onOpenRefine={handleOpenRefine}
                     onOpenKnowledge={knowledgeContentAvailable ? handleOpenKnowledge : undefined}
                     onContinueFlow={handleContinueFlow}
