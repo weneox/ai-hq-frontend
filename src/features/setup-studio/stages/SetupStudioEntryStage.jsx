@@ -1,12 +1,14 @@
+// src/features/setup-studio/stages/SetupStudioEntryStage.jsx
 import { useEffect, useMemo, useState } from "react";
 import { flushSync } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowRight,
+  Check,
   ChevronDown,
   Link2,
   Paperclip,
-  ShoppingBag,
+  Plus,
   X,
   Zap,
 } from "lucide-react";
@@ -20,6 +22,10 @@ import tiktokIcon from "../../../assets/setup-studio/channels/tiktok.svg";
 import youtubeIcon from "../../../assets/setup-studio/channels/youtube.svg";
 import whatsappIcon from "../../../assets/setup-studio/channels/whatsapp.svg";
 
+const DISPLAY_FONT_STYLE = {
+  fontFamily: '"Sora", "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif',
+};
+
 function s(v) {
   return String(v ?? "").replace(/\u00a0/g, " ").trim();
 }
@@ -28,15 +34,9 @@ function obj(v, d = {}) {
   return v && typeof v === "object" && !Array.isArray(v) ? v : d;
 }
 
-const PROMPT_CHIPS = [
-  "🔥 Global product search",
-  "🍌 Design with AI",
-  "Prepare for Q3 peak season",
-  "Multi-platform supplier search",
-  "Analyze bestsellers",
-  "Evaluate market potential",
-  "Discover trends",
-];
+function escapeRegExp(value = "") {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
 const SOURCE_OPTIONS = [
   {
@@ -49,6 +49,7 @@ const SOURCE_OPTIONS = [
     description: "Paste the main website URL.",
     actionLabel: "Add website",
     connectLabel: "",
+    themeClass: "theme-website",
   },
   {
     key: "google_maps",
@@ -60,6 +61,7 @@ const SOURCE_OPTIONS = [
     description: "Paste your business Google Maps link.",
     actionLabel: "Add Maps link",
     connectLabel: "",
+    themeClass: "theme-google-maps",
   },
   {
     key: "instagram",
@@ -71,6 +73,7 @@ const SOURCE_OPTIONS = [
     description: "Paste the public profile link or connect later.",
     actionLabel: "Add profile link",
     connectLabel: "Connect",
+    themeClass: "theme-instagram",
   },
   {
     key: "linkedin",
@@ -82,6 +85,7 @@ const SOURCE_OPTIONS = [
     description: "Paste the company page link or connect later.",
     actionLabel: "Add page link",
     connectLabel: "Connect",
+    themeClass: "theme-linkedin",
   },
   {
     key: "facebook",
@@ -93,6 +97,7 @@ const SOURCE_OPTIONS = [
     description: "Paste the page link or connect later.",
     actionLabel: "Add page link",
     connectLabel: "Connect",
+    themeClass: "theme-facebook",
   },
   {
     key: "tiktok",
@@ -104,6 +109,7 @@ const SOURCE_OPTIONS = [
     description: "Paste the public TikTok profile link.",
     actionLabel: "Add TikTok link",
     connectLabel: "",
+    themeClass: "theme-tiktok",
   },
   {
     key: "youtube",
@@ -115,6 +121,7 @@ const SOURCE_OPTIONS = [
     description: "Paste the public channel link.",
     actionLabel: "Add channel link",
     connectLabel: "",
+    themeClass: "theme-youtube",
   },
   {
     key: "whatsapp",
@@ -126,6 +133,7 @@ const SOURCE_OPTIONS = [
     description: "Paste your WhatsApp link or connect later.",
     actionLabel: "Add WhatsApp link",
     connectLabel: "Connect",
+    themeClass: "theme-whatsapp",
   },
 ];
 
@@ -213,13 +221,59 @@ function detectInlineSource(raw = "") {
   return null;
 }
 
+function sourceDraftValues(sourceDrafts = {}) {
+  return Object.values(sourceDrafts)
+    .map((item) => s(obj(item).value))
+    .filter(Boolean);
+}
+
+function stripKnownSourceBits(raw = "", sourceDrafts = {}) {
+  let text = s(raw);
+  if (!text) return "";
+
+  const exactLabelMatch = SOURCE_OPTIONS.some(
+    (item) => text.toLowerCase() === item.label.toLowerCase()
+  );
+  if (exactLabelMatch) return "";
+
+  for (const value of sourceDraftValues(sourceDrafts)) {
+    const escaped = escapeRegExp(value);
+    text = text.replace(new RegExp(escaped, "gi"), " ");
+  }
+
+  const inlinePatterns = [
+    /(?:https?:\/\/)?(?:www\.)?instagram\.com\/[^\s,]+/gi,
+    /(^|[\s(])@[a-z0-9._]{2,}\b/gi,
+    /(?:https?:\/\/)?(?:www\.)?linkedin\.com\/[^\s,]+/gi,
+    /(?:https?:\/\/)?(?:www\.)?facebook\.com\/[^\s,]+/gi,
+    /(?:https?:\/\/)?(?:www\.)?tiktok\.com\/[^\s,]+/gi,
+    /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com|youtu\.be)\/[^\s,]+/gi,
+    /(?:https?:\/\/)?(?:wa\.me|api\.whatsapp\.com)\/[^\s,]+/gi,
+    /(?:https?:\/\/)?(?:www\.)?(?:maps\.app\.goo\.gl|maps\.google\.[^\s/]+|goo\.gl\/maps)\/?[^\s,]*/gi,
+    /(?:https?:\/\/)?(?:www\.)?[a-z0-9-]+(?:\.[a-z0-9-]+)+(?:\/[^\s,]*)?/gi,
+  ];
+
+  for (const regex of inlinePatterns) {
+    text = text.replace(regex, " ");
+  }
+
+  return text
+    .replace(/\(\s*\)/g, " ")
+    .replace(/\[\s*\]/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .replace(/^[,;:\-\s]+/, "")
+    .replace(/[,;:\-\s]+$/, "")
+    .trim();
+}
+
 function pickPrimaryAttachedSource(sourceDrafts = {}) {
   for (const item of SOURCE_OPTIONS) {
     const record = obj(sourceDrafts[item.key]);
-    if (s(record.value)) {
+    if (s(record.value) || s(record.mode) === "connect") {
       return {
         sourceType: item.key,
         sourceValue: s(record.value),
+        mode: s(record.mode),
       };
     }
   }
@@ -228,27 +282,25 @@ function pickPrimaryAttachedSource(sourceDrafts = {}) {
 }
 
 function buildInterpretation(raw = "", sourceDrafts = {}) {
-  const text = s(raw);
+  const cleanText = stripKnownSourceBits(raw, sourceDrafts);
   const attached = pickPrimaryAttachedSource(sourceDrafts);
 
-  if (attached?.sourceValue) {
+  if (attached?.sourceType) {
     return {
       sourceType: attached.sourceType,
       sourceValue: attached.sourceValue,
       websiteUrl: attached.sourceType === "website" ? attached.sourceValue : "",
-      note: text,
-      description: text,
+      note: cleanText,
+      description: cleanText,
     };
   }
 
-  const inlineSource = detectInlineSource(text);
+  const inlineSource = detectInlineSource(raw);
 
   if (inlineSource?.sourceValue) {
-    const note = s(
-      text
-        .replace(inlineSource.fullMatch, " ")
-        .replace(/^[,;:\-\s]+/, "")
-        .replace(/\s{2,}/g, " ")
+    const note = stripKnownSourceBits(
+      raw.replace(inlineSource.fullMatch, " "),
+      sourceDrafts
     );
 
     return {
@@ -265,33 +317,68 @@ function buildInterpretation(raw = "", sourceDrafts = {}) {
     sourceType: "",
     sourceValue: "",
     websiteUrl: "",
-    note: text,
-    description: text,
+    note: cleanText,
+    description: cleanText,
   };
 }
 
-function AccioWordmark() {
+function initialComposerSeed(discoveryForm = {}, businessForm = {}) {
+  const drafts = buildInitialSourceDrafts(discoveryForm);
+  return stripKnownSourceBits(
+    s(discoveryForm?.note || businessForm?.description),
+    drafts
+  );
+}
+
+function sourceStatus(sourceDrafts = {}, sourceKey = "") {
+  const record = obj(sourceDrafts[sourceKey]);
+  if (s(record.value)) return "linked";
+  if (s(record.mode) === "connect") return "connected";
+  return "idle";
+}
+
+function NeoxWordmark() {
   return (
     <div className="inline-flex select-none items-center justify-center">
-      <div className="relative text-[54px] font-extrabold leading-none tracking-[-0.08em] text-black sm:text-[58px]">
-        <span className="relative inline-block pr-[1px]">
-          A
-          <span className="pointer-events-none absolute left-[13px] top-[8px] h-[31px] w-[8px] -rotate-[23deg] rounded-full bg-[linear-gradient(180deg,#18e188_0%,#4fd1ff_100%)] sm:left-[14px] sm:top-[9px] sm:h-[34px] sm:w-[8px]" />
+      <div
+        style={DISPLAY_FONT_STYLE}
+        className="inline-flex items-baseline gap-2 text-[34px] font-extrabold leading-none tracking-[-0.075em] sm:text-[40px] lg:text-[44px]"
+      >
+        <span className="bg-[linear-gradient(90deg,#0f172a_0%,#1d4ed8_42%,#0ea5e9_74%,#14b8a6_100%)] bg-clip-text text-transparent">
+          NEOX
         </span>
-        <span>ccio</span>
+        <span className="bg-[linear-gradient(90deg,#334155_0%,#475569_38%,#0f766e_100%)] bg-clip-text text-transparent">
+          AI Studio
+        </span>
       </div>
     </div>
   );
 }
 
-function SuggestionChip({ label, onClick }) {
+function SourceChipButton({ source, status = "idle", onClick }) {
+  const active = status !== "idle";
+
   return (
     <button
       type="button"
-      onClick={() => onClick(label)}
-      className="inline-flex h-[50px] items-center justify-center rounded-full border border-white/85 bg-[rgba(255,255,255,.66)] px-5 text-[16px] font-normal tracking-[-0.03em] text-[rgba(31,41,55,.76)] shadow-[0_10px_24px_-20px_rgba(15,23,42,.28)] backdrop-blur-[10px] transition hover:bg-[rgba(255,255,255,.82)] sm:px-7 sm:text-[17px]"
+      onClick={onClick}
+      className={`${source.themeClass} inline-flex h-[46px] items-center justify-center gap-2.5 rounded-full border border-white/85 bg-[rgba(255,255,255,.66)] px-4 text-[14px] font-medium tracking-[-0.03em] text-[rgba(31,41,55,.76)] shadow-[0_10px_24px_-20px_rgba(15,23,42,.28)] backdrop-blur-[10px] transition hover:bg-[rgba(255,255,255,.82)] sm:h-[50px] sm:px-5 sm:text-[15px]`}
     >
-      {label}
+      <img
+        src={source.icon}
+        alt={source.label}
+        className="h-[17px] w-[17px] object-contain opacity-90"
+      />
+      <span>{source.label}</span>
+
+      {active ? (
+        <span className="inline-flex items-center justify-center">
+          <span
+            className="h-2.5 w-2.5 rounded-full shadow-[0_0_0_3px_rgba(255,255,255,.86)]"
+            style={{ background: "var(--pill-accent)" }}
+          />
+        </span>
+      ) : null}
     </button>
   );
 }
@@ -302,7 +389,7 @@ function SourcePickerModal({ onClose, onChoose }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[90] flex items-center justify-center bg-[rgba(15,23,42,.16)] px-4 py-6 backdrop-blur-[12px]"
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-[rgba(15,23,42,.14)] px-4 py-6 backdrop-blur-[12px]"
     >
       <button
         type="button"
@@ -316,14 +403,17 @@ function SourcePickerModal({ onClose, onChoose }) {
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 18, scale: 0.985 }}
         transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-        className="relative z-10 w-full max-w-[720px] rounded-[32px] border border-white/80 bg-[rgba(248,248,248,.94)] p-6 shadow-[0_28px_70px_-34px_rgba(15,23,42,.24)] backdrop-blur-[14px] sm:p-7"
+        className="relative z-10 w-full max-w-[760px] rounded-[30px] border border-white/80 bg-[rgba(248,248,248,.94)] p-6 shadow-[0_28px_70px_-34px_rgba(15,23,42,.24)] backdrop-blur-[14px] sm:p-7"
       >
         <div className="flex items-center justify-between gap-4">
           <div>
             <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-slate-400">
               Sources
             </div>
-            <h3 className="mt-2 text-[28px] font-semibold tracking-[-0.05em] text-slate-950">
+            <h3
+              style={DISPLAY_FONT_STYLE}
+              className="mt-2 text-[24px] font-semibold tracking-[-0.05em] text-slate-950 sm:text-[28px]"
+            >
               Add a business source
             </h3>
           </div>
@@ -371,7 +461,7 @@ function SourceModal({
 }) {
   if (!source) return null;
 
-  const showConnect = source.mode === "hybrid";
+  const showConnect = source.mode === "hybrid" && !!s(source.connectLabel);
   const hasValue = !!s(value);
 
   return (
@@ -379,7 +469,7 @@ function SourceModal({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[95] flex items-center justify-center bg-[rgba(15,23,42,.16)] px-4 py-6 backdrop-blur-[12px]"
+      className="fixed inset-0 z-[95] flex items-center justify-center bg-[rgba(15,23,42,.14)] px-4 py-6 backdrop-blur-[12px]"
     >
       <button
         type="button"
@@ -393,7 +483,7 @@ function SourceModal({
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 18, scale: 0.985 }}
         transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-        className="relative z-10 w-full max-w-[560px] rounded-[32px] border border-white/80 bg-[rgba(248,248,248,.95)] p-6 shadow-[0_28px_70px_-34px_rgba(15,23,42,.24)] backdrop-blur-[14px] sm:p-7"
+        className="relative z-10 w-full max-w-[560px] rounded-[30px] border border-white/80 bg-[rgba(248,248,248,.95)] p-6 shadow-[0_28px_70px_-34px_rgba(15,23,42,.24)] backdrop-blur-[14px] sm:p-7"
       >
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-4">
@@ -409,7 +499,10 @@ function SourceModal({
               <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-slate-400">
                 Source
               </div>
-              <h3 className="mt-2 text-[28px] font-semibold leading-[1.02] tracking-[-0.05em] text-slate-950">
+              <h3
+                style={DISPLAY_FONT_STYLE}
+                className="mt-2 text-[24px] font-semibold leading-[1.04] tracking-[-0.05em] text-slate-950 sm:text-[28px]"
+              >
                 {source.title}
               </h3>
               <p className="mt-3 text-[14px] leading-7 text-slate-600">
@@ -428,7 +521,7 @@ function SourceModal({
         </div>
 
         <div className="mt-8">
-          <div className="flex items-center gap-3 rounded-[20px] border border-[rgba(19,28,45,.08)] bg-white/88 px-4 py-4">
+          <div className="flex items-center gap-3 rounded-[18px] border border-[rgba(19,28,45,.08)] bg-white/88 px-4 py-4">
             <Link2 className="h-4 w-4 text-slate-400" />
             <input
               value={value}
@@ -483,8 +576,8 @@ export default function SetupStudioEntryStage({
   onSetDiscoveryField,
   onContinueFlow,
 }) {
-  const [composerValue, setComposerValue] = useState(
-    s(discoveryForm?.note || businessForm?.description)
+  const [composerValue, setComposerValue] = useState(() =>
+    initialComposerSeed(discoveryForm, businessForm)
   );
   const [sourceDrafts, setSourceDrafts] = useState(
     buildInitialSourceDrafts(discoveryForm)
@@ -499,7 +592,7 @@ export default function SetupStudioEntryStage({
     return buildInterpretation(composerValue, sourceDrafts);
   }, [composerValue, sourceDrafts]);
 
-  const hasRealSource = !!s(interpretation.sourceValue);
+  const hasRealSource = !!s(interpretation.sourceValue) || !!s(interpretation.sourceType);
   const canContinue = !!(s(composerValue) || hasRealSource);
 
   useEffect(() => {
@@ -538,11 +631,6 @@ export default function SetupStudioEntryStage({
     syncState(nextText, sourceDrafts);
   }
 
-  function handleChipClick(label) {
-    setComposerValue(label);
-    syncState(label, sourceDrafts);
-  }
-
   function openSourcePicker() {
     setSourcePickerOpen(true);
   }
@@ -553,6 +641,10 @@ export default function SetupStudioEntryStage({
 
   function chooseSource(sourceKey) {
     setSourcePickerOpen(false);
+    setActiveSourceKey(sourceKey);
+  }
+
+  function openSourceModal(sourceKey) {
     setActiveSourceKey(sourceKey);
   }
 
@@ -607,12 +699,11 @@ export default function SetupStudioEntryStage({
     <>
       <section className="relative min-h-screen w-full overflow-hidden bg-transparent">
         <div className="pointer-events-none absolute inset-0">
-          <div className="absolute right-[-10%] top-[-10%] h-[30rem] w-[30rem] rounded-full bg-[radial-gradient(circle,_rgba(196,235,230,.30)_0%,_rgba(196,235,230,0)_70%)] blur-3xl" />
-          <div className="absolute right-[16%] top-[24%] h-[23rem] w-[23rem] rounded-full bg-[radial-gradient(circle,_rgba(186,242,255,.22)_0%,_rgba(186,242,255,0)_70%)] blur-3xl" />
-          <div className="absolute left-1/2 top-[55%] h-[13rem] w-[52rem] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,_rgba(104,255,196,.18)_0%,_rgba(137,228,255,.14)_34%,_rgba(137,228,255,0)_74%)] blur-3xl" />
+          <div className="absolute right-[-8%] top-[-9%] h-[28rem] w-[28rem] rounded-full bg-[radial-gradient(circle,_rgba(196,235,230,.28)_0%,_rgba(196,235,230,0)_70%)] blur-3xl" />
+          <div className="absolute right-[16%] top-[22%] h-[18rem] w-[18rem] rounded-full bg-[radial-gradient(circle,_rgba(186,242,255,.18)_0%,_rgba(186,242,255,0)_70%)] blur-3xl" />
         </div>
 
-        <div className="relative z-10 flex min-h-screen items-start justify-center px-4 pb-16 pt-[44px] sm:px-6 lg:px-8">
+        <div className="relative z-10 flex min-h-screen items-start justify-center px-4 pb-10 pt-[38px] sm:px-6 lg:px-8">
           <div className="w-full max-w-[1180px]">
             <motion.div
               initial={{ opacity: 0, y: 10 }}
@@ -620,10 +711,13 @@ export default function SetupStudioEntryStage({
               transition={{ duration: 0.22 }}
               className="text-center"
             >
-              <AccioWordmark />
+              <NeoxWordmark />
 
-              <h1 className="mx-auto mt-4 max-w-[980px] text-center text-[34px] font-semibold leading-[1.12] tracking-[-0.055em] text-[rgba(17,24,39,.96)] sm:text-[42px] lg:text-[56px]">
-                All tasks in one ask, smart sourcing with AI
+              <h1
+                style={DISPLAY_FONT_STYLE}
+                className="mx-auto mt-4 max-w-[1060px] text-center text-[30px] font-semibold leading-[1.12] tracking-[-0.055em] text-[rgba(17,24,39,.96)] sm:text-[38px] lg:text-[46px]"
+              >
+                All your business context in one ask, shaped with AI
               </h1>
             </motion.div>
 
@@ -631,23 +725,25 @@ export default function SetupStudioEntryStage({
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.24, delay: 0.04 }}
-              className="relative mx-auto mt-10 w-full max-w-[1000px]"
+              className="relative mx-auto mt-8 w-full max-w-[1002px]"
             >
-              <div className="overflow-hidden rounded-[32px] border border-[rgba(17,24,39,.10)] bg-[rgba(248,248,248,.90)] shadow-[0_18px_44px_-28px_rgba(15,23,42,.22)] backdrop-blur-[12px]">
+              <div className="pointer-events-none absolute left-1/2 bottom-[-18px] h-[58px] w-[64%] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,_rgba(110,231,183,.28)_0%,_rgba(125,211,252,.18)_42%,_rgba(125,211,252,0)_74%)] blur-[22px]" />
+
+              <div className="relative overflow-hidden rounded-[30px] border border-[rgba(17,24,39,.10)] bg-[rgba(248,248,248,.90)] shadow-[0_18px_44px_-28px_rgba(15,23,42,.18)] backdrop-blur-[12px]">
                 <textarea
                   value={composerValue}
                   onChange={(e) => handleComposerChange(e.target.value)}
-                  rows={5}
-                  placeholder="Describe your needs..."
-                  className="min-h-[150px] w-full resize-none border-0 bg-transparent px-[22px] pt-[20px] text-[17px] font-normal leading-8 tracking-[-0.03em] text-slate-900 outline-none shadow-none placeholder:text-[rgba(107,114,128,.78)] focus:ring-0 sm:text-[18px]"
+                  rows={4}
+                  placeholder="Describe your business..."
+                  className="min-h-[122px] w-full resize-none border-0 bg-transparent px-[22px] pt-[20px] text-[16px] font-normal leading-7 tracking-[-0.03em] text-slate-900 outline-none shadow-none placeholder:text-[rgba(107,114,128,.78)] focus:ring-0 sm:min-h-[132px] sm:text-[17px]"
                 />
 
-                <div className="flex items-center justify-between px-4 pb-4 pt-[2px] sm:px-[16px]">
+                <div className="flex items-center justify-between px-4 pb-4 pt-0 sm:px-[16px]">
                   <div className="flex items-center gap-3">
                     <button
                       type="button"
                       onClick={openSourcePicker}
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(17,24,39,.12)] bg-[rgba(255,255,255,.52)] text-[rgba(31,41,55,.82)] shadow-[0_8px_24px_-18px_rgba(15,23,42,.26)] backdrop-blur-[8px] transition hover:bg-white"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(17,24,39,.12)] bg-[rgba(255,255,255,.52)] text-[rgba(31,41,55,.82)] shadow-[0_8px_24px_-18px_rgba(15,23,42,.20)] backdrop-blur-[8px] transition hover:bg-white"
                     >
                       <Paperclip className="h-[18px] w-[18px]" />
                     </button>
@@ -655,18 +751,18 @@ export default function SetupStudioEntryStage({
                     <button
                       type="button"
                       onClick={openSourcePicker}
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(17,24,39,.12)] bg-[rgba(255,255,255,.52)] text-[rgba(31,41,55,.82)] shadow-[0_8px_24px_-18px_rgba(15,23,42,.26)] backdrop-blur-[8px] transition hover:bg-white"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(17,24,39,.12)] bg-[rgba(255,255,255,.52)] text-[rgba(31,41,55,.82)] shadow-[0_8px_24px_-18px_rgba(15,23,42,.20)] backdrop-blur-[8px] transition hover:bg-white"
                     >
-                      <ShoppingBag className="h-[18px] w-[18px]" />
+                      <Plus className="h-[18px] w-[18px]" />
                     </button>
                   </div>
 
                   <div className="flex items-center gap-3">
                     <button
                       type="button"
-                      className="inline-flex h-10 items-center gap-2 rounded-full bg-transparent px-3 text-[16px] font-medium tracking-[-0.03em] text-[rgba(31,41,55,.88)] sm:text-[17px]"
+                      className="inline-flex h-10 items-center gap-2 rounded-full bg-transparent px-3 text-[15px] font-medium tracking-[-0.03em] text-[rgba(31,41,55,.88)] sm:text-[16px]"
                     >
-                      <Zap className="h-[16px] w-[16px]" />
+                      <Zap className="h-[15px] w-[15px]" />
                       Fast
                       <ChevronDown className="h-[16px] w-[16px] text-[rgba(107,114,128,.82)]" />
                     </button>
@@ -677,7 +773,7 @@ export default function SetupStudioEntryStage({
                       onClick={handleContinue}
                       className={`inline-flex h-10 w-10 items-center justify-center rounded-full transition ${
                         canContinue && !importingWebsite
-                          ? "bg-slate-950 text-white shadow-[0_16px_30px_-18px_rgba(15,23,42,.38)] hover:bg-slate-800"
+                          ? "bg-slate-950 text-white shadow-[0_16px_30px_-18px_rgba(15,23,42,.34)] hover:bg-slate-800"
                           : "bg-[rgba(17,24,39,.18)] text-white/90"
                       }`}
                     >
@@ -687,12 +783,13 @@ export default function SetupStudioEntryStage({
                 </div>
               </div>
 
-              <div className="mx-auto mt-11 flex max-w-[980px] flex-wrap items-center justify-center gap-4">
-                {PROMPT_CHIPS.map((chip) => (
-                  <SuggestionChip
-                    key={chip}
-                    label={chip}
-                    onClick={handleChipClick}
+              <div className="mx-auto mt-11 flex max-w-[1080px] flex-wrap items-center justify-center gap-4">
+                {SOURCE_OPTIONS.map((source) => (
+                  <SourceChipButton
+                    key={source.key}
+                    source={source}
+                    status={sourceStatus(sourceDrafts, source.key)}
+                    onClick={() => openSourceModal(source.key)}
                   />
                 ))}
               </div>
