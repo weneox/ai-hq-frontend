@@ -26,7 +26,6 @@ import {
   extractItems,
   isPendingKnowledge,
   profilePatchFromDiscovery,
-  mergeBusinessForm,
   profilePreviewRows,
   discoveryModeLabel,
   deriveStudioProgress,
@@ -235,16 +234,181 @@ function parseFaqItemsFromText(text = "") {
     .map((question) => ({ question, answer: "" }));
 }
 
+function normalizeRequestedSourceRows(items = []) {
+  return arr(items)
+    .map((item) => {
+      const x = obj(item);
+
+      const sourceType = normalizeStudioSourceType(
+        x.sourceType || x.source_type || x.type || x.key,
+        x.url || x.sourceUrl || x.source_url || x.sourceValue || x.value
+      );
+
+      const url = s(
+        x.url ||
+          x.sourceUrl ||
+          x.source_url ||
+          x.sourceValue ||
+          x.source_value ||
+          x.value ||
+          x.handle
+      );
+
+      if (!sourceType && !url) return null;
+
+      return {
+        sourceType,
+        url,
+        label: s(x.label || x.title || x.name || sourceLabelFor(sourceType)),
+        isPrimary:
+          typeof x.isPrimary === "boolean"
+            ? x.isPrimary
+            : typeof x.primary === "boolean"
+              ? x.primary
+              : false,
+      };
+    })
+    .filter(Boolean);
+}
+
+function pickRequestedPrimarySource(request = {}) {
+  const explicit = obj(request.primarySource);
+
+  const explicitType = normalizeStudioSourceType(
+    explicit.sourceType || explicit.type,
+    explicit.url || explicit.sourceUrl || explicit.source_value || explicit.sourceValue
+  );
+
+  const explicitUrl = s(
+    explicit.url ||
+      explicit.sourceUrl ||
+      explicit.source_value ||
+      explicit.sourceValue ||
+      explicit.value
+  );
+
+  if (explicitType || explicitUrl) {
+    return {
+      sourceType: explicitType,
+      url: explicitUrl,
+      label: s(explicit.label || sourceLabelFor(explicitType)),
+      isPrimary: true,
+    };
+  }
+
+  const requested = normalizeRequestedSourceRows(request.sources);
+  const markedPrimary = requested.find((item) => item.isPrimary);
+  if (markedPrimary) return { ...markedPrimary, isPrimary: true };
+
+  return requested[0] ? { ...requested[0], isPrimary: true } : null;
+}
+
+function sourceSeedKey(item = {}) {
+  return `${s(item.sourceType).toLowerCase()}|${s(item.url).toLowerCase()}`;
+}
+
+function buildSourceSeedContext({
+  requestedSources = [],
+  primarySource = null,
+} = {}) {
+  const normalizedSources = normalizeRequestedSourceRows(requestedSources);
+  const normalizedPrimary = primarySource
+    ? pickRequestedPrimarySource({
+        sources: normalizedSources,
+        primarySource,
+      })
+    : pickRequestedPrimarySource({
+        sources: normalizedSources,
+      });
+
+  const out = [];
+  const seen = new Set();
+
+  for (const item of [
+    ...(normalizedPrimary ? [{ ...normalizedPrimary, isPrimary: true }] : []),
+    ...normalizedSources,
+  ]) {
+    const key = sourceSeedKey(item);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      sourceType: s(item.sourceType),
+      url: s(item.url),
+      label: s(item.label || sourceLabelFor(item.sourceType)),
+      isPrimary:
+        normalizedPrimary && key === sourceSeedKey(normalizedPrimary),
+    });
+  }
+
+  return {
+    primarySource:
+      normalizedPrimary && s(normalizedPrimary.sourceType)
+        ? {
+            sourceType: s(normalizedPrimary.sourceType),
+            url: s(normalizedPrimary.url),
+            label: s(
+              normalizedPrimary.label || sourceLabelFor(normalizedPrimary.sourceType)
+            ),
+            isPrimary: true,
+          }
+        : null,
+    sources: out,
+  };
+}
+
+function buildSourceSeedLines({
+  requestedSources = [],
+  primarySource = null,
+} = {}) {
+  const sourceContext = buildSourceSeedContext({
+    requestedSources,
+    primarySource,
+  });
+
+  const primary = obj(sourceContext.primarySource);
+  const primaryLine =
+    s(primary.sourceType) && s(primary.url)
+      ? `Primary source seed: ${sourceLabelFor(primary.sourceType)} — ${primary.url}`
+      : "";
+
+  const others = arr(sourceContext.sources)
+    .filter((item) => !item.isPrimary)
+    .map((item) => `${sourceLabelFor(item.sourceType)} — ${item.url}`);
+
+  const additionalLine = others.length
+    ? `Additional source seeds: ${others.join(" | ")}`
+    : "";
+
+  return {
+    primarySource: sourceContext.primarySource,
+    sources: sourceContext.sources,
+    lines: [primaryLine, additionalLine].filter(Boolean),
+  };
+}
+
 function buildAnalyzePayloadFromStudioState({
   businessForm = {},
   manualSections = {},
   discoveryForm = {},
   fallbackSourceUrl = "",
+  scanRequest = {},
 } = {}) {
+  const sourceSeedContext = buildSourceSeedLines({
+    requestedSources: arr(scanRequest.sources),
+    primarySource: scanRequest.primarySource,
+  });
+
+  const requestedWebsiteSeed = arr(sourceSeedContext.sources).find(
+    (item) => s(item.sourceType) === "website" && s(item.url)
+  );
+
   const companyName = s(businessForm.companyName);
   const description = s(businessForm.description);
   const websiteUrl = s(
-    businessForm.websiteUrl || discoveryForm.websiteUrl || fallbackSourceUrl
+    businessForm.websiteUrl ||
+      discoveryForm.websiteUrl ||
+      fallbackSourceUrl ||
+      requestedWebsiteSeed?.url
   );
   const primaryPhone = s(businessForm.primaryPhone);
   const primaryEmail = s(businessForm.primaryEmail);
@@ -267,6 +431,7 @@ function buildAnalyzePayloadFromStudioState({
     timezone ? `Timezone: ${timezone}` : "",
     services.length ? `Services: ${services.join(" | ")}` : "",
     policiesText ? `Policies: ${policiesText}` : "",
+    ...arr(sourceSeedContext.lines),
   ]
     .filter(Boolean)
     .join("\n");
@@ -282,6 +447,29 @@ function buildAnalyzePayloadFromStudioState({
     timezone,
     services,
     faqItems,
+    primarySourceSeed: sourceSeedContext.primarySource
+      ? compactObject({
+          sourceType: s(sourceSeedContext.primarySource.sourceType),
+          url: s(sourceSeedContext.primarySource.url),
+          label: s(sourceSeedContext.primarySource.label),
+        })
+      : undefined,
+    sourceSeeds: arr(sourceSeedContext.sources).map((item) =>
+      compactObject({
+        sourceType: s(item.sourceType),
+        url: s(item.url),
+        label: s(item.label),
+        isPrimary: !!item.isPrimary,
+      })
+    ),
+    sourceTypes: [
+      ...new Set(
+        arr(sourceSeedContext.sources)
+          .map((item) => s(item.sourceType))
+          .filter(Boolean)
+      ),
+    ],
+    sourceCount: arr(sourceSeedContext.sources).length,
   });
 
   const hasAnyInput = !!(
@@ -296,7 +484,8 @@ function buildAnalyzePayloadFromStudioState({
     services.length ||
     faqItems.length ||
     policiesText ||
-    s(discoveryForm.note)
+    s(discoveryForm.note) ||
+    arr(sourceSeedContext.sources).length
   );
 
   return {
@@ -1019,9 +1208,29 @@ export default function SetupStudioScreen() {
 
   async function onScanBusiness(input) {
     const request = normalizeScanRequest(input, discoveryForm);
-    const sourceType = request.sourceType;
+    const requestedSources = normalizeRequestedSourceRows(request.sources);
+    const requestedPrimarySource = pickRequestedPrimarySource({
+      sources: requestedSources,
+      primarySource: request.primarySource,
+    });
+
+    const sourceType = s(request.sourceType);
     const sourceUrl = s(request.url);
-    const hasSource = !!sourceUrl && !!sourceType;
+    const hasImportableSource = !!(
+      request?.hasImportableSource &&
+      sourceType &&
+      sourceUrl
+    );
+    const hasRequestedSources = requestedSources.length > 0;
+
+    const requestedPrimarySourceType = s(
+      request.requestedPrimarySourceType ||
+        requestedPrimarySource?.sourceType
+    );
+    const requestedPrimarySourceUrl = s(
+      request.requestedPrimarySourceUrl ||
+        requestedPrimarySource?.url
+    );
 
     const analyzePayload = buildAnalyzePayloadFromStudioState({
       businessForm,
@@ -1030,15 +1239,30 @@ export default function SetupStudioScreen() {
         ...discoveryForm,
         note: request.note,
       },
-      fallbackSourceUrl: sourceUrl,
+      fallbackSourceUrl: sourceUrl || requestedPrimarySourceUrl,
+      scanRequest: {
+        ...request,
+        sources: requestedSources,
+        primarySource: requestedPrimarySource,
+      },
     });
 
-    if (!hasSource && !analyzePayload.hasAnyInput) {
+    if (!hasImportableSource && !analyzePayload.hasAnyInput && !hasRequestedSources) {
       setError("Source, manual məlumat və ya biznes təsviri daxil edilməlidir.");
       return;
     }
 
-    const uiSourceType = hasSource ? sourceType : "manual";
+    const uiSourceType = hasImportableSource
+      ? requestedPrimarySourceType || sourceType
+      : "manual";
+
+    const displaySourceType =
+      requestedPrimarySourceType ||
+      (hasImportableSource ? sourceType : "manual");
+
+    const displaySourceUrl =
+      requestedPrimarySourceUrl ||
+      sourceUrl;
 
     try {
       setImportingWebsite(true);
@@ -1046,20 +1270,27 @@ export default function SetupStudioScreen() {
       setError("");
       autoRevealRef.current = "";
 
-      updateActiveSourceScope(uiSourceType, sourceUrl);
+      updateActiveSourceScope(
+        uiSourceType,
+        hasImportableSource ? displaySourceUrl : ""
+      );
+
       clearStudioReviewState({ preserveActiveSource: true });
-      resetBusinessTwinDraftForNewScan(sourceUrl);
+      resetBusinessTwinDraftForNewScan(
+        hasImportableSource ? displaySourceUrl : ""
+      );
 
       setDiscoveryState((prev) => ({
         ...prev,
         mode: "running",
-        lastUrl: sourceUrl,
+        lastUrl: hasImportableSource ? displaySourceUrl : "",
         lastSourceType: uiSourceType,
-        sourceLabel: sourceLabelFor(uiSourceType),
-        message:
-          uiSourceType === "manual"
-            ? "Business draft hazırlanır..."
-            : scanStartLabel(uiSourceType),
+        sourceLabel: sourceLabelFor(displaySourceType),
+        message: hasImportableSource
+          ? scanStartLabel(sourceType)
+          : hasRequestedSources
+            ? `${sourceLabelFor(displaySourceType)} source context əlavə edildi...`
+            : "Business draft hazırlanır...",
         warnings: [],
         shouldReview: false,
         reviewRequired: false,
@@ -1073,15 +1304,15 @@ export default function SetupStudioScreen() {
 
       let importResult = null;
 
-      if (hasSource) {
+      if (hasImportableSource) {
         importResult = await importSourceForSetup({
           sourceType,
           url: sourceUrl,
           sourceUrl,
           note: request.note,
           businessNote: request.note,
-          sources: request.sources,
-          primarySource: request.primarySource,
+          sources: requestedSources,
+          primarySource: requestedPrimarySource,
         });
       }
 
@@ -1099,13 +1330,14 @@ export default function SetupStudioScreen() {
       const effectiveSourceType = s(
         reviewInfo.sourceType ||
           analyzeResult?.sourceType ||
-          uiSourceType
+          uiSourceType ||
+          "manual"
       );
 
       const effectiveSourceUrl = s(
         reviewInfo.sourceUrl ||
           analyzeResult?.sourceUrl ||
-          sourceUrl
+          (hasImportableSource ? displaySourceUrl : "")
       );
 
       if (effectiveSourceUrl || effectiveSourceType === "manual") {
@@ -1120,10 +1352,25 @@ export default function SetupStudioScreen() {
         .map((x) => s(x))
         .filter(Boolean);
 
-      const combinedWarnings = [...new Set([...importWarnings, ...analyzeWarnings])];
+      const contextualWarnings = [
+        ...(!hasImportableSource && hasRequestedSources
+          ? ["Seçilən source-lar draft context kimi saxlanıldı."]
+          : []),
+        ...(hasImportableSource && request?.hasUnsupportedSources
+          ? ["Bəzi əlavə source-lar draft context kimi saxlanıldı."]
+          : []),
+      ];
+
+      const combinedWarnings = [
+        ...new Set([
+          ...importWarnings,
+          ...analyzeWarnings,
+          ...contextualWarnings,
+        ]),
+      ];
 
       const barrierOnlyResult =
-        hasSource &&
+        hasImportableSource &&
         isBarrierOnlyImportResult(importResult, sourceType) &&
         !hasMeaningfulProfile(
           chooseBestProfileForForm(
@@ -1229,10 +1476,17 @@ export default function SetupStudioScreen() {
       const immediateDiscoveryState = {
         lastUrl: effectiveSourceUrl,
         lastSourceType: effectiveSourceType,
-        sourceLabel: s(
-          analyzeResult?.sourceLabel || sourceLabelFor(effectiveSourceType)
+        sourceLabel: sourceLabelFor(
+          hasImportableSource ? effectiveSourceType : displaySourceType
         ),
-        intakeContext: obj(importResult?.intakeContext),
+        intakeContext: {
+          ...obj(importResult?.intakeContext),
+          requestedSources,
+          primarySource: requestedPrimarySource || null,
+          hasImportableSource,
+          hasUnsupportedSources: !!request?.hasUnsupportedSources,
+          sourceCount: Number(request?.sourceCount || requestedSources.length || 0),
+        },
         snapshot: obj(analyzeResult?.snapshot || importResult?.snapshot),
         profile: bestIncomingProfile,
         signals: obj(analyzeResult?.signals || importResult?.signals),
@@ -1289,8 +1543,8 @@ export default function SetupStudioScreen() {
         mode: s(analyzeResult?.mode || importResult?.mode) || "success",
         lastUrl: effectiveSourceUrl,
         lastSourceType: effectiveSourceType,
-        sourceLabel: s(
-          analyzeResult?.sourceLabel || sourceLabelFor(effectiveSourceType)
+        sourceLabel: sourceLabelFor(
+          hasImportableSource ? effectiveSourceType : displaySourceType
         ),
         message:
           combinedWarnings.length > 0
@@ -1306,7 +1560,14 @@ export default function SetupStudioScreen() {
         shouldReview: !!analyzeResult?.shouldReview,
         warnings: combinedWarnings,
         requestId: s(analyzeResult?.requestId || importResult?.requestId),
-        intakeContext: obj(importResult?.intakeContext),
+        intakeContext: {
+          ...obj(importResult?.intakeContext),
+          requestedSources,
+          primarySource: requestedPrimarySource || null,
+          hasImportableSource,
+          hasUnsupportedSources: !!request?.hasUnsupportedSources,
+          sourceCount: Number(request?.sourceCount || requestedSources.length || 0),
+        },
         profile: {
           ...bestIncomingProfile,
           mainLanguage:
@@ -1393,9 +1654,9 @@ export default function SetupStudioScreen() {
       setDiscoveryState((prev) => ({
         ...prev,
         mode: "error",
-        lastUrl: sourceUrl,
+        lastUrl: s(requestedPrimarySourceUrl || sourceUrl),
         lastSourceType: uiSourceType,
-        sourceLabel: sourceLabelFor(uiSourceType),
+        sourceLabel: sourceLabelFor(displaySourceType),
         message,
         hasResults: false,
         resultCount: 0,

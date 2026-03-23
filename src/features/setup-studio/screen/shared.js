@@ -2,6 +2,24 @@ import { arr, obj, s } from "../lib/setupStudioHelpers.js";
 
 export const KNOWN_LANGS = new Set(["az", "en", "tr", "ru"]);
 
+export const STUDIO_SOURCE_TYPES = new Set([
+  "manual",
+  "website",
+  "instagram",
+  "facebook",
+  "linkedin",
+  "google_maps",
+]);
+
+export const IMPORTABLE_STUDIO_SOURCE_TYPES = new Set([
+  "website",
+  "google_maps",
+]);
+
+function lower(value = "") {
+  return s(value).toLowerCase();
+}
+
 export function createEmptyReviewState() {
   return {
     session: null,
@@ -202,78 +220,448 @@ export function extractReviewMetadata(value = {}) {
 export function normalizeIncomingSourceType(value = "") {
   const x = s(value).toLowerCase().replace(/[\s-]+/g, "_");
 
+  if (x === "manual" || x === "note" || x === "text" || x === "voice") {
+    return "manual";
+  }
+
   if (x === "website" || x === "site" || x === "web") return "website";
+
   if (
     x === "google_maps" ||
     x === "googlemaps" ||
+    x === "google_map" ||
     x === "maps" ||
     x === "gmaps"
   ) {
     return "google_maps";
   }
 
+  if (x === "instagram" || x === "ig" || x === "insta") {
+    return "instagram";
+  }
+
+  if (x === "facebook" || x === "fb" || x === "meta") {
+    return "facebook";
+  }
+
+  if (x === "linkedin" || x === "li") {
+    return "linkedin";
+  }
+
   return "";
 }
 
+export function isImportableStudioSourceType(value = "") {
+  return IMPORTABLE_STUDIO_SOURCE_TYPES.has(normalizeIncomingSourceType(value));
+}
+
 export function detectSourceTypeFromUrl(url = "") {
-  const value = s(url).toLowerCase();
+  const value = lower(url);
+  if (!value) return "";
 
   if (
     value.includes("google.com/maps") ||
     value.includes("maps.app.goo.gl") ||
-    value.includes("g.co/kgs")
+    value.includes("g.co/kgs") ||
+    value.includes("goo.gl/maps")
   ) {
     return "google_maps";
   }
 
-  return "website";
+  if (value.includes("instagram.com") || /^@[a-z0-9._]{2,}$/i.test(s(url))) {
+    return "instagram";
+  }
+
+  if (
+    value.includes("facebook.com") ||
+    value.includes("fb.com") ||
+    value.includes("m.facebook.com")
+  ) {
+    return "facebook";
+  }
+
+  if (value.includes("linkedin.com")) {
+    return "linkedin";
+  }
+
+  if (
+    /^(https?:\/\/)?(?:www\.)?[a-z0-9-]+(?:\.[a-z0-9-]+)+(?:\/[^\s]*)?$/i.test(
+      s(url)
+    )
+  ) {
+    return "website";
+  }
+
+  return "";
+}
+
+function buildStudioSourceLabel(sourceType = "", sourceUrl = "") {
+  const normalizedType =
+    normalizeIncomingSourceType(sourceType) || detectSourceTypeFromUrl(sourceUrl);
+
+  if (normalizedType === "google_maps") return "Google Maps";
+  if (normalizedType === "instagram") return "Instagram";
+  if (normalizedType === "facebook") return "Facebook";
+  if (normalizedType === "linkedin") return "LinkedIn";
+  if (normalizedType === "website") return "Website";
+  if (normalizedType === "manual") return "Manual";
+  return "Source";
+}
+
+function maybeNormalizeImportableUrl(sourceType = "", value = "") {
+  const raw = s(value);
+  if (!raw) return "";
+
+  const normalizedType = normalizeIncomingSourceType(sourceType);
+
+  if (normalizedType === "website" || normalizedType === "google_maps") {
+    return safeNormalizeUrl(raw);
+  }
+
+  return raw;
+}
+
+function normalizeStudioSourceRecord(item = {}) {
+  const x = obj(item);
+
+  const rawType =
+    normalizeIncomingSourceType(
+      x.sourceType || x.source_type || x.type || x.key
+    ) || detectSourceTypeFromUrl(x.url || x.sourceUrl || x.source_url || x.value);
+
+  const rawValue = s(
+    x.url ||
+      x.sourceUrl ||
+      x.source_url ||
+      x.sourceValue ||
+      x.source_value ||
+      x.value ||
+      x.websiteUrl ||
+      x.website_url ||
+      x.handle
+  );
+
+  const normalizedValue = maybeNormalizeImportableUrl(rawType, rawValue);
+
+  const label =
+    s(x.label) ||
+    s(x.title) ||
+    s(x.name) ||
+    s(x.displayName) ||
+    s(x.display_name) ||
+    buildStudioSourceLabel(rawType, normalizedValue);
+
+  const isPrimary =
+    typeof x.isPrimary === "boolean"
+      ? x.isPrimary
+      : typeof x.primary === "boolean"
+        ? x.primary
+        : false;
+
+  if (!rawType && !normalizedValue) return null;
+
+  return {
+    sourceType: rawType,
+    url: normalizedValue,
+    label,
+    isPrimary,
+  };
+}
+
+function normalizeSourceDraftMap(sourceDrafts = {}) {
+  const drafts = obj(sourceDrafts);
+  const out = [];
+
+  for (const [key, raw] of Object.entries(drafts)) {
+    const item = obj(raw);
+    const value = s(item.value || item.url || item.sourceUrl || item.sourceValue);
+    if (!value) continue;
+
+    const normalizedType = normalizeIncomingSourceType(key);
+    if (!normalizedType) continue;
+
+    out.push({
+      sourceType: normalizedType,
+      url: maybeNormalizeImportableUrl(normalizedType, value),
+      label: buildStudioSourceLabel(normalizedType, value),
+      isPrimary: false,
+    });
+  }
+
+  return out;
+}
+
+export function safeNormalizeUrl(input = "") {
+  const raw = s(input);
+  if (!raw) return "";
+
+  if (/^@[a-z0-9._]{2,}$/i.test(raw)) return raw;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(raw)) return raw;
+  if (raw.startsWith("//")) return `https:${raw}`;
+
+  return `https://${raw.replace(/^\/+/, "")}`;
+}
+
+export function comparableHost(input = "") {
+  const raw = s(input);
+  if (!raw) return "";
+
+  if (/^@[a-z0-9._]{2,}$/i.test(raw)) {
+    return raw.toLowerCase().replace(/^@/, "");
+  }
+
+  try {
+    const u = new URL(safeNormalizeUrl(raw));
+    return s(u.hostname).toLowerCase().replace(/^www\./, "");
+  } catch {
+    return s(raw)
+      .toLowerCase()
+      .replace(/^https?:\/\//, "")
+      .replace(/^www\./, "")
+      .split(/[/?#]/)[0];
+  }
+}
+
+export function comparableUrl(input = "") {
+  const raw = s(input);
+  if (!raw) return "";
+
+  if (/^@[a-z0-9._]{2,}$/i.test(raw)) {
+    return raw.toLowerCase().replace(/^@/, "");
+  }
+
+  try {
+    const u = new URL(safeNormalizeUrl(raw));
+    const host = s(u.hostname).toLowerCase().replace(/^www\./, "");
+    const path = s(u.pathname || "/").replace(/\/+$/, "") || "/";
+    const search = s(u.search || "");
+    return `${host}${path}${search}`;
+  } catch {
+    return s(raw)
+      .toLowerCase()
+      .replace(/^https?:\/\//, "")
+      .replace(/^www\./, "")
+      .replace(/\/+$/, "");
+  }
+}
+
+export function sourceIdentityKey(sourceType = "", sourceUrl = "") {
+  const normalizedType =
+    normalizeIncomingSourceType(sourceType) || detectSourceTypeFromUrl(sourceUrl);
+
+  if (!normalizedType && !s(sourceUrl)) return "";
+
+  if (normalizedType === "website") {
+    return `website|${comparableHost(sourceUrl)}`;
+  }
+
+  if (normalizedType === "instagram") {
+    return `instagram|${comparableUrl(sourceUrl)}`;
+  }
+
+  if (normalizedType === "facebook") {
+    return `facebook|${comparableUrl(sourceUrl)}`;
+  }
+
+  if (normalizedType === "linkedin") {
+    return `linkedin|${comparableUrl(sourceUrl)}`;
+  }
+
+  return `${normalizedType || "unknown"}|${comparableUrl(sourceUrl)}`;
+}
+
+function dedupeStudioSources(items = []) {
+  const out = [];
+  const seen = new Set();
+
+  for (const raw of arr(items)) {
+    const item = normalizeStudioSourceRecord(raw);
+    if (!item?.sourceType && !item?.url) continue;
+
+    const key = sourceIdentityKey(item.sourceType, item.url);
+    if (!key || seen.has(key)) continue;
+
+    seen.add(key);
+    out.push(item);
+  }
+
+  return out;
+}
+
+function firstImportableSource(items = []) {
+  return (
+    arr(items).find(
+      (item) =>
+        isImportableStudioSourceType(item?.sourceType) && s(item?.url)
+    ) || null
+  );
+}
+
+function preferredPrimarySource({
+  explicitPrimary = null,
+  normalizedSources = [],
+  fallbackSourceType = "",
+  fallbackUrl = "",
+} = {}) {
+  const explicit = normalizeStudioSourceRecord(explicitPrimary);
+  if (explicit?.sourceType || explicit?.url) {
+    return {
+      ...explicit,
+      isPrimary: true,
+    };
+  }
+
+  const fromList = arr(normalizedSources).find((item) => item.isPrimary);
+  if (fromList) {
+    return {
+      ...fromList,
+      isPrimary: true,
+    };
+  }
+
+  const fallback = normalizeStudioSourceRecord({
+    sourceType: fallbackSourceType,
+    url: fallbackUrl,
+    isPrimary: true,
+  });
+
+  if (fallback?.sourceType || fallback?.url) return fallback;
+  return null;
 }
 
 export function normalizeScanRequest(input, discoveryForm = {}) {
   if (input && typeof input.preventDefault === "function") {
     input.preventDefault();
-
-    const fallbackUrl = s(discoveryForm.websiteUrl);
-    return {
-      sourceType: detectSourceTypeFromUrl(fallbackUrl),
-      url: fallbackUrl,
-      note: s(discoveryForm.note),
-      sources: [],
-      primarySource: null,
-    };
+    return normalizeScanRequest(obj(discoveryForm), {});
   }
 
   const payload = obj(input);
-  const url = s(payload.url || payload.sourceUrl || discoveryForm.websiteUrl);
-  const sourceType =
-    normalizeIncomingSourceType(payload.sourceType || payload.type) ||
-    detectSourceTypeFromUrl(url);
+  const discovery = obj(discoveryForm);
+
+  const singularPayloadSource = normalizeStudioSourceRecord({
+    sourceType:
+      payload.sourceType ||
+      payload.type ||
+      discovery.sourceType,
+    url:
+      payload.url ||
+      payload.sourceUrl ||
+      payload.source_value ||
+      payload.sourceValue ||
+      payload.websiteUrl ||
+      discovery.sourceValue ||
+      discovery.websiteUrl,
+    isPrimary: true,
+  });
+
+  const explicitSources = dedupeStudioSources([
+    ...arr(payload.sources),
+    ...arr(discovery.sources),
+    ...normalizeSourceDraftMap(payload.sourceDrafts),
+    ...normalizeSourceDraftMap(discovery.sourceDrafts),
+    singularPayloadSource,
+  ]);
+
+  const fallbackUrl = s(
+    payload.url ||
+      payload.sourceUrl ||
+      payload.source_value ||
+      payload.sourceValue ||
+      payload.websiteUrl ||
+      discovery.sourceValue ||
+      discovery.websiteUrl
+  );
+
+  const fallbackType =
+    normalizeIncomingSourceType(
+      payload.sourceType || payload.type || discovery.sourceType
+    ) || detectSourceTypeFromUrl(fallbackUrl);
+
+  const primarySource = preferredPrimarySource({
+    explicitPrimary: payload.primarySource || discovery.primarySource,
+    normalizedSources: explicitSources,
+    fallbackSourceType: fallbackType,
+    fallbackUrl,
+  });
+
+  const normalizedSources = dedupeStudioSources(
+    primarySource
+      ? [
+          ...explicitSources.map((item) => ({
+            ...item,
+            isPrimary:
+              sourceIdentityKey(item.sourceType, item.url) ===
+              sourceIdentityKey(primarySource.sourceType, primarySource.url),
+          })),
+          primarySource,
+        ]
+      : explicitSources
+  );
+
+  const importablePrimary =
+    (primarySource &&
+    isImportableStudioSourceType(primarySource.sourceType) &&
+    s(primarySource.url)
+      ? {
+          sourceType: primarySource.sourceType,
+          url: primarySource.url,
+        }
+      : null) || firstImportableSource(normalizedSources);
 
   return {
-    sourceType,
-    url,
-    note: s(payload.note || discoveryForm.note),
-    sources: arr(payload.sources),
-    primarySource: payload.primarySource || null,
+    sourceType: s(importablePrimary?.sourceType),
+    url: s(importablePrimary?.url),
+    note: s(payload.note || discovery.note),
+    sources: normalizedSources,
+    primarySource: primarySource
+      ? {
+          sourceType: s(primarySource.sourceType),
+          url: s(primarySource.url),
+          label:
+            s(primarySource.label) ||
+            buildStudioSourceLabel(primarySource.sourceType, primarySource.url),
+          isPrimary: true,
+        }
+      : null,
+    requestedPrimarySourceType: s(primarySource?.sourceType),
+    requestedPrimarySourceUrl: s(primarySource?.url),
+    sourceCount: normalizedSources.length,
+    hasImportableSource: !!(
+      s(importablePrimary?.sourceType) && s(importablePrimary?.url)
+    ),
+    hasUnsupportedSources: normalizedSources.some(
+      (item) =>
+        !isImportableStudioSourceType(item?.sourceType) && s(item?.url)
+    ),
   };
 }
 
 export function scanStartLabel(sourceType = "") {
-  return sourceType === "google_maps"
-    ? "Google Maps scan başladı..."
-    : "Website scan başladı...";
+  const x = normalizeIncomingSourceType(sourceType);
+
+  if (x === "google_maps") return "Google Maps scan başladı...";
+  if (x === "instagram") return "Instagram source hazırlandı...";
+  if (x === "facebook") return "Facebook source hazırlandı...";
+  if (x === "linkedin") return "LinkedIn source hazırlandı...";
+  if (x === "manual") return "Business draft hazırlanır...";
+  return "Website scan başladı...";
 }
 
 export function scanCompleteLabel(sourceType = "", candidateCount = 0) {
+  const x = normalizeIncomingSourceType(sourceType);
   const count = Number(candidateCount || 0);
 
   if (count > 0) {
     return `${count} discovery hazırlandı.`;
   }
 
-  return sourceType === "google_maps"
-    ? "Google Maps import tamamlandı."
-    : "Website import tamamlandı.";
+  if (x === "google_maps") return "Google Maps import tamamlandı.";
+  if (x === "instagram") return "Instagram source hazırdır.";
+  if (x === "facebook") return "Facebook source hazırdır.";
+  if (x === "linkedin") return "LinkedIn source hazırdır.";
+  if (x === "manual") return "Business draft generated.";
+
+  return "Website import tamamlandı.";
 }
 
 export function applyUiHintsFromMeta({
@@ -303,62 +691,6 @@ export function normalizeReviewState(payload = {}) {
     sources: arr(review?.sources),
     events: arr(review?.events),
   };
-}
-
-export function safeNormalizeUrl(input = "") {
-  const raw = s(input);
-  if (!raw) return "";
-  if (/^[a-z][a-z0-9+.-]*:/i.test(raw)) return raw;
-  if (raw.startsWith("//")) return `https:${raw}`;
-  return `https://${raw.replace(/^\/+/, "")}`;
-}
-
-export function comparableHost(input = "") {
-  const raw = s(input);
-  if (!raw) return "";
-
-  try {
-    const u = new URL(safeNormalizeUrl(raw));
-    return s(u.hostname).toLowerCase().replace(/^www\./, "");
-  } catch {
-    return s(raw)
-      .toLowerCase()
-      .replace(/^https?:\/\//, "")
-      .replace(/^www\./, "")
-      .split(/[/?#]/)[0];
-  }
-}
-
-export function comparableUrl(input = "") {
-  const raw = s(input);
-  if (!raw) return "";
-
-  try {
-    const u = new URL(safeNormalizeUrl(raw));
-    const host = s(u.hostname).toLowerCase().replace(/^www\./, "");
-    const path = s(u.pathname || "/").replace(/\/+$/, "") || "/";
-    const search = s(u.search || "");
-    return `${host}${path}${search}`;
-  } catch {
-    return s(raw)
-      .toLowerCase()
-      .replace(/^https?:\/\//, "")
-      .replace(/^www\./, "")
-      .replace(/\/+$/, "");
-  }
-}
-
-export function sourceIdentityKey(sourceType = "", sourceUrl = "") {
-  const normalizedType =
-    normalizeIncomingSourceType(sourceType) || detectSourceTypeFromUrl(sourceUrl);
-
-  if (!normalizedType && !s(sourceUrl)) return "";
-
-  if (normalizedType === "website") {
-    return `website|${comparableHost(sourceUrl)}`;
-  }
-
-  return `${normalizedType || "unknown"}|${comparableUrl(sourceUrl)}`;
 }
 
 export function firstNonEmpty(...values) {
