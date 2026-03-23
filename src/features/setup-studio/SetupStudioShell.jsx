@@ -1,7 +1,7 @@
 export default function SetupStudioShell({ children }) {
   return (
-    <div className="min-h-screen bg-[#f5f6f7] text-slate-950">
-      <div className="min-h-screen">{children}</div>
+    <div className="min-h-screen bg-transparent text-slate-950 antialiased">
+      {children}
     </div>
   );
 }

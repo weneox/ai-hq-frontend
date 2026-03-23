@@ -4,11 +4,11 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowRight,
   ChevronDown,
-  Globe2,
   Link2,
   Paperclip,
-  SquarePlus,
+  ShoppingBag,
   X,
+  Zap,
 } from "lucide-react";
 
 import websiteIcon from "../../../assets/setup-studio/channels/weblink.webp";
@@ -28,9 +28,15 @@ function obj(v, d = {}) {
   return v && typeof v === "object" && !Array.isArray(v) ? v : d;
 }
 
-function lower(v) {
-  return s(v).toLowerCase();
-}
+const PROMPT_CHIPS = [
+  "🔥 Global product search",
+  "🍌 Design with AI",
+  "Prepare for Q3 peak season",
+  "Multi-platform supplier search",
+  "Analyze bestsellers",
+  "Evaluate market potential",
+  "Discover trends",
+];
 
 const SOURCE_OPTIONS = [
   {
@@ -40,11 +46,9 @@ const SOURCE_OPTIONS = [
     mode: "link",
     placeholder: "yourbusiness.com",
     title: "Add your website",
-    description:
-      "Paste the main website URL. This is usually the strongest public source for the first business draft.",
+    description: "Paste the main website URL.",
     actionLabel: "Add website",
     connectLabel: "",
-    glow: "from-sky-400/20 via-cyan-300/8 to-transparent",
   },
   {
     key: "google_maps",
@@ -53,11 +57,9 @@ const SOURCE_OPTIONS = [
     mode: "link",
     placeholder: "Paste your Google Maps link",
     title: "Add your Google Maps source",
-    description:
-      "Paste the Maps link for your business. This helps with place identity and local business details.",
+    description: "Paste your business Google Maps link.",
     actionLabel: "Add Maps link",
     connectLabel: "",
-    glow: "from-emerald-400/22 via-lime-300/8 to-transparent",
   },
   {
     key: "instagram",
@@ -66,11 +68,9 @@ const SOURCE_OPTIONS = [
     mode: "hybrid",
     placeholder: "instagram.com/yourbrand",
     title: "Add or connect Instagram",
-    description:
-      "Paste the public profile link now. The connect action can be wired to real auth later.",
+    description: "Paste the public profile link or connect later.",
     actionLabel: "Add profile link",
     connectLabel: "Connect",
-    glow: "from-pink-400/22 via-fuchsia-300/8 to-transparent",
   },
   {
     key: "linkedin",
@@ -79,11 +79,9 @@ const SOURCE_OPTIONS = [
     mode: "hybrid",
     placeholder: "linkedin.com/company/yourbrand",
     title: "Add or connect LinkedIn",
-    description:
-      "Paste the company page link now. The connect action can be wired to real auth later.",
+    description: "Paste the company page link or connect later.",
     actionLabel: "Add page link",
     connectLabel: "Connect",
-    glow: "from-sky-400/22 via-blue-300/8 to-transparent",
   },
   {
     key: "facebook",
@@ -92,11 +90,9 @@ const SOURCE_OPTIONS = [
     mode: "hybrid",
     placeholder: "facebook.com/yourbrand",
     title: "Add or connect Facebook",
-    description:
-      "Paste the public page link now. The connect action can be wired to real auth later.",
+    description: "Paste the page link or connect later.",
     actionLabel: "Add page link",
     connectLabel: "Connect",
-    glow: "from-blue-400/22 via-indigo-300/8 to-transparent",
   },
   {
     key: "tiktok",
@@ -105,11 +101,9 @@ const SOURCE_OPTIONS = [
     mode: "link",
     placeholder: "tiktok.com/@yourbrand",
     title: "Add your TikTok profile",
-    description:
-      "Paste the public TikTok profile link if this is a real source for the business.",
+    description: "Paste the public TikTok profile link.",
     actionLabel: "Add TikTok link",
     connectLabel: "",
-    glow: "from-slate-400/18 via-slate-200/8 to-transparent",
   },
   {
     key: "youtube",
@@ -118,11 +112,9 @@ const SOURCE_OPTIONS = [
     mode: "link",
     placeholder: "youtube.com/@yourbrand",
     title: "Add your YouTube channel",
-    description:
-      "Paste the channel link if the business publishes videos or explainers there.",
+    description: "Paste the public channel link.",
     actionLabel: "Add channel link",
     connectLabel: "",
-    glow: "from-rose-400/22 via-red-300/8 to-transparent",
   },
   {
     key: "whatsapp",
@@ -131,11 +123,9 @@ const SOURCE_OPTIONS = [
     mode: "hybrid",
     placeholder: "wa.me/994xxxxxxxxx",
     title: "Add or connect WhatsApp",
-    description:
-      "Paste a WhatsApp link now. The connect action can be wired to real auth later.",
+    description: "Paste your WhatsApp link or connect later.",
     actionLabel: "Add WhatsApp link",
     connectLabel: "Connect",
-    glow: "from-emerald-400/22 via-green-300/8 to-transparent",
   },
 ];
 
@@ -280,22 +270,94 @@ function buildInterpretation(raw = "", sourceDrafts = {}) {
   };
 }
 
-function SourceChip({ source, active = false, filled = false, onClick }) {
+function AccioWordmark() {
+  return (
+    <div className="inline-flex select-none items-center justify-center">
+      <div className="relative text-[54px] font-extrabold leading-none tracking-[-0.08em] text-black sm:text-[58px]">
+        <span className="relative inline-block pr-[1px]">
+          A
+          <span className="pointer-events-none absolute left-[13px] top-[8px] h-[31px] w-[8px] -rotate-[23deg] rounded-full bg-[linear-gradient(180deg,#18e188_0%,#4fd1ff_100%)] sm:left-[14px] sm:top-[9px] sm:h-[34px] sm:w-[8px]" />
+        </span>
+        <span>ccio</span>
+      </div>
+    </div>
+  );
+}
+
+function SuggestionChip({ label, onClick }) {
   return (
     <button
       type="button"
-      onClick={onClick}
-      className={`inline-flex items-center gap-2 rounded-full border px-5 py-3 text-[13px] font-medium transition ${
-        active
-          ? "border-slate-900 bg-slate-900 text-white shadow-[0_12px_28px_rgba(15,23,42,.14)]"
-          : filled
-            ? "border-slate-300 bg-white text-slate-900 shadow-[0_8px_20px_rgba(15,23,42,.05)]"
-            : "border-white/85 bg-white/80 text-slate-700 shadow-[0_8px_20px_rgba(15,23,42,.04)] hover:bg-white"
-      }`}
+      onClick={() => onClick(label)}
+      className="inline-flex h-[50px] items-center justify-center rounded-full border border-white/85 bg-[rgba(255,255,255,.66)] px-5 text-[16px] font-normal tracking-[-0.03em] text-[rgba(31,41,55,.76)] shadow-[0_10px_24px_-20px_rgba(15,23,42,.28)] backdrop-blur-[10px] transition hover:bg-[rgba(255,255,255,.82)] sm:px-7 sm:text-[17px]"
     >
-      <img src={source.icon} alt={source.label} className="h-4 w-4 object-contain" />
-      <span>{source.label}</span>
+      {label}
     </button>
+  );
+}
+
+function SourcePickerModal({ onClose, onChoose }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-[rgba(15,23,42,.16)] px-4 py-6 backdrop-blur-[12px]"
+    >
+      <button
+        type="button"
+        aria-label="Close"
+        className="absolute inset-0"
+        onClick={onClose}
+      />
+
+      <motion.div
+        initial={{ opacity: 0, y: 18, scale: 0.985 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 18, scale: 0.985 }}
+        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+        className="relative z-10 w-full max-w-[720px] rounded-[32px] border border-white/80 bg-[rgba(248,248,248,.94)] p-6 shadow-[0_28px_70px_-34px_rgba(15,23,42,.24)] backdrop-blur-[14px] sm:p-7"
+      >
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+              Sources
+            </div>
+            <h3 className="mt-2 text-[28px] font-semibold tracking-[-0.05em] text-slate-950">
+              Add a business source
+            </h3>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:text-slate-950"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {SOURCE_OPTIONS.map((source) => (
+            <button
+              key={source.key}
+              type="button"
+              onClick={() => onChoose(source.key)}
+              className="inline-flex min-h-[84px] flex-col items-center justify-center gap-3 rounded-[22px] border border-white/80 bg-white/80 px-4 py-4 text-center shadow-[0_10px_24px_-20px_rgba(15,23,42,.28)] transition hover:bg-white"
+            >
+              <img
+                src={source.icon}
+                alt={source.label}
+                className="h-6 w-6 object-contain"
+              />
+              <span className="text-[14px] font-medium tracking-[-0.03em] text-slate-800">
+                {source.label}
+              </span>
+            </button>
+          ))}
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -317,11 +379,11 @@ function SourceModal({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[90] flex items-center justify-center bg-[rgba(15,23,42,.22)] px-4 py-6 backdrop-blur-[12px]"
+      className="fixed inset-0 z-[95] flex items-center justify-center bg-[rgba(15,23,42,.16)] px-4 py-6 backdrop-blur-[12px]"
     >
       <button
         type="button"
-        aria-label="Close source modal"
+        aria-label="Close"
         className="absolute inset-0"
         onClick={onClose}
       />
@@ -331,92 +393,79 @@ function SourceModal({
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 18, scale: 0.985 }}
         transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-        className="relative z-10 w-full max-w-[560px] overflow-hidden rounded-[30px] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,.96),rgba(249,251,254,.92))] shadow-[0_30px_90px_rgba(15,23,42,.18)]"
+        className="relative z-10 w-full max-w-[560px] rounded-[32px] border border-white/80 bg-[rgba(248,248,248,.95)] p-6 shadow-[0_28px_70px_-34px_rgba(15,23,42,.24)] backdrop-blur-[14px] sm:p-7"
       >
-        <div className="pointer-events-none absolute inset-0">
-          <div
-            className={`absolute inset-x-0 top-0 h-40 bg-gradient-to-br ${source.glow}`}
-          />
-          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent opacity-80" />
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <span className="inline-flex h-14 w-14 items-center justify-center rounded-[18px] border border-slate-200 bg-white shadow-[0_10px_24px_-18px_rgba(15,23,42,.2)]">
+              <img
+                src={source.icon}
+                alt={source.label}
+                className="h-7 w-7 object-contain"
+              />
+            </span>
+
+            <div>
+              <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                Source
+              </div>
+              <h3 className="mt-2 text-[28px] font-semibold leading-[1.02] tracking-[-0.05em] text-slate-950">
+                {source.title}
+              </h3>
+              <p className="mt-3 text-[14px] leading-7 text-slate-600">
+                {source.description}
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:text-slate-950"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
 
-        <div className="relative z-10 p-6 sm:p-7">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-4">
-              <span className="inline-flex h-14 w-14 items-center justify-center rounded-[20px] border border-slate-200 bg-white shadow-[0_10px_24px_rgba(15,23,42,.05)]">
-                <img
-                  src={source.icon}
-                  alt={source.label}
-                  className="h-7 w-7 object-contain"
-                />
-              </span>
+        <div className="mt-8">
+          <div className="flex items-center gap-3 rounded-[20px] border border-[rgba(19,28,45,.08)] bg-white/88 px-4 py-4">
+            <Link2 className="h-4 w-4 text-slate-400" />
+            <input
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              placeholder={source.placeholder}
+              className="h-full w-full border-0 bg-transparent p-0 text-[15px] text-slate-950 outline-none placeholder:text-slate-400 focus:ring-0"
+              autoFocus
+            />
+          </div>
 
-              <div className="min-w-0">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-                  Source
-                </div>
-                <h3 className="mt-2 text-[28px] font-semibold leading-[1.02] tracking-[-0.05em] text-slate-950">
-                  {source.title}
-                </h3>
-                <p className="mt-3 max-w-[420px] text-[14px] leading-7 text-slate-600">
-                  {source.description}
-                </p>
-              </div>
-            </div>
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={onSaveLink}
+              disabled={!hasValue}
+              className="inline-flex h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-medium text-white shadow-[0_14px_30px_rgba(15,23,42,.14)] transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {source.actionLabel}
+            </button>
+
+            {showConnect ? (
+              <button
+                type="button"
+                onClick={onConnect}
+                className="inline-flex h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-5 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
+              >
+                {source.connectLabel}
+              </button>
+            ) : null}
 
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:text-slate-950"
+              className="inline-flex h-11 items-center justify-center rounded-full px-3 text-sm font-medium text-slate-500 transition hover:text-slate-900"
             >
-              <X className="h-4 w-4" />
+              Cancel
             </button>
-          </div>
-
-          <div className="mt-8 rounded-[24px] border border-slate-200 bg-white/92 p-4 shadow-[0_10px_24px_rgba(15,23,42,.04)]">
-            <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-              {showConnect ? "Add link or connect" : "Add source link"}
-            </div>
-
-            <div className="flex items-center gap-3 rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3.5">
-              <Link2 className="h-4 w-4 text-slate-400" />
-              <input
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                placeholder={source.placeholder}
-                className="h-full w-full border-0 bg-transparent p-0 text-[15px] text-slate-950 outline-none placeholder:text-slate-400 focus:ring-0"
-                autoFocus
-              />
-            </div>
-
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={onSaveLink}
-                disabled={!hasValue}
-                className="inline-flex h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-medium text-white shadow-[0_14px_30px_rgba(15,23,42,.14)] transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {source.actionLabel}
-              </button>
-
-              {showConnect ? (
-                <button
-                  type="button"
-                  onClick={onConnect}
-                  className="inline-flex h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-5 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
-                >
-                  {source.connectLabel}
-                </button>
-              ) : null}
-
-              <button
-                type="button"
-                onClick={onClose}
-                className="inline-flex h-11 items-center justify-center rounded-full px-3 text-sm font-medium text-slate-500 transition hover:text-slate-900"
-              >
-                Cancel
-              </button>
-            </div>
           </div>
         </div>
       </motion.div>
@@ -440,6 +489,7 @@ export default function SetupStudioEntryStage({
   const [sourceDrafts, setSourceDrafts] = useState(
     buildInitialSourceDrafts(discoveryForm)
   );
+  const [sourcePickerOpen, setSourcePickerOpen] = useState(false);
   const [activeSourceKey, setActiveSourceKey] = useState("");
   const [modalValue, setModalValue] = useState("");
 
@@ -459,13 +509,13 @@ export default function SetupStudioEntryStage({
   }, [activeSource, sourceDrafts]);
 
   useEffect(() => {
-    if (!activeSourceKey) return;
+    if (!activeSourceKey && !sourcePickerOpen) return;
     const original = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = original;
     };
-  }, [activeSourceKey]);
+  }, [activeSourceKey, sourcePickerOpen]);
 
   function syncState(nextText = composerValue, nextDrafts = sourceDrafts) {
     const next = buildInterpretation(nextText, nextDrafts);
@@ -488,7 +538,21 @@ export default function SetupStudioEntryStage({
     syncState(nextText, sourceDrafts);
   }
 
-  function openSourceModal(sourceKey) {
+  function handleChipClick(label) {
+    setComposerValue(label);
+    syncState(label, sourceDrafts);
+  }
+
+  function openSourcePicker() {
+    setSourcePickerOpen(true);
+  }
+
+  function closeSourcePicker() {
+    setSourcePickerOpen(false);
+  }
+
+  function chooseSource(sourceKey) {
+    setSourcePickerOpen(false);
     setActiveSourceKey(sourceKey);
   }
 
@@ -527,6 +591,7 @@ export default function SetupStudioEntryStage({
     };
 
     setSourceDrafts(nextDrafts);
+    syncState(composerValue, nextDrafts);
     closeSourceModal();
   }
 
@@ -540,128 +605,110 @@ export default function SetupStudioEntryStage({
 
   return (
     <>
-      <section className="relative min-h-[100svh] w-full overflow-hidden bg-[linear-gradient(180deg,#f8fbff_0%,#f5f9fc_48%,#eef6fb_100%)]">
+      <section className="relative min-h-screen w-full overflow-hidden bg-transparent">
         <div className="pointer-events-none absolute inset-0">
-          <div className="absolute right-[-8%] top-[-10%] h-[28rem] w-[28rem] rounded-full bg-[radial-gradient(circle,_rgba(191,235,255,.34)_0%,_rgba(191,235,255,0)_70%)] blur-3xl" />
-          <div className="absolute right-[10%] top-[18%] h-[22rem] w-[22rem] rounded-full bg-[radial-gradient(circle,_rgba(210,246,255,.26)_0%,_rgba(210,246,255,0)_72%)] blur-3xl" />
+          <div className="absolute right-[-10%] top-[-10%] h-[30rem] w-[30rem] rounded-full bg-[radial-gradient(circle,_rgba(196,235,230,.30)_0%,_rgba(196,235,230,0)_70%)] blur-3xl" />
+          <div className="absolute right-[16%] top-[24%] h-[23rem] w-[23rem] rounded-full bg-[radial-gradient(circle,_rgba(186,242,255,.22)_0%,_rgba(186,242,255,0)_70%)] blur-3xl" />
+          <div className="absolute left-1/2 top-[55%] h-[13rem] w-[52rem] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,_rgba(104,255,196,.18)_0%,_rgba(137,228,255,.14)_34%,_rgba(137,228,255,0)_74%)] blur-3xl" />
         </div>
 
-        <div className="relative z-10 flex min-h-[100svh] w-full flex-col">
-          <div className="flex items-center justify-end px-6 pt-5 lg:px-10">
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                className="inline-flex h-12 items-center gap-2 rounded-full bg-white/85 px-4 text-sm font-medium text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,.05)]"
-              >
-                <Globe2 className="h-4 w-4" />
-                English
-                <ChevronDown className="h-4 w-4 text-slate-400" />
-              </button>
+        <div className="relative z-10 flex min-h-screen items-start justify-center px-4 pb-16 pt-[44px] sm:px-6 lg:px-8">
+          <div className="w-full max-w-[1180px]">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.22 }}
+              className="text-center"
+            >
+              <AccioWordmark />
 
-              <button
-                type="button"
-                className="inline-flex h-12 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-medium text-white shadow-[0_16px_34px_rgba(15,23,42,.16)]"
-              >
-                Sign in / sign up
-              </button>
-            </div>
-          </div>
+              <h1 className="mx-auto mt-4 max-w-[980px] text-center text-[34px] font-semibold leading-[1.12] tracking-[-0.055em] text-[rgba(17,24,39,.96)] sm:text-[42px] lg:text-[56px]">
+                All tasks in one ask, smart sourcing with AI
+              </h1>
+            </motion.div>
 
-          <div className="flex flex-1 items-start justify-center px-4 pb-16 pt-20 sm:px-6 lg:px-8">
-            <div className="w-full max-w-[1120px]">
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.22 }}
-                className="text-center"
-              >
-                <div className="text-[34px] font-bold tracking-[-0.06em] text-slate-950 sm:text-[42px]">
-                  NEOX AI Studio
-                </div>
+            <motion.div
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.24, delay: 0.04 }}
+              className="relative mx-auto mt-10 w-full max-w-[1000px]"
+            >
+              <div className="overflow-hidden rounded-[32px] border border-[rgba(17,24,39,.10)] bg-[rgba(248,248,248,.90)] shadow-[0_18px_44px_-28px_rgba(15,23,42,.22)] backdrop-blur-[12px]">
+                <textarea
+                  value={composerValue}
+                  onChange={(e) => handleComposerChange(e.target.value)}
+                  rows={5}
+                  placeholder="Describe your needs..."
+                  className="min-h-[150px] w-full resize-none border-0 bg-transparent px-[22px] pt-[20px] text-[17px] font-normal leading-8 tracking-[-0.03em] text-slate-900 outline-none shadow-none placeholder:text-[rgba(107,114,128,.78)] focus:ring-0 sm:text-[18px]"
+                />
 
-                <h1 className="mx-auto mt-7 max-w-[1080px] text-[28px] font-medium leading-[1.14] tracking-[-0.04em] text-slate-900 sm:text-[36px] lg:text-[44px]">
-                  Describe your business in any language, then let AI build the
-                  first business draft.
-                </h1>
-              </motion.div>
+                <div className="flex items-center justify-between px-4 pb-4 pt-[2px] sm:px-[16px]">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={openSourcePicker}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(17,24,39,.12)] bg-[rgba(255,255,255,.52)] text-[rgba(31,41,55,.82)] shadow-[0_8px_24px_-18px_rgba(15,23,42,.26)] backdrop-blur-[8px] transition hover:bg-white"
+                    >
+                      <Paperclip className="h-[18px] w-[18px]" />
+                    </button>
 
-              <motion.div
-                initial={{ opacity: 0, y: 14 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.24, delay: 0.04 }}
-                className="relative mx-auto mt-12 w-full max-w-[1000px]"
-              >
-                <div className="pointer-events-none absolute inset-x-[10%] -bottom-8 h-24 rounded-full bg-[radial-gradient(circle,_rgba(90,255,190,.22)_0%,_rgba(132,234,255,.18)_32%,_rgba(132,234,255,0)_74%)] blur-2xl" />
+                    <button
+                      type="button"
+                      onClick={openSourcePicker}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(17,24,39,.12)] bg-[rgba(255,255,255,.52)] text-[rgba(31,41,55,.82)] shadow-[0_8px_24px_-18px_rgba(15,23,42,.26)] backdrop-blur-[8px] transition hover:bg-white"
+                    >
+                      <ShoppingBag className="h-[18px] w-[18px]" />
+                    </button>
+                  </div>
 
-                <div className="overflow-hidden rounded-[34px] border border-[rgba(208,217,230,.9)] bg-[rgba(255,255,255,.90)] shadow-[0_20px_50px_rgba(15,23,42,.06)] backdrop-blur-[10px]">
-                  <textarea
-                    value={composerValue}
-                    onChange={(e) => handleComposerChange(e.target.value)}
-                    rows={6}
-                    placeholder="Describe your business in any language..."
-                    className="min-h-[176px] w-full resize-none border-0 bg-transparent px-6 py-6 text-[18px] leading-8 text-slate-900 outline-none shadow-none placeholder:text-slate-400 focus:ring-0"
-                  />
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      className="inline-flex h-10 items-center gap-2 rounded-full bg-transparent px-3 text-[16px] font-medium tracking-[-0.03em] text-[rgba(31,41,55,.88)] sm:text-[17px]"
+                    >
+                      <Zap className="h-[16px] w-[16px]" />
+                      Fast
+                      <ChevronDown className="h-[16px] w-[16px] text-[rgba(107,114,128,.82)]" />
+                    </button>
 
-                  <div className="flex items-center justify-between border-t border-[rgba(220,228,239,.9)] px-4 py-4 sm:px-5">
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[rgba(214,221,232,.95)] bg-white text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,.04)]"
-                      >
-                        <Paperclip className="h-4 w-4" />
-                      </button>
-
-                      <button
-                        type="button"
-                        className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[rgba(214,221,232,.95)] bg-white text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,.04)]"
-                      >
-                        <SquarePlus className="h-4 w-4" />
-                      </button>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        className="inline-flex h-11 items-center gap-2 rounded-full bg-white px-4 text-sm font-medium text-slate-700 shadow-[0_4px_12px_rgba(15,23,42,.04)]"
-                      >
-                        Draft
-                        <ChevronDown className="h-4 w-4 text-slate-400" />
-                      </button>
-
-                      <button
-                        type="button"
-                        disabled={!canContinue || importingWebsite}
-                        onClick={handleContinue}
-                        className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-slate-950 text-white shadow-[0_14px_30px_rgba(15,23,42,.14)] transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        <ArrowRight className="h-4 w-4" />
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      disabled={!canContinue || importingWebsite}
+                      onClick={handleContinue}
+                      className={`inline-flex h-10 w-10 items-center justify-center rounded-full transition ${
+                        canContinue && !importingWebsite
+                          ? "bg-slate-950 text-white shadow-[0_16px_30px_-18px_rgba(15,23,42,.38)] hover:bg-slate-800"
+                          : "bg-[rgba(17,24,39,.18)] text-white/90"
+                      }`}
+                    >
+                      <ArrowRight className="h-[18px] w-[18px]" />
+                    </button>
                   </div>
                 </div>
+              </div>
 
-                <div className="mx-auto mt-12 flex max-w-[980px] flex-wrap items-center justify-center gap-4">
-                  {SOURCE_OPTIONS.map((source) => {
-                    const record = obj(sourceDrafts[source.key]);
-                    const filled =
-                      !!s(record.value) || lower(record.mode) === "connect";
-
-                    return (
-                      <SourceChip
-                        key={source.key}
-                        source={source}
-                        active={activeSourceKey === source.key}
-                        filled={filled}
-                        onClick={() => openSourceModal(source.key)}
-                      />
-                    );
-                  })}
-                </div>
-              </motion.div>
-            </div>
+              <div className="mx-auto mt-11 flex max-w-[980px] flex-wrap items-center justify-center gap-4">
+                {PROMPT_CHIPS.map((chip) => (
+                  <SuggestionChip
+                    key={chip}
+                    label={chip}
+                    onClick={handleChipClick}
+                  />
+                ))}
+              </div>
+            </motion.div>
           </div>
         </div>
       </section>
+
+      <AnimatePresence>
+        {sourcePickerOpen ? (
+          <SourcePickerModal
+            onClose={closeSourcePicker}
+            onChoose={chooseSource}
+          />
+        ) : null}
+      </AnimatePresence>
 
       <AnimatePresence>
         {activeSource ? (

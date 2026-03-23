@@ -305,60 +305,80 @@ export default function SetupStudioScene({
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center px-6">
-        <div className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600">
+        <div className="rounded-full border border-white/80 bg-[rgba(250,250,250,.82)] px-4 py-2 text-sm text-slate-600 shadow-[0_10px_24px_-20px_rgba(15,23,42,.28)] backdrop-blur-[10px]">
           Setup studio hazırlanır...
         </div>
       </div>
     );
   }
 
-  const isEntryStage = stage === "entry";
+  if (stage === "entry") {
+    return (
+      <>
+        <SetupStudioEntryStage
+          importingWebsite={importingWebsite}
+          discoveryForm={discoveryForm}
+          businessForm={businessForm}
+          manualSections={manualSections}
+          onSetBusinessField={onSetBusinessField}
+          onSetManualSection={onSetManualSection}
+          onSetDiscoveryField={onSetDiscoveryField}
+          onContinueFlow={onContinueFlow}
+        />
+
+        <AnimatePresence>
+          {showRefine ? (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,.18)] px-4 py-4 backdrop-blur-[14px]">
+              <button
+                type="button"
+                aria-label="Close refine modal"
+                className="absolute inset-0"
+                onClick={onToggleRefine}
+              />
+
+              <div className="relative z-10 w-full max-w-[1180px]">
+                <SetupStudioRefineModal
+                  savingBusiness={savingBusiness}
+                  businessForm={businessForm}
+                  discoveryProfileRows={discoveryProfileRows}
+                  manualSections={manualSections}
+                  onSetBusinessField={onSetBusinessField}
+                  onSetManualSection={onSetManualSection}
+                  onSaveBusiness={onSaveBusiness}
+                  onClose={onToggleRefine}
+                  reviewDraft={reviewDraft}
+                />
+              </div>
+            </div>
+          ) : null}
+        </AnimatePresence>
+      </>
+    );
+  }
 
   return (
     <>
       <div className="min-h-screen overflow-y-auto">
-        <main
-          className={
-            isEntryStage
-              ? "w-full"
-              : "mx-auto w-full max-w-[1200px] px-4 py-8 sm:px-6 lg:px-8 lg:py-10"
-          }
-        >
-          {!isEntryStage ? (
-            <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-              <div className="text-[12px] font-medium text-slate-400">
-                {sourceLabel ? sourceLabel : "Setup studio"}
-              </div>
-
-              <button
-                type="button"
-                onClick={onRefresh}
-                disabled={refreshing}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <RefreshCw
-                  className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
-                />
-                Refresh
-              </button>
+        <main className="mx-auto w-full max-w-[1200px] px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+            <div className="text-[12px] font-medium text-slate-400">
+              {sourceLabel ? sourceLabel : "Setup studio"}
             </div>
-          ) : null}
+
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={refreshing}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-white/80 bg-[rgba(250,250,250,.82)] px-4 text-sm font-medium text-slate-700 shadow-[0_10px_24px_-20px_rgba(15,23,42,.28)] backdrop-blur-[10px] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <RefreshCw
+                className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
+              />
+              Refresh
+            </button>
+          </div>
 
           <AnimatePresence mode="wait">
-            {stage === "entry" ? (
-              <SetupStudioEntryStage
-                key="entry"
-                importingWebsite={importingWebsite}
-                discoveryForm={discoveryForm}
-                businessForm={businessForm}
-                manualSections={manualSections}
-                onSetBusinessField={onSetBusinessField}
-                onSetManualSection={onSetManualSection}
-                onSetDiscoveryField={onSetDiscoveryField}
-                onContinueFlow={onContinueFlow}
-              />
-            ) : null}
-
             {stage === "scanning" ? (
               <SetupStudioScanningStage
                 key="scanning"
@@ -427,8 +447,8 @@ export default function SetupStudioScene({
             ) : null}
           </AnimatePresence>
 
-          {!isEntryStage && error ? (
-            <div className="mt-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          {error ? (
+            <div className="mt-6 rounded-[24px] border border-rose-200 bg-rose-50/90 px-4 py-3 text-sm text-rose-700">
               {error}
             </div>
           ) : null}
@@ -437,7 +457,7 @@ export default function SetupStudioScene({
 
       <AnimatePresence>
         {showRefine ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,.34)] px-4 py-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,.18)] px-4 py-4 backdrop-blur-[14px]">
             <button
               type="button"
               aria-label="Close refine modal"
