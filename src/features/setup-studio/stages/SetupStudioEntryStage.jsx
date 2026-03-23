@@ -31,7 +31,7 @@ const SOURCE_OPTIONS = [
     icon: websiteIcon,
     placeholder: "yourbusiness.com",
     title: "Website",
-    description: "Best starting point. Paste the main website URL.",
+    description: "Paste the main business website.",
     actionLabel: "Save source",
   },
   {
@@ -40,7 +40,7 @@ const SOURCE_OPTIONS = [
     icon: googleMapsIcon,
     placeholder: "Business name, city or Google Maps link",
     title: "Google Maps",
-    description: "Paste a Maps link, or just write the business name with city.",
+    description: "Paste a Maps link, or enter the business name with city.",
     actionLabel: "Save source",
   },
   {
@@ -240,9 +240,7 @@ function NeoxWordmark() {
         className="inline-flex items-end gap-[8px] text-[34px] font-semibold leading-none tracking-[-0.075em] sm:text-[38px] lg:text-[42px]"
       >
         <span className="text-slate-950">NEOX</span>
-        <span className="bg-[linear-gradient(180deg,#475569_0%,#0f172a_100%)] bg-clip-text text-transparent">
-          AI Studio
-        </span>
+        <span className="text-slate-700">AI Studio</span>
       </div>
     </div>
   );
@@ -253,10 +251,10 @@ function SourceChip({ source, active = false, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex h-[58px] items-center justify-center gap-3 rounded-full border px-6 text-[15px] font-medium tracking-[-0.03em] transition ${
+      className={`inline-flex h-[58px] items-center justify-center gap-3 rounded-full border px-6 text-[15px] font-medium tracking-[-0.03em] backdrop-blur-[8px] transition ${
         active
-          ? "border-slate-300 bg-white text-slate-950 shadow-[0_16px_32px_-24px_rgba(15,23,42,.24)]"
-          : "border-white/90 bg-[rgba(255,255,255,.86)] text-slate-700 shadow-[0_14px_28px_-24px_rgba(15,23,42,.18)] hover:bg-white"
+          ? "border-slate-300 bg-white text-slate-950 shadow-[0_16px_32px_-24px_rgba(15,23,42,.22)]"
+          : "border-white/90 bg-[rgba(255,255,255,.82)] text-slate-700 shadow-[0_14px_28px_-24px_rgba(15,23,42,.16)] hover:bg-white"
       }`}
     >
       <img
@@ -409,6 +407,7 @@ export default function SetupStudioEntryStage({
   const [speechSupported, setSpeechSupported] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [speechError, setSpeechError] = useState("");
+  const [isComposerFocused, setIsComposerFocused] = useState(false);
 
   useEffect(() => {
     composerRef.current = composerValue;
@@ -425,7 +424,9 @@ export default function SetupStudioEntryStage({
   }, [composerValue, sourceDrafts]);
 
   const hasRealSource = !!s(interpretation.sourceValue);
-  const canContinue = !!(s(composerValue) || hasRealSource);
+  const hasComposerContent = !!s(composerValue);
+  const canContinue = !!(hasComposerContent || hasRealSource);
+  const showGlow = isComposerFocused || hasComposerContent || isListening;
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
@@ -562,6 +563,7 @@ export default function SetupStudioEntryStage({
 
     recognition.onstart = () => {
       setIsListening(true);
+      setIsComposerFocused(true);
     };
 
     recognition.onresult = (event) => {
@@ -658,14 +660,10 @@ export default function SetupStudioEntryStage({
 
               <h1
                 style={DISPLAY_FONT_STYLE}
-                className="mx-auto mt-7 max-w-[1100px] text-[34px] font-semibold leading-[1.08] tracking-[-0.065em] text-slate-950 sm:text-[42px] lg:text-[56px]"
+                className="mx-auto mt-7 max-w-[1220px] text-[34px] font-semibold leading-[1.08] tracking-[-0.065em] text-slate-950 sm:text-[42px] lg:text-[54px]"
               >
-                Turn one source into a business draft.
+                Build your business draft from real signals.
               </h1>
-
-              <p className="mx-auto mt-4 max-w-[680px] text-[15px] leading-7 tracking-[-0.02em] text-slate-500 sm:text-[16px]">
-                Start with a website, Maps, Instagram, Facebook, or voice.
-              </p>
             </motion.div>
 
             <motion.div
@@ -674,15 +672,33 @@ export default function SetupStudioEntryStage({
               transition={{ duration: 0.24, delay: 0.04 }}
               className="relative mx-auto mt-10 w-full max-w-[1060px]"
             >
-              <div className="pointer-events-none absolute left-1/2 top-[calc(100%-8px)] h-[150px] w-[74%] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,_rgba(102,255,190,.22)_0%,_rgba(140,228,255,.16)_34%,_rgba(140,228,255,0)_72%)] blur-[36px]" />
+              <div className="pointer-events-none absolute left-1/2 top-[calc(100%-10px)] z-0 h-[180px] w-[78%] -translate-x-1/2">
+                <div
+                  className={`absolute left-1/2 top-0 h-[130px] w-[52%] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,_rgba(88,255,180,.34)_0%,_rgba(88,255,180,.14)_32%,_rgba(88,255,180,0)_72%)] blur-[30px] transition-all duration-500 ${
+                    showGlow ? "scale-100 opacity-100" : "scale-90 opacity-0"
+                  }`}
+                />
+                <div
+                  className={`absolute left-1/2 top-[8px] h-[160px] w-[82%] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,_rgba(120,232,255,.24)_0%,_rgba(120,232,255,.12)_36%,_rgba(120,232,255,0)_76%)] blur-[42px] transition-all duration-700 ${
+                    showGlow ? "scale-100 opacity-100" : "scale-95 opacity-0"
+                  }`}
+                />
+                <div
+                  className={`absolute left-1/2 top-[12px] h-[92px] w-[34%] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,_rgba(255,255,255,.58)_0%,_rgba(255,255,255,0)_74%)] blur-[18px] transition-all duration-500 ${
+                    showGlow ? "opacity-100" : "opacity-0"
+                  }`}
+                />
+              </div>
 
               <div className="relative z-10 overflow-hidden rounded-[30px] border border-[rgba(15,23,42,.08)] bg-[rgba(255,255,255,.94)] shadow-[0_18px_40px_-28px_rgba(15,23,42,.14)] backdrop-blur-[10px]">
                 <textarea
                   ref={textareaRef}
                   value={composerValue}
                   onChange={(e) => handleComposerChange(e.target.value)}
+                  onFocus={() => setIsComposerFocused(true)}
+                  onBlur={() => setIsComposerFocused(false)}
                   rows={4}
-                  placeholder="Paste a website, a Maps link, or briefly describe the business."
+                  placeholder="Tell us what this business does and what AI should understand first."
                   className="min-h-[146px] w-full resize-none border-0 bg-transparent px-[24px] pt-[22px] text-[16px] font-normal leading-7 tracking-[-0.03em] text-slate-900 outline-none shadow-none placeholder:text-[rgba(100,116,139,.9)] focus:ring-0 sm:text-[17px]"
                 />
 
@@ -707,9 +723,9 @@ export default function SetupStudioEntryStage({
 
                     <div className="hidden min-w-0 truncate text-[13px] text-slate-500 sm:block">
                       {isListening
-                        ? "Say what the business does and who it serves."
+                        ? "Describe the business naturally."
                         : speechSupported
-                        ? "Talk naturally for 10–20 seconds."
+                        ? "Speak for 10–20 seconds."
                         : "Voice works in supported browsers."}
                     </div>
                   </div>
