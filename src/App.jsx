@@ -23,7 +23,7 @@ import AdminTenants from "./pages/AdminTenants.jsx";
 import AdminTeam from "./pages/AdminTeam.jsx";
 import AdminSecrets from "./pages/AdminSecrets.jsx";
 
-import SetupStudioRoute from "./features/setup-studio/index.jsx";
+import SetupStudioRoute from "./pages/SetupStudio/index.jsx";
 
 export default function App() {
   return (
