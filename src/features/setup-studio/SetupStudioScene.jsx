@@ -18,12 +18,64 @@ function arr(v, d = []) {
   return Array.isArray(v) ? v : d;
 }
 
+function obj(v, d = {}) {
+  return v && typeof v === "object" && !Array.isArray(v) ? v : d;
+}
+
 function sourceLabelFromProps(discoveryState = {}, discoveryModeLabel) {
   return s(
     discoveryState?.sourceLabel ||
       (typeof discoveryModeLabel === "function"
         ? discoveryModeLabel(discoveryState?.lastSourceType)
         : "")
+  );
+}
+
+function hasText(value = "") {
+  return !!s(value);
+}
+
+function hasManualDraftInput({
+  businessForm = {},
+  manualSections = {},
+  discoveryForm = {},
+  discoveryState = {},
+}) {
+  const form = obj(businessForm);
+  const sections = obj(manualSections);
+  const discovery = obj(discoveryForm);
+  const state = obj(discoveryState);
+
+  return !!(
+    hasText(form.companyName) ||
+    hasText(form.description) ||
+    hasText(form.primaryPhone) ||
+    hasText(form.primaryEmail) ||
+    hasText(form.primaryAddress) ||
+    hasText(form.websiteUrl) ||
+    hasText(form.timezone) ||
+    hasText(form.language) ||
+    hasText(sections.servicesText) ||
+    hasText(sections.faqsText) ||
+    hasText(sections.policiesText) ||
+    hasText(discovery.note) ||
+    hasText(state.manualTranscript) ||
+    hasText(state.manualSummary)
+  );
+}
+
+function hasVoiceDraftInput({ discoveryForm = {}, discoveryState = {} }) {
+  const discovery = obj(discoveryForm);
+  const state = obj(discoveryState);
+
+  return !!(
+    hasText(discovery.voiceTranscript) ||
+    hasText(discovery.voiceNote) ||
+    hasText(discovery.voiceText) ||
+    hasText(state.voiceTranscript) ||
+    hasText(state.voiceNote) ||
+    hasText(state.voiceText) ||
+    hasText(state.audioTranscript)
   );
 }
 
@@ -76,6 +128,77 @@ export default function SetupStudioScene({
     () => sourceLabelFromProps(discoveryState, discoveryModeLabel),
     [discoveryState, discoveryModeLabel]
   );
+
+  const scanningSourceType = useMemo(() => {
+    return s(
+      discoveryState?.lastSourceType ||
+        discoveryForm?.sourceType ||
+        reviewDraft?.sourceType
+    );
+  }, [
+    discoveryState?.lastSourceType,
+    discoveryForm?.sourceType,
+    reviewDraft?.sourceType,
+  ]);
+
+  const hasSourceInput = useMemo(() => {
+    return !!s(
+      discoveryState?.lastUrl ||
+        discoveryForm?.sourceValue ||
+        discoveryForm?.websiteUrl
+    );
+  }, [
+    discoveryState?.lastUrl,
+    discoveryForm?.sourceValue,
+    discoveryForm?.websiteUrl,
+  ]);
+
+  const hasManualInput = useMemo(() => {
+    return hasManualDraftInput({
+      businessForm,
+      manualSections,
+      discoveryForm,
+      discoveryState,
+    });
+  }, [businessForm, manualSections, discoveryForm, discoveryState]);
+
+  const hasVoiceInput = useMemo(() => {
+    return hasVoiceDraftInput({
+      discoveryForm,
+      discoveryState,
+    });
+  }, [discoveryForm, discoveryState]);
+
+  const scanLines = useMemo(() => {
+    return arr(
+      discoveryState?.scanLines ||
+        discoveryState?.progressLines ||
+        discoveryState?.analysisSteps
+    );
+  }, [
+    discoveryState?.scanLines,
+    discoveryState?.progressLines,
+    discoveryState?.analysisSteps,
+  ]);
+
+  const scanLineIndex = useMemo(() => {
+    const candidates = [
+      discoveryState?.scanLineIndex,
+      discoveryState?.progressIndex,
+      discoveryState?.analysisStepIndex,
+    ];
+
+    for (const value of candidates) {
+      const x = Number(value);
+      if (Number.isFinite(x)) return x;
+    }
+
+    return 0;
+  }, [
+    discoveryState?.scanLineIndex,
+    discoveryState?.progressIndex,
+    discoveryState?.analysisStepIndex,
+  ]);
 
   const hasServiceStage = useMemo(() => {
     return (
@@ -230,6 +353,12 @@ export default function SetupStudioScene({
               <SetupStudioScanningStage
                 key="scanning"
                 lastUrl={discoveryState?.lastUrl}
+                sourceType={scanningSourceType}
+                hasSourceInput={hasSourceInput}
+                hasManualInput={hasManualInput}
+                hasVoiceInput={hasVoiceInput}
+                scanLines={scanLines}
+                scanLineIndex={scanLineIndex}
               />
             ) : null}
 
