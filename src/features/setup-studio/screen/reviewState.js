@@ -17,6 +17,68 @@ import {
 } from "./shared.js";
 import { safeDraftKey } from "./profile.js";
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function maybeUuid(value = "") {
+  const x = s(value);
+  return UUID_RE.test(x) ? x : "";
+}
+
+function metadataObject(item = {}) {
+  const x = obj(item);
+  return obj(x.metadataJson || x.metadata_json || x.metadata);
+}
+
+function pickKnowledgeCandidateUuid(item = {}) {
+  const x = obj(item);
+  const meta = metadataObject(x);
+  const candidate = obj(x.candidate);
+
+  return (
+    maybeUuid(x.candidateId) ||
+    maybeUuid(x.candidate_id) ||
+    maybeUuid(x.knowledgeCandidateId) ||
+    maybeUuid(x.knowledge_candidate_id) ||
+    maybeUuid(x.reviewCandidateId) ||
+    maybeUuid(x.review_candidate_id) ||
+    maybeUuid(x.candidateUuid) ||
+    maybeUuid(x.candidate_uuid) ||
+    maybeUuid(x.uuid) ||
+    maybeUuid(x.itemUuid) ||
+    maybeUuid(x.item_uuid) ||
+    maybeUuid(meta.candidateId) ||
+    maybeUuid(meta.candidate_id) ||
+    maybeUuid(meta.knowledgeCandidateId) ||
+    maybeUuid(meta.knowledge_candidate_id) ||
+    maybeUuid(meta.reviewCandidateId) ||
+    maybeUuid(meta.review_candidate_id) ||
+    maybeUuid(meta.candidateUuid) ||
+    maybeUuid(meta.candidate_uuid) ||
+    maybeUuid(meta.uuid) ||
+    maybeUuid(candidate.id) ||
+    maybeUuid(candidate.candidateId) ||
+    maybeUuid(candidate.candidate_id) ||
+    maybeUuid(x.id)
+  );
+}
+
+function pickKnowledgeRowId(item = {}, fallbackPrefix = "knowledge") {
+  const x = obj(item);
+
+  return s(
+    x.rowId ||
+      x.row_id ||
+      x.id ||
+      x.key ||
+      x.itemKey ||
+      x.item_key ||
+      x.title ||
+      x.label ||
+      `${fallbackPrefix}-${Math.random().toString(36).slice(2, 10)}`
+  );
+}
+
 export function normalizeDraftServiceItem(item = {}) {
   const x = obj(item);
 
@@ -42,10 +104,14 @@ export function normalizeDraftServiceItem(item = {}) {
 
 export function normalizeDraftKnowledgeItem(item = {}) {
   const x = obj(item);
+  const rowId = pickKnowledgeRowId(x, "draft-knowledge");
+  const candidateId = pickKnowledgeCandidateUuid(x);
 
   return {
-    id: s(x.id || x.key || x.title),
-    candidateId: s(x.candidateId || x.id),
+    id: rowId,
+    rowId,
+    candidateId,
+    candidateUuid: candidateId,
     key: s(x.key || x.itemKey || x.item_key),
     title: s(x.title || x.label || x.key),
     valueText: s(
@@ -64,7 +130,9 @@ export function normalizeDraftKnowledgeItem(item = {}) {
         : Number(x.confidence || 0) || 0,
     confidenceLabel: s(x.confidenceLabel || x.confidence_label),
     evidence: arr(x.evidence),
-    sourceEvidenceJson: arr(x.evidence),
+    sourceEvidenceJson: arr(
+      x.sourceEvidenceJson || x.source_evidence_json || x.evidence
+    ),
     metadataJson: obj(x.metadataJson || x.metadata_json),
     origin: s(x.origin || "setup_review_session"),
   };
@@ -77,10 +145,14 @@ export function normalizeVisibleKnowledgeItem(item = {}) {
   );
   const helperEvidence = arr(evidenceList(x));
   const allEvidence = fallbackEvidence.length ? fallbackEvidence : helperEvidence;
+  const rowId = pickKnowledgeRowId(x, "visible-knowledge");
+  const candidateId = pickKnowledgeCandidateUuid(x);
 
   return {
-    id: s(x.id || x.candidateId || x.key || x.title),
-    candidateId: s(x.candidateId || x.id),
+    id: rowId,
+    rowId,
+    candidateId,
+    candidateUuid: candidateId,
     key: s(x.key || x.itemKey || x.item_key),
     title: s(x.title || x.label || candidateTitle(x)),
     valueText: s(
