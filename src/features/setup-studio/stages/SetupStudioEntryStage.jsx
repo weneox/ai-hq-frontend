@@ -4,7 +4,6 @@ import { flushSync } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowRight,
-  Check,
   ChevronDown,
   Link2,
   Paperclip,
@@ -49,7 +48,6 @@ const SOURCE_OPTIONS = [
     description: "Paste the main website URL.",
     actionLabel: "Add website",
     connectLabel: "",
-    themeClass: "theme-website",
   },
   {
     key: "google_maps",
@@ -61,7 +59,6 @@ const SOURCE_OPTIONS = [
     description: "Paste your business Google Maps link.",
     actionLabel: "Add Maps link",
     connectLabel: "",
-    themeClass: "theme-google-maps",
   },
   {
     key: "instagram",
@@ -73,7 +70,6 @@ const SOURCE_OPTIONS = [
     description: "Paste the public profile link or connect later.",
     actionLabel: "Add profile link",
     connectLabel: "Connect",
-    themeClass: "theme-instagram",
   },
   {
     key: "linkedin",
@@ -85,7 +81,6 @@ const SOURCE_OPTIONS = [
     description: "Paste the company page link or connect later.",
     actionLabel: "Add page link",
     connectLabel: "Connect",
-    themeClass: "theme-linkedin",
   },
   {
     key: "facebook",
@@ -97,7 +92,6 @@ const SOURCE_OPTIONS = [
     description: "Paste the page link or connect later.",
     actionLabel: "Add page link",
     connectLabel: "Connect",
-    themeClass: "theme-facebook",
   },
   {
     key: "tiktok",
@@ -109,7 +103,6 @@ const SOURCE_OPTIONS = [
     description: "Paste the public TikTok profile link.",
     actionLabel: "Add TikTok link",
     connectLabel: "",
-    themeClass: "theme-tiktok",
   },
   {
     key: "youtube",
@@ -121,7 +114,6 @@ const SOURCE_OPTIONS = [
     description: "Paste the public channel link.",
     actionLabel: "Add channel link",
     connectLabel: "",
-    themeClass: "theme-youtube",
   },
   {
     key: "whatsapp",
@@ -133,8 +125,12 @@ const SOURCE_OPTIONS = [
     description: "Paste your WhatsApp link or connect later.",
     actionLabel: "Add WhatsApp link",
     connectLabel: "Connect",
-    themeClass: "theme-whatsapp",
   },
+];
+
+const CHIP_ROWS = [
+  ["website", "google_maps", "instagram", "linkedin"],
+  ["facebook", "tiktok", "youtube", "whatsapp"],
 ];
 
 function sourceByKey(key = "") {
@@ -160,9 +156,14 @@ function cleanComposerText(raw = "", sourceDrafts = {}) {
 
   if (!text) return "";
 
-  SOURCE_OPTIONS.forEach((item) => {
-    const label = s(item.label);
-    const record = obj(sourceDrafts[item.key]);
+  text = text.replace(
+    /find local businesses,\s*view maps and get driving directions in google maps\.?/gi,
+    " "
+  );
+
+  for (const source of SOURCE_OPTIONS) {
+    const label = s(source.label);
+    const record = obj(sourceDrafts[source.key]);
     const value = s(record.value);
 
     if (value) {
@@ -172,13 +173,15 @@ function cleanComposerText(raw = "", sourceDrafts = {}) {
     if (lower(text) === lower(label)) {
       text = "";
     }
-  });
+  }
 
-  return text
+  text = text
     .replace(/\s{2,}/g, " ")
     .replace(/^[,;:\-\s]+/, "")
     .replace(/[,:;\-\s]+$/, "")
     .trim();
+
+  return text;
 }
 
 function detectInlineSource(raw = "") {
@@ -263,7 +266,7 @@ function pickPrimaryAttachedSource(sourceDrafts = {}) {
 }
 
 function buildInterpretation(raw = "", sourceDrafts = {}) {
-  const text = cleanComposerText(raw, sourceDrafts);
+  const cleaned = cleanComposerText(raw, sourceDrafts);
   const attached = pickPrimaryAttachedSource(sourceDrafts);
 
   if (attached?.sourceValue) {
@@ -271,16 +274,16 @@ function buildInterpretation(raw = "", sourceDrafts = {}) {
       sourceType: attached.sourceType,
       sourceValue: attached.sourceValue,
       websiteUrl: attached.sourceType === "website" ? attached.sourceValue : "",
-      note: text,
-      description: text,
+      note: cleaned,
+      description: cleaned,
     };
   }
 
-  const inlineSource = detectInlineSource(text);
+  const inlineSource = detectInlineSource(cleaned);
 
   if (inlineSource?.sourceValue) {
     const note = s(
-      text
+      cleaned
         .replace(inlineSource.fullMatch, " ")
         .replace(/^[,;:\-\s]+/, "")
         .replace(/\s{2,}/g, " ")
@@ -300,8 +303,8 @@ function buildInterpretation(raw = "", sourceDrafts = {}) {
     sourceType: "",
     sourceValue: "",
     websiteUrl: "",
-    note: text,
-    description: text,
+    note: cleaned,
+    description: cleaned,
   };
 }
 
@@ -310,12 +313,12 @@ function NeoxWordmark() {
     <div className="inline-flex select-none items-center justify-center">
       <div
         style={DISPLAY_FONT_STYLE}
-        className="inline-flex items-center gap-2 text-[32px] font-extrabold leading-none tracking-[-0.065em] text-slate-950 sm:text-[38px] lg:text-[44px]"
+        className="inline-flex items-center gap-[6px] text-[34px] font-extrabold leading-none tracking-[-0.075em] sm:text-[38px] lg:text-[42px]"
       >
-        <span className="bg-[linear-gradient(90deg,#0f172a_0%,#1d4ed8_42%,#0ea5e9_72%,#14b8a6_100%)] bg-clip-text text-transparent">
+        <span className="bg-[linear-gradient(90deg,#1e3a8a_0%,#2563eb_34%,#22d3ee_72%,#14b8a6_100%)] bg-clip-text text-transparent">
           NEOX
         </span>
-        <span className="bg-[linear-gradient(90deg,#334155_0%,#475569_38%,#0f766e_100%)] bg-clip-text text-transparent">
+        <span className="bg-[linear-gradient(90deg,#334155_0%,#475569_44%,#0f766e_100%)] bg-clip-text text-transparent">
           AI Studio
         </span>
       </div>
@@ -323,25 +326,19 @@ function NeoxWordmark() {
   );
 }
 
-function SourceChip({ source, active = false, onClick }) {
+function SourceChip({ source, onClick }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`${source.themeClass} inline-flex h-[46px] items-center justify-center gap-2.5 rounded-full border border-white/85 bg-[rgba(255,255,255,.66)] px-4 text-[14px] font-medium tracking-[-0.03em] text-[rgba(31,41,55,.76)] shadow-[0_10px_24px_-20px_rgba(15,23,42,.28)] backdrop-blur-[10px] transition hover:bg-[rgba(255,255,255,.82)] sm:h-[48px] sm:px-5 sm:text-[15px]`}
+      className="inline-flex h-[50px] items-center justify-center gap-2.5 rounded-full border border-white/85 bg-[rgba(255,255,255,.66)] px-5 text-[15px] font-normal tracking-[-0.03em] text-[rgba(31,41,55,.76)] shadow-[0_10px_24px_-20px_rgba(15,23,42,.24)] backdrop-blur-[10px] transition hover:bg-[rgba(255,255,255,.82)]"
     >
       <img
         src={source.icon}
         alt={source.label}
-        className="h-[17px] w-[17px] object-contain"
+        className="h-[15px] w-[15px] object-contain"
       />
       <span>{source.label}</span>
-
-      {active ? (
-        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/90 text-[var(--pill-accent)]">
-          <Check className="h-3.5 w-3.5" />
-        </span>
-      ) : null}
     </button>
   );
 }
@@ -558,7 +555,8 @@ export default function SetupStudioEntryStage({
     return buildInterpretation(composerValue, sourceDrafts);
   }, [composerValue, sourceDrafts]);
 
-  const canContinue = !!(s(composerValue) || s(interpretation.sourceValue));
+  const hasRealSource = !!s(interpretation.sourceValue);
+  const canContinue = !!(s(composerValue) || hasRealSource);
 
   useEffect(() => {
     if (!activeSource) return;
@@ -666,21 +664,15 @@ export default function SetupStudioEntryStage({
     onContinueFlow?.();
   }
 
-  function isSourceActive(sourceKey) {
-    const record = obj(sourceDrafts[sourceKey]);
-    return !!(s(record.value) || s(record.mode));
-  }
-
   return (
     <>
       <section className="relative min-h-screen w-full overflow-hidden bg-transparent">
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute right-[-8%] top-[-8%] h-[28rem] w-[28rem] rounded-full bg-[radial-gradient(circle,_rgba(196,235,230,.24)_0%,_rgba(196,235,230,0)_70%)] blur-3xl" />
-          <div className="absolute right-[16%] top-[21%] h-[18rem] w-[18rem] rounded-full bg-[radial-gradient(circle,_rgba(186,242,255,.18)_0%,_rgba(186,242,255,0)_70%)] blur-3xl" />
-          <div className="absolute left-1/2 top-[56%] h-[10rem] w-[38rem] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,_rgba(104,255,196,.16)_0%,_rgba(137,228,255,.12)_38%,_rgba(137,228,255,0)_74%)] blur-3xl" />
+          <div className="absolute right-[16%] top-[18%] h-[18rem] w-[18rem] rounded-full bg-[radial-gradient(circle,_rgba(186,242,255,.18)_0%,_rgba(186,242,255,0)_70%)] blur-3xl" />
         </div>
 
-        <div className="relative z-10 flex min-h-screen items-start justify-center px-4 pb-10 pt-[40px] sm:px-6 lg:px-8">
+        <div className="relative z-10 flex min-h-screen items-start justify-center px-4 pb-10 pt-[78px] sm:px-6 lg:px-8">
           <div className="w-full max-w-[1180px]">
             <motion.div
               initial={{ opacity: 0, y: 10 }}
@@ -692,9 +684,9 @@ export default function SetupStudioEntryStage({
 
               <h1
                 style={DISPLAY_FONT_STYLE}
-                className="mx-auto mt-5 max-w-[980px] text-center text-[32px] font-semibold leading-[1.14] tracking-[-0.05em] text-[rgba(17,24,39,.96)] sm:text-[38px] lg:text-[44px]"
+                className="mx-auto mt-6 max-w-[1040px] text-center text-[33px] font-semibold leading-[1.14] tracking-[-0.055em] text-[rgba(17,24,39,.96)] sm:text-[38px] lg:text-[44px]"
               >
-                All your business context in one ask, shaped with AI
+                All tasks in one ask, smart sourcing with AI
               </h1>
             </motion.div>
 
@@ -702,25 +694,25 @@ export default function SetupStudioEntryStage({
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.24, delay: 0.04 }}
-              className="relative mx-auto mt-9 w-full max-w-[1000px]"
+              className="relative mx-auto mt-11 w-full max-w-[1000px]"
             >
-              <div className="absolute left-1/2 top-full h-[60px] w-[64%] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,_rgba(102,255,191,.24)_0%,_rgba(137,228,255,.16)_42%,_rgba(137,228,255,0)_78%)] blur-[24px]" />
+              <div className="pointer-events-none absolute left-1/2 top-full h-[48px] w-[60%] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,_rgba(102,255,191,.22)_0%,_rgba(137,228,255,.15)_42%,_rgba(137,228,255,0)_78%)] blur-[20px]" />
 
-              <div className="relative overflow-hidden rounded-[30px] border border-[rgba(17,24,39,.10)] bg-[rgba(248,248,248,.90)] shadow-[0_18px_44px_-28px_rgba(15,23,42,.20)] backdrop-blur-[12px]">
+              <div className="relative overflow-hidden rounded-[30px] border border-[rgba(17,24,39,.10)] bg-[rgba(248,248,248,.90)] shadow-[0_18px_44px_-28px_rgba(15,23,42,.18)] backdrop-blur-[12px]">
                 <textarea
                   value={composerValue}
                   onChange={(e) => handleComposerChange(e.target.value)}
                   rows={4}
-                  placeholder="Describe your business..."
-                  className="min-h-[132px] w-full resize-none border-0 bg-transparent px-[22px] pt-[20px] text-[16px] font-normal leading-7 tracking-[-0.03em] text-slate-900 outline-none shadow-none placeholder:text-[rgba(107,114,128,.78)] focus:ring-0 sm:text-[17px]"
+                  placeholder="Describe your needs..."
+                  className="min-h-[136px] w-full resize-none border-0 bg-transparent px-[22px] pt-[21px] text-[16px] font-normal leading-7 tracking-[-0.03em] text-slate-900 outline-none shadow-none placeholder:text-[rgba(107,114,128,.82)] focus:ring-0 sm:text-[17px]"
                 />
 
-                <div className="flex items-center justify-between px-4 pb-4 pt-[2px] sm:px-[16px]">
+                <div className="flex items-center justify-between px-4 pb-4 pt-0 sm:px-[16px]">
                   <div className="flex items-center gap-3">
                     <button
                       type="button"
                       onClick={openSourcePicker}
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(17,24,39,.12)] bg-[rgba(255,255,255,.52)] text-[rgba(31,41,55,.82)] shadow-[0_8px_24px_-18px_rgba(15,23,42,.26)] backdrop-blur-[8px] transition hover:bg-white"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(17,24,39,.12)] bg-[rgba(255,255,255,.52)] text-[rgba(31,41,55,.82)] shadow-[0_8px_24px_-18px_rgba(15,23,42,.22)] backdrop-blur-[8px] transition hover:bg-white"
                     >
                       <Paperclip className="h-[18px] w-[18px]" />
                     </button>
@@ -728,7 +720,7 @@ export default function SetupStudioEntryStage({
                     <button
                       type="button"
                       onClick={openSourcePicker}
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(17,24,39,.12)] bg-[rgba(255,255,255,.52)] text-[rgba(31,41,55,.82)] shadow-[0_8px_24px_-18px_rgba(15,23,42,.26)] backdrop-blur-[8px] transition hover:bg-white"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(17,24,39,.12)] bg-[rgba(255,255,255,.52)] text-[rgba(31,41,55,.82)] shadow-[0_8px_24px_-18px_rgba(15,23,42,.22)] backdrop-blur-[8px] transition hover:bg-white"
                     >
                       <ShoppingBag className="h-[18px] w-[18px]" />
                     </button>
@@ -737,9 +729,9 @@ export default function SetupStudioEntryStage({
                   <div className="flex items-center gap-3">
                     <button
                       type="button"
-                      className="inline-flex h-10 items-center gap-2 rounded-full bg-transparent px-3 text-[15px] font-medium tracking-[-0.03em] text-[rgba(31,41,55,.88)] sm:text-[16px]"
+                      className="inline-flex h-10 items-center gap-2 rounded-full bg-transparent px-3 text-[15px] font-medium tracking-[-0.03em] text-[rgba(31,41,55,.88)]"
                     >
-                      <Zap className="h-[16px] w-[16px]" />
+                      <Zap className="h-[15px] w-[15px]" />
                       Fast
                       <ChevronDown className="h-[16px] w-[16px] text-[rgba(107,114,128,.82)]" />
                     </button>
@@ -750,7 +742,7 @@ export default function SetupStudioEntryStage({
                       onClick={handleContinue}
                       className={`inline-flex h-10 w-10 items-center justify-center rounded-full transition ${
                         canContinue && !importingWebsite
-                          ? "bg-slate-950 text-white shadow-[0_16px_30px_-18px_rgba(15,23,42,.38)] hover:bg-slate-800"
+                          ? "bg-[rgba(17,24,39,.22)] text-white hover:bg-[rgba(17,24,39,.34)]"
                           : "bg-[rgba(17,24,39,.18)] text-white/90"
                       }`}
                     >
@@ -760,14 +752,25 @@ export default function SetupStudioEntryStage({
                 </div>
               </div>
 
-              <div className="mx-auto mt-11 flex max-w-[1080px] flex-wrap items-center justify-center gap-4">
-                {SOURCE_OPTIONS.map((source) => (
-                  <SourceChip
-                    key={source.key}
-                    source={source}
-                    active={isSourceActive(source.key)}
-                    onClick={() => openSourceModal(source.key)}
-                  />
+              <div className="mx-auto mt-11 flex max-w-[980px] flex-col items-center gap-4">
+                {CHIP_ROWS.map((row, rowIndex) => (
+                  <div
+                    key={rowIndex}
+                    className="flex flex-wrap items-center justify-center gap-4"
+                  >
+                    {row.map((key) => {
+                      const source = sourceByKey(key);
+                      if (!source) return null;
+
+                      return (
+                        <SourceChip
+                          key={source.key}
+                          source={source}
+                          onClick={() => openSourceModal(source.key)}
+                        />
+                      );
+                    })}
+                  </div>
                 ))}
               </div>
             </motion.div>
