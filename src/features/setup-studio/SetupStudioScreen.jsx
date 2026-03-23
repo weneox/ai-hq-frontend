@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { getAppBootstrap } from "../../api/app.js";
 import {
   importSourceForSetup,
+  analyzeSetupIntake,
   getCurrentSetupReview,
   patchCurrentSetupReview,
   finalizeCurrentSetupReview,
@@ -101,13 +102,210 @@ function lowerText(value = "") {
   return s(value).toLowerCase();
 }
 
+function compactObject(input = {}) {
+  const out = {};
+
+  for (const [key, raw] of Object.entries(obj(input))) {
+    if (raw == null) continue;
+
+    if (Array.isArray(raw)) {
+      if (raw.length) out[key] = raw;
+      continue;
+    }
+
+    if (raw && typeof raw === "object") {
+      const nested = compactObject(raw);
+      if (Object.keys(nested).length) out[key] = nested;
+      continue;
+    }
+
+    if (typeof raw === "string") {
+      const text = s(raw);
+      if (text) out[key] = text;
+      continue;
+    }
+
+    out[key] = raw;
+  }
+
+  return out;
+}
+
+function normalizeStudioSourceType(value = "", url = "") {
+  const raw = s(value).toLowerCase();
+  if (raw === "manual") return "manual";
+  return normalizeIncomingSourceType(value) || detectSourceTypeFromUrl(url);
+}
+
 function sourceLabelFor(type = "") {
   const x = s(type).toLowerCase();
+  if (x === "manual") return "Manual";
   if (x === "google_maps" || x === "googlemaps") return "Google Maps";
   if (x === "instagram") return "Instagram";
   if (x === "linkedin") return "LinkedIn";
   if (x === "facebook") return "Facebook";
   return "Website";
+}
+
+function splitManualList(text = "") {
+  return [
+    ...new Set(
+      s(text)
+        .split(/\n+|[|•·▪●]+|;/g)
+        .flatMap((part) => {
+          const value = s(part);
+          if (!value) return [];
+
+          if (
+            value.includes(",") &&
+            value.split(",").length >= 2 &&
+            value.length <= 220 &&
+            !/[.!?]/.test(value)
+          ) {
+            return value
+              .split(",")
+              .map((x) => s(x))
+              .filter(Boolean);
+          }
+
+          return [value];
+        })
+        .map((item) => s(item))
+        .filter(Boolean)
+    ),
+  ];
+}
+
+function parseFaqItemsFromText(text = "") {
+  const raw = s(text);
+  if (!raw) return [];
+
+  const blocks = raw
+    .split(/\n{2,}/)
+    .map((item) => s(item))
+    .filter(Boolean);
+
+  const out = [];
+
+  for (const block of blocks) {
+    const lines = block
+      .split(/\n+/)
+      .map((line) => s(line))
+      .filter(Boolean);
+
+    if (!lines.length) continue;
+
+    let question = "";
+    let answer = "";
+
+    for (const line of lines) {
+      if (/^(q|question)\s*[:—–-]\s*/i.test(line)) {
+        question = s(line.replace(/^(q|question)\s*[:—–-]\s*/i, ""));
+        continue;
+      }
+
+      if (/^(a|answer)\s*[:—–-]\s*/i.test(line)) {
+        answer = s(line.replace(/^(a|answer)\s*[:—–-]\s*/i, ""));
+        continue;
+      }
+
+      if (!question) {
+        question = line;
+      } else if (!answer) {
+        answer = line;
+      } else {
+        answer = `${answer} ${line}`.trim();
+      }
+    }
+
+    if (question) {
+      out.push({
+        question,
+        answer,
+      });
+    }
+  }
+
+  if (out.length) return out;
+
+  return raw
+    .split(/\n+/)
+    .map((line) => s(line))
+    .filter(Boolean)
+    .map((question) => ({ question, answer: "" }));
+}
+
+function buildAnalyzePayloadFromStudioState({
+  businessForm = {},
+  manualSections = {},
+  discoveryForm = {},
+  fallbackSourceUrl = "",
+} = {}) {
+  const companyName = s(businessForm.companyName);
+  const description = s(businessForm.description);
+  const websiteUrl = s(
+    businessForm.websiteUrl || discoveryForm.websiteUrl || fallbackSourceUrl
+  );
+  const primaryPhone = s(businessForm.primaryPhone);
+  const primaryEmail = s(businessForm.primaryEmail);
+  const primaryAddress = s(businessForm.primaryAddress);
+  const language = s(businessForm.language);
+  const timezone = s(businessForm.timezone);
+
+  const services = splitManualList(manualSections.servicesText);
+  const faqItems = parseFaqItemsFromText(manualSections.faqsText);
+  const policiesText = s(manualSections.policiesText);
+
+  const manualLines = [
+    companyName ? `Business name: ${companyName}` : "",
+    description ? `Description: ${description}` : "",
+    websiteUrl ? `Website: ${websiteUrl}` : "",
+    primaryPhone ? `Phone: ${primaryPhone}` : "",
+    primaryEmail ? `Email: ${primaryEmail}` : "",
+    primaryAddress ? `Address: ${primaryAddress}` : "",
+    language ? `Language: ${language}` : "",
+    timezone ? `Timezone: ${timezone}` : "",
+    services.length ? `Services: ${services.join(" | ")}` : "",
+    policiesText ? `Policies: ${policiesText}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const answers = compactObject({
+    companyName,
+    description,
+    website: websiteUrl,
+    phone: primaryPhone,
+    email: primaryEmail,
+    address: primaryAddress,
+    language,
+    timezone,
+    services,
+    faqItems,
+  });
+
+  const hasAnyInput = !!(
+    companyName ||
+    description ||
+    websiteUrl ||
+    primaryPhone ||
+    primaryEmail ||
+    primaryAddress ||
+    language ||
+    timezone ||
+    services.length ||
+    faqItems.length ||
+    policiesText ||
+    s(discoveryForm.note)
+  );
+
+  return {
+    manualText: manualLines,
+    voiceTranscript: "",
+    answers,
+    note: s(discoveryForm.note),
+    hasAnyInput,
+  };
 }
 
 function isBarrierLikeIdentityText(value = "", warnings = []) {
@@ -316,9 +514,7 @@ export default function SetupStudioScreen() {
 
   function updateActiveSourceScope(sourceType = "", sourceUrl = "") {
     const normalizedUrl = s(sourceUrl);
-    const normalizedType =
-      normalizeIncomingSourceType(sourceType) ||
-      detectSourceTypeFromUrl(normalizedUrl);
+    const normalizedType = normalizeStudioSourceType(sourceType, normalizedUrl);
 
     const next =
       normalizedUrl || normalizedType
@@ -342,12 +538,13 @@ export default function SetupStudioScreen() {
     );
 
     const rawType =
-      normalizeIncomingSourceType(
+      normalizeStudioSourceType(
         override?.sourceType ||
           activeSourceRef.current?.sourceType ||
           activeSourceScope.sourceType ||
-          discoveryState.lastSourceType
-      ) || detectSourceTypeFromUrl(rawUrl);
+          discoveryState.lastSourceType,
+        rawUrl
+      ) || "";
 
     return {
       sourceType: rawType,
@@ -384,7 +581,6 @@ export default function SetupStudioScreen() {
       formFromProfile(profile, {
         ...DEFAULT_BUSINESS_FORM,
         timezone: s(prev.timezone || "Asia/Baku"),
-        language: s(prev.language || "az"),
       })
     );
   }
@@ -414,6 +610,10 @@ export default function SetupStudioScreen() {
           profile.language
         ),
     };
+
+    if (s(reviewInfo.sourceUrl) || lowerText(reviewInfo.sourceType) === "manual") {
+      updateActiveSourceScope(reviewInfo.sourceType, reviewInfo.sourceUrl);
+    }
 
     setDiscoveryState((prev) => ({
       ...prev,
@@ -463,7 +663,7 @@ export default function SetupStudioScreen() {
     const nextManualSections = buildManualSectionsFromReview(normalized);
     const reviewInfo = resolveReviewSourceInfo(normalized, legacy);
 
-    if (s(reviewInfo.sourceUrl)) {
+    if (s(reviewInfo.sourceUrl) || lowerText(reviewInfo.sourceType) === "manual") {
       updateActiveSourceScope(reviewInfo.sourceType, reviewInfo.sourceUrl);
     }
 
@@ -528,6 +728,7 @@ export default function SetupStudioScreen() {
       const shouldApplyIntoActiveStudio =
         !preserveBusinessForm ||
         !s(sourceScope.sourceUrl) ||
+        sourceScope.sourceType === "manual" ||
         reviewStateMatchesSource(
           normalized,
           legacy,
@@ -636,6 +837,7 @@ export default function SetupStudioScreen() {
       const shouldApplyIntoActiveStudio =
         !preserveBusinessForm ||
         !s(sourceScope.sourceUrl) ||
+        sourceScope.sourceType === "manual" ||
         reviewStateMatchesSource(
           reviewState,
           legacyDraft,
@@ -661,7 +863,7 @@ export default function SetupStudioScreen() {
 
       const reviewInfo = resolveReviewSourceInfo(reviewState, legacyDraft);
 
-      if (s(reviewInfo.sourceUrl)) {
+      if (s(reviewInfo.sourceUrl) || lowerText(reviewInfo.sourceType) === "manual") {
         updateActiveSourceScope(reviewInfo.sourceType, reviewInfo.sourceUrl);
       }
 
@@ -819,16 +1021,24 @@ export default function SetupStudioScreen() {
     const request = normalizeScanRequest(input, discoveryForm);
     const sourceType = request.sourceType;
     const sourceUrl = s(request.url);
+    const hasSource = !!sourceUrl && !!sourceType;
 
-    if (!sourceUrl) {
-      setError("Source URL boş ola bilməz.");
+    const analyzePayload = buildAnalyzePayloadFromStudioState({
+      businessForm,
+      manualSections,
+      discoveryForm: {
+        ...discoveryForm,
+        note: request.note,
+      },
+      fallbackSourceUrl: sourceUrl,
+    });
+
+    if (!hasSource && !analyzePayload.hasAnyInput) {
+      setError("Source, manual məlumat və ya biznes təsviri daxil edilməlidir.");
       return;
     }
 
-    if (!sourceType) {
-      setError("Scan üçün source type müəyyən edilə bilmədi.");
-      return;
-    }
+    const uiSourceType = hasSource ? sourceType : "manual";
 
     try {
       setImportingWebsite(true);
@@ -836,7 +1046,7 @@ export default function SetupStudioScreen() {
       setError("");
       autoRevealRef.current = "";
 
-      updateActiveSourceScope(sourceType, sourceUrl);
+      updateActiveSourceScope(uiSourceType, sourceUrl);
       clearStudioReviewState({ preserveActiveSource: true });
       resetBusinessTwinDraftForNewScan(sourceUrl);
 
@@ -844,9 +1054,12 @@ export default function SetupStudioScreen() {
         ...prev,
         mode: "running",
         lastUrl: sourceUrl,
-        lastSourceType: sourceType,
-        sourceLabel: sourceLabelFor(sourceType),
-        message: scanStartLabel(sourceType),
+        lastSourceType: uiSourceType,
+        sourceLabel: sourceLabelFor(uiSourceType),
+        message:
+          uiSourceType === "manual"
+            ? "Business draft hazırlanır..."
+            : scanStartLabel(uiSourceType),
         warnings: [],
         shouldReview: false,
         reviewRequired: false,
@@ -858,78 +1071,121 @@ export default function SetupStudioScreen() {
         importedServices: [],
       }));
 
-      const result = await importSourceForSetup({
-        sourceType,
-        url: sourceUrl,
-        sourceUrl,
-        note: request.note,
-        businessNote: request.note,
-        sources: request.sources,
-        primarySource: request.primarySource,
-      });
+      let importResult = null;
 
-      const importedReview = normalizeReviewState(result?.review || {});
+      if (hasSource) {
+        importResult = await importSourceForSetup({
+          sourceType,
+          url: sourceUrl,
+          sourceUrl,
+          note: request.note,
+          businessNote: request.note,
+          sources: request.sources,
+          primarySource: request.primarySource,
+        });
+      }
+
+      const analyzeResult = await analyzeSetupIntake(analyzePayload);
+
+      const importedReview = normalizeReviewState(
+        analyzeResult?.review || importResult?.review || {}
+      );
       const legacyImportedDraft = mapCurrentReviewToLegacyDraft(importedReview);
-
-      const incomingReviewAligned = reviewStateMatchesSource(
+      const reviewInfo = resolveReviewSourceInfo(
         importedReview,
-        legacyImportedDraft,
-        sourceType,
-        sourceUrl
+        legacyImportedDraft
       );
 
-      const reviewBackedProfile = incomingReviewAligned
-        ? obj(legacyImportedDraft?.overview)
-        : {};
+      const effectiveSourceType = s(
+        reviewInfo.sourceType ||
+          analyzeResult?.sourceType ||
+          uiSourceType
+      );
 
-      const discoveredProfile = obj(result?.profile);
-      const helperProfilePatch = profilePatchFromDiscovery(discoveredProfile);
-      const barrierOnlyResult = isBarrierOnlyImportResult(result, sourceType);
+      const effectiveSourceUrl = s(
+        reviewInfo.sourceUrl ||
+          analyzeResult?.sourceUrl ||
+          sourceUrl
+      );
 
-      const resultWarnings = arr(result?.warnings)
+      if (effectiveSourceUrl || effectiveSourceType === "manual") {
+        updateActiveSourceScope(effectiveSourceType, effectiveSourceUrl);
+      }
+
+      const importWarnings = arr(importResult?.warnings)
         .map((x) => s(x))
         .filter(Boolean);
 
+      const analyzeWarnings = arr(analyzeResult?.warnings)
+        .map((x) => s(x))
+        .filter(Boolean);
+
+      const combinedWarnings = [...new Set([...importWarnings, ...analyzeWarnings])];
+
+      const barrierOnlyResult =
+        hasSource &&
+        isBarrierOnlyImportResult(importResult, sourceType) &&
+        !hasMeaningfulProfile(
+          chooseBestProfileForForm(
+            obj(legacyImportedDraft?.overview),
+            obj(analyzeResult?.profile)
+          )
+        );
+
+      const reviewBackedProfile = obj(legacyImportedDraft?.overview);
+      const helperProfilePatch = profilePatchFromDiscovery(
+        obj(analyzeResult?.profile || importResult?.profile)
+      );
+
       const resultMetadata = {
-        reviewRequired:
-          !!(result?.reviewRequired ?? legacyImportedDraft?.reviewRequired ?? false),
+        reviewRequired: !!(
+          analyzeResult?.reviewRequired ??
+          legacyImportedDraft?.reviewRequired ??
+          false
+        ),
         reviewFlags: arr(
-          result?.reviewFlags || legacyImportedDraft?.reviewFlags || []
+          analyzeResult?.reviewFlags || legacyImportedDraft?.reviewFlags || []
         ),
         fieldConfidence: obj(
-          result?.fieldConfidence || legacyImportedDraft?.fieldConfidence || {}
+          analyzeResult?.fieldConfidence ||
+            legacyImportedDraft?.fieldConfidence ||
+            {}
         ),
         mainLanguage:
-          s(result?.mainLanguage) ||
+          s(analyzeResult?.mainLanguage) ||
           s(legacyImportedDraft?.mainLanguage) ||
           resolveMainLanguageValue(
-            discoveredProfile?.mainLanguage,
-            discoveredProfile?.primaryLanguage,
-            discoveredProfile?.language
+            reviewBackedProfile?.mainLanguage,
+            reviewBackedProfile?.primaryLanguage,
+            reviewBackedProfile?.language
           ),
         primaryLanguage:
-          s(result?.primaryLanguage) ||
+          s(analyzeResult?.primaryLanguage) ||
           s(legacyImportedDraft?.primaryLanguage) ||
           resolveMainLanguageValue(
-            discoveredProfile?.primaryLanguage,
-            discoveredProfile?.mainLanguage,
-            discoveredProfile?.language
+            reviewBackedProfile?.primaryLanguage,
+            reviewBackedProfile?.mainLanguage,
+            reviewBackedProfile?.language
           ),
       };
 
       const rawBestIncomingProfile = barrierOnlyResult
-        ? chooseBestProfileForForm(discoveredProfile, helperProfilePatch)
+        ? chooseBestProfileForForm(
+            obj(analyzeResult?.profile),
+            helperProfilePatch
+          )
         : chooseBestProfileForForm(
             reviewBackedProfile,
-            discoveredProfile,
+            obj(analyzeResult?.profile),
+            obj(importResult?.profile),
             helperProfilePatch
           );
 
       const bestIncomingProfile = buildSafeUiProfile({
         rawProfile: rawBestIncomingProfile,
-        sourceType,
-        sourceUrl,
-        warnings: resultWarnings,
+        sourceType: effectiveSourceType,
+        sourceUrl: effectiveSourceUrl,
+        warnings: combinedWarnings,
         mainLanguage: resultMetadata.mainLanguage,
         primaryLanguage: resultMetadata.primaryLanguage,
         reviewRequired: resultMetadata.reviewRequired,
@@ -938,39 +1194,8 @@ export default function SetupStudioScreen() {
         barrierOnly: barrierOnlyResult,
       });
 
-      const shouldApplyExtractedIdentityToForm =
-        !barrierOnlyResult && hasExtractedIdentityProfile(bestIncomingProfile);
-
-      setBusinessForm((prev) => {
-        const blankBase = {
-          ...DEFAULT_BUSINESS_FORM,
-          timezone: s(prev.timezone || "Asia/Baku"),
-          language: s(prev.language || "az"),
-          websiteUrl: sourceUrl,
-        };
-
-        const mergedFromHelper = shouldApplyExtractedIdentityToForm
-          ? mergeBusinessForm(blankBase, helperProfilePatch)
-          : blankBase;
-
-        const next = shouldApplyExtractedIdentityToForm
-          ? hydrateBusinessFormFromProfile(mergedFromHelper, bestIncomingProfile, {
-              force: false,
-            })
-          : {
-              ...mergedFromHelper,
-              websiteUrl: sourceUrl,
-            };
-
-        if (!s(next.language) && resultMetadata.mainLanguage) {
-          next.language = resultMetadata.mainLanguage;
-        }
-
-        return next;
-      });
-
-      if (result?.review && !barrierOnlyResult && incomingReviewAligned) {
-        applyReviewState(result.review, {
+      if (analyzeResult?.review) {
+        applyReviewState(analyzeResult.review, {
           preserveBusinessForm: true,
           fallbackProfile: bestIncomingProfile,
         });
@@ -979,38 +1204,50 @@ export default function SetupStudioScreen() {
         setReviewDraft(createEmptyLegacyDraft());
       }
 
-      const sourceId = s(result?.source?.id || legacyImportedDraft?.sourceId);
-      const sourceRunId = s(result?.run?.id || legacyImportedDraft?.sourceRunId);
-      const snapshotId = s(legacyImportedDraft?.snapshotId || result?.snapshot?.id);
+      const sourceId = s(
+        analyzeResult?.source?.id ||
+          importResult?.source?.id ||
+          legacyImportedDraft?.sourceId
+      );
+      const sourceRunId = s(
+        analyzeResult?.run?.id ||
+          importResult?.run?.id ||
+          legacyImportedDraft?.sourceRunId
+      );
+      const snapshotId = s(
+        legacyImportedDraft?.snapshotId ||
+          analyzeResult?.snapshot?.id ||
+          importResult?.snapshot?.id
+      );
 
       const scopedImportedReview =
-        !barrierOnlyResult && incomingReviewAligned
-          ? importedReview
-          : createEmptyReviewState();
+        !barrierOnlyResult ? importedReview : createEmptyReviewState();
 
       const scopedImportedDraft =
-        !barrierOnlyResult && incomingReviewAligned
-          ? legacyImportedDraft
-          : createEmptyLegacyDraft();
+        !barrierOnlyResult ? legacyImportedDraft : createEmptyLegacyDraft();
 
       const immediateDiscoveryState = {
-        lastUrl: sourceUrl,
-        lastSourceType: sourceType,
-        sourceLabel: s(result?.sourceLabel || sourceLabelFor(sourceType)),
-        intakeContext: obj(result?.intakeContext),
-        snapshot: obj(result?.snapshot),
+        lastUrl: effectiveSourceUrl,
+        lastSourceType: effectiveSourceType,
+        sourceLabel: s(
+          analyzeResult?.sourceLabel || sourceLabelFor(effectiveSourceType)
+        ),
+        intakeContext: obj(importResult?.intakeContext),
+        snapshot: obj(analyzeResult?.snapshot || importResult?.snapshot),
         profile: bestIncomingProfile,
-        signals: obj(result?.signals),
+        signals: obj(analyzeResult?.signals || importResult?.signals),
         sourceId,
         sourceRunId,
         snapshotId,
         importedKnowledgeItems: barrierOnlyResult
           ? []
-          : arr(result?.candidates || result?.knowledgeItems),
-        importedServices: barrierOnlyResult ? [] : arr(result?.services),
+          : arr(scopedImportedDraft?.reviewQueue),
+        importedServices: barrierOnlyResult
+          ? []
+          : arr(scopedImportedDraft?.sections?.services),
         mainLanguage: resultMetadata.mainLanguage,
         primaryLanguage: resultMetadata.primaryLanguage,
-        reviewRequired: !!(result?.shouldReview || resultMetadata.reviewRequired),
+        reviewRequired: !!resultMetadata.reviewRequired,
         reviewFlags: arr(resultMetadata.reviewFlags),
         fieldConfidence: obj(resultMetadata.fieldConfidence),
       };
@@ -1036,33 +1273,40 @@ export default function SetupStudioScreen() {
         discoveryState: immediateDiscoveryState,
       });
 
-      const importedProfileRows = profilePreviewRows(
-        chooseBestProfileForForm(bestIncomingProfile, reviewBackedProfile)
-      );
+      const importedVisibleEvents = deriveVisibleEvents(scopedImportedReview);
+      const importedProfileRows = profilePreviewRows(bestIncomingProfile);
 
       const hasImmediateVisibleResults =
         importedVisibleKnowledgeItems.length > 0 ||
         importedVisibleServiceItems.length > 0 ||
         importedVisibleSources.length > 0 ||
+        importedVisibleEvents.length > 0 ||
         importedProfileRows.length > 0 ||
-        resultWarnings.length > 0 ||
+        combinedWarnings.length > 0 ||
         hasMeaningfulProfile(bestIncomingProfile);
 
       setDiscoveryState({
-        mode: s(result?.mode) || "success",
-        lastUrl: sourceUrl,
-        lastSourceType: sourceType,
-        sourceLabel: s(result?.sourceLabel || sourceLabelFor(sourceType)),
+        mode: s(analyzeResult?.mode || importResult?.mode) || "success",
+        lastUrl: effectiveSourceUrl,
+        lastSourceType: effectiveSourceType,
+        sourceLabel: s(
+          analyzeResult?.sourceLabel || sourceLabelFor(effectiveSourceType)
+        ),
         message:
-          resultWarnings.length > 0
-            ? resultWarnings[0]
-            : scanCompleteLabel(sourceType, result?.candidateCount),
-        candidateCount: barrierOnlyResult ? 0 : Number(result?.candidateCount || 0),
+          combinedWarnings.length > 0
+            ? combinedWarnings[0]
+            : effectiveSourceType === "manual"
+              ? "Business draft generated"
+              : scanCompleteLabel(
+                  effectiveSourceType,
+                  analyzeResult?.candidateCount
+                ),
+        candidateCount: Number(analyzeResult?.candidateCount || 0),
         profileApplied: hasMeaningfulProfile(bestIncomingProfile),
-        shouldReview: !!result?.shouldReview,
-        warnings: resultWarnings,
-        requestId: s(result?.requestId),
-        intakeContext: obj(result?.intakeContext),
+        shouldReview: !!analyzeResult?.shouldReview,
+        warnings: combinedWarnings,
+        requestId: s(analyzeResult?.requestId || importResult?.requestId),
+        intakeContext: obj(importResult?.intakeContext),
         profile: {
           ...bestIncomingProfile,
           mainLanguage:
@@ -1075,27 +1319,30 @@ export default function SetupStudioScreen() {
           reviewFlags: arr(immediateDiscoveryState.reviewFlags),
           fieldConfidence: obj(immediateDiscoveryState.fieldConfidence),
         },
-        signals: obj(result?.signals),
-        snapshot: obj(result?.snapshot),
+        signals: obj(analyzeResult?.signals || importResult?.signals),
+        snapshot: obj(analyzeResult?.snapshot || importResult?.snapshot),
         sourceId,
         sourceRunId,
         snapshotId,
-        reviewSessionId: barrierOnlyResult
-          ? ""
-          : s(result?.reviewSessionId || importedReview?.session?.id),
-        reviewSessionStatus: barrierOnlyResult
-          ? ""
-          : s(result?.reviewSessionStatus || importedReview?.session?.status),
+        reviewSessionId: s(
+          analyzeResult?.reviewSessionId || importedReview?.session?.id
+        ),
+        reviewSessionStatus: s(
+          analyzeResult?.reviewSessionStatus || importedReview?.session?.status
+        ),
         hasResults: hasImmediateVisibleResults,
         resultCount:
           importedVisibleKnowledgeItems.length +
           importedVisibleServiceItems.length +
           importedVisibleSources.length +
+          importedVisibleEvents.length +
           importedProfileRows.length,
         importedKnowledgeItems: barrierOnlyResult
           ? []
-          : arr(result?.candidates || result?.knowledgeItems),
-        importedServices: barrierOnlyResult ? [] : arr(result?.services),
+          : arr(scopedImportedDraft?.reviewQueue),
+        importedServices: barrierOnlyResult
+          ? []
+          : arr(scopedImportedDraft?.sections?.services),
         mainLanguage: immediateDiscoveryState.mainLanguage,
         primaryLanguage: immediateDiscoveryState.primaryLanguage,
         reviewRequired: immediateDiscoveryState.reviewRequired,
@@ -1105,9 +1352,9 @@ export default function SetupStudioScreen() {
 
       const refreshResult = await refreshAndMaybeRouteHome({
         preserveBusinessForm: true,
-        hydrateReview: !barrierOnlyResult,
-        activeSourceType: sourceType,
-        activeSourceUrl: sourceUrl,
+        hydrateReview: true,
+        activeSourceType: effectiveSourceType,
+        activeSourceUrl: effectiveSourceUrl,
       });
 
       if (!refreshResult.routed) {
@@ -1118,8 +1365,8 @@ export default function SetupStudioScreen() {
         const shouldOpenKnowledge =
           !barrierOnlyResult &&
           (
-            !!result?.shouldReview ||
-            Number(result?.candidateCount || 0) > 0 ||
+            !!analyzeResult?.shouldReview ||
+            Number(analyzeResult?.candidateCount || 0) > 0 ||
             refreshedPendingKnowledge.length > 0 ||
             importedVisibleKnowledgeItems.length > 0 ||
             importedVisibleServiceItems.length > 0 ||
@@ -1139,19 +1386,23 @@ export default function SetupStudioScreen() {
         setShowRefine(shouldOpenRefine);
       }
     } catch (e2) {
-      const message = String(e2?.message || e2 || "Source scan alınmadı.");
+      const message = String(
+        e2?.message || e2 || "Business draft analiz edilə bilmədi."
+      );
+
       setDiscoveryState((prev) => ({
         ...prev,
         mode: "error",
         lastUrl: sourceUrl,
-        lastSourceType: sourceType,
-        sourceLabel: sourceLabelFor(sourceType),
+        lastSourceType: uiSourceType,
+        sourceLabel: sourceLabelFor(uiSourceType),
         message,
         hasResults: false,
         resultCount: 0,
         importedKnowledgeItems: [],
         importedServices: [],
       }));
+
       setError(message);
     } finally {
       setImportingWebsite(false);
@@ -1398,10 +1649,14 @@ export default function SetupStudioScreen() {
     if (freshEntryMode) return false;
 
     const scopedUrl = s(activeSourceScope.sourceUrl || discoveryState.lastUrl);
-    const scopedType =
-      normalizeIncomingSourceType(
-        activeSourceScope.sourceType || discoveryState.lastSourceType
-      ) || detectSourceTypeFromUrl(scopedUrl);
+    const scopedType = normalizeStudioSourceType(
+      activeSourceScope.sourceType || discoveryState.lastSourceType,
+      scopedUrl
+    );
+
+    if (scopedType === "manual") {
+      return !!s(currentReview?.session?.id);
+    }
 
     if (!scopedUrl) return false;
 
@@ -1654,6 +1909,7 @@ export default function SetupStudioScreen() {
       s(discoveryState.mode),
       s(discoveryState.mainLanguage),
       String(arr(discoveryState.reviewFlags).length),
+      s(discoveryState.lastSourceType),
     ]
       .filter(Boolean)
       .join("|");
@@ -1669,6 +1925,7 @@ export default function SetupStudioScreen() {
     discoveryState.mode,
     discoveryState.mainLanguage,
     discoveryState.reviewFlags,
+    discoveryState.lastSourceType,
   ]);
 
   useEffect(() => {

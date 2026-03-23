@@ -1,5 +1,5 @@
 // src/api/setup.js
-// FINAL v2.0 — setup studio API with session review flow
+// FINAL v2.1 — setup studio API with session review flow + unified analyze
 
 import { apiGet, apiPost, apiPut, apiPatch } from "./client.js";
 
@@ -29,6 +29,10 @@ export function importGoogleMapsForSetup(payload = {}) {
 
 export function importSourceForSetup(payload = {}) {
   return apiPost("/api/setup/import/source", payload);
+}
+
+export function analyzeSetupIntake(payload = {}) {
+  return apiPost("/api/setup/review/current/analyze", payload);
 }
 
 export function getCurrentSetupReview(params = {}) {

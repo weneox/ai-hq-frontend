@@ -35,6 +35,7 @@ export default function SetupStudioScene({
   actingKnowledgeId,
   savingServiceSuggestion,
   showRefine,
+  showKnowledge,
   error,
   businessForm,
   discoveryForm,
@@ -50,6 +51,8 @@ export default function SetupStudioScene({
   serviceSuggestionTitle,
   studioProgress,
   services = [],
+  reviewSources = [],
+  reviewEvents = [],
   hasVisibleResults,
   visibleKnowledgeCount = 0,
   visibleServiceCount = 0,
@@ -75,8 +78,30 @@ export default function SetupStudioScene({
   );
 
   const hasServiceStage = useMemo(() => {
-    return !!s(serviceSuggestionTitle) || arr(services).length > 0 || visibleServiceCount > 0;
+    return (
+      !!s(serviceSuggestionTitle) ||
+      arr(services).length > 0 ||
+      visibleServiceCount > 0
+    );
   }, [serviceSuggestionTitle, services, visibleServiceCount]);
+
+  const hasAnyReviewContent = useMemo(() => {
+    return !!(
+      arr(discoveryProfileRows).length ||
+      arr(knowledgeItems).length ||
+      arr(services).length ||
+      arr(reviewSources).length ||
+      arr(reviewEvents).length ||
+      arr(discoveryState?.warnings).length
+    );
+  }, [
+    discoveryProfileRows,
+    knowledgeItems,
+    services,
+    reviewSources,
+    reviewEvents,
+    discoveryState?.warnings,
+  ]);
 
   useEffect(() => {
     const mode = s(discoveryState?.mode).toLowerCase();
@@ -89,7 +114,7 @@ export default function SetupStudioScene({
       return;
     }
 
-    if (!hasVisibleResults) {
+    if (!hasVisibleResults && !hasAnyReviewContent) {
       setStage("entry");
       return;
     }
@@ -100,23 +125,31 @@ export default function SetupStudioScene({
     }
 
     setStage((prev) => {
-      if (prev === "entry" || prev === "scanning") return "identity";
+      if (prev === "entry" || prev === "scanning") {
+        if (showKnowledge && visibleKnowledgeCount > 0) return "knowledge";
+        return "identity";
+      }
+
       if (prev === "knowledge" && visibleKnowledgeCount <= 0) {
         return hasServiceStage ? "service" : "ready";
       }
+
       if (prev === "service" && !hasServiceStage) {
         return "ready";
       }
+
       return prev;
     });
   }, [
     importingWebsite,
     discoveryState?.mode,
     hasVisibleResults,
+    hasAnyReviewContent,
     studioProgress?.nextStudioStage,
     meta?.setupCompleted,
     visibleKnowledgeCount,
     hasServiceStage,
+    showKnowledge,
   ]);
 
   function goNextFromIdentity() {
@@ -168,7 +201,8 @@ export default function SetupStudioScene({
             <button
               type="button"
               onClick={onRefresh}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
+              disabled={refreshing}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <RefreshCw
                 className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
@@ -181,7 +215,12 @@ export default function SetupStudioScene({
             {stage === "entry" ? (
               <SetupStudioEntryStage
                 key="entry"
+                importingWebsite={importingWebsite}
                 discoveryForm={discoveryForm}
+                businessForm={businessForm}
+                manualSections={manualSections}
+                onSetBusinessField={onSetBusinessField}
+                onSetManualSection={onSetManualSection}
                 onSetDiscoveryField={onSetDiscoveryField}
                 onContinueFlow={onContinueFlow}
               />
