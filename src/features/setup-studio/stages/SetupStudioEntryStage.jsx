@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, Link2, Mic, Square, X } from "lucide-react";
+import { ArrowRight, Check, Link2, Mic, Square, X } from "lucide-react";
 
 import websiteIcon from "../../../assets/setup-studio/channels/weblink.webp";
 import googleMapsIcon from "../../../assets/setup-studio/channels/google-maps.svg";
@@ -30,40 +30,36 @@ const SOURCE_OPTIONS = [
     label: "Website",
     icon: websiteIcon,
     placeholder: "yourbusiness.com",
-    title: "Add your website",
-    description:
-      "Best starting point. Paste the main website URL and we will build the first draft from it.",
-    actionLabel: "Save website",
+    title: "Website",
+    description: "Best starting point. Paste the main URL.",
+    actionLabel: "Save source",
   },
   {
     key: "google_maps",
     label: "Google Maps",
     icon: googleMapsIcon,
-    placeholder: "Business name, city or Google Maps link",
-    title: "Add your Google Maps source",
-    description:
-      "Paste the Maps link or simply write the business name with city for a better starting point.",
-    actionLabel: "Save Google Maps source",
+    placeholder: "Business name, city or Maps link",
+    title: "Google Maps",
+    description: "Paste the Maps link, or business name with city.",
+    actionLabel: "Save source",
   },
   {
     key: "instagram",
     label: "Instagram",
     icon: instagramIcon,
     placeholder: "@yourbrand or instagram.com/yourbrand",
-    title: "Add your Instagram source",
-    description:
-      "Use a public handle or profile link. This works best as supporting business context.",
-    actionLabel: "Save Instagram source",
+    title: "Instagram",
+    description: "Paste a public handle or profile link.",
+    actionLabel: "Save source",
   },
   {
     key: "facebook",
     label: "Facebook",
     icon: facebookIcon,
     placeholder: "facebook.com/yourbrand",
-    title: "Add your Facebook source",
-    description:
-      "Paste the public business page link so we can use it as supporting context.",
-    actionLabel: "Save Facebook source",
+    title: "Facebook",
+    description: "Paste the public business page link.",
+    actionLabel: "Save source",
   },
 ];
 
@@ -241,10 +237,10 @@ function NeoxWordmark() {
     <div className="inline-flex select-none items-center justify-center">
       <div
         style={DISPLAY_FONT_STYLE}
-        className="inline-flex items-end gap-[8px] text-[32px] font-semibold leading-none tracking-[-0.07em] sm:text-[36px] lg:text-[40px]"
+        className="inline-flex items-end gap-[8px] text-[34px] font-semibold leading-none tracking-[-0.075em] sm:text-[38px] lg:text-[42px]"
       >
         <span className="text-slate-950">NEOX</span>
-        <span className="text-slate-500">AI Studio</span>
+        <span className="text-slate-700">AI Studio</span>
       </div>
     </div>
   );
@@ -255,19 +251,19 @@ function SourceChip({ source, active = false, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex h-[58px] items-center justify-center gap-3 rounded-full border px-6 text-[15px] font-medium tracking-[-0.03em] transition ${
+      className={`inline-flex h-[60px] items-center justify-center gap-3 rounded-full border px-6 text-[15px] font-medium tracking-[-0.03em] transition ${
         active
-          ? "border-slate-300 bg-white text-slate-950 shadow-[0_12px_30px_-22px_rgba(15,23,42,.28)]"
-          : "border-slate-200 bg-white/86 text-slate-700 hover:border-slate-300 hover:bg-white"
+          ? "border-slate-300 bg-white text-slate-950 shadow-[0_14px_30px_-22px_rgba(15,23,42,.26)]"
+          : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-white"
       }`}
     >
       <img
         src={source.icon}
         alt={source.label}
-        className="h-[20px] w-[20px] object-contain"
+        className="h-[22px] w-[22px] object-contain"
       />
       <span>{source.label}</span>
-      {active ? <span className="h-2 w-2 rounded-full bg-slate-900" /> : null}
+      {active ? <Check className="h-[15px] w-[15px] text-slate-900" /> : null}
     </button>
   );
 }
@@ -302,7 +298,7 @@ function SourceModal({
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 18, scale: 0.985 }}
         transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-        className="relative z-10 w-full max-w-[560px] rounded-[30px] border border-white/80 bg-[rgba(250,250,250,.96)] p-6 shadow-[0_28px_70px_-34px_rgba(15,23,42,.24)] sm:p-7"
+        className="relative z-10 w-full max-w-[560px] rounded-[30px] border border-white/80 bg-[rgba(250,250,250,.98)] p-6 shadow-[0_28px_70px_-34px_rgba(15,23,42,.24)] sm:p-7"
       >
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-4">
@@ -315,12 +311,9 @@ function SourceModal({
             </span>
 
             <div>
-              <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                Source
-              </div>
               <h3
                 style={DISPLAY_FONT_STYLE}
-                className="mt-2 text-[28px] font-semibold leading-[1.02] tracking-[-0.05em] text-slate-950"
+                className="text-[28px] font-semibold leading-[1.02] tracking-[-0.05em] text-slate-950"
               >
                 {source.title}
               </h3>
@@ -367,7 +360,7 @@ function SourceModal({
                 onClick={onRemove}
                 className="inline-flex h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-5 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-950"
               >
-                Remove source
+                Remove
               </button>
             ) : null}
 
@@ -642,8 +635,8 @@ export default function SetupStudioEntryStage({
   return (
     <>
       <section className="relative min-h-screen w-full overflow-hidden bg-transparent">
-        <div className="relative z-10 flex min-h-screen items-start justify-center px-4 pb-10 pt-[76px] sm:px-6 lg:px-8">
-          <div className="w-full max-w-[1180px]">
+        <div className="relative z-10 flex min-h-screen items-start justify-center px-4 pb-10 pt-[82px] sm:px-6 lg:px-8">
+          <div className="w-full max-w-[1160px]">
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -654,15 +647,14 @@ export default function SetupStudioEntryStage({
 
               <h1
                 style={DISPLAY_FONT_STYLE}
-                className="mx-auto mt-6 max-w-[980px] text-center text-[34px] font-semibold leading-[1.12] tracking-[-0.06em] text-slate-950 sm:text-[40px] lg:text-[48px]"
+                className="mx-auto mt-7 max-w-[980px] text-center text-[36px] font-semibold leading-[1.08] tracking-[-0.07em] text-slate-950 sm:text-[44px] lg:text-[56px]"
               >
-                Start with one reliable source, or explain the business in your own words
+                One signal in.
+                <br className="hidden sm:block" /> A business draft out.
               </h1>
 
-              <p className="mx-auto mt-4 max-w-[760px] text-[15px] leading-7 tracking-[-0.02em] text-slate-500 sm:text-[16px]">
-                Website works best. Google Maps, Instagram and Facebook can add
-                supporting context. You can also speak naturally and we will turn it
-                into a draft.
+              <p className="mx-auto mt-5 max-w-[620px] text-[15px] leading-7 tracking-[-0.02em] text-slate-500 sm:text-[16px]">
+                Start with a website, Maps, Instagram, Facebook or voice.
               </p>
             </motion.div>
 
@@ -672,13 +664,13 @@ export default function SetupStudioEntryStage({
               transition={{ duration: 0.24, delay: 0.04 }}
               className="relative mx-auto mt-10 w-full max-w-[1020px]"
             >
-              <div className="relative overflow-hidden rounded-[32px] border border-[rgba(17,24,39,.10)] bg-[rgba(250,250,250,.96)] shadow-[0_20px_44px_-30px_rgba(15,23,42,.16)]">
+              <div className="relative overflow-hidden rounded-[32px] border border-[rgba(17,24,39,.09)] bg-[rgba(250,250,250,.98)] shadow-[0_20px_44px_-30px_rgba(15,23,42,.14)]">
                 <textarea
                   ref={textareaRef}
                   value={composerValue}
                   onChange={(e) => handleComposerChange(e.target.value)}
                   rows={5}
-                  placeholder="Paste a website, add a Maps source, or describe what the business does, who it serves, and where it operates."
+                  placeholder="Paste a website, or briefly say what the business does."
                   className="min-h-[178px] w-full resize-none border-0 bg-transparent px-[24px] pt-[22px] text-[16px] font-normal leading-7 tracking-[-0.03em] text-slate-900 outline-none shadow-none placeholder:text-[rgba(100,116,139,.88)] focus:ring-0 sm:text-[17px]"
                 />
 
@@ -699,15 +691,15 @@ export default function SetupStudioEntryStage({
                         ) : (
                           <Mic className="h-[16px] w-[16px]" />
                         )}
-                        {isListening ? "Listening..." : "Speak instead"}
+                        {isListening ? "Listening..." : "Use voice"}
                       </button>
 
                       <div className="text-[13px] text-slate-500">
                         {isListening
-                          ? "Say what you sell, who you help, and where you operate."
+                          ? "Say what you do, who it is for, and where you operate."
                           : speechSupported
-                          ? "Use voice if explaining the business is easier than typing."
-                          : "Voice input works in supported browsers like Chrome or Edge."}
+                          ? "Talk naturally for 10–20 seconds."
+                          : "Voice works in supported browsers."}
                       </div>
                     </div>
 
@@ -731,7 +723,7 @@ export default function SetupStudioEntryStage({
                 </div>
               </div>
 
-              <div className="mx-auto mt-8 flex max-w-[920px] flex-wrap items-center justify-center gap-4">
+              <div className="mx-auto mt-9 flex max-w-[920px] flex-wrap items-center justify-center gap-4">
                 {VISIBLE_SOURCE_KEYS.map((key) => {
                   const source = sourceByKey(key);
                   if (!source) return null;
