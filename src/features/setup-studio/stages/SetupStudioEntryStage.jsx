@@ -1,47 +1,252 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { flushSync } from "react-dom";
 import { motion } from "framer-motion";
-import { ArrowRight, Globe2, PencilLine } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 function s(v) {
-  return String(v ?? "").trim();
+  return String(v ?? "").replace(/\u00a0/g, " ").trim();
 }
 
-const SOURCE_TYPES = [
-  {
-    key: "website",
-    label: "Website",
-    placeholder: "yourbusiness.com",
-    hint: "Best first pass for services, contact details, and business summary.",
-  },
-  {
-    key: "instagram",
-    label: "Instagram",
-    placeholder: "@yourbrand",
-    hint: "Useful for brand tone, social proof, and visual context.",
-  },
-  {
-    key: "linkedin",
-    label: "LinkedIn",
-    placeholder: "linkedin.com/company/yourbrand",
-    hint: "Useful for company identity, trust, and positioning.",
-  },
-  {
-    key: "google_maps",
-    label: "Google Maps",
-    placeholder: "Business name or maps link",
-    hint: "Helpful when the business is location-first.",
-  },
+function lines(v = "") {
+  return s(v)
+    .split(/\n+/)
+    .map((item) => s(item))
+    .filter(Boolean);
+}
+
+function stripLabel(v = "") {
+  return s(v).replace(
+    /^(website|site|url|link|source|google maps|maps|instagram|linkedin)\s*:\s*/i,
+    ""
+  );
+}
+
+function looksLikeWebsite(v = "") {
+  const x = s(v);
+  if (!x) return false;
+  if (/\s/.test(x) && !/^https?:\/\//i.test(x)) return false;
+
+  return /^(https?:\/\/)?(www\.)?[a-z0-9-]+(\.[a-z0-9-]+)+(\/[^\s]*)?$/i.test(x);
+}
+
+function detectInlineSource(raw = "") {
+  const text = s(raw);
+  if (!text) return null;
+
+  const patterns = [
+    {
+      type: "instagram",
+      regex:
+        /(?:https?:\/\/)?(?:www\.)?instagram\.com\/[^\s,]+|(^|[\s(])@[a-z0-9._]{2,}\b/i,
+      normalize(match) {
+        return s(match).replace(/^[\s(]+/, "");
+      },
+    },
+    {
+      type: "linkedin",
+      regex: /(?:https?:\/\/)?(?:www\.)?linkedin\.com\/[^\s,]+/i,
+    },
+    {
+      type: "google_maps",
+      regex:
+        /(?:https?:\/\/)?(?:www\.)?(?:maps\.app\.goo\.gl|maps\.google\.[^\s/]+|goo\.gl\/maps)\/?[^\s,]*|google maps/i,
+    },
+    {
+      type: "website",
+      regex:
+        /(?:https?:\/\/)?(?:www\.)?[a-z0-9-]+(?:\.[a-z0-9-]+)+(?:\/[^\s,]*)?/i,
+    },
+  ];
+
+  for (const item of patterns) {
+    const match = text.match(item.regex);
+    if (!match) continue;
+
+    const value = s(
+      typeof item.normalize === "function" ? item.normalize(match[0]) : match[0]
+    );
+
+    if (!value) continue;
+
+    if (item.type === "website" && /@/.test(value)) continue;
+
+    return {
+      sourceType: item.type,
+      sourceValue: value,
+      fullMatch: match[0],
+    };
+  }
+
+  return null;
+}
+
+function detectLineSourceType(v = "") {
+  const x = stripLabel(v);
+
+  if (!x) return "";
+  if (
+    /(?:https?:\/\/)?(?:www\.)?instagram\.com\/[^\s,]+/i.test(x) ||
+    (/^@[a-z0-9._]{2,}$/i.test(x) && !/@.+\./i.test(x))
+  ) {
+    return "instagram";
+  }
+
+  if (/(?:https?:\/\/)?(?:www\.)?linkedin\.com\/[^\s,]+/i.test(x)) {
+    return "linkedin";
+  }
+
+  if (
+    /(?:https?:\/\/)?(?:www\.)?(?:maps\.app\.goo\.gl|maps\.google\.[^\s/]+|goo\.gl\/maps)\/?[^\s,]*/i.test(
+      x
+    ) ||
+    /^google maps$/i.test(x)
+  ) {
+    return "google_maps";
+  }
+
+  if (looksLikeWebsite(x)) {
+    return "website";
+  }
+
+  return "";
+}
+
+function buildInitialComposer({ discoveryForm = {}, businessForm = {} }) {
+  const source = s(
+    discoveryForm?.sourceValue ||
+      discoveryForm?.websiteUrl ||
+      businessForm?.websiteUrl
+  );
+  const note = s(discoveryForm?.note || businessForm?.description);
+
+  return [source, note].filter(Boolean).join("\n\n");
+}
+
+function buildInitialMode({ discoveryForm = {} }) {
+  const sourceType = s(discoveryForm?.sourceType).toLowerCase();
+
+  if (
+    ["website", "google_maps", "instagram", "linkedin", "auto"].includes(
+      sourceType
+    )
+  ) {
+    return sourceType;
+  }
+
+  return "auto";
+}
+
+function buildInterpretation(raw = "", preferredMode = "auto") {
+  const text = s(raw);
+
+  if (!text) {
+    return {
+      sourceType: "",
+      sourceValue: "",
+      websiteUrl: "",
+      note: "",
+      description: "",
+      summary: "Add a source or describe the business to begin.",
+    };
+  }
+
+  const cleanLines = lines(text).map(stripLabel);
+
+  if (preferredMode !== "auto") {
+    const firstLine = s(cleanLines[0]);
+    const rest = cleanLines.slice(1).join("\n\n").trim();
+
+    if (firstLine) {
+      return {
+        sourceType: preferredMode,
+        sourceValue: firstLine,
+        websiteUrl: preferredMode === "website" ? firstLine : "",
+        note: rest,
+        description: rest,
+        summary: rest
+          ? `Will use ${sourceLabel(preferredMode)} + your note.`
+          : `Will use ${sourceLabel(preferredMode)} only.`,
+      };
+    }
+  }
+
+  const firstLine = s(cleanLines[0]);
+  const firstLineSourceType = detectLineSourceType(firstLine);
+
+  if (firstLineSourceType) {
+    const rest = cleanLines.slice(1).join("\n\n").trim();
+    return {
+      sourceType: firstLineSourceType,
+      sourceValue: firstLine,
+      websiteUrl: firstLineSourceType === "website" ? firstLine : "",
+      note: rest,
+      description: rest,
+      summary: rest
+        ? `Will scan ${sourceLabel(firstLineSourceType)} + use your note.`
+        : `Will scan ${sourceLabel(firstLineSourceType)} only.`,
+    };
+  }
+
+  const inlineSource = detectInlineSource(text);
+
+  if (inlineSource?.sourceValue) {
+    const sourceValue = s(inlineSource.sourceValue);
+    const note = s(
+      text
+        .replace(inlineSource.fullMatch, " ")
+        .replace(/^[,;:\-\s]+/, "")
+        .replace(/\s{2,}/g, " ")
+    );
+
+    return {
+      sourceType: inlineSource.sourceType,
+      sourceValue,
+      websiteUrl: inlineSource.sourceType === "website" ? sourceValue : "",
+      note,
+      description: note,
+      summary: note
+        ? `Will scan ${sourceLabel(inlineSource.sourceType)} + use your note.`
+        : `Will scan ${sourceLabel(inlineSource.sourceType)} only.`,
+    };
+  }
+
+  return {
+    sourceType: "",
+    sourceValue: "",
+    websiteUrl: "",
+    note: text,
+    description: text,
+    summary: "Will build the first draft from your description only.",
+  };
+}
+
+function sourceLabel(type = "") {
+  const x = s(type).toLowerCase();
+
+  if (x === "website") return "website";
+  if (x === "google_maps") return "Google Maps";
+  if (x === "instagram") return "Instagram";
+  if (x === "linkedin") return "LinkedIn";
+  return "your input";
+}
+
+const MODE_OPTIONS = [
+  { key: "auto", label: "Auto detect" },
+  { key: "website", label: "Website" },
+  { key: "google_maps", label: "Google Maps" },
+  { key: "instagram", label: "Instagram" },
+  { key: "linkedin", label: "LinkedIn" },
 ];
 
-function SourcePill({ active, children, onClick }) {
+function ModePill({ active, children, onClick }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-full px-3 py-2 text-sm transition ${
+      className={`rounded-full px-3.5 py-2 text-[12px] font-medium transition ${
         active
-          ? "bg-slate-950 text-white"
-          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+          ? "border border-slate-900 bg-slate-900 text-white shadow-[0_12px_30px_rgba(15,23,42,.14)]"
+          : "border border-white/70 bg-white/80 text-slate-600 hover:border-slate-300 hover:bg-white hover:text-slate-950"
       }`}
     >
       {children}
@@ -49,61 +254,11 @@ function SourcePill({ active, children, onClick }) {
   );
 }
 
-function SectionCard({ icon: Icon, title, body, children }) {
+function SignalPill({ children }) {
   return (
-    <div className="rounded-[30px] border border-slate-200 bg-white p-6 sm:p-7">
-      <div className="flex items-start gap-4">
-        <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-700">
-          <Icon className="h-5 w-5" />
-        </span>
-
-        <div>
-          <div className="text-[22px] font-semibold tracking-[-0.03em] text-slate-950">
-            {title}
-          </div>
-          <div className="mt-2 text-sm leading-6 text-slate-600">{body}</div>
-        </div>
-      </div>
-
-      <div className="mt-6">{children}</div>
+    <div className="rounded-full border border-slate-200/90 bg-white/80 px-3.5 py-2 text-[12px] font-medium text-slate-600 shadow-[0_8px_24px_rgba(15,23,42,.05)]">
+      {children}
     </div>
-  );
-}
-
-function Input({ value, onChange, placeholder, type = "text" }) {
-  return (
-    <input
-      type={type}
-      value={value}
-      onChange={onChange}
-      placeholder={placeholder}
-      className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-[16px] text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-slate-300"
-    />
-  );
-}
-
-function Textarea({ value, onChange, placeholder, rows = 4, className = "" }) {
-  return (
-    <textarea
-      value={value}
-      onChange={onChange}
-      placeholder={placeholder}
-      rows={rows}
-      className={`w-full resize-none rounded-[24px] border border-slate-200 bg-white px-4 py-4 text-[15px] leading-7 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-slate-300 ${className}`}
-    />
-  );
-}
-
-function PrimaryButton({ disabled, loading, children, onClick }) {
-  return (
-    <button
-      type="button"
-      disabled={disabled || loading}
-      onClick={onClick}
-      className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-slate-950 px-5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
-    >
-      {loading ? "Analyzing..." : children}
-    </button>
   );
 }
 
@@ -117,224 +272,174 @@ export default function SetupStudioEntryStage({
   onSetDiscoveryField,
   onContinueFlow,
 }) {
-  const sourceType = s(discoveryForm?.sourceType || "website");
-  const sourceValue = s(discoveryForm?.sourceValue || discoveryForm?.websiteUrl || "");
-  const operatorNote = s(discoveryForm?.note || "");
+  const [inputMode, setInputMode] = useState(
+    buildInitialMode({ discoveryForm })
+  );
+  const [composerValue, setComposerValue] = useState(
+    buildInitialComposer({ discoveryForm, businessForm })
+  );
 
-  const activeSource =
-    SOURCE_TYPES.find((item) => item.key === sourceType) || SOURCE_TYPES[0];
+  const interpretation = useMemo(() => {
+    return buildInterpretation(composerValue, inputMode);
+  }, [composerValue, inputMode]);
 
-  const hasSource = !!sourceValue;
-  const hasManualInput = useMemo(() => {
-    return !!(
-      s(businessForm?.companyName) ||
-      s(businessForm?.description) ||
-      s(businessForm?.primaryPhone) ||
-      s(businessForm?.primaryEmail) ||
-      s(businessForm?.primaryAddress) ||
-      s(manualSections?.servicesText) ||
-      s(manualSections?.faqsText) ||
-      s(manualSections?.policiesText)
-    );
-  }, [businessForm, manualSections]);
+  const canContinue = !!s(composerValue);
 
-  const canContinue = hasSource || hasManualInput;
+  function syncState(nextText, nextMode) {
+    const next = buildInterpretation(nextText, nextMode);
 
-  function handleSourceTypeChange(nextType) {
-    onSetDiscoveryField?.("sourceType", nextType);
+    onSetDiscoveryField?.("sourceType", next.sourceType || "");
+    onSetDiscoveryField?.("sourceValue", next.sourceValue || "");
+    onSetDiscoveryField?.("websiteUrl", next.websiteUrl || "");
+    onSetDiscoveryField?.("note", next.note || "");
 
-    if (nextType !== "website" && s(discoveryForm?.websiteUrl)) {
-      onSetDiscoveryField?.("websiteUrl", "");
-    }
+    onSetBusinessField?.("companyName", "");
+    onSetBusinessField?.("websiteUrl", next.websiteUrl || "");
+    onSetBusinessField?.("primaryPhone", "");
+    onSetBusinessField?.("primaryEmail", "");
+    onSetBusinessField?.("primaryAddress", "");
+    onSetBusinessField?.("timezone", "");
+    onSetBusinessField?.("language", "");
+    onSetBusinessField?.("description", next.description || "");
+
+    onSetManualSection?.("servicesText", "");
+    onSetManualSection?.("faqsText", "");
+    onSetManualSection?.("policiesText", "");
   }
 
-  function handleSourceValueChange(nextValue) {
-    onSetDiscoveryField?.("sourceValue", nextValue);
+  function handleComposerChange(nextText) {
+    setComposerValue(nextText);
+    syncState(nextText, inputMode);
+  }
 
-    if (sourceType === "website") {
-      onSetDiscoveryField?.("websiteUrl", nextValue);
-    }
+  function handleModeChange(nextMode) {
+    setInputMode(nextMode);
+    syncState(composerValue, nextMode);
   }
 
   function handleContinue() {
+    flushSync(() => {
+      syncState(composerValue, inputMode);
+    });
+
     onContinueFlow?.();
   }
 
   return (
-    <section className="w-full py-4 sm:py-6">
-      <div className="max-w-[820px]">
-        <div className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
-          Setup studio
-        </div>
-
-        <h1 className="mt-5 text-[36px] font-semibold leading-[0.98] tracking-[-0.06em] text-slate-950 sm:text-[48px] lg:text-[56px]">
-          Build the first business draft.
-        </h1>
-
-        <p className="mt-4 max-w-[700px] text-[15px] leading-7 text-slate-600 sm:text-[16px]">
-          Add a source if you have one. Then write anything important the system
-          should know. The final draft will be generated from both.
-        </p>
-      </div>
-
-      <div className="mt-10 grid gap-4 xl:grid-cols-[1.02fr_.98fr]">
+    <section className="w-full py-2 sm:py-4">
+      <div className="mx-auto max-w-[1100px]">
         <motion.div
-          initial={{ opacity: 0, y: 8 }}
+          initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.18 }}
+          transition={{ duration: 0.22 }}
+          className="max-w-[760px]"
         >
-          <SectionCard
-            icon={Globe2}
-            title="1. Add a business source"
-            body="Website is best, but Instagram, LinkedIn, or Google Maps can also help. This step is optional if the business has no source yet."
-          >
-            <div className="flex flex-wrap gap-2">
-              {SOURCE_TYPES.map((item) => (
-                <SourcePill
-                  key={item.key}
-                  active={item.key === sourceType}
-                  onClick={() => handleSourceTypeChange(item.key)}
-                >
-                  {item.label}
-                </SourcePill>
-              ))}
-            </div>
+          <div className="inline-flex items-center rounded-full border border-white/70 bg-white/80 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 shadow-[0_10px_30px_rgba(15,23,42,.05)]">
+            Ready to scan
+          </div>
 
-            <div className="mt-6">
-              <Input
-                value={sourceValue}
-                onChange={(e) => handleSourceValueChange(e.target.value)}
-                placeholder={activeSource.placeholder}
-              />
-            </div>
+          <h1 className="mt-6 text-[40px] font-semibold leading-[0.94] tracking-[-0.07em] text-slate-950 sm:text-[54px] lg:text-[68px]">
+            Build the first
+            <span className="bg-gradient-to-r from-slate-950 via-slate-700 to-slate-500 bg-clip-text text-transparent">
+              {" "}
+              business draft.
+            </span>
+          </h1>
 
-            <p className="mt-4 text-sm leading-6 text-slate-500">
-              {activeSource.hint}
-            </p>
-
-            <div className="mt-6">
-              <Textarea
-                value={operatorNote}
-                onChange={(e) => onSetDiscoveryField?.("note", e.target.value)}
-                placeholder="Optional note for extra context. Example: We mostly work with restaurant owners in Baku."
-                rows={4}
-              />
-            </div>
-          </SectionCard>
+          <p className="mt-5 max-w-[700px] text-[15px] leading-7 text-slate-600 sm:text-[17px]">
+            Paste a website, Maps, Instagram, or LinkedIn link — or just
+            describe the business in your own language. The system will build
+            the first draft and ask only for what is still missing.
+          </p>
         </motion.div>
 
         <motion.div
-          initial={{ opacity: 0, y: 8 }}
+          initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.18, delay: 0.04 }}
+          transition={{ duration: 0.24, delay: 0.04 }}
+          className="relative mt-10 overflow-hidden rounded-[34px] border border-white/75 bg-white/78 shadow-[0_28px_80px_rgba(15,23,42,.10)] backdrop-blur-xl"
         >
-          <SectionCard
-            icon={PencilLine}
-            title="2. Add what the source may miss"
-            body="Use this for business description, contact details, services, FAQs, or anything else you want the first draft to include."
-          >
-            <div className="grid gap-4">
-              <Input
-                value={s(businessForm?.companyName)}
-                onChange={(e) =>
-                  onSetBusinessField?.("companyName", e.target.value)
-                }
-                placeholder="Business name"
-              />
+          <div className="pointer-events-none absolute inset-0">
+            <div className="absolute -right-10 -top-10 h-56 w-56 rounded-full bg-[radial-gradient(circle,_rgba(255,168,76,.26)_0%,_rgba(255,168,76,0)_68%)] blur-2xl" />
+            <div className="absolute right-[14%] top-[8%] h-64 w-64 rounded-full bg-[radial-gradient(circle,_rgba(170,120,255,.18)_0%,_rgba(170,120,255,0)_72%)] blur-3xl" />
+            <div className="absolute left-[10%] top-[18%] h-40 w-40 rounded-full bg-[radial-gradient(circle,_rgba(116,181,255,.16)_0%,_rgba(116,181,255,0)_70%)] blur-2xl" />
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent opacity-80" />
+          </div>
 
-              <Textarea
-                value={s(businessForm?.description)}
-                onChange={(e) =>
-                  onSetBusinessField?.("description", e.target.value)
-                }
-                placeholder="Describe what the business does."
-                rows={5}
-                className="min-h-[150px]"
-              />
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Input
-                  value={s(businessForm?.primaryPhone)}
-                  onChange={(e) =>
-                    onSetBusinessField?.("primaryPhone", e.target.value)
-                  }
-                  placeholder="Phone"
-                />
-
-                <Input
-                  value={s(businessForm?.primaryEmail)}
-                  onChange={(e) =>
-                    onSetBusinessField?.("primaryEmail", e.target.value)
-                  }
-                  placeholder="Email"
-                  type="email"
-                />
+          <div className="relative z-10 p-5 sm:p-7 lg:p-8">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                  Start with anything
+                </div>
+                <div className="mt-2 text-[22px] font-semibold tracking-[-0.04em] text-slate-950 sm:text-[28px]">
+                  One input. The system does the structuring.
+                </div>
               </div>
 
-              <Input
-                value={s(businessForm?.primaryAddress)}
-                onChange={(e) =>
-                  onSetBusinessField?.("primaryAddress", e.target.value)
-                }
-                placeholder="Address"
-              />
-
-              <Textarea
-                value={s(manualSections?.servicesText)}
-                onChange={(e) =>
-                  onSetManualSection?.("servicesText", e.target.value)
-                }
-                placeholder="Services or products. One per line or comma separated."
-                rows={4}
-              />
-
-              <Textarea
-                value={s(manualSections?.faqsText)}
-                onChange={(e) =>
-                  onSetManualSection?.("faqsText", e.target.value)
-                }
-                placeholder="FAQs. Example:&#10;Q: Do you offer delivery?&#10;A: Yes, across Baku."
-                rows={4}
-              />
-
-              <Textarea
-                value={s(manualSections?.policiesText)}
-                onChange={(e) =>
-                  onSetManualSection?.("policiesText", e.target.value)
-                }
-                placeholder="Policies, pricing notes, booking rules, working hours, or other important details."
-                rows={4}
-              />
+              <div className="flex flex-wrap gap-2">
+                {MODE_OPTIONS.map((item) => (
+                  <ModePill
+                    key={item.key}
+                    active={item.key === inputMode}
+                    onClick={() => handleModeChange(item.key)}
+                  >
+                    {item.label}
+                  </ModePill>
+                ))}
+              </div>
             </div>
-          </SectionCard>
+
+            <div className="mt-6 overflow-hidden rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,.92),rgba(248,250,252,.84))] shadow-[inset_0_1px_0_rgba(255,255,255,.9),0_16px_40px_rgba(15,23,42,.06)]">
+              <textarea
+                value={composerValue}
+                onChange={(e) => handleComposerChange(e.target.value)}
+                rows={8}
+                placeholder={`Paste a source or describe the business...
+
+Examples:
+saytpro.az
+
+Google Maps:
+ABB Xırdalan filialı
+
+Or just write naturally:
+Bakıda xidmət göstərən kişi salonuyuq. Əsasən saç kəsimi, saqqal forması və boyama edirik. Müştərilər əsasən şəhər içindən gəlir.`}
+                className="min-h-[280px] w-full resize-none border-0 bg-transparent px-5 py-5 text-[16px] leading-8 text-slate-950 outline-none placeholder:text-slate-400 focus:ring-0 sm:px-6 sm:py-6 sm:text-[17px]"
+              />
+
+              <div className="flex flex-col gap-4 border-t border-slate-200/80 px-5 py-4 sm:px-6 sm:py-5 lg:flex-row lg:items-end lg:justify-between">
+                <div className="min-w-0">
+                  <div className="text-[13px] font-medium text-slate-700">
+                    {interpretation.summary}
+                  </div>
+                  <div className="mt-2 text-sm leading-6 text-slate-500">
+                    You can write in Azerbaijani, English, Turkish, Russian, or
+                    any language you prefer.
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={!canContinue || importingWebsite}
+                  onClick={handleContinue}
+                  className="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-slate-950 px-5 text-sm font-medium text-white shadow-[0_16px_34px_rgba(15,23,42,.16)] transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {importingWebsite ? "Building draft..." : "Build draft"}
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-5 flex flex-wrap gap-2.5">
+              <SignalPill>Name & positioning</SignalPill>
+              <SignalPill>Contacts & address</SignalPill>
+              <SignalPill>Services & FAQs</SignalPill>
+              <SignalPill>Review before launch</SignalPill>
+            </div>
+          </div>
         </motion.div>
       </div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.18, delay: 0.08 }}
-        className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-[30px] border border-slate-200 bg-white px-6 py-5"
-      >
-        <div className="text-sm leading-6 text-slate-600">
-          {hasSource && hasManualInput
-            ? "Source + manual context will be analyzed together."
-            : hasSource
-              ? "Only the source will be analyzed."
-              : hasManualInput
-                ? "Only your manual input will be analyzed."
-                : "Add a source, manual details, or both."}
-        </div>
-
-        <PrimaryButton
-          disabled={!canContinue}
-          loading={importingWebsite}
-          onClick={handleContinue}
-        >
-          Analyze business
-          <ArrowRight className="h-4 w-4" />
-        </PrimaryButton>
-      </motion.div>
     </section>
   );
 }
