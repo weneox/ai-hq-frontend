@@ -1,13 +1,11 @@
 import {
   AlertTriangle,
-  BadgeCheck,
-  ChevronRight,
-  FileSearch,
-  Sparkles,
+  ArrowRight,
+  Check,
+  ExternalLink,
+  X,
 } from "lucide-react";
 import SetupStudioStageShell from "../components/SetupStudioStageShell.jsx";
-import { GhostButton } from "../components/SetupStudioUi.jsx";
-import SetupStudioKnowledgeLine from "../components/SetupStudioKnowledgeLine.jsx";
 
 function s(v, d = "") {
   return String(v ?? d).trim();
@@ -28,19 +26,7 @@ function n(v, d = 0) {
 
 function humanConfidence(item = {}) {
   const x = obj(item);
-
-  const label = s(
-    x.confidenceLabel ||
-      x.confidence_label ||
-      x.confidenceText ||
-      x.confidence_text
-  );
-  if (label) return label;
-
-  const raw = x.confidence;
-  const value = typeof raw === "number" ? raw : Number(raw);
-
-  if (!Number.isFinite(value)) return "";
+  const value = typeof x.confidence === "number" ? x.confidence : Number(x.confidence || 0);
 
   if (value >= 0.85) return "high";
   if (value >= 0.6) return "medium";
@@ -83,9 +69,8 @@ function normalizeKnowledgeItem(item = {}, index = 0) {
 
   return {
     ...x,
-    id: s(x.id || x.candidateId || x.candidate_id || x.key || x.title),
-    candidateId: s(x.candidateId || x.candidate_id || x.id),
-    index: String(index + 1).padStart(2, "0"),
+    id: s(x.id || x.candidateId || x.candidate_id || x.key || x.title || `knowledge-${index + 1}`),
+    candidateId: s(x.candidateId || x.candidate_id || x.id || `knowledge-${index + 1}`),
     title: s(x.title || x.label || x.key || "Untitled item"),
     value: s(
       x.value ||
@@ -95,16 +80,7 @@ function normalizeKnowledgeItem(item = {}, index = 0) {
         x.normalized_text ||
         x.description
     ),
-    valueText: s(
-      x.valueText ||
-        x.value_text ||
-        x.value ||
-        x.normalizedText ||
-        x.normalized_text ||
-        x.description
-    ),
     category: s(x.category || "general"),
-    status: s(x.status || "pending"),
     source: s(
       x.source ||
         x.sourceLabel ||
@@ -113,11 +89,7 @@ function normalizeKnowledgeItem(item = {}, index = 0) {
         x.sourceType ||
         x.source_type
     ),
-    sourceType: s(x.sourceType || x.source_type),
-    confidence:
-      typeof x.confidence === "number"
-        ? x.confidence
-        : Number(x.confidence || 0) || 0,
+    confidence: n(x.confidence, 0),
     confidenceLabel: humanConfidence(x),
     evidence,
     evidenceUrl: pickEvidenceUrl(x, evidence),
@@ -149,6 +121,23 @@ function humanizeWarning(value = "") {
   return s(value).replaceAll("_", " ");
 }
 
+function ActionButton({ active = false, icon: Icon, children, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex h-11 items-center justify-center gap-2 rounded-full px-4 text-sm font-medium transition ${
+        active
+          ? "bg-slate-950 text-white hover:bg-slate-800"
+          : "border border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:text-slate-950"
+      }`}
+    >
+      <Icon className="h-4 w-4" />
+      {children}
+    </button>
+  );
+}
+
 export default function SetupStudioKnowledgeStage({
   knowledgePreview,
   knowledgeItems = [],
@@ -167,201 +156,180 @@ export default function SetupStudioKnowledgeStage({
   const items = mergedSource
     .map((item, index) => normalizeKnowledgeItem(item, index))
     .filter((item) => item.id || item.title || item.value)
-    .slice(0, 5);
+    .slice(0, 6);
 
   const warningList = arr(warnings).map((x) => s(x)).filter(Boolean);
 
-  const categoryCounts = items.reduce((acc, item) => {
-    const key = s(item.category || "general").toLowerCase() || "general";
-    acc[key] = (acc[key] || 0) + 1;
-    return acc;
-  }, {});
-
-  const categoryBadges = Object.entries(categoryCounts).slice(0, 4);
-
   const avgConfidence = items.length
     ? Math.round(
-        (items.reduce((sum, item) => sum + n(item.confidence, 0), 0) /
-          items.length) *
-          100
+        (items.reduce((sum, item) => sum + n(item.confidence, 0), 0) / items.length) * 100
       )
     : 0;
 
-  const highConfidenceCount = items.filter((item) => n(item.confidence, 0) >= 0.85).length;
-
   return (
     <SetupStudioStageShell
-      eyebrow="build draft"
-      title={
-        <>
-          Review what AI should
-          <br />
-          remember from the source.
-        </>
-      }
-      body="This stage shows the knowledge signals worth keeping. Approve what should shape runtime behavior, reject the noise, and keep the business draft clean."
+      eyebrow="knowledge"
+      title="Keep only what should shape runtime."
+      body="Approve the useful signals. Reject generic or noisy items. The goal is a clean business memory, not a long list."
     >
-      <div className="mx-auto max-w-[1120px] space-y-6">
-        {(sourceLabel || warningList.length || items.length) ? (
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.12fr)_360px]">
-            <div className="overflow-hidden rounded-[28px] border border-white/70 bg-white/84 shadow-[0_20px_60px_rgba(15,23,42,.07)] backdrop-blur-xl">
-              <div className="border-b border-slate-200/70 px-5 py-4.5">
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500 shadow-sm">
-                    <FileSearch className="h-3.5 w-3.5" />
-                    knowledge review
-                  </span>
+      <div className="space-y-6">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
+          <div className="rounded-[30px] border border-slate-200 bg-white p-6">
+            <div className="flex flex-wrap items-center gap-2">
+              {sourceLabel ? (
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  {sourceLabel}
+                </span>
+              ) : null}
 
-                  {sourceLabel ? (
-                    <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-600">
-                      <Sparkles className="h-3.5 w-3.5" />
-                      {sourceLabel}
-                    </span>
-                  ) : null}
-
-                  <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-600">
-                    {items.length} visible item{items.length === 1 ? "" : "s"}
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-4 px-5 py-5">
-                <div className="text-sm leading-7 text-slate-600">
-                  The system prepared these knowledge candidates from the source.
-                  Keep what should influence replies and review behavior, and leave
-                  out anything weak, noisy, or overly generic.
-                </div>
-
-                {categoryBadges.length ? (
-                  <div className="flex flex-wrap gap-2">
-                    {categoryBadges.map(([key, count]) => (
-                      <span
-                        key={key}
-                        className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-700"
-                      >
-                        {groupLabel(key)} · {count}
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
-
-                {warningList.length ? (
-                  <div className="flex items-start gap-3 rounded-[22px] border border-amber-200 bg-amber-50 px-4 py-3.5 text-sm text-amber-800">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                    <span>{humanizeWarning(warningList[0])}</span>
-                  </div>
-                ) : null}
-              </div>
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                {items.length} visible items
+              </span>
             </div>
 
-            <div className="overflow-hidden rounded-[28px] border border-white/70 bg-white/84 shadow-[0_20px_60px_rgba(15,23,42,.07)] backdrop-blur-xl">
-              <div className="border-b border-slate-200/70 px-5 py-4.5">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">
-                  Signal quality
+            <p className="mt-5 text-[15px] leading-7 text-slate-600">
+              Review the strongest candidates only. Weak memory here will hurt
+              downstream replies.
+            </p>
+
+            {warningList.length ? (
+              <div className="mt-5 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3.5 text-sm text-amber-800">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{humanizeWarning(warningList[0])}</span>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="rounded-[30px] border border-slate-200 bg-white p-6">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">
+              Quality
+            </div>
+
+            <div className="mt-5 grid gap-3">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                  Preview
+                </div>
+                <div className="mt-2 text-[28px] font-semibold tracking-[-0.04em] text-slate-950">
+                  {items.length}
                 </div>
               </div>
 
-              <div className="grid gap-3 px-5 py-5">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-[22px] border border-slate-200/80 bg-slate-50/72 px-4 py-4">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                      Preview
-                    </div>
-                    <div className="mt-2 text-[28px] font-semibold tracking-[-0.04em] text-slate-950">
-                      {items.length}
-                    </div>
-                  </div>
-
-                  <div className="rounded-[22px] border border-slate-200/80 bg-slate-50/72 px-4 py-4">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                      Avg confidence
-                    </div>
-                    <div className="mt-2 text-[28px] font-semibold tracking-[-0.04em] text-slate-950">
-                      {avgConfidence}%
-                    </div>
-                  </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                  Avg confidence
                 </div>
-
-                <div className="rounded-[22px] border border-slate-200/80 bg-slate-50/72 px-4 py-4">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                    High-confidence items
-                  </div>
-                  <div className="mt-2 text-[28px] font-semibold tracking-[-0.04em] text-slate-950">
-                    {highConfidenceCount}
-                  </div>
+                <div className="mt-2 text-[28px] font-semibold tracking-[-0.04em] text-slate-950">
+                  {avgConfidence}%
                 </div>
               </div>
             </div>
           </div>
-        ) : null}
+        </div>
 
         {items.length ? (
-          <div className="overflow-hidden rounded-[30px] border border-white/70 bg-white/82 shadow-[0_24px_70px_rgba(15,23,42,.08)] backdrop-blur-xl">
-            <div className="border-b border-slate-200/70 px-5 py-4.5">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">
-                    Candidate memory
-                  </div>
-                  <div className="mt-1 text-sm leading-6 text-slate-600">
-                    Approve useful knowledge and reject anything that should not enter runtime.
+          <div className="space-y-3">
+            {items.map((item) => {
+              const busy = actingKnowledgeId === item.id;
+
+              return (
+                <div
+                  key={item.id}
+                  className="rounded-[28px] border border-slate-200 bg-white p-5"
+                >
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                          {groupLabel(item.category)}
+                        </span>
+
+                        {item.confidenceLabel ? (
+                          <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                            {item.confidenceLabel}
+                          </span>
+                        ) : null}
+
+                        {item.source ? (
+                          <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                            {item.source}
+                          </span>
+                        ) : null}
+                      </div>
+
+                      <div className="mt-4 text-[20px] font-semibold tracking-[-0.03em] text-slate-950">
+                        {item.title}
+                      </div>
+
+                      <div className="mt-2 text-sm leading-7 text-slate-600">
+                        {item.value || "No detailed value found."}
+                      </div>
+
+                      {item.evidenceUrl ? (
+                        <a
+                          href={item.evidenceUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-slate-700 transition hover:text-slate-950"
+                        >
+                          View evidence
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      ) : null}
+                    </div>
+
+                    <div className="flex shrink-0 flex-wrap gap-2">
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() =>
+                          onApproveKnowledge?.({
+                            ...item,
+                            id: item.id,
+                            candidateId: item.candidateId || item.id,
+                          })
+                        }
+                        className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-slate-950 px-4 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-50"
+                      >
+                        <Check className="h-4 w-4" />
+                        {busy ? "Saving..." : "Approve"}
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() =>
+                          onRejectKnowledge?.({
+                            ...item,
+                            id: item.id,
+                            candidateId: item.candidateId || item.id,
+                          })
+                        }
+                        className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:text-slate-950 disabled:opacity-50"
+                      >
+                        <X className="h-4 w-4" />
+                        Reject
+                      </button>
+                    </div>
                   </div>
                 </div>
-
-                <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
-                  top {items.length}
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-1 p-2">
-              {items.map((item) => (
-                <SetupStudioKnowledgeLine
-                  key={item.id || item.title || item.index}
-                  item={item}
-                  busy={actingKnowledgeId === item.id}
-                  onApprove={() =>
-                    onApproveKnowledge?.({
-                      ...item,
-                      id: item.id,
-                      candidateId: item.candidateId || item.id,
-                    })
-                  }
-                  onReject={() =>
-                    onRejectKnowledge?.({
-                      ...item,
-                      id: item.id,
-                      candidateId: item.candidateId || item.id,
-                    })
-                  }
-                />
-              ))}
-            </div>
+              );
+            })}
           </div>
         ) : (
-          <div className="rounded-[30px] border border-white/70 bg-white/82 px-6 py-10 text-center shadow-[0_24px_70px_rgba(15,23,42,.08)] backdrop-blur-xl">
-            <div className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-500 shadow-sm">
-              <BadgeCheck className="h-5 w-5" />
-            </div>
-
-            <div className="mt-4 text-base font-semibold text-slate-900">
-              No knowledge items are ready for review yet
-            </div>
-
-            <div className="mt-2 text-sm leading-6 text-slate-500">
-              There is nothing meaningful to approve here right now. You can open the full intake or continue to the next stage.
-            </div>
+          <div className="rounded-[30px] border border-dashed border-slate-200 bg-white px-6 py-10 text-center text-sm leading-7 text-slate-500">
+            No strong knowledge items are ready for review yet.
           </div>
         )}
 
         <div className="flex flex-wrap gap-3">
-          <GhostButton onClick={onNext} icon={ChevronRight} active>
+          <ActionButton active icon={ArrowRight} onClick={onNext}>
             Continue
-          </GhostButton>
+          </ActionButton>
 
-          <GhostButton onClick={onToggleKnowledge} icon={BadgeCheck}>
+          <ActionButton icon={ExternalLink} onClick={onToggleKnowledge}>
             Open full intake
-          </GhostButton>
+          </ActionButton>
         </div>
       </div>
     </SetupStudioStageShell>

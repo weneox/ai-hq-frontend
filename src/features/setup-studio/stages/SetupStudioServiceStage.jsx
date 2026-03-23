@@ -1,8 +1,5 @@
-// src/features/setup-studio/stages/SetupStudioServiceStage.jsx
-
-import { ChevronRight, Sparkles, Wand2 } from "lucide-react";
+import { ArrowRight, Plus } from "lucide-react";
 import SetupStudioStageShell from "../components/SetupStudioStageShell.jsx";
-import { GhostButton, TinyChip } from "../components/SetupStudioUi.jsx";
 
 function s(v, d = "") {
   return String(v ?? d).trim();
@@ -37,8 +34,25 @@ function normalizeService(item = {}, index = 0) {
         x.valueText ||
         x.value_text
     ),
-    status: s(x.status || "ready"),
   };
+}
+
+function ActionButton({ active = false, icon: Icon, children, onClick, disabled }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`inline-flex h-11 items-center justify-center gap-2 rounded-full px-4 text-sm font-medium transition ${
+        active
+          ? "bg-slate-950 text-white hover:bg-slate-800 disabled:opacity-50"
+          : "border border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:text-slate-950 disabled:opacity-50"
+      }`}
+    >
+      <Icon className="h-4 w-4" />
+      {children}
+    </button>
+  );
 }
 
 export default function SetupStudioServiceStage({
@@ -58,163 +72,119 @@ export default function SetupStudioServiceStage({
   const isCreating = !!savingServiceSuggestion;
 
   const readinessScore = num(meta?.readinessScore, 0);
-  const playbookCount = num(meta?.playbookCount, 0);
 
   const headline =
     hasSuggestion && serviceCount === 0
       ? serviceSuggestionTitle
       : serviceCount > 0
-        ? "The service layer already has a foundation."
-        : "Prepare the first service seed.";
+        ? "The service layer already has a base."
+        : "Create the first service seed.";
 
   const supportingCopy =
     serviceCount > 0
-      ? "A base service structure already exists. You can keep moving now, or add another seed if the draft still feels thin."
+      ? "You already have enough to move forward. Add more detail later inside the workspace."
       : hasSuggestion
-        ? "The first service suggestion is ready from the draft. Create it now and refine the catalog later inside the workspace."
-        : "You do not need a full catalog here. One good starting service is enough to make the launch flow feel grounded.";
-
-  const canCreate = !isCreating && (hasSuggestion || serviceCount > 0);
+        ? "A first service suggestion is ready from the current draft."
+        : "One believable service is enough for the first launch pass.";
 
   return (
     <SetupStudioStageShell
-      eyebrow="build draft"
-      title={
-        <>
-          Shape the first
-          <br />
-          service layer.
-        </>
-      }
-      body="You do not need a perfect catalog here. Just create enough service structure for the first launch to feel real, then deepen it later in the workspace."
+      eyebrow="services"
+      title="Shape the first service layer."
+      body="You do not need a full catalog here. Just enough structure to make the business real."
     >
-      <div className="mx-auto max-w-[1120px] space-y-6">
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.06fr)_360px]">
-          <div className="overflow-hidden rounded-[30px] border border-white/70 bg-white/84 shadow-[0_24px_70px_rgba(15,23,42,.08)] backdrop-blur-xl">
-            <div className="border-b border-slate-200/70 px-5 py-4.5">
-              <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500 shadow-sm">
-                <Sparkles className="h-3.5 w-3.5" />
-                service layer
-              </div>
-            </div>
+      <div className="space-y-6">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
+          <div className="rounded-[30px] border border-slate-200 bg-white p-6">
+            <h3 className="text-[28px] font-semibold leading-[1.02] tracking-[-0.04em] text-slate-950 sm:text-[34px]">
+              {headline}
+            </h3>
 
-            <div className="space-y-5 px-5 py-5">
-              <div>
-                <div className="text-[32px] font-semibold leading-[1.02] tracking-[-0.05em] text-slate-950 sm:text-[42px]">
-                  {headline}
+            <p className="mt-4 max-w-[760px] text-[15px] leading-7 text-slate-600">
+              {supportingCopy}
+            </p>
+
+            {hasSuggestion ? (
+              <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                  Suggested seed
                 </div>
-
-                <div className="mt-4 max-w-[760px] text-[15px] leading-8 text-slate-600">
-                  {supportingCopy}
+                <div className="mt-2 text-lg font-semibold text-slate-950">
+                  {serviceSuggestionTitle}
                 </div>
               </div>
+            ) : null}
 
-              {hasSuggestion ? (
-                <div className="rounded-[24px] border border-sky-200 bg-sky-50/80 p-4">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700">
-                    Suggested first seed
-                  </div>
-                  <div className="mt-2 text-[20px] font-semibold tracking-[-0.03em] text-slate-950">
-                    {serviceSuggestionTitle}
-                  </div>
-                  <div className="mt-2 text-sm leading-6 text-slate-600">
-                    This suggestion came from the current draft and can become the first real service object.
-                  </div>
-                </div>
-              ) : null}
+            <div className="mt-8 flex flex-wrap gap-3">
+              <ActionButton
+                active
+                icon={Plus}
+                onClick={onCreateSeed}
+                disabled={isCreating || (!hasSuggestion && serviceCount === 0)}
+              >
+                {isCreating
+                  ? "Creating..."
+                  : serviceCount > 0
+                    ? "Create another seed"
+                    : "Create seed"}
+              </ActionButton>
 
-              <div className="flex flex-wrap gap-3">
-                <GhostButton
-                  onClick={onCreateSeed}
-                  icon={Wand2}
-                  active
-                  disabled={!canCreate}
-                >
-                  {isCreating
-                    ? "Creating..."
-                    : serviceCount > 0
-                      ? "Create another seed"
-                      : "Create seed"}
-                </GhostButton>
-
-                <GhostButton onClick={onSkip} icon={ChevronRight}>
-                  {serviceCount > 0 ? "Continue" : "Skip for now"}
-                </GhostButton>
-              </div>
+              <ActionButton icon={ArrowRight} onClick={onSkip}>
+                {serviceCount > 0 ? "Continue" : "Skip for now"}
+              </ActionButton>
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-[30px] border border-white/70 bg-white/84 shadow-[0_24px_70px_rgba(15,23,42,.08)] backdrop-blur-xl">
-            <div className="border-b border-slate-200/70 px-5 py-4.5">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">
-                Readiness
-              </div>
+          <div className="rounded-[30px] border border-slate-200 bg-white p-6">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">
+              Summary
             </div>
 
-            <div className="space-y-3 px-5 py-5">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-[22px] border border-slate-200/80 bg-slate-50/72 px-4 py-4">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                    Services
-                  </div>
-                  <div className="mt-2 text-[28px] font-semibold tracking-[-0.04em] text-slate-950">
-                    {serviceCount}
-                  </div>
-                </div>
-
-                <div className="rounded-[22px] border border-slate-200/80 bg-slate-50/72 px-4 py-4">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                    Readiness
-                  </div>
-                  <div className="mt-2 text-[28px] font-semibold tracking-[-0.04em] text-slate-950">
-                    {readinessScore}%
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-[22px] border border-slate-200/80 bg-slate-50/72 px-4 py-4">
+            <div className="mt-5 grid gap-3">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                  Playbooks
+                  Services
                 </div>
                 <div className="mt-2 text-[28px] font-semibold tracking-[-0.04em] text-slate-950">
-                  {playbookCount}
+                  {serviceCount}
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-2">
-                <TinyChip>services {serviceCount}</TinyChip>
-                <TinyChip>readiness {readinessScore}%</TinyChip>
-                <TinyChip>playbooks {playbookCount}</TinyChip>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                  Readiness
+                </div>
+                <div className="mt-2 text-[28px] font-semibold tracking-[-0.04em] text-slate-950">
+                  {readinessScore}%
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-[30px] border border-white/70 bg-white/82 shadow-[0_24px_70px_rgba(15,23,42,.08)] backdrop-blur-xl">
-          <div className="border-b border-slate-200/70 px-5 py-4.5">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">
-                  Current service base
-                </div>
-                <div className="mt-1 text-sm leading-6 text-slate-600">
-                  The first launch only needs a small, believable foundation.
-                </div>
+        <div className="rounded-[30px] border border-slate-200 bg-white p-6">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">
+                Current service base
               </div>
+              <div className="mt-1 text-sm text-slate-500">
+                Keep this small and believable.
+              </div>
+            </div>
 
-              <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
-                {serviceCount} item{serviceCount === 1 ? "" : "s"}
-              </div>
+            <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
+              {serviceCount} item{serviceCount === 1 ? "" : "s"}
             </div>
           </div>
 
-          <div className="px-5 py-5">
+          <div className="mt-5">
             {serviceCount > 0 ? (
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {normalizedServices.slice(0, 6).map((item) => (
                   <div
                     key={item.id}
-                    className="rounded-[24px] border border-slate-200/80 bg-white/88 p-4 shadow-[0_10px_24px_rgba(15,23,42,.03)]"
+                    className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4"
                   >
                     <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                       Service
@@ -223,18 +193,19 @@ export default function SetupStudioServiceStage({
                       {item.title}
                     </div>
                     <div className="mt-2 text-sm leading-6 text-slate-600">
-                      {truncate(item.description, 180) || "A base service entry is ready for refinement in the workspace."}
+                      {truncate(item.description, 180) ||
+                        "A base service entry is ready for refinement in the workspace."}
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50/72 px-5 py-8 text-center">
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-center">
                 <div className="text-base font-semibold text-slate-900">
                   No service seed exists yet
                 </div>
                 <div className="mt-2 text-sm leading-6 text-slate-500">
-                  Create one starting service now, or move on and finish the service structure later in the workspace.
+                  Create one starting service now, or move on and finish it later.
                 </div>
               </div>
             )}

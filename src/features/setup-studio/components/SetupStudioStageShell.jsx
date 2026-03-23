@@ -11,52 +11,38 @@ export default function SetupStudioStageShell({
   align = "left",
   children,
 }) {
-  const isCenter = s(align).toLowerCase() === "center";
+  const centered = s(align).toLowerCase() === "center";
 
   return (
     <motion.section
-      initial={{ opacity: 0, y: 18 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
-      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+      exit={{ opacity: 0, y: -8 }}
+      transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
       className="w-full"
     >
       <div
-        className={`mx-auto flex w-full max-w-[1240px] flex-col gap-8 ${
-          isCenter ? "items-center text-center" : ""
+        className={`mx-auto w-full max-w-[1120px] ${
+          centered ? "text-center" : ""
         }`}
       >
-        <div
-          className={`max-w-[900px] ${
-            isCenter ? "flex flex-col items-center text-center" : ""
-          }`}
-        >
+        <div className={centered ? "mx-auto max-w-[760px]" : "max-w-[760px]"}>
           {eyebrow ? (
-            <div className="mb-4 inline-flex items-center rounded-full border border-slate-200 bg-white/88 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500 shadow-sm">
+            <div className="mb-4 inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
               {eyebrow}
             </div>
           ) : null}
 
-          <div
-            className={`text-[32px] font-semibold leading-[1.02] tracking-[-0.055em] text-slate-950 sm:text-[42px] lg:text-[54px] ${
-              isCenter ? "mx-auto" : ""
-            }`}
-          >
+          <h2 className="text-[30px] font-semibold leading-[1.02] tracking-[-0.05em] text-slate-950 sm:text-[40px] lg:text-[48px]">
             {title}
-          </div>
+          </h2>
 
           {body ? (
-            <div
-              className={`mt-4 max-w-[760px] text-[15px] leading-8 text-slate-600 ${
-                isCenter ? "mx-auto" : ""
-              }`}
-            >
-              {body}
-            </div>
+            <p className="mt-4 text-[15px] leading-7 text-slate-600">{body}</p>
           ) : null}
         </div>
 
-        <div className="w-full">{children}</div>
+        <div className="mt-8 w-full">{children}</div>
       </div>
     </motion.section>
   );
