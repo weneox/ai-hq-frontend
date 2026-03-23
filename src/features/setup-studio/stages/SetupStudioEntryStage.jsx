@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { flushSync } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, Link2, X } from "lucide-react";
+import {
+  ArrowRight,
+  ChevronDown,
+  Globe2,
+  Link2,
+  Sparkles,
+  X,
+} from "lucide-react";
 
 import websiteIcon from "../../../assets/setup-studio/channels/weblink.webp";
 import googleMapsIcon from "../../../assets/setup-studio/channels/google-maps.svg";
@@ -28,10 +35,6 @@ function lower(v) {
   return s(v).toLowerCase();
 }
 
-function uniqueStrings(list = []) {
-  return [...new Set(arr(list).map((item) => s(item)).filter(Boolean))];
-}
-
 const SOURCE_OPTIONS = [
   {
     key: "website",
@@ -41,7 +44,7 @@ const SOURCE_OPTIONS = [
     placeholder: "yourbusiness.com",
     title: "Add your website",
     description:
-      "Paste the main website URL. This helps build the first draft from the most reliable public source.",
+      "Paste the main website URL for your business. This is usually the strongest public source for the first draft.",
     actionLabel: "Add website",
     connectLabel: "",
     tone: "from-sky-400/25 via-cyan-300/10 to-transparent",
@@ -51,10 +54,10 @@ const SOURCE_OPTIONS = [
     label: "Google Maps",
     icon: googleMapsIcon,
     mode: "link",
-    placeholder: "Paste a Google Maps link",
+    placeholder: "Paste your Google Maps link",
     title: "Add your Google Maps source",
     description:
-      "Paste the Maps link for the business location. This helps with local identity and contact details.",
+      "Paste the Google Maps link for your business. This helps with place identity and local business details.",
     actionLabel: "Add Maps link",
     connectLabel: "",
     tone: "from-emerald-400/25 via-lime-300/10 to-transparent",
@@ -67,7 +70,7 @@ const SOURCE_OPTIONS = [
     placeholder: "instagram.com/yourbrand",
     title: "Add or connect Instagram",
     description:
-      "Add the profile link now, or use Connect as the future direct sign-in flow.",
+      "Paste the public Instagram profile link now. The connect action can later be wired to the real auth flow.",
     actionLabel: "Add profile link",
     connectLabel: "Connect",
     tone: "from-pink-400/25 via-fuchsia-300/10 to-transparent",
@@ -80,7 +83,7 @@ const SOURCE_OPTIONS = [
     placeholder: "linkedin.com/company/yourbrand",
     title: "Add or connect LinkedIn",
     description:
-      "Use the company page link, or keep Connect ready for the future auth flow.",
+      "Paste the company page link now. The connect action can later be wired to the real auth flow.",
     actionLabel: "Add page link",
     connectLabel: "Connect",
     tone: "from-sky-400/25 via-blue-300/10 to-transparent",
@@ -93,7 +96,7 @@ const SOURCE_OPTIONS = [
     placeholder: "facebook.com/yourbrand",
     title: "Add or connect Facebook",
     description:
-      "Use the public page link now. Connect can be wired later for the real source sync.",
+      "Paste the public Facebook page link now. The connect action can later be wired to the real auth flow.",
     actionLabel: "Add page link",
     connectLabel: "Connect",
     tone: "from-blue-400/25 via-indigo-300/10 to-transparent",
@@ -106,7 +109,7 @@ const SOURCE_OPTIONS = [
     placeholder: "tiktok.com/@yourbrand",
     title: "Add your TikTok profile",
     description:
-      "Paste the TikTok profile link if the business publishes short-form content there.",
+      "Paste the public TikTok profile link if this is a real source for the business brand.",
     actionLabel: "Add TikTok link",
     connectLabel: "",
     tone: "from-slate-500/20 via-slate-300/10 to-transparent",
@@ -119,7 +122,7 @@ const SOURCE_OPTIONS = [
     placeholder: "youtube.com/@yourbrand",
     title: "Add your YouTube channel",
     description:
-      "Paste the channel link if the business publishes videos, explainers, or brand content.",
+      "Paste the channel link if the business publishes videos, explainers, or brand content there.",
     actionLabel: "Add channel link",
     connectLabel: "",
     tone: "from-rose-400/25 via-red-300/10 to-transparent",
@@ -132,7 +135,7 @@ const SOURCE_OPTIONS = [
     placeholder: "wa.me/994xxxxxxxxx",
     title: "Add or connect WhatsApp",
     description:
-      "Use a WhatsApp contact link now, or keep Connect ready for the future auth flow.",
+      "Paste a WhatsApp link now. The connect action can later be wired to the real auth flow.",
     actionLabel: "Add WhatsApp link",
     connectLabel: "Connect",
     tone: "from-emerald-400/25 via-green-300/10 to-transparent",
@@ -140,7 +143,7 @@ const SOURCE_OPTIONS = [
 ];
 
 function sourceByKey(key = "") {
-  return SOURCE_OPTIONS.find((item) => item.key === key) || SOURCE_OPTIONS[0];
+  return SOURCE_OPTIONS.find((item) => item.key === key) || null;
 }
 
 function buildInitialSourceDrafts(discoveryForm = {}) {
@@ -155,14 +158,6 @@ function buildInitialSourceDrafts(discoveryForm = {}) {
       mode: "link",
     },
   };
-}
-
-function looksLikeWebsite(v = "") {
-  const x = s(v);
-  if (!x) return false;
-  if (/\s/.test(x) && !/^https?:\/\//i.test(x)) return false;
-
-  return /^(https?:\/\/)?(www\.)?[a-z0-9-]+(\.[a-z0-9-]+)+(\/[^\s]*)?$/i.test(x);
 }
 
 function detectInlineSource(raw = "") {
@@ -201,7 +196,7 @@ function detectInlineSource(raw = "") {
     {
       type: "google_maps",
       regex:
-        /(?:https?:\/\/)?(?:www\.)?(?:maps\.app\.goo\.gl|maps\.google\.[^\s/]+|goo\.gl\/maps)\/?[^\s,]*|google maps/i,
+        /(?:https?:\/\/)?(?:www\.)?(?:maps\.app\.goo\.gl|maps\.google\.[^\s/]+|goo\.gl\/maps)\/?[^\s,]*/i,
     },
     {
       type: "website",
@@ -231,6 +226,20 @@ function detectInlineSource(raw = "") {
   return null;
 }
 
+function sourceLabel(type = "") {
+  const x = lower(type);
+
+  if (x === "website") return "Website";
+  if (x === "google_maps") return "Google Maps";
+  if (x === "instagram") return "Instagram";
+  if (x === "linkedin") return "LinkedIn";
+  if (x === "facebook") return "Facebook";
+  if (x === "tiktok") return "TikTok";
+  if (x === "youtube") return "YouTube";
+  if (x === "whatsapp") return "WhatsApp";
+  return "your source";
+}
+
 function pickPrimaryAttachedSource(sourceDrafts = {}) {
   for (const item of SOURCE_OPTIONS) {
     const record = obj(sourceDrafts[item.key]);
@@ -238,7 +247,6 @@ function pickPrimaryAttachedSource(sourceDrafts = {}) {
       return {
         sourceType: item.key,
         sourceValue: s(record.value),
-        mode: lower(record.mode || "link"),
       };
     }
   }
@@ -248,30 +256,15 @@ function pickPrimaryAttachedSource(sourceDrafts = {}) {
 
 function buildInterpretation(raw = "", sourceDrafts = {}) {
   const text = s(raw);
-  const primaryAttached = pickPrimaryAttachedSource(sourceDrafts);
+  const attached = pickPrimaryAttachedSource(sourceDrafts);
 
-  if (primaryAttached?.sourceValue) {
+  if (attached?.sourceValue) {
     return {
-      sourceType: primaryAttached.sourceType,
-      sourceValue: primaryAttached.sourceValue,
-      websiteUrl:
-        primaryAttached.sourceType === "website" ? primaryAttached.sourceValue : "",
+      sourceType: attached.sourceType,
+      sourceValue: attached.sourceValue,
+      websiteUrl: attached.sourceType === "website" ? attached.sourceValue : "",
       note: text,
       description: text,
-      summary: text
-        ? `Will scan ${sourceLabel(primaryAttached.sourceType)} and use your description.`
-        : `Will scan ${sourceLabel(primaryAttached.sourceType)}.`,
-    };
-  }
-
-  if (!text) {
-    return {
-      sourceType: "",
-      sourceValue: "",
-      websiteUrl: "",
-      note: "",
-      description: "",
-      summary: "Describe the business or add a source to begin.",
     };
   }
 
@@ -292,9 +285,6 @@ function buildInterpretation(raw = "", sourceDrafts = {}) {
         inlineSource.sourceType === "website" ? inlineSource.sourceValue : "",
       note,
       description: note,
-      summary: note
-        ? `Will scan ${sourceLabel(inlineSource.sourceType)} and use your description.`
-        : `Will scan ${sourceLabel(inlineSource.sourceType)}.`,
     };
   }
 
@@ -304,87 +294,29 @@ function buildInterpretation(raw = "", sourceDrafts = {}) {
     websiteUrl: "",
     note: text,
     description: text,
-    summary: "Will build the first draft from your description.",
   };
 }
 
-function sourceLabel(type = "") {
-  const x = lower(type);
-
-  if (x === "website") return "Website";
-  if (x === "google_maps") return "Google Maps";
-  if (x === "instagram") return "Instagram";
-  if (x === "linkedin") return "LinkedIn";
-  if (x === "facebook") return "Facebook";
-  if (x === "tiktok") return "TikTok";
-  if (x === "youtube") return "YouTube";
-  if (x === "whatsapp") return "WhatsApp";
-  return "your source";
-}
-
-function SourceChip({ source, active = false, onClick, value = "", mode = "" }) {
-  const hasValue = !!s(value);
-  const isConnect = lower(mode) === "connect";
-
+function SourcePill({ source, active = false, onClick, filled = false }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`group relative overflow-hidden rounded-[20px] border px-4 py-3 text-left transition ${
+      className={`group inline-flex items-center gap-2 rounded-full border px-4 py-3 text-sm font-medium transition ${
         active
-          ? "border-slate-900 bg-slate-900 text-white shadow-[0_16px_34px_rgba(15,23,42,.18)]"
-          : "border-slate-200/90 bg-white/84 text-slate-700 shadow-[0_10px_28px_rgba(15,23,42,.05)] hover:-translate-y-[1px] hover:border-slate-300 hover:bg-white"
+          ? "border-slate-900 bg-slate-900 text-white shadow-[0_14px_30px_rgba(15,23,42,.16)]"
+          : filled
+            ? "border-slate-300 bg-white text-slate-900 shadow-[0_10px_26px_rgba(15,23,42,.06)]"
+            : "border-white/80 bg-white/82 text-slate-700 shadow-[0_10px_26px_rgba(15,23,42,.05)] hover:-translate-y-[1px] hover:bg-white"
       }`}
     >
-      <div
-        className={`pointer-events-none absolute inset-0 opacity-0 transition group-hover:opacity-100 bg-gradient-to-r ${source.tone}`}
+      <img
+        src={source.icon}
+        alt={source.label}
+        className="h-4 w-4 object-contain"
       />
-      <div className="relative z-10 flex items-center gap-3">
-        <span
-          className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl border ${
-            active
-              ? "border-white/15 bg-white/10"
-              : "border-slate-200 bg-white/90"
-          }`}
-        >
-          <img
-            src={source.icon}
-            alt={source.label}
-            className="h-5 w-5 object-contain"
-          />
-        </span>
-
-        <span className="min-w-0">
-          <span className="block text-sm font-semibold">{source.label}</span>
-          <span
-            className={`mt-0.5 block truncate text-[12px] ${
-              active ? "text-white/70" : "text-slate-500"
-            }`}
-          >
-            {hasValue
-              ? value
-              : isConnect
-                ? "Connect selected"
-                : "Add source"}
-          </span>
-        </span>
-      </div>
+      <span>{source.label}</span>
     </button>
-  );
-}
-
-function SavedBadge({ source, record }) {
-  const value = s(record?.value);
-  const mode = lower(record?.mode);
-
-  return (
-    <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-slate-200/90 bg-white/85 px-3 py-2 text-[12px] text-slate-600 shadow-[0_8px_20px_rgba(15,23,42,.04)]">
-      <img src={source.icon} alt={source.label} className="h-4 w-4 object-contain" />
-      <span className="font-medium text-slate-700">{source.label}</span>
-      <span className="truncate">
-        {value || (mode === "connect" ? "Connect selected" : "Added")}
-      </span>
-    </div>
   );
 }
 
@@ -392,9 +324,9 @@ function SourceModal({
   source,
   value,
   onChange,
-  onClose,
   onSaveLink,
   onConnect,
+  onClose,
 }) {
   if (!source) return null;
 
@@ -402,116 +334,114 @@ function SourceModal({
   const hasValue = !!s(value);
 
   return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[80] flex items-center justify-center bg-[rgba(15,23,42,.24)] px-4 py-6 backdrop-blur-[12px]"
-      >
-        <button
-          type="button"
-          aria-label="Close source panel"
-          className="absolute inset-0"
-          onClick={onClose}
-        />
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-[rgba(15,23,42,.22)] px-4 py-6 backdrop-blur-[12px]"
+    >
+      <button
+        type="button"
+        aria-label="Close source modal"
+        className="absolute inset-0"
+        onClick={onClose}
+      />
 
-        <motion.div
-          initial={{ opacity: 0, y: 18, scale: 0.985 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 18, scale: 0.985 }}
-          transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-          className="relative z-10 w-full max-w-[560px] overflow-hidden rounded-[32px] border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,.94),rgba(250,252,255,.88))] shadow-[0_28px_80px_rgba(15,23,42,.18)]"
-        >
-          <div className="pointer-events-none absolute inset-0">
-            <div
-              className={`absolute inset-x-0 top-0 h-40 bg-gradient-to-br ${source.tone}`}
-            />
-            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent opacity-80" />
+      <motion.div
+        initial={{ opacity: 0, y: 18, scale: 0.985 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 18, scale: 0.985 }}
+        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+        className="relative z-10 w-full max-w-[560px] overflow-hidden rounded-[30px] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,.95),rgba(249,251,254,.9))] shadow-[0_30px_90px_rgba(15,23,42,.18)]"
+      >
+        <div className="pointer-events-none absolute inset-0">
+          <div
+            className={`absolute inset-x-0 top-0 h-40 bg-gradient-to-br ${source.tone}`}
+          />
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent opacity-80" />
+        </div>
+
+        <div className="relative z-10 p-6 sm:p-7">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <span className="inline-flex h-14 w-14 items-center justify-center rounded-[20px] border border-slate-200 bg-white shadow-[0_10px_26px_rgba(15,23,42,.06)]">
+                <img
+                  src={source.icon}
+                  alt={source.label}
+                  className="h-7 w-7 object-contain"
+                />
+              </span>
+
+              <div className="min-w-0">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                  Source
+                </div>
+                <h3 className="mt-2 text-[28px] font-semibold leading-[1.02] tracking-[-0.05em] text-slate-950">
+                  {source.title}
+                </h3>
+                <p className="mt-3 max-w-[420px] text-[14px] leading-7 text-slate-600">
+                  {source.description}
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:text-slate-950"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
 
-          <div className="relative z-10 p-6 sm:p-7">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex items-start gap-4">
-                <span className="inline-flex h-14 w-14 items-center justify-center rounded-[20px] border border-slate-200 bg-white shadow-[0_10px_24px_rgba(15,23,42,.06)]">
-                  <img
-                    src={source.icon}
-                    alt={source.label}
-                    className="h-7 w-7 object-contain"
-                  />
-                </span>
+          <div className="mt-8 rounded-[24px] border border-slate-200 bg-white/90 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,.9),0_10px_26px_rgba(15,23,42,.04)]">
+            <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+              {showConnect ? "Add link or connect" : "Add source link"}
+            </div>
 
-                <div className="min-w-0">
-                  <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                    Source
-                  </div>
-                  <h3 className="mt-2 text-[28px] font-semibold leading-[1] tracking-[-0.05em] text-slate-950">
-                    {source.title}
-                  </h3>
-                  <p className="mt-3 max-w-[420px] text-[14px] leading-7 text-slate-600">
-                    {source.description}
-                  </p>
-                </div>
-              </div>
+            <div className="flex items-center gap-3 rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3.5">
+              <Link2 className="h-4 w-4 text-slate-400" />
+              <input
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                placeholder={source.placeholder}
+                className="h-full w-full border-0 bg-transparent p-0 text-[15px] text-slate-950 outline-none placeholder:text-slate-400 focus:ring-0"
+                autoFocus
+              />
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={onSaveLink}
+                disabled={!hasValue}
+                className="inline-flex h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-medium text-white shadow-[0_14px_30px_rgba(15,23,42,.14)] transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {source.actionLabel}
+              </button>
+
+              {showConnect ? (
+                <button
+                  type="button"
+                  onClick={onConnect}
+                  className="inline-flex h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-5 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
+                >
+                  {source.connectLabel}
+                </button>
+              ) : null}
 
               <button
                 type="button"
                 onClick={onClose}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:text-slate-950"
+                className="inline-flex h-11 items-center justify-center rounded-full px-3 text-sm font-medium text-slate-500 transition hover:text-slate-900"
               >
-                <X className="h-4 w-4" />
+                Cancel
               </button>
             </div>
-
-            <div className="mt-8 rounded-[24px] border border-slate-200 bg-white/90 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,.9),0_10px_26px_rgba(15,23,42,.04)]">
-              <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-                {showConnect ? "Add link or connect" : "Add source link"}
-              </div>
-
-              <div className="flex items-center gap-3 rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3.5">
-                <Link2 className="h-4 w-4 text-slate-400" />
-                <input
-                  value={value}
-                  onChange={(e) => onChange(e.target.value)}
-                  placeholder={source.placeholder}
-                  className="h-full w-full border-0 bg-transparent p-0 text-[15px] text-slate-950 outline-none placeholder:text-slate-400 focus:ring-0"
-                  autoFocus
-                />
-              </div>
-
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  onClick={onSaveLink}
-                  disabled={!hasValue}
-                  className="inline-flex h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-medium text-white shadow-[0_14px_30px_rgba(15,23,42,.14)] transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  {source.actionLabel}
-                </button>
-
-                {showConnect ? (
-                  <button
-                    type="button"
-                    onClick={onConnect}
-                    className="inline-flex h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-5 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
-                  >
-                    {source.connectLabel}
-                  </button>
-                ) : null}
-
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="inline-flex h-11 items-center justify-center rounded-full border border-transparent px-3 text-sm font-medium text-slate-500 transition hover:text-slate-800"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
           </div>
-        </motion.div>
+        </div>
       </motion.div>
-    </AnimatePresence>
+    </motion.div>
   );
 }
 
@@ -535,7 +465,7 @@ export default function SetupStudioEntryStage({
   const [modalValue, setModalValue] = useState("");
 
   const activeSource = useMemo(
-    () => SOURCE_OPTIONS.find((item) => item.key === activeSourceKey) || null,
+    () => sourceByKey(activeSourceKey),
     [activeSourceKey]
   );
 
@@ -543,21 +473,14 @@ export default function SetupStudioEntryStage({
     return buildInterpretation(composerValue, sourceDrafts);
   }, [composerValue, sourceDrafts]);
 
-  const attachedSourceCount = useMemo(() => {
-    return SOURCE_OPTIONS.filter((item) => {
-      const record = obj(sourceDrafts[item.key]);
-      return !!(s(record.value) || lower(record.mode) === "connect");
-    }).length;
-  }, [sourceDrafts]);
-
   const hasRealSource = !!s(interpretation.sourceValue);
   const canContinue = !!(s(composerValue) || hasRealSource);
 
   useEffect(() => {
     if (!activeSource) return;
 
-    const previous = obj(sourceDrafts[activeSource.key]);
-    setModalValue(s(previous.value));
+    const prev = obj(sourceDrafts[activeSource.key]);
+    setModalValue(s(prev.value));
   }, [activeSource, sourceDrafts]);
 
   useEffect(() => {
@@ -582,11 +505,9 @@ export default function SetupStudioEntryStage({
     onSetBusinessField?.("websiteUrl", next.websiteUrl || "");
     onSetBusinessField?.("description", next.description || "");
 
-    if (!nextText) {
-      onSetManualSection?.("servicesText", s(manualSections?.servicesText || ""));
-      onSetManualSection?.("faqsText", s(manualSections?.faqsText || ""));
-      onSetManualSection?.("policiesText", s(manualSections?.policiesText || ""));
-    }
+    onSetManualSection?.("servicesText", s(manualSections?.servicesText || ""));
+    onSetManualSection?.("faqsText", s(manualSections?.faqsText || ""));
+    onSetManualSection?.("policiesText", s(manualSections?.policiesText || ""));
   }
 
   function handleComposerChange(nextText) {
@@ -605,6 +526,7 @@ export default function SetupStudioEntryStage({
 
   function handleSaveSourceLink() {
     if (!activeSource) return;
+
     const nextValue = s(modalValue);
     if (!nextValue) return;
 
@@ -646,134 +568,139 @@ export default function SetupStudioEntryStage({
 
   return (
     <>
-      <section className="w-full py-6 sm:py-8">
-        <div className="mx-auto flex max-w-[1180px] flex-col items-center">
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.22 }}
-            className="max-w-[860px] text-center"
-          >
-            <div className="inline-flex items-center rounded-full border border-white/80 bg-white/86 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 shadow-[0_10px_28px_rgba(15,23,42,.05)]">
-              Ready to scan
+      <section className="relative min-h-[100svh] w-full overflow-hidden bg-[linear-gradient(180deg,#f8fbff_0%,#f3f7fb_48%,#eef5fb_100%)]">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute right-[-8%] top-[-8%] h-[28rem] w-[28rem] rounded-full bg-[radial-gradient(circle,_rgba(164,231,255,.18)_0%,_rgba(164,231,255,0)_68%)] blur-3xl" />
+          <div className="absolute left-[-8%] bottom-[-12%] h-[26rem] w-[26rem] rounded-full bg-[radial-gradient(circle,_rgba(198,230,255,.16)_0%,_rgba(198,230,255,0)_70%)] blur-3xl" />
+          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,.18)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.18)_1px,transparent_1px)] bg-[size:48px_48px] opacity-[0.18]" />
+        </div>
+
+        <div className="relative z-10 flex min-h-[100svh] w-full flex-col">
+          <div className="flex items-center justify-end px-4 pb-0 pt-5 sm:px-6 lg:px-10">
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                className="inline-flex h-11 items-center gap-2 rounded-full border border-white/80 bg-white/80 px-4 text-sm font-medium text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,.05)] transition hover:bg-white"
+              >
+                <Globe2 className="h-4 w-4" />
+                English
+                <ChevronDown className="h-4 w-4" />
+              </button>
+
+              <button
+                type="button"
+                className="inline-flex h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-medium text-white shadow-[0_16px_34px_rgba(15,23,42,.16)] transition hover:bg-slate-800"
+              >
+                Studio mode
+              </button>
             </div>
+          </div>
 
-            <h1 className="mt-7 text-[44px] font-semibold leading-[0.94] tracking-[-0.07em] text-slate-950 sm:text-[58px] lg:text-[76px]">
-              Build the first business draft.
-            </h1>
+          <div className="flex flex-1 items-center justify-center px-4 py-10 sm:px-6 lg:px-10 lg:py-14">
+            <div className="w-full max-w-[1050px]">
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.22 }}
+                className="text-center"
+              >
+                <div className="mx-auto w-fit rounded-full border border-white/80 bg-white/84 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 shadow-[0_10px_26px_rgba(15,23,42,.05)]">
+                  Ready to scan
+                </div>
 
-            <p className="mx-auto mt-5 max-w-[760px] text-[15px] leading-7 text-slate-600 sm:text-[17px]">
-              Describe your business in any language. You can also add a website,
-              Maps, or social source and let the system structure the first draft
-              for you.
-            </p>
-          </motion.div>
+                <div className="mt-8">
+                  <div className="text-[38px] font-semibold leading-none tracking-[-0.06em] text-slate-950 sm:text-[52px]">
+                    NEOX AI Studio
+                  </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.24, delay: 0.04 }}
-            className="relative mt-12 w-full max-w-[920px]"
-          >
-            <div className="pointer-events-none absolute inset-x-[12%] -bottom-10 h-28 rounded-full bg-[radial-gradient(circle,_rgba(90,255,190,.22)_0%,_rgba(113,216,255,.18)_30%,_rgba(113,216,255,0)_74%)] blur-2xl" />
+                  <p className="mx-auto mt-5 max-w-[800px] text-[24px] leading-tight tracking-[-0.03em] text-slate-900 sm:text-[34px]">
+                    Describe your business in any language, then let AI build the
+                    first business draft.
+                  </p>
+                </div>
+              </motion.div>
 
-            <div className="relative overflow-hidden rounded-[36px] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,.9),rgba(248,250,252,.82))] shadow-[0_30px_90px_rgba(15,23,42,.10)] backdrop-blur-xl">
-              <div className="pointer-events-none absolute inset-0">
-                <div className="absolute right-[8%] top-0 h-44 w-44 rounded-full bg-[radial-gradient(circle,_rgba(255,186,112,.18)_0%,_rgba(255,186,112,0)_72%)] blur-2xl" />
-                <div className="absolute left-[8%] bottom-0 h-36 w-36 rounded-full bg-[radial-gradient(circle,_rgba(114,184,255,.12)_0%,_rgba(114,184,255,0)_70%)] blur-2xl" />
-                <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent opacity-80" />
-              </div>
+              <motion.div
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.24, delay: 0.04 }}
+                className="relative mx-auto mt-10 w-full max-w-[940px]"
+              >
+                <div className="pointer-events-none absolute inset-x-[18%] -bottom-8 h-24 rounded-full bg-[radial-gradient(circle,_rgba(96,255,192,.22)_0%,_rgba(126,229,255,.18)_34%,_rgba(126,229,255,0)_74%)] blur-2xl" />
 
-              <div className="relative z-10 p-5 sm:p-6 lg:p-7">
-                <div className="rounded-[30px] border border-slate-200/90 bg-white/88 shadow-[inset_0_1px_0_rgba(255,255,255,.9),0_18px_38px_rgba(15,23,42,.05)]">
-                  <textarea
-                    value={composerValue}
-                    onChange={(e) => handleComposerChange(e.target.value)}
-                    rows={6}
-                    placeholder="Describe your business in any language..."
-                    className="min-h-[230px] w-full resize-none border-0 bg-transparent px-5 py-5 text-[17px] leading-8 text-slate-950 outline-none placeholder:text-slate-400 focus:ring-0 sm:px-6 sm:py-6"
-                  />
+                <div className="relative overflow-hidden rounded-[34px] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,.90),rgba(249,252,255,.84))] shadow-[0_28px_80px_rgba(15,23,42,.10)] backdrop-blur-xl">
+                  <div className="pointer-events-none absolute inset-0">
+                    <div className="absolute right-[10%] top-0 h-40 w-40 rounded-full bg-[radial-gradient(circle,_rgba(154,233,255,.14)_0%,_rgba(154,233,255,0)_72%)] blur-2xl" />
+                    <div className="absolute left-[8%] bottom-0 h-32 w-32 rounded-full bg-[radial-gradient(circle,_rgba(126,211,255,.10)_0%,_rgba(126,211,255,0)_70%)] blur-2xl" />
+                  </div>
 
-                  <div className="flex flex-col gap-4 border-t border-slate-200/80 px-5 py-4 sm:px-6 sm:py-5 lg:flex-row lg:items-end lg:justify-between">
-                    <div className="min-w-0">
-                      <div className="text-[13px] font-medium text-slate-700">
-                        {interpretation.summary}
-                      </div>
-                      <div className="mt-2 text-sm leading-6 text-slate-500">
-                        Sources are optional. Start with text only, or add a source
-                        below.
+                  <div className="relative z-10 p-4 sm:p-5">
+                    <div className="overflow-hidden rounded-[28px] border border-slate-200/90 bg-white/88 shadow-[inset_0_1px_0_rgba(255,255,255,.9),0_16px_38px_rgba(15,23,42,.05)]">
+                      <textarea
+                        value={composerValue}
+                        onChange={(e) => handleComposerChange(e.target.value)}
+                        rows={5}
+                        placeholder="Describe your business in any language..."
+                        className="min-h-[180px] w-full resize-none border-0 bg-transparent px-5 py-5 text-[17px] leading-8 text-slate-950 outline-none placeholder:text-slate-400 focus:ring-0 sm:px-6 sm:py-6"
+                      />
+
+                      <div className="flex flex-col gap-4 border-t border-slate-200/80 px-5 py-4 sm:px-6 sm:py-5 lg:flex-row lg:items-center lg:justify-between">
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-[0_8px_20px_rgba(15,23,42,.04)] transition hover:border-slate-300 hover:text-slate-900"
+                          >
+                            <Link2 className="h-4 w-4" />
+                          </button>
+
+                          <button
+                            type="button"
+                            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-[0_8px_20px_rgba(15,23,42,.04)] transition hover:border-slate-300 hover:text-slate-900"
+                          >
+                            <Sparkles className="h-4 w-4" />
+                          </button>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-3">
+                          <div className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-[0_8px_20px_rgba(15,23,42,.04)]">
+                            Draft
+                            <ChevronDown className="h-4 w-4 text-slate-400" />
+                          </div>
+
+                          <button
+                            type="button"
+                            disabled={!canContinue || importingWebsite}
+                            onClick={handleContinue}
+                            className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-slate-950 text-white shadow-[0_16px_34px_rgba(15,23,42,.16)] transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            <ArrowRight className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      disabled={!canContinue || importingWebsite}
-                      onClick={handleContinue}
-                      className="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-slate-950 px-5 text-sm font-medium text-white shadow-[0_16px_34px_rgba(15,23,42,.16)] transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      {importingWebsite ? "Building draft..." : "Build draft"}
-                      <ArrowRight className="h-4 w-4" />
-                    </button>
+                    <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+                      {SOURCE_OPTIONS.map((source) => {
+                        const record = obj(sourceDrafts[source.key]);
+                        const filled =
+                          !!s(record.value) || lower(record.mode) === "connect";
+
+                        return (
+                          <SourcePill
+                            key={source.key}
+                            source={source}
+                            active={activeSourceKey === source.key}
+                            filled={filled}
+                            onClick={() => openSourceModal(source.key)}
+                          />
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
-
-                <div className="mt-6">
-                  <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-                    Add a source
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                    {SOURCE_OPTIONS.map((source) => {
-                      const record = obj(sourceDrafts[source.key]);
-                      return (
-                        <SourceChip
-                          key={source.key}
-                          source={source}
-                          active={activeSourceKey === source.key}
-                          value={record.value}
-                          mode={record.mode}
-                          onClick={() => openSourceModal(source.key)}
-                        />
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {attachedSourceCount > 0 ? (
-                  <div className="mt-5 flex flex-wrap gap-2.5">
-                    {SOURCE_OPTIONS.filter((source) => {
-                      const record = obj(sourceDrafts[source.key]);
-                      return !!(s(record.value) || lower(record.mode) === "connect");
-                    }).map((source) => (
-                      <SavedBadge
-                        key={source.key}
-                        source={source}
-                        record={sourceDrafts[source.key]}
-                      />
-                    ))}
-                  </div>
-                ) : null}
-
-                <div className="mt-6 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[12px] text-slate-500">
-                  {uniqueStrings([
-                    "Website",
-                    "Google Maps",
-                    "Instagram",
-                    "LinkedIn",
-                    "Facebook",
-                    "TikTok",
-                    "YouTube",
-                    "WhatsApp",
-                  ]).map((item) => (
-                    <span key={item} className="inline-flex items-center gap-2">
-                      <span className="h-1 w-1 rounded-full bg-slate-300" />
-                      {item}
-                    </span>
-                  ))}
-                </div>
-              </div>
+              </motion.div>
             </div>
-          </motion.div>
+          </div>
         </div>
       </section>
 
@@ -783,9 +710,9 @@ export default function SetupStudioEntryStage({
             source={activeSource}
             value={modalValue}
             onChange={setModalValue}
-            onClose={closeSourceModal}
             onSaveLink={handleSaveSourceLink}
             onConnect={handleConnectSelection}
+            onClose={closeSourceModal}
           />
         ) : null}
       </AnimatePresence>

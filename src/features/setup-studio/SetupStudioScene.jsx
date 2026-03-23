@@ -312,27 +312,37 @@ export default function SetupStudioScene({
     );
   }
 
+  const isEntryStage = stage === "entry";
+
   return (
     <>
       <div className="min-h-screen overflow-y-auto">
-        <main className="mx-auto w-full max-w-[1200px] px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
-          <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-            <div className="text-[12px] font-medium text-slate-400">
-              {sourceLabel ? sourceLabel : "Setup studio"}
-            </div>
+        <main
+          className={
+            isEntryStage
+              ? "w-full"
+              : "mx-auto w-full max-w-[1200px] px-4 py-8 sm:px-6 lg:px-8 lg:py-10"
+          }
+        >
+          {!isEntryStage ? (
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+              <div className="text-[12px] font-medium text-slate-400">
+                {sourceLabel ? sourceLabel : "Setup studio"}
+              </div>
 
-            <button
-              type="button"
-              onClick={onRefresh}
-              disabled={refreshing}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <RefreshCw
-                className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
-              />
-              Refresh
-            </button>
-          </div>
+              <button
+                type="button"
+                onClick={onRefresh}
+                disabled={refreshing}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <RefreshCw
+                  className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
+                />
+                Refresh
+              </button>
+            </div>
+          ) : null}
 
           <AnimatePresence mode="wait">
             {stage === "entry" ? (
@@ -417,7 +427,7 @@ export default function SetupStudioScene({
             ) : null}
           </AnimatePresence>
 
-          {error ? (
+          {!isEntryStage && error ? (
             <div className="mt-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
               {error}
             </div>
