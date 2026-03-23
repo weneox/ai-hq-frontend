@@ -4,9 +4,10 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, Check, Link2, Mic, Square, X } from "lucide-react";
 
 import websiteIcon from "../../../assets/setup-studio/channels/weblink.webp";
-import googleMapsIcon from "../../../assets/setup-studio/channels/google-maps.svg";
 import instagramIcon from "../../../assets/setup-studio/channels/instagram.svg";
 import facebookIcon from "../../../assets/setup-studio/channels/facebook.svg";
+import linkedinIcon from "../../../assets/setup-studio/channels/linkedin.svg";
+import googleMapsIcon from "../../../assets/setup-studio/channels/google-maps.svg";
 
 const DISPLAY_FONT_STYLE = {
   fontFamily: '"Sora", "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif',
@@ -39,19 +40,6 @@ const SOURCE_OPTIONS = [
     border: "rgba(56,189,248,.22)",
   },
   {
-    key: "google_maps",
-    label: "Google Maps",
-    icon: googleMapsIcon,
-    placeholder: "Business name, city or Maps link",
-    title: "Google Maps",
-    description: "Add a Maps link, or the business name with city.",
-    actionLabel: "Save source",
-    glow: "rgba(34,197,94,.28)",
-    glowSoft: "rgba(250,204,21,.14)",
-    tint: "rgba(34,197,94,.07)",
-    border: "rgba(34,197,94,.18)",
-  },
-  {
     key: "instagram",
     label: "Instagram",
     icon: instagramIcon,
@@ -77,9 +65,41 @@ const SOURCE_OPTIONS = [
     tint: "rgba(59,130,246,.07)",
     border: "rgba(59,130,246,.18)",
   },
+  {
+    key: "linkedin",
+    label: "LinkedIn",
+    icon: linkedinIcon,
+    placeholder: "linkedin.com/company/yourbrand",
+    title: "LinkedIn",
+    description: "Add the company page link.",
+    actionLabel: "Save source",
+    glow: "rgba(14,165,233,.26)",
+    glowSoft: "rgba(56,189,248,.14)",
+    tint: "rgba(14,165,233,.07)",
+    border: "rgba(14,165,233,.18)",
+  },
+  {
+    key: "google_maps",
+    label: "Google Maps",
+    icon: googleMapsIcon,
+    placeholder: "Business name, city or Maps link",
+    title: "Google Maps",
+    description: "Add a Maps link, or the business name with city.",
+    actionLabel: "Save source",
+    glow: "rgba(34,197,94,.28)",
+    glowSoft: "rgba(250,204,21,.14)",
+    tint: "rgba(34,197,94,.07)",
+    border: "rgba(34,197,94,.18)",
+  },
 ];
 
-const VISIBLE_SOURCE_KEYS = ["website", "google_maps", "instagram", "facebook"];
+const VISIBLE_SOURCE_KEYS = [
+  "website",
+  "instagram",
+  "facebook",
+  "linkedin",
+  "google_maps",
+];
 
 function sourceByKey(key = "") {
   return SOURCE_OPTIONS.find((item) => item.key === key) || null;
@@ -149,6 +169,10 @@ function detectInlineSource(raw = "") {
     {
       type: "facebook",
       regex: /(?:https?:\/\/)?(?:www\.)?facebook\.com\/[^\s,]+/i,
+    },
+    {
+      type: "linkedin",
+      regex: /(?:https?:\/\/)?(?:www\.)?linkedin\.com\/[^\s,]+/i,
     },
     {
       type: "google_maps",
@@ -365,7 +389,7 @@ function SourceModal({
         </div>
 
         <div className="mt-8">
-          <div className="group flex h-[60px] items-center gap-3 rounded-full border border-[rgba(15,23,42,.08)] bg-[#f7f8fa] px-5 transition focus-within:border-[rgba(15,23,42,.16)] focus-within:bg-white">
+          <div className="flex h-[60px] items-center gap-3 rounded-full border border-[rgba(15,23,42,.08)] bg-[#f7f8fa] px-5 transition focus-within:border-[rgba(15,23,42,.16)] focus-within:bg-white">
             <Link2 className="h-[16px] w-[16px] shrink-0 text-slate-400" />
             <input
               type="text"
@@ -375,8 +399,12 @@ function SourceModal({
               value={value}
               onChange={(e) => onChange(e.target.value)}
               placeholder={source.placeholder}
-              className="min-w-0 flex-1 appearance-none border-0 bg-transparent p-0 text-[16px] text-slate-900 outline-none ring-0 placeholder:text-slate-400 focus:outline-none focus:ring-0"
+              className="min-w-0 flex-1 rounded-none border-0 bg-transparent p-0 text-[16px] leading-none text-slate-900 outline-none ring-0 placeholder:text-slate-400 focus:outline-none focus:ring-0"
               style={{
+                appearance: "none",
+                WebkitAppearance: "none",
+                boxShadow: "none",
+                borderRadius: 0,
                 WebkitBoxShadow: "0 0 0 1000px transparent inset",
                 WebkitTextFillColor: "#0f172a",
               }}
@@ -494,10 +522,22 @@ export default function SetupStudioEntryStage({
 
   useEffect(() => {
     if (!activeSourceKey) return;
-    const original = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+
+    const body = document.body;
+    const scrollbarWidth =
+      window.innerWidth - document.documentElement.clientWidth;
+    const previousOverflow = body.style.overflow;
+    const previousPaddingRight = body.style.paddingRight;
+
+    body.style.overflow = "hidden";
+
+    if (scrollbarWidth > 0) {
+      body.style.paddingRight = `${scrollbarWidth}px`;
+    }
+
     return () => {
-      document.body.style.overflow = original;
+      body.style.overflow = previousOverflow;
+      body.style.paddingRight = previousPaddingRight;
     };
   }, [activeSourceKey]);
 
@@ -791,7 +831,7 @@ export default function SetupStudioEntryStage({
                 ) : null}
               </div>
 
-              <div className="relative z-10 mx-auto mt-11 flex max-w-[880px] flex-wrap items-center justify-center gap-x-4 gap-y-4">
+              <div className="relative z-10 mx-auto mt-11 flex max-w-[980px] flex-wrap items-center justify-center gap-x-4 gap-y-4">
                 {VISIBLE_SOURCE_KEYS.map((key) => {
                   const source = sourceByKey(key);
                   if (!source) return null;
