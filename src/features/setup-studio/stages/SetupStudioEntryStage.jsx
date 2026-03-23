@@ -31,16 +31,16 @@ const SOURCE_OPTIONS = [
     icon: websiteIcon,
     placeholder: "yourbusiness.com",
     title: "Website",
-    description: "Best starting point. Paste the main URL.",
+    description: "Best starting point. Paste the main website URL.",
     actionLabel: "Save source",
   },
   {
     key: "google_maps",
     label: "Google Maps",
     icon: googleMapsIcon,
-    placeholder: "Business name, city or Maps link",
+    placeholder: "Business name, city or Google Maps link",
     title: "Google Maps",
-    description: "Paste the Maps link, or business name with city.",
+    description: "Paste a Maps link, or just write the business name with city.",
     actionLabel: "Save source",
   },
   {
@@ -49,7 +49,7 @@ const SOURCE_OPTIONS = [
     icon: instagramIcon,
     placeholder: "@yourbrand or instagram.com/yourbrand",
     title: "Instagram",
-    description: "Paste a public handle or profile link.",
+    description: "Paste a public profile link or handle.",
     actionLabel: "Save source",
   },
   {
@@ -240,7 +240,9 @@ function NeoxWordmark() {
         className="inline-flex items-end gap-[8px] text-[34px] font-semibold leading-none tracking-[-0.075em] sm:text-[38px] lg:text-[42px]"
       >
         <span className="text-slate-950">NEOX</span>
-        <span className="text-slate-700">AI Studio</span>
+        <span className="bg-[linear-gradient(180deg,#475569_0%,#0f172a_100%)] bg-clip-text text-transparent">
+          AI Studio
+        </span>
       </div>
     </div>
   );
@@ -251,16 +253,16 @@ function SourceChip({ source, active = false, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex h-[60px] items-center justify-center gap-3 rounded-full border px-6 text-[15px] font-medium tracking-[-0.03em] transition ${
+      className={`inline-flex h-[58px] items-center justify-center gap-3 rounded-full border px-6 text-[15px] font-medium tracking-[-0.03em] transition ${
         active
-          ? "border-slate-300 bg-white text-slate-950 shadow-[0_14px_30px_-22px_rgba(15,23,42,.26)]"
-          : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-white"
+          ? "border-slate-300 bg-white text-slate-950 shadow-[0_16px_32px_-24px_rgba(15,23,42,.24)]"
+          : "border-white/90 bg-[rgba(255,255,255,.86)] text-slate-700 shadow-[0_14px_28px_-24px_rgba(15,23,42,.18)] hover:bg-white"
       }`}
     >
       <img
         src={source.icon}
         alt={source.label}
-        className="h-[22px] w-[22px] object-contain"
+        className="h-[21px] w-[21px] object-contain"
       />
       <span>{source.label}</span>
       {active ? <Check className="h-[15px] w-[15px] text-slate-900" /> : null}
@@ -284,7 +286,7 @@ function SourceModal({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[95] flex items-center justify-center bg-[rgba(15,23,42,.16)] px-4 py-6 backdrop-blur-[10px]"
+      className="fixed inset-0 z-[95] flex items-center justify-center bg-[rgba(15,23,42,.14)] px-4 py-6 backdrop-blur-[10px]"
     >
       <button
         type="button"
@@ -390,6 +392,8 @@ export default function SetupStudioEntryStage({
 }) {
   const textareaRef = useRef(null);
   const recognitionRef = useRef(null);
+  const composerRef = useRef("");
+  const sourceDraftsRef = useRef({});
 
   const [composerValue, setComposerValue] = useState(() =>
     cleanComposerText(
@@ -405,6 +409,14 @@ export default function SetupStudioEntryStage({
   const [speechSupported, setSpeechSupported] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [speechError, setSpeechError] = useState("");
+
+  useEffect(() => {
+    composerRef.current = composerValue;
+  }, [composerValue]);
+
+  useEffect(() => {
+    sourceDraftsRef.current = sourceDrafts;
+  }, [sourceDrafts]);
 
   const activeSource = useMemo(() => sourceByKey(activeSourceKey), [activeSourceKey]);
 
@@ -448,7 +460,7 @@ export default function SetupStudioEntryStage({
     };
   }, [activeSourceKey]);
 
-  function syncState(nextText = composerValue, nextDrafts = sourceDrafts) {
+  function syncState(nextText = composerRef.current, nextDrafts = sourceDraftsRef.current) {
     const next = buildInterpretation(nextText, nextDrafts);
 
     onSetDiscoveryField?.("sourceType", next.sourceType || "");
@@ -466,7 +478,7 @@ export default function SetupStudioEntryStage({
 
   function handleComposerChange(nextText) {
     setComposerValue(nextText);
-    syncState(nextText, sourceDrafts);
+    syncState(nextText, sourceDraftsRef.current);
   }
 
   function openSourceModal(sourceKey) {
@@ -484,14 +496,14 @@ export default function SetupStudioEntryStage({
     if (!nextValue) return;
 
     const nextDrafts = {
-      ...sourceDrafts,
+      ...sourceDraftsRef.current,
       [activeSource.key]: {
         value: nextValue,
         mode: "manual",
       },
     };
 
-    const nextComposer = cleanComposerText(composerValue, nextDrafts);
+    const nextComposer = cleanComposerText(composerRef.current, nextDrafts);
 
     setSourceDrafts(nextDrafts);
     setComposerValue(nextComposer);
@@ -502,10 +514,10 @@ export default function SetupStudioEntryStage({
   function handleRemoveSource() {
     if (!activeSource) return;
 
-    const nextDrafts = { ...sourceDrafts };
+    const nextDrafts = { ...sourceDraftsRef.current };
     delete nextDrafts[activeSource.key];
 
-    const nextComposer = cleanComposerText(composerValue, nextDrafts);
+    const nextComposer = cleanComposerText(composerRef.current, nextDrafts);
 
     setSourceDrafts(nextDrafts);
     setComposerValue(nextComposer);
@@ -585,9 +597,9 @@ export default function SetupStudioEntryStage({
       recognitionRef.current = null;
 
       if (s(finalTranscript)) {
-        const nextText = appendText(composerValue, finalTranscript);
+        const nextText = appendText(composerRef.current, finalTranscript);
         setComposerValue(nextText);
-        syncState(nextText, sourceDrafts);
+        syncState(nextText, sourceDraftsRef.current);
       }
 
       focusComposer();
@@ -626,7 +638,7 @@ export default function SetupStudioEntryStage({
 
   function handleContinue() {
     flushSync(() => {
-      syncState(composerValue, sourceDrafts);
+      syncState(composerRef.current, sourceDraftsRef.current);
     });
 
     onContinueFlow?.();
@@ -634,27 +646,25 @@ export default function SetupStudioEntryStage({
 
   return (
     <>
-      <section className="relative min-h-screen w-full overflow-hidden bg-transparent">
-        <div className="relative z-10 flex min-h-screen items-start justify-center px-4 pb-10 pt-[82px] sm:px-6 lg:px-8">
-          <div className="w-full max-w-[1160px]">
+      <section className="w-full bg-transparent">
+        <div className="mx-auto max-w-[1260px] px-4 py-[56px] sm:px-6 sm:py-[72px] lg:px-8 lg:py-[84px]">
+          <div className="mx-auto w-full max-w-[1080px] text-center">
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.22 }}
-              className="text-center"
             >
               <NeoxWordmark />
 
               <h1
                 style={DISPLAY_FONT_STYLE}
-                className="mx-auto mt-7 max-w-[980px] text-center text-[36px] font-semibold leading-[1.08] tracking-[-0.07em] text-slate-950 sm:text-[44px] lg:text-[56px]"
+                className="mx-auto mt-7 max-w-[1100px] text-[34px] font-semibold leading-[1.08] tracking-[-0.065em] text-slate-950 sm:text-[42px] lg:text-[56px]"
               >
-                One signal in.
-                <br className="hidden sm:block" /> A business draft out.
+                Turn one source into a business draft.
               </h1>
 
-              <p className="mx-auto mt-5 max-w-[620px] text-[15px] leading-7 tracking-[-0.02em] text-slate-500 sm:text-[16px]">
-                Start with a website, Maps, Instagram, Facebook or voice.
+              <p className="mx-auto mt-4 max-w-[680px] text-[15px] leading-7 tracking-[-0.02em] text-slate-500 sm:text-[16px]">
+                Start with a website, Maps, Instagram, Facebook, or voice.
               </p>
             </motion.div>
 
@@ -662,68 +672,70 @@ export default function SetupStudioEntryStage({
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.24, delay: 0.04 }}
-              className="relative mx-auto mt-10 w-full max-w-[1020px]"
+              className="relative mx-auto mt-10 w-full max-w-[1060px]"
             >
-              <div className="relative overflow-hidden rounded-[32px] border border-[rgba(17,24,39,.09)] bg-[rgba(250,250,250,.98)] shadow-[0_20px_44px_-30px_rgba(15,23,42,.14)]">
+              <div className="pointer-events-none absolute left-1/2 top-[calc(100%-8px)] h-[150px] w-[74%] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,_rgba(102,255,190,.22)_0%,_rgba(140,228,255,.16)_34%,_rgba(140,228,255,0)_72%)] blur-[36px]" />
+
+              <div className="relative z-10 overflow-hidden rounded-[30px] border border-[rgba(15,23,42,.08)] bg-[rgba(255,255,255,.94)] shadow-[0_18px_40px_-28px_rgba(15,23,42,.14)] backdrop-blur-[10px]">
                 <textarea
                   ref={textareaRef}
                   value={composerValue}
                   onChange={(e) => handleComposerChange(e.target.value)}
-                  rows={5}
-                  placeholder="Paste a website, or briefly say what the business does."
-                  className="min-h-[178px] w-full resize-none border-0 bg-transparent px-[24px] pt-[22px] text-[16px] font-normal leading-7 tracking-[-0.03em] text-slate-900 outline-none shadow-none placeholder:text-[rgba(100,116,139,.88)] focus:ring-0 sm:text-[17px]"
+                  rows={4}
+                  placeholder="Paste a website, a Maps link, or briefly describe the business."
+                  className="min-h-[146px] w-full resize-none border-0 bg-transparent px-[24px] pt-[22px] text-[16px] font-normal leading-7 tracking-[-0.03em] text-slate-900 outline-none shadow-none placeholder:text-[rgba(100,116,139,.9)] focus:ring-0 sm:text-[17px]"
                 />
 
-                <div className="border-t border-[rgba(17,24,39,.06)] px-4 py-4 sm:px-[18px]">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex flex-wrap items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={handleVoiceAction}
-                        className={`inline-flex h-11 items-center gap-2.5 rounded-full border px-4 text-[14px] font-medium tracking-[-0.03em] transition ${
-                          isListening
-                            ? "border-rose-200 bg-rose-50 text-rose-700"
-                            : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:text-slate-950"
-                        }`}
-                      >
-                        {isListening ? (
-                          <Square className="h-[15px] w-[15px] fill-current" />
-                        ) : (
-                          <Mic className="h-[16px] w-[16px]" />
-                        )}
-                        {isListening ? "Listening..." : "Use voice"}
-                      </button>
-
-                      <div className="text-[13px] text-slate-500">
-                        {isListening
-                          ? "Say what you do, who it is for, and where you operate."
-                          : speechSupported
-                          ? "Talk naturally for 10–20 seconds."
-                          : "Voice works in supported browsers."}
-                      </div>
-                    </div>
-
+                <div className="flex items-center justify-between border-t border-[rgba(15,23,42,.06)] px-4 py-4 sm:px-[18px]">
+                  <div className="flex min-w-0 items-center gap-3">
                     <button
                       type="button"
-                      disabled={!canContinue || importingWebsite}
-                      onClick={handleContinue}
-                      className={`inline-flex h-11 w-11 items-center justify-center rounded-full transition ${
-                        canContinue && !importingWebsite
-                          ? "bg-slate-950 text-white hover:bg-slate-800"
-                          : "bg-slate-200 text-white"
+                      onClick={handleVoiceAction}
+                      className={`inline-flex h-11 shrink-0 items-center gap-2.5 rounded-full border px-4 text-[14px] font-medium tracking-[-0.03em] transition ${
+                        isListening
+                          ? "border-rose-200 bg-rose-50 text-rose-700"
+                          : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:text-slate-950"
                       }`}
                     >
-                      <ArrowRight className="h-[18px] w-[18px]" />
+                      {isListening ? (
+                        <Square className="h-[15px] w-[15px] fill-current" />
+                      ) : (
+                        <Mic className="h-[16px] w-[16px]" />
+                      )}
+                      {isListening ? "Listening..." : "Use voice"}
                     </button>
+
+                    <div className="hidden min-w-0 truncate text-[13px] text-slate-500 sm:block">
+                      {isListening
+                        ? "Say what the business does and who it serves."
+                        : speechSupported
+                        ? "Talk naturally for 10–20 seconds."
+                        : "Voice works in supported browsers."}
+                    </div>
                   </div>
 
-                  {speechError ? (
-                    <div className="mt-3 text-[13px] text-rose-600">{speechError}</div>
-                  ) : null}
+                  <button
+                    type="button"
+                    disabled={!canContinue || importingWebsite}
+                    onClick={handleContinue}
+                    className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition ${
+                      canContinue && !importingWebsite
+                        ? "bg-[rgba(15,23,42,.18)] text-white hover:bg-[rgba(15,23,42,.30)]"
+                        : "bg-[rgba(15,23,42,.10)] text-white"
+                    }`}
+                  >
+                    <ArrowRight className="h-[18px] w-[18px]" />
+                  </button>
                 </div>
+
+                {speechError ? (
+                  <div className="border-t border-[rgba(15,23,42,.06)] px-5 py-3 text-left text-[13px] text-rose-600">
+                    {speechError}
+                  </div>
+                ) : null}
               </div>
 
-              <div className="mx-auto mt-9 flex max-w-[920px] flex-wrap items-center justify-center gap-4">
+              <div className="relative z-10 mx-auto mt-10 flex max-w-[860px] flex-wrap items-center justify-center gap-4">
                 {VISIBLE_SOURCE_KEYS.map((key) => {
                   const source = sourceByKey(key);
                   if (!source) return null;
