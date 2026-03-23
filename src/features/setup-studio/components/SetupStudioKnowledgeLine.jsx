@@ -1,4 +1,4 @@
-import { ExternalLink } from "lucide-react";
+import { Check, ExternalLink, X } from "lucide-react";
 import { TinyChip } from "./SetupStudioUi.jsx";
 
 function s(v, d = "") {
@@ -23,7 +23,15 @@ function normalizeEvidenceUrl(item = {}) {
 }
 
 function normalizeConfidence(item = {}) {
-  return s(item.confidenceLabel || item.confidence || "");
+  const raw = item.confidenceLabel || item.confidence || "";
+  const text = s(raw);
+
+  if (!text) return "";
+
+  if (text === "1") return "high";
+  if (text === "0") return "";
+
+  return text;
 }
 
 export default function SetupStudioKnowledgeLine({
@@ -36,57 +44,58 @@ export default function SetupStudioKnowledgeLine({
   const confidence = normalizeConfidence(item);
 
   return (
-    <div className="grid gap-4 border-t border-slate-900/8 py-4 md:grid-cols-[28px_minmax(0,1fr)_auto] md:items-center">
-      <div className="text-[11px] font-medium uppercase tracking-[0.24em] text-slate-400">
-        {s(item.index)}
-      </div>
+    <div className="rounded-[26px] border border-slate-200 bg-white p-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            {s(item.index) ? <TinyChip>{s(item.index)}</TinyChip> : null}
+            {s(item.category) ? <TinyChip>{s(item.category)}</TinyChip> : null}
+            {confidence ? <TinyChip>{confidence}</TinyChip> : null}
+            {s(item.source) ? <TinyChip>{s(item.source)}</TinyChip> : null}
+          </div>
 
-      <div className="min-w-0">
-        <div className="flex flex-wrap gap-2">
-          {s(item.category) ? <TinyChip>{s(item.category)}</TinyChip> : null}
-          {confidence ? <TinyChip>{confidence}</TinyChip> : null}
-          {s(item.source) ? <TinyChip>{s(item.source)}</TinyChip> : null}
+          <div className="mt-4 text-[20px] font-semibold leading-[1.15] tracking-[-0.03em] text-slate-950">
+            {s(item.title) || "Untitled item"}
+          </div>
+
+          <div className="mt-2 text-sm leading-7 text-slate-600">
+            {s(item.value) || "Preview yoxdur."}
+          </div>
+
+          {evidenceUrl ? (
+            <a
+              href={evidenceUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 transition hover:text-slate-950"
+            >
+              <ExternalLink className="h-4 w-4" />
+              Open evidence
+            </a>
+          ) : null}
         </div>
 
-        <div className="mt-3 text-lg font-semibold tracking-[-0.04em] text-slate-950">
-          {s(item.title) || "Untitled item"}
-        </div>
-
-        <div className="mt-1 text-sm leading-7 text-slate-600">
-          {s(item.value) || "Preview yoxdur."}
-        </div>
-
-        {evidenceUrl ? (
-          <a
-            href={evidenceUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-900"
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onApprove}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-slate-950 px-4 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-60"
           >
-            <ExternalLink className="h-3.5 w-3.5" />
-            Open evidence
-          </a>
-        ) : null}
-      </div>
+            <Check className="h-4 w-4" />
+            {busy ? "Saving..." : "Approve"}
+          </button>
 
-      <div className="flex shrink-0 gap-2">
-        <button
-          type="button"
-          disabled={busy}
-          onClick={onApprove}
-          className="inline-flex items-center justify-center rounded-full bg-slate-950 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-60"
-        >
-          {busy ? "..." : "Approve"}
-        </button>
-
-        <button
-          type="button"
-          disabled={busy}
-          onClick={onReject}
-          className="inline-flex items-center justify-center rounded-full border border-slate-900/10 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 disabled:opacity-60"
-        >
-          Reject
-        </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onReject}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:text-slate-950 disabled:opacity-60"
+          >
+            <X className="h-4 w-4" />
+            Reject
+          </button>
+        </div>
       </div>
     </div>
   );

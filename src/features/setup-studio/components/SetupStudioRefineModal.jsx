@@ -52,11 +52,11 @@ function countLines(value = "") {
 }
 
 function inputClassName() {
-  return "h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-[15px] text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-slate-300";
+  return "h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-[14px] text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-slate-300";
 }
 
 function textAreaClassName(minHeightClass = "min-h-[120px]") {
-  return `${minHeightClass} w-full resize-none rounded-[24px] border border-slate-200 bg-white px-4 py-4 text-[15px] leading-7 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-slate-300`;
+  return `${minHeightClass} w-full resize-none rounded-[22px] border border-slate-200 bg-white px-4 py-3.5 text-[14px] leading-7 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-slate-300`;
 }
 
 function labelClassName() {
@@ -72,24 +72,21 @@ function MicroLabel({ icon: Icon, children }) {
   );
 }
 
-function Section({ title, subtitle = "", children }) {
+function Section({ title, children, className = "" }) {
   return (
-    <section className="rounded-[28px] border border-slate-200 bg-white">
-      <div className="border-b border-slate-200 px-5 py-4">
+    <section className={`rounded-[24px] border border-slate-200 bg-white ${className}`}>
+      <div className="border-b border-slate-200 px-4 py-3.5">
         <div className="text-sm font-semibold text-slate-950">{title}</div>
-        {subtitle ? (
-          <div className="mt-1 text-sm leading-6 text-slate-500">{subtitle}</div>
-        ) : null}
       </div>
 
-      <div className="px-5 py-5">{children}</div>
+      <div className="px-4 py-4">{children}</div>
     </section>
   );
 }
 
 function SnapshotRow({ label, value }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5">
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-3">
       <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
         {label || "Field"}
       </div>
@@ -102,8 +99,8 @@ function SnapshotRow({ label, value }) {
 
 function KeyFactRow({ icon: Icon, label, value }) {
   return (
-    <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5">
-      <div className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500">
+    <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-3">
+      <div className="inline-flex h-8 w-8 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500">
         <Icon className="h-4 w-4" />
       </div>
 
@@ -135,6 +132,18 @@ function SectionHeader({ title, count, hint }) {
 
 function EmptySectionHint({ text }) {
   return <div className="mt-2 text-xs leading-6 text-slate-400">{text}</div>;
+}
+
+function FormatRow({ icon: Icon, title, value }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-3">
+      <div className="flex items-center gap-2 text-slate-900">
+        <Icon className="h-4 w-4" />
+        <span className="text-sm font-medium">{title}</span>
+      </div>
+      <div className="mt-1.5 text-sm text-slate-600">{value}</div>
+    </div>
+  );
 }
 
 export default function SetupStudioRefineModal({
@@ -185,24 +194,23 @@ export default function SetupStudioRefineModal({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 16, scale: 0.98 }}
+      initial={{ opacity: 0, y: 14, scale: 0.985 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: 16, scale: 0.98 }}
-      transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-      className="relative my-2 flex w-full max-w-[1180px] flex-col overflow-hidden rounded-[34px] border border-slate-200 bg-[#f8f8f8] shadow-[0_30px_80px_rgba(15,23,42,.16)] max-h-[calc(100vh-1rem)] sm:my-4 sm:max-h-[calc(100vh-2rem)]"
+      exit={{ opacity: 0, y: 14, scale: 0.985 }}
+      transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+      className="relative my-2 flex w-full max-w-[1120px] flex-col overflow-hidden rounded-[30px] border border-slate-200 bg-[#f6f6f7] shadow-[0_24px_60px_rgba(15,23,42,.14)] max-h-[calc(100vh-1rem)] sm:my-4 sm:max-h-[calc(100vh-2rem)]"
     >
-      <div className="sticky top-0 z-10 border-b border-slate-200 bg-[#f8f8f8] px-5 py-5 sm:px-6">
+      <div className="sticky top-0 z-10 border-b border-slate-200 bg-[#f6f6f7] px-5 py-4 sm:px-6">
         <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0 max-w-[760px]">
+          <div className="min-w-0 max-w-[720px]">
             <MicroLabel icon={Brain}>Refine draft</MicroLabel>
 
-            <h2 className="mt-4 text-[28px] font-semibold leading-[1.02] tracking-[-0.05em] text-slate-950 sm:text-[34px]">
+            <h2 className="mt-4 text-[24px] font-semibold leading-[1.04] tracking-[-0.04em] text-slate-950 sm:text-[30px]">
               Review and confirm the business draft
             </h2>
 
-            <p className="mt-3 text-sm leading-7 text-slate-500">
-              Clean the business identity, add only useful structured details,
-              and confirm the version that should become the working business twin.
+            <p className="mt-2 text-sm leading-7 text-slate-500">
+              Clean the core identity and keep only the structured details that matter.
             </p>
           </div>
 
@@ -219,16 +227,13 @@ export default function SetupStudioRefineModal({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="grid gap-6 px-5 py-5 sm:px-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="grid gap-5 px-5 py-5 sm:px-6 xl:grid-cols-[minmax(0,1fr)_320px]">
           <form
             id={FORM_ID}
             onSubmit={onSaveBusiness}
-            className="min-w-0 space-y-6"
+            className="min-w-0 space-y-5"
           >
-            <Section
-              title="Core business identity"
-              subtitle="These fields shape the main business draft the runtime will rely on."
-            >
+            <Section title="Core business identity">
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <label className={labelClassName()}>Company name</label>
@@ -320,16 +325,13 @@ export default function SetupStudioRefineModal({
                 <textarea
                   value={s(form.description)}
                   onChange={(e) => onSetBusinessField("description", e.target.value)}
-                  className={textAreaClassName("min-h-[160px]")}
-                  placeholder="Describe what the business does, who it serves, and what makes it clear."
+                  className={textAreaClassName("min-h-[140px]")}
+                  placeholder="Describe what the business does and who it serves."
                 />
               </div>
             </Section>
 
-            <Section
-              title="Structured knowledge"
-              subtitle="Add only the information the runtime should actually learn from."
-            >
+            <Section title="Structured knowledge">
               <div className="space-y-5">
                 <div>
                   <SectionHeader
@@ -339,9 +341,13 @@ export default function SetupStudioRefineModal({
                   />
                   <textarea
                     value={sections.servicesText}
-                    onChange={(e) => onSetManualSection?.("servicesText", e.target.value)}
-                    className={textAreaClassName("min-h-[120px]")}
-                    placeholder={"Hair coloring | Premium color service\nConsultation | First visit consultation"}
+                    onChange={(e) =>
+                      onSetManualSection?.("servicesText", e.target.value)
+                    }
+                    className={textAreaClassName("min-h-[110px]")}
+                    placeholder={
+                      "Hair coloring | Premium color service\nConsultation | First visit consultation"
+                    }
                   />
                   {serviceCount === 0 ? (
                     <EmptySectionHint text="Format: Name | Description" />
@@ -356,9 +362,13 @@ export default function SetupStudioRefineModal({
                   />
                   <textarea
                     value={sections.faqsText}
-                    onChange={(e) => onSetManualSection?.("faqsText", e.target.value)}
-                    className={textAreaClassName("min-h-[120px]")}
-                    placeholder={"Do you work on weekends? | Yes, Saturdays are open from 10:00 to 18:00"}
+                    onChange={(e) =>
+                      onSetManualSection?.("faqsText", e.target.value)
+                    }
+                    className={textAreaClassName("min-h-[110px]")}
+                    placeholder={
+                      "Do you work on weekends? | Yes, Saturdays are open from 10:00 to 18:00"
+                    }
                   />
                   {faqCount === 0 ? (
                     <EmptySectionHint text="Format: Question | Answer" />
@@ -373,9 +383,13 @@ export default function SetupStudioRefineModal({
                   />
                   <textarea
                     value={sections.policiesText}
-                    onChange={(e) => onSetManualSection?.("policiesText", e.target.value)}
-                    className={textAreaClassName("min-h-[120px]")}
-                    placeholder={"Booking policy | Appointments should be confirmed in advance"}
+                    onChange={(e) =>
+                      onSetManualSection?.("policiesText", e.target.value)
+                    }
+                    className={textAreaClassName("min-h-[110px]")}
+                    placeholder={
+                      "Booking policy | Appointments should be confirmed in advance"
+                    }
                   />
                   {policyCount === 0 ? (
                     <EmptySectionHint text="Format: Title | Description" />
@@ -385,18 +399,15 @@ export default function SetupStudioRefineModal({
             </Section>
           </form>
 
-          <div className="min-w-0 space-y-6">
-            <Section
-              title="Extracted snapshot"
-              subtitle="This is the structured source result you are refining."
-            >
+          <div className="min-w-0 space-y-5">
+            <Section title="Extracted snapshot">
               <div className="mb-4">
-                <MicroLabel icon={BadgeCheck}>Extracted snapshot</MicroLabel>
+                <MicroLabel icon={BadgeCheck}>Snapshot</MicroLabel>
               </div>
 
               <div className="space-y-3">
                 {rows.length ? (
-                  rows.map((item, index) => (
+                  rows.slice(0, 8).map((item, index) => (
                     <SnapshotRow
                       key={`${item.label}-${index}`}
                       label={item.label}
@@ -411,10 +422,7 @@ export default function SetupStudioRefineModal({
               </div>
             </Section>
 
-            <Section
-              title="Current key facts"
-              subtitle="Quick facts from the current editable draft."
-            >
+            <Section title="Key facts">
               {keyFacts.length ? (
                 <div className="space-y-3">
                   {keyFacts.map((item) => (
@@ -433,41 +441,32 @@ export default function SetupStudioRefineModal({
               )}
             </Section>
 
-            <Section
-              title="Input format"
-              subtitle="Keep each line simple so the structured draft stays clean."
-            >
-              <div className="space-y-3 text-sm leading-7 text-slate-600">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <div className="flex items-center gap-2 text-slate-900">
-                    <FileText className="h-4 w-4" />
-                    <span className="font-medium">Services</span>
-                  </div>
-                  <div className="mt-1.5 text-slate-900">Name | Description</div>
-                </div>
+            <Section title="Input format">
+              <div className="space-y-3">
+                <FormatRow
+                  icon={FileText}
+                  title="Services"
+                  value="Name | Description"
+                />
 
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <div className="flex items-center gap-2 text-slate-900">
-                    <Sparkles className="h-4 w-4" />
-                    <span className="font-medium">FAQ</span>
-                  </div>
-                  <div className="mt-1.5 text-slate-900">Question | Answer</div>
-                </div>
+                <FormatRow
+                  icon={Sparkles}
+                  title="FAQ"
+                  value="Question | Answer"
+                />
 
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <div className="flex items-center gap-2 text-slate-900">
-                    <BadgeCheck className="h-4 w-4" />
-                    <span className="font-medium">Policies</span>
-                  </div>
-                  <div className="mt-1.5 text-slate-900">Title | Description</div>
-                </div>
+                <FormatRow
+                  icon={BadgeCheck}
+                  title="Policies"
+                  value="Title | Description"
+                />
               </div>
             </Section>
           </div>
         </div>
       </div>
 
-      <div className="sticky bottom-0 z-10 border-t border-slate-200 bg-[#f8f8f8] px-5 py-4 sm:px-6">
+      <div className="sticky bottom-0 z-10 border-t border-slate-200 bg-[#f6f6f7] px-5 py-4 sm:px-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm text-slate-500">
             Confirming will write this draft into the canonical business layer.
