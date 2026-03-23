@@ -6,7 +6,8 @@ import {
   ChevronDown,
   Globe2,
   Link2,
-  Sparkles,
+  Paperclip,
+  SquarePlus,
   X,
 } from "lucide-react";
 
@@ -21,10 +22,6 @@ import whatsappIcon from "../../../assets/setup-studio/channels/whatsapp.svg";
 
 function s(v) {
   return String(v ?? "").replace(/\u00a0/g, " ").trim();
-}
-
-function arr(v, d = []) {
-  return Array.isArray(v) ? v : d;
 }
 
 function obj(v, d = {}) {
@@ -44,10 +41,10 @@ const SOURCE_OPTIONS = [
     placeholder: "yourbusiness.com",
     title: "Add your website",
     description:
-      "Paste the main website URL for your business. This is usually the strongest public source for the first draft.",
+      "Paste the main website URL. This is usually the strongest public source for the first business draft.",
     actionLabel: "Add website",
     connectLabel: "",
-    tone: "from-sky-400/25 via-cyan-300/10 to-transparent",
+    glow: "from-sky-400/20 via-cyan-300/8 to-transparent",
   },
   {
     key: "google_maps",
@@ -57,10 +54,10 @@ const SOURCE_OPTIONS = [
     placeholder: "Paste your Google Maps link",
     title: "Add your Google Maps source",
     description:
-      "Paste the Google Maps link for your business. This helps with place identity and local business details.",
+      "Paste the Maps link for your business. This helps with place identity and local business details.",
     actionLabel: "Add Maps link",
     connectLabel: "",
-    tone: "from-emerald-400/25 via-lime-300/10 to-transparent",
+    glow: "from-emerald-400/22 via-lime-300/8 to-transparent",
   },
   {
     key: "instagram",
@@ -70,10 +67,10 @@ const SOURCE_OPTIONS = [
     placeholder: "instagram.com/yourbrand",
     title: "Add or connect Instagram",
     description:
-      "Paste the public Instagram profile link now. The connect action can later be wired to the real auth flow.",
+      "Paste the public profile link now. The connect action can be wired to real auth later.",
     actionLabel: "Add profile link",
     connectLabel: "Connect",
-    tone: "from-pink-400/25 via-fuchsia-300/10 to-transparent",
+    glow: "from-pink-400/22 via-fuchsia-300/8 to-transparent",
   },
   {
     key: "linkedin",
@@ -83,10 +80,10 @@ const SOURCE_OPTIONS = [
     placeholder: "linkedin.com/company/yourbrand",
     title: "Add or connect LinkedIn",
     description:
-      "Paste the company page link now. The connect action can later be wired to the real auth flow.",
+      "Paste the company page link now. The connect action can be wired to real auth later.",
     actionLabel: "Add page link",
     connectLabel: "Connect",
-    tone: "from-sky-400/25 via-blue-300/10 to-transparent",
+    glow: "from-sky-400/22 via-blue-300/8 to-transparent",
   },
   {
     key: "facebook",
@@ -96,10 +93,10 @@ const SOURCE_OPTIONS = [
     placeholder: "facebook.com/yourbrand",
     title: "Add or connect Facebook",
     description:
-      "Paste the public Facebook page link now. The connect action can later be wired to the real auth flow.",
+      "Paste the public page link now. The connect action can be wired to real auth later.",
     actionLabel: "Add page link",
     connectLabel: "Connect",
-    tone: "from-blue-400/25 via-indigo-300/10 to-transparent",
+    glow: "from-blue-400/22 via-indigo-300/8 to-transparent",
   },
   {
     key: "tiktok",
@@ -109,10 +106,10 @@ const SOURCE_OPTIONS = [
     placeholder: "tiktok.com/@yourbrand",
     title: "Add your TikTok profile",
     description:
-      "Paste the public TikTok profile link if this is a real source for the business brand.",
+      "Paste the public TikTok profile link if this is a real source for the business.",
     actionLabel: "Add TikTok link",
     connectLabel: "",
-    tone: "from-slate-500/20 via-slate-300/10 to-transparent",
+    glow: "from-slate-400/18 via-slate-200/8 to-transparent",
   },
   {
     key: "youtube",
@@ -122,10 +119,10 @@ const SOURCE_OPTIONS = [
     placeholder: "youtube.com/@yourbrand",
     title: "Add your YouTube channel",
     description:
-      "Paste the channel link if the business publishes videos, explainers, or brand content there.",
+      "Paste the channel link if the business publishes videos or explainers there.",
     actionLabel: "Add channel link",
     connectLabel: "",
-    tone: "from-rose-400/25 via-red-300/10 to-transparent",
+    glow: "from-rose-400/22 via-red-300/8 to-transparent",
   },
   {
     key: "whatsapp",
@@ -135,10 +132,10 @@ const SOURCE_OPTIONS = [
     placeholder: "wa.me/994xxxxxxxxx",
     title: "Add or connect WhatsApp",
     description:
-      "Paste a WhatsApp link now. The connect action can later be wired to the real auth flow.",
+      "Paste a WhatsApp link now. The connect action can be wired to real auth later.",
     actionLabel: "Add WhatsApp link",
     connectLabel: "Connect",
-    tone: "from-emerald-400/25 via-green-300/10 to-transparent",
+    glow: "from-emerald-400/22 via-green-300/8 to-transparent",
   },
 ];
 
@@ -226,20 +223,6 @@ function detectInlineSource(raw = "") {
   return null;
 }
 
-function sourceLabel(type = "") {
-  const x = lower(type);
-
-  if (x === "website") return "Website";
-  if (x === "google_maps") return "Google Maps";
-  if (x === "instagram") return "Instagram";
-  if (x === "linkedin") return "LinkedIn";
-  if (x === "facebook") return "Facebook";
-  if (x === "tiktok") return "TikTok";
-  if (x === "youtube") return "YouTube";
-  if (x === "whatsapp") return "WhatsApp";
-  return "your source";
-}
-
 function pickPrimaryAttachedSource(sourceDrafts = {}) {
   for (const item of SOURCE_OPTIONS) {
     const record = obj(sourceDrafts[item.key]);
@@ -297,24 +280,20 @@ function buildInterpretation(raw = "", sourceDrafts = {}) {
   };
 }
 
-function SourcePill({ source, active = false, onClick, filled = false }) {
+function SourceChip({ source, active = false, filled = false, onClick }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`group inline-flex items-center gap-2 rounded-full border px-4 py-3 text-sm font-medium transition ${
+      className={`inline-flex items-center gap-2 rounded-full border px-5 py-3 text-[13px] font-medium transition ${
         active
-          ? "border-slate-900 bg-slate-900 text-white shadow-[0_14px_30px_rgba(15,23,42,.16)]"
+          ? "border-slate-900 bg-slate-900 text-white shadow-[0_12px_28px_rgba(15,23,42,.14)]"
           : filled
-            ? "border-slate-300 bg-white text-slate-900 shadow-[0_10px_26px_rgba(15,23,42,.06)]"
-            : "border-white/80 bg-white/82 text-slate-700 shadow-[0_10px_26px_rgba(15,23,42,.05)] hover:-translate-y-[1px] hover:bg-white"
+            ? "border-slate-300 bg-white text-slate-900 shadow-[0_8px_20px_rgba(15,23,42,.05)]"
+            : "border-white/85 bg-white/80 text-slate-700 shadow-[0_8px_20px_rgba(15,23,42,.04)] hover:bg-white"
       }`}
     >
-      <img
-        src={source.icon}
-        alt={source.label}
-        className="h-4 w-4 object-contain"
-      />
+      <img src={source.icon} alt={source.label} className="h-4 w-4 object-contain" />
       <span>{source.label}</span>
     </button>
   );
@@ -352,11 +331,11 @@ function SourceModal({
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 18, scale: 0.985 }}
         transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-        className="relative z-10 w-full max-w-[560px] overflow-hidden rounded-[30px] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,.95),rgba(249,251,254,.9))] shadow-[0_30px_90px_rgba(15,23,42,.18)]"
+        className="relative z-10 w-full max-w-[560px] overflow-hidden rounded-[30px] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,.96),rgba(249,251,254,.92))] shadow-[0_30px_90px_rgba(15,23,42,.18)]"
       >
         <div className="pointer-events-none absolute inset-0">
           <div
-            className={`absolute inset-x-0 top-0 h-40 bg-gradient-to-br ${source.tone}`}
+            className={`absolute inset-x-0 top-0 h-40 bg-gradient-to-br ${source.glow}`}
           />
           <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent opacity-80" />
         </div>
@@ -364,7 +343,7 @@ function SourceModal({
         <div className="relative z-10 p-6 sm:p-7">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-4">
-              <span className="inline-flex h-14 w-14 items-center justify-center rounded-[20px] border border-slate-200 bg-white shadow-[0_10px_26px_rgba(15,23,42,.06)]">
+              <span className="inline-flex h-14 w-14 items-center justify-center rounded-[20px] border border-slate-200 bg-white shadow-[0_10px_24px_rgba(15,23,42,.05)]">
                 <img
                   src={source.icon}
                   alt={source.label}
@@ -373,7 +352,7 @@ function SourceModal({
               </span>
 
               <div className="min-w-0">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
                   Source
                 </div>
                 <h3 className="mt-2 text-[28px] font-semibold leading-[1.02] tracking-[-0.05em] text-slate-950">
@@ -394,7 +373,7 @@ function SourceModal({
             </button>
           </div>
 
-          <div className="mt-8 rounded-[24px] border border-slate-200 bg-white/90 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,.9),0_10px_26px_rgba(15,23,42,.04)]">
+          <div className="mt-8 rounded-[24px] border border-slate-200 bg-white/92 p-4 shadow-[0_10px_24px_rgba(15,23,42,.04)]">
             <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
               {showConnect ? "Add link or connect" : "Add source link"}
             </div>
@@ -464,10 +443,7 @@ export default function SetupStudioEntryStage({
   const [activeSourceKey, setActiveSourceKey] = useState("");
   const [modalValue, setModalValue] = useState("");
 
-  const activeSource = useMemo(
-    () => sourceByKey(activeSourceKey),
-    [activeSourceKey]
-  );
+  const activeSource = useMemo(() => sourceByKey(activeSourceKey), [activeSourceKey]);
 
   const interpretation = useMemo(() => {
     return buildInterpretation(composerValue, sourceDrafts);
@@ -478,17 +454,14 @@ export default function SetupStudioEntryStage({
 
   useEffect(() => {
     if (!activeSource) return;
-
     const prev = obj(sourceDrafts[activeSource.key]);
     setModalValue(s(prev.value));
   }, [activeSource, sourceDrafts]);
 
   useEffect(() => {
     if (!activeSourceKey) return;
-
     const original = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-
     return () => {
       document.body.style.overflow = original;
     };
@@ -526,7 +499,6 @@ export default function SetupStudioEntryStage({
 
   function handleSaveSourceLink() {
     if (!activeSource) return;
-
     const nextValue = s(modalValue);
     if (!nextValue) return;
 
@@ -568,135 +540,122 @@ export default function SetupStudioEntryStage({
 
   return (
     <>
-      <section className="relative min-h-[100svh] w-full overflow-hidden bg-[linear-gradient(180deg,#f8fbff_0%,#f3f7fb_48%,#eef5fb_100%)]">
+      <section className="relative min-h-[100svh] w-full overflow-hidden bg-[linear-gradient(180deg,#f8fbff_0%,#f5f9fc_48%,#eef6fb_100%)]">
         <div className="pointer-events-none absolute inset-0">
-          <div className="absolute right-[-8%] top-[-8%] h-[28rem] w-[28rem] rounded-full bg-[radial-gradient(circle,_rgba(164,231,255,.18)_0%,_rgba(164,231,255,0)_68%)] blur-3xl" />
-          <div className="absolute left-[-8%] bottom-[-12%] h-[26rem] w-[26rem] rounded-full bg-[radial-gradient(circle,_rgba(198,230,255,.16)_0%,_rgba(198,230,255,0)_70%)] blur-3xl" />
-          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,.18)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.18)_1px,transparent_1px)] bg-[size:48px_48px] opacity-[0.18]" />
+          <div className="absolute right-[-8%] top-[-10%] h-[28rem] w-[28rem] rounded-full bg-[radial-gradient(circle,_rgba(191,235,255,.34)_0%,_rgba(191,235,255,0)_70%)] blur-3xl" />
+          <div className="absolute right-[10%] top-[18%] h-[22rem] w-[22rem] rounded-full bg-[radial-gradient(circle,_rgba(210,246,255,.26)_0%,_rgba(210,246,255,0)_72%)] blur-3xl" />
         </div>
 
         <div className="relative z-10 flex min-h-[100svh] w-full flex-col">
-          <div className="flex items-center justify-end px-4 pb-0 pt-5 sm:px-6 lg:px-10">
-            <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center justify-end px-6 pt-5 lg:px-10">
+            <div className="flex items-center gap-3">
               <button
                 type="button"
-                className="inline-flex h-11 items-center gap-2 rounded-full border border-white/80 bg-white/80 px-4 text-sm font-medium text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,.05)] transition hover:bg-white"
+                className="inline-flex h-12 items-center gap-2 rounded-full bg-white/85 px-4 text-sm font-medium text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,.05)]"
               >
                 <Globe2 className="h-4 w-4" />
                 English
-                <ChevronDown className="h-4 w-4" />
+                <ChevronDown className="h-4 w-4 text-slate-400" />
               </button>
 
               <button
                 type="button"
-                className="inline-flex h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-medium text-white shadow-[0_16px_34px_rgba(15,23,42,.16)] transition hover:bg-slate-800"
+                className="inline-flex h-12 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-medium text-white shadow-[0_16px_34px_rgba(15,23,42,.16)]"
               >
-                Studio mode
+                Sign in / sign up
               </button>
             </div>
           </div>
 
-          <div className="flex flex-1 items-center justify-center px-4 py-10 sm:px-6 lg:px-10 lg:py-14">
-            <div className="w-full max-w-[1050px]">
+          <div className="flex flex-1 items-start justify-center px-4 pb-16 pt-20 sm:px-6 lg:px-8">
+            <div className="w-full max-w-[1120px]">
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.22 }}
                 className="text-center"
               >
-                <div className="mx-auto w-fit rounded-full border border-white/80 bg-white/84 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 shadow-[0_10px_26px_rgba(15,23,42,.05)]">
-                  Ready to scan
+                <div className="text-[34px] font-bold tracking-[-0.06em] text-slate-950 sm:text-[42px]">
+                  NEOX AI Studio
                 </div>
 
-                <div className="mt-8">
-                  <div className="text-[38px] font-semibold leading-none tracking-[-0.06em] text-slate-950 sm:text-[52px]">
-                    NEOX AI Studio
-                  </div>
-
-                  <p className="mx-auto mt-5 max-w-[800px] text-[24px] leading-tight tracking-[-0.03em] text-slate-900 sm:text-[34px]">
-                    Describe your business in any language, then let AI build the
-                    first business draft.
-                  </p>
-                </div>
+                <h1 className="mx-auto mt-7 max-w-[1080px] text-[28px] font-medium leading-[1.14] tracking-[-0.04em] text-slate-900 sm:text-[36px] lg:text-[44px]">
+                  Describe your business in any language, then let AI build the
+                  first business draft.
+                </h1>
               </motion.div>
 
               <motion.div
                 initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.24, delay: 0.04 }}
-                className="relative mx-auto mt-10 w-full max-w-[940px]"
+                className="relative mx-auto mt-12 w-full max-w-[1000px]"
               >
-                <div className="pointer-events-none absolute inset-x-[18%] -bottom-8 h-24 rounded-full bg-[radial-gradient(circle,_rgba(96,255,192,.22)_0%,_rgba(126,229,255,.18)_34%,_rgba(126,229,255,0)_74%)] blur-2xl" />
+                <div className="pointer-events-none absolute inset-x-[10%] -bottom-8 h-24 rounded-full bg-[radial-gradient(circle,_rgba(90,255,190,.22)_0%,_rgba(132,234,255,.18)_32%,_rgba(132,234,255,0)_74%)] blur-2xl" />
 
-                <div className="relative overflow-hidden rounded-[34px] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,.90),rgba(249,252,255,.84))] shadow-[0_28px_80px_rgba(15,23,42,.10)] backdrop-blur-xl">
-                  <div className="pointer-events-none absolute inset-0">
-                    <div className="absolute right-[10%] top-0 h-40 w-40 rounded-full bg-[radial-gradient(circle,_rgba(154,233,255,.14)_0%,_rgba(154,233,255,0)_72%)] blur-2xl" />
-                    <div className="absolute left-[8%] bottom-0 h-32 w-32 rounded-full bg-[radial-gradient(circle,_rgba(126,211,255,.10)_0%,_rgba(126,211,255,0)_70%)] blur-2xl" />
+                <div className="overflow-hidden rounded-[34px] border border-[rgba(208,217,230,.9)] bg-[rgba(255,255,255,.90)] shadow-[0_20px_50px_rgba(15,23,42,.06)] backdrop-blur-[10px]">
+                  <textarea
+                    value={composerValue}
+                    onChange={(e) => handleComposerChange(e.target.value)}
+                    rows={6}
+                    placeholder="Describe your business in any language..."
+                    className="min-h-[176px] w-full resize-none border-0 bg-transparent px-6 py-6 text-[18px] leading-8 text-slate-900 outline-none shadow-none placeholder:text-slate-400 focus:ring-0"
+                  />
+
+                  <div className="flex items-center justify-between border-t border-[rgba(220,228,239,.9)] px-4 py-4 sm:px-5">
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[rgba(214,221,232,.95)] bg-white text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,.04)]"
+                      >
+                        <Paperclip className="h-4 w-4" />
+                      </button>
+
+                      <button
+                        type="button"
+                        className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[rgba(214,221,232,.95)] bg-white text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,.04)]"
+                      >
+                        <SquarePlus className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        className="inline-flex h-11 items-center gap-2 rounded-full bg-white px-4 text-sm font-medium text-slate-700 shadow-[0_4px_12px_rgba(15,23,42,.04)]"
+                      >
+                        Draft
+                        <ChevronDown className="h-4 w-4 text-slate-400" />
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={!canContinue || importingWebsite}
+                        onClick={handleContinue}
+                        className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-slate-950 text-white shadow-[0_14px_30px_rgba(15,23,42,.14)] transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <ArrowRight className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
+                </div>
 
-                  <div className="relative z-10 p-4 sm:p-5">
-                    <div className="overflow-hidden rounded-[28px] border border-slate-200/90 bg-white/88 shadow-[inset_0_1px_0_rgba(255,255,255,.9),0_16px_38px_rgba(15,23,42,.05)]">
-                      <textarea
-                        value={composerValue}
-                        onChange={(e) => handleComposerChange(e.target.value)}
-                        rows={5}
-                        placeholder="Describe your business in any language..."
-                        className="min-h-[180px] w-full resize-none border-0 bg-transparent px-5 py-5 text-[17px] leading-8 text-slate-950 outline-none placeholder:text-slate-400 focus:ring-0 sm:px-6 sm:py-6"
+                <div className="mx-auto mt-12 flex max-w-[980px] flex-wrap items-center justify-center gap-4">
+                  {SOURCE_OPTIONS.map((source) => {
+                    const record = obj(sourceDrafts[source.key]);
+                    const filled =
+                      !!s(record.value) || lower(record.mode) === "connect";
+
+                    return (
+                      <SourceChip
+                        key={source.key}
+                        source={source}
+                        active={activeSourceKey === source.key}
+                        filled={filled}
+                        onClick={() => openSourceModal(source.key)}
                       />
-
-                      <div className="flex flex-col gap-4 border-t border-slate-200/80 px-5 py-4 sm:px-6 sm:py-5 lg:flex-row lg:items-center lg:justify-between">
-                        <div className="flex items-center gap-3">
-                          <button
-                            type="button"
-                            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-[0_8px_20px_rgba(15,23,42,.04)] transition hover:border-slate-300 hover:text-slate-900"
-                          >
-                            <Link2 className="h-4 w-4" />
-                          </button>
-
-                          <button
-                            type="button"
-                            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-[0_8px_20px_rgba(15,23,42,.04)] transition hover:border-slate-300 hover:text-slate-900"
-                          >
-                            <Sparkles className="h-4 w-4" />
-                          </button>
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-3">
-                          <div className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-[0_8px_20px_rgba(15,23,42,.04)]">
-                            Draft
-                            <ChevronDown className="h-4 w-4 text-slate-400" />
-                          </div>
-
-                          <button
-                            type="button"
-                            disabled={!canContinue || importingWebsite}
-                            onClick={handleContinue}
-                            className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-slate-950 text-white shadow-[0_16px_34px_rgba(15,23,42,.16)] transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
-                          >
-                            <ArrowRight className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-                      {SOURCE_OPTIONS.map((source) => {
-                        const record = obj(sourceDrafts[source.key]);
-                        const filled =
-                          !!s(record.value) || lower(record.mode) === "connect";
-
-                        return (
-                          <SourcePill
-                            key={source.key}
-                            source={source}
-                            active={activeSourceKey === source.key}
-                            filled={filled}
-                            onClick={() => openSourceModal(source.key)}
-                          />
-                        );
-                      })}
-                    </div>
-                  </div>
+                    );
+                  })}
                 </div>
               </motion.div>
             </div>
