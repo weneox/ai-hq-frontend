@@ -7,6 +7,9 @@ import {
 } from "lucide-react";
 import SetupStudioStageShell from "../components/SetupStudioStageShell.jsx";
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 function s(v, d = "") {
   return String(v ?? d).trim();
 }
@@ -22,6 +25,48 @@ function obj(v, d = {}) {
 function n(v, d = 0) {
   const x = Number(v);
   return Number.isFinite(x) ? x : d;
+}
+
+function maybeUuid(value = "") {
+  const x = s(value);
+  return UUID_RE.test(x) ? x : "";
+}
+
+function pickCandidateUuid(item = {}) {
+  const x = obj(item);
+  const candidate = obj(x.candidate);
+
+  return (
+    maybeUuid(x.candidateId) ||
+    maybeUuid(x.candidate_id) ||
+    maybeUuid(x.knowledgeCandidateId) ||
+    maybeUuid(x.knowledge_candidate_id) ||
+    maybeUuid(x.reviewCandidateId) ||
+    maybeUuid(x.review_candidate_id) ||
+    maybeUuid(x.candidateUuid) ||
+    maybeUuid(x.candidate_uuid) ||
+    maybeUuid(x.uuid) ||
+    maybeUuid(candidate.id) ||
+    maybeUuid(candidate.candidateId) ||
+    maybeUuid(candidate.candidate_id) ||
+    maybeUuid(x.id)
+  );
+}
+
+function pickRowId(item = {}, index = 0) {
+  const x = obj(item);
+
+  return s(
+    x.rowId ||
+      x.row_id ||
+      x.id ||
+      x.key ||
+      x.itemKey ||
+      x.item_key ||
+      x.title ||
+      x.label ||
+      `knowledge-${index + 1}`
+  );
 }
 
 function humanConfidence(item = {}) {
@@ -67,20 +112,14 @@ function pickEvidenceUrl(item = {}, evidence = []) {
 function normalizeKnowledgeItem(item = {}, index = 0) {
   const x = obj(item);
   const evidence = normalizeEvidenceList(x);
+  const candidateId = pickCandidateUuid(x);
+  const rowId = pickRowId(x, index);
 
   return {
     ...x,
-    id: s(
-      x.id ||
-        x.candidateId ||
-        x.candidate_id ||
-        x.key ||
-        x.title ||
-        `knowledge-${index + 1}`
-    ),
-    candidateId: s(
-      x.candidateId || x.candidate_id || x.id || `knowledge-${index + 1}`
-    ),
+    id: rowId,
+    rowId,
+    candidateId,
     title: s(x.title || x.label || x.key || "Untitled item"),
     value: s(
       x.value ||
@@ -180,7 +219,7 @@ export default function SetupStudioKnowledgeStage({
 
   const items = mergedSource
     .map((item, index) => normalizeKnowledgeItem(item, index))
-    .filter((item) => item.id || item.title || item.value)
+    .filter((item) => item.rowId || item.title || item.value)
     .slice(0, 6);
 
   const warningList = arr(warnings).map((x) => s(x)).filter(Boolean);
@@ -258,11 +297,12 @@ export default function SetupStudioKnowledgeStage({
         {items.length ? (
           <div className="space-y-3">
             {items.map((item) => {
-              const busy = actingKnowledgeId === item.id;
+              const busy = !!item.candidateId && actingKnowledgeId === item.candidateId;
+              const disabled = !item.candidateId || busy;
 
               return (
                 <div
-                  key={item.id}
+                  key={item.rowId}
                   className="rounded-[28px] border border-slate-200 bg-white p-5"
                 >
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -309,12 +349,13 @@ export default function SetupStudioKnowledgeStage({
                     <div className="flex shrink-0 flex-wrap gap-2">
                       <button
                         type="button"
-                        disabled={busy}
+                        disabled={disabled}
                         onClick={() =>
                           onApproveKnowledge?.({
                             ...item,
-                            id: item.id,
-                            candidateId: item.candidateId || item.id,
+                            id: item.rowId,
+                            rowId: item.rowId,
+                            candidateId: item.candidateId,
                           })
                         }
                         className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-slate-950 px-4 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-50"
@@ -325,12 +366,13 @@ export default function SetupStudioKnowledgeStage({
 
                       <button
                         type="button"
-                        disabled={busy}
+                        disabled={disabled}
                         onClick={() =>
                           onRejectKnowledge?.({
                             ...item,
-                            id: item.id,
-                            candidateId: item.candidateId || item.id,
+                            id: item.rowId,
+                            rowId: item.rowId,
+                            candidateId: item.candidateId,
                           })
                         }
                         className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:text-slate-950 disabled:opacity-50"

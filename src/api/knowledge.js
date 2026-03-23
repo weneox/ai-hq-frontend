@@ -1,7 +1,10 @@
 // src/api/knowledge.js
-// FINAL v1.1 — workspace knowledge API helpers
+// FINAL v1.2 — workspace knowledge API helpers with safe candidate id guard
 
 import { apiGet, apiPost } from "./client.js";
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function s(v, d = "") {
   return String(v ?? d).trim();
@@ -20,6 +23,11 @@ function buildQuery(params = {}) {
   return qs ? `?${qs}` : "";
 }
 
+function normalizeKnowledgeCandidateId(value = "") {
+  const id = s(value);
+  return UUID_RE.test(id) ? id : "";
+}
+
 export function getKnowledgeCandidates(filters = {}) {
   const query = buildQuery({
     status: filters.status,
@@ -31,15 +39,27 @@ export function getKnowledgeCandidates(filters = {}) {
 }
 
 export function approveKnowledgeCandidate(candidateId, payload = {}) {
+  const safeId = normalizeKnowledgeCandidateId(candidateId);
+
+  if (!safeId) {
+    throw new Error("Knowledge candidate UUID is missing.");
+  }
+
   return apiPost(
-    `/api/knowledge/candidates/${encodeURIComponent(candidateId)}/approve`,
+    `/api/knowledge/candidates/${encodeURIComponent(safeId)}/approve`,
     payload
   );
 }
 
 export function rejectKnowledgeCandidate(candidateId, payload = {}) {
+  const safeId = normalizeKnowledgeCandidateId(candidateId);
+
+  if (!safeId) {
+    throw new Error("Knowledge candidate UUID is missing.");
+  }
+
   return apiPost(
-    `/api/knowledge/candidates/${encodeURIComponent(candidateId)}/reject`,
+    `/api/knowledge/candidates/${encodeURIComponent(safeId)}/reject`,
     payload
   );
 }

@@ -75,6 +75,9 @@ import {
   deriveVisibleEvents,
 } from "./screen/reviewState.js";
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 const DEFAULT_BUSINESS_FORM = {
   companyName: "",
   description: "",
@@ -99,6 +102,48 @@ const DEFAULT_DISCOVERY_FORM = {
 
 function lowerText(value = "") {
   return s(value).toLowerCase();
+}
+
+function maybeUuid(value = "") {
+  const x = s(value);
+  return UUID_RE.test(x) ? x : "";
+}
+
+function pickKnowledgeCandidateId(item = {}) {
+  const x = obj(item);
+  const candidate = obj(x.candidate);
+
+  return (
+    maybeUuid(x.candidateId) ||
+    maybeUuid(x.candidate_id) ||
+    maybeUuid(x.knowledgeCandidateId) ||
+    maybeUuid(x.knowledge_candidate_id) ||
+    maybeUuid(x.reviewCandidateId) ||
+    maybeUuid(x.review_candidate_id) ||
+    maybeUuid(x.candidateUuid) ||
+    maybeUuid(x.candidate_uuid) ||
+    maybeUuid(x.uuid) ||
+    maybeUuid(candidate.id) ||
+    maybeUuid(candidate.candidateId) ||
+    maybeUuid(candidate.candidate_id) ||
+    maybeUuid(x.id)
+  );
+}
+
+function pickKnowledgeRowId(item = {}, fallback = "") {
+  const x = obj(item);
+
+  return s(
+    x.rowId ||
+      x.row_id ||
+      x.id ||
+      x.key ||
+      x.itemKey ||
+      x.item_key ||
+      x.title ||
+      x.label ||
+      fallback
+  );
 }
 
 function compactObject(input = {}) {
@@ -1753,15 +1798,18 @@ export default function SetupStudioScreen() {
   }
 
   async function onApproveKnowledge(item) {
-    const id = s(item.id || item.candidateId);
-    if (!id) return { ok: false };
+    const candidateId = pickKnowledgeCandidateId(item);
+    if (!candidateId) {
+      setError("Bu knowledge item üçün candidate UUID tapılmadı.");
+      return { ok: false };
+    }
 
     try {
       setFreshEntryMode(false);
-      setActingKnowledgeId(id);
+      setActingKnowledgeId(candidateId);
       setError("");
 
-      await approveKnowledgeCandidate(id, {});
+      await approveKnowledgeCandidate(candidateId, {});
       await loadCurrentReview({
         preserveBusinessForm: true,
         activateReviewSession: true,
@@ -1796,15 +1844,18 @@ export default function SetupStudioScreen() {
   }
 
   async function onRejectKnowledge(item) {
-    const id = s(item.id || item.candidateId);
-    if (!id) return { ok: false };
+    const candidateId = pickKnowledgeCandidateId(item);
+    if (!candidateId) {
+      setError("Bu knowledge item üçün candidate UUID tapılmadı.");
+      return { ok: false };
+    }
 
     try {
       setFreshEntryMode(false);
-      setActingKnowledgeId(id);
+      setActingKnowledgeId(candidateId);
       setError("");
 
-      await rejectKnowledgeCandidate(id, {});
+      await rejectKnowledgeCandidate(candidateId, {});
       await loadCurrentReview({
         preserveBusinessForm: true,
         activateReviewSession: true,
@@ -2108,10 +2159,13 @@ export default function SetupStudioScreen() {
   }, [importingWebsite, discoveryState, effectiveMeta]);
 
   const knowledgePreview = useMemo(() => {
-    return visibleKnowledgeItems.slice(0, 6).map((item) => ({
-      id: s(item.id || item.candidateId),
+    return visibleKnowledgeItems.slice(0, 6).map((item, index) => ({
+      ...item,
+      id: pickKnowledgeRowId(item, `knowledge-${index + 1}`),
+      rowId: pickKnowledgeRowId(item, `knowledge-${index + 1}`),
+      candidateId: pickKnowledgeCandidateId(item),
       title: s(item.title),
-      value: s(item.valueText),
+      value: s(item.valueText || item.value),
       category: s(item.category),
       source: s(item.source || item.sourceType),
       confidence:

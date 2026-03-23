@@ -4,6 +4,9 @@ import { BadgeCheck, CircleAlert, RotateCw, X } from "lucide-react";
 import { TinyLabel } from "./SetupStudioUi.jsx";
 import SetupStudioKnowledgeLine from "./SetupStudioKnowledgeLine.jsx";
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 function s(v, d = "") {
   return String(v ?? d).trim();
 }
@@ -19,6 +22,48 @@ function obj(v, d = {}) {
 function n(v, d = 0) {
   const x = Number(v);
   return Number.isFinite(x) ? x : d;
+}
+
+function maybeUuid(value = "") {
+  const x = s(value);
+  return UUID_RE.test(x) ? x : "";
+}
+
+function pickCandidateUuid(item = {}) {
+  const x = obj(item);
+  const candidate = obj(x.candidate);
+
+  return (
+    maybeUuid(x.candidateId) ||
+    maybeUuid(x.candidate_id) ||
+    maybeUuid(x.knowledgeCandidateId) ||
+    maybeUuid(x.knowledge_candidate_id) ||
+    maybeUuid(x.reviewCandidateId) ||
+    maybeUuid(x.review_candidate_id) ||
+    maybeUuid(x.candidateUuid) ||
+    maybeUuid(x.candidate_uuid) ||
+    maybeUuid(x.uuid) ||
+    maybeUuid(candidate.id) ||
+    maybeUuid(candidate.candidateId) ||
+    maybeUuid(candidate.candidate_id) ||
+    maybeUuid(x.id)
+  );
+}
+
+function pickRowId(item = {}, index = 0) {
+  const x = obj(item);
+
+  return s(
+    x.rowId ||
+      x.row_id ||
+      x.id ||
+      x.key ||
+      x.itemKey ||
+      x.item_key ||
+      x.title ||
+      x.label ||
+      `knowledge-${index + 1}`
+  );
 }
 
 function normalizeEvidence(item = {}) {
@@ -60,7 +105,8 @@ function humanConfidence(item = {}) {
   );
   if (explicitLabel) return explicitLabel;
 
-  const raw = typeof x.confidence === "number" ? x.confidence : Number(x.confidence);
+  const raw =
+    typeof x.confidence === "number" ? x.confidence : Number(x.confidence);
   if (!Number.isFinite(raw)) return "";
 
   if (raw >= 0.85) return "high";
@@ -74,11 +120,14 @@ function normalizeKnowledgeItem(item = {}, index = 0) {
   const evidence = normalizeEvidence(x);
   const confidenceValue =
     typeof x.confidence === "number" ? x.confidence : Number(x.confidence || 0) || 0;
+  const candidateId = pickCandidateUuid(x);
+  const rowId = pickRowId(x, index);
 
   return {
     ...x,
-    id: s(x.id || x.candidateId || x.candidate_id || x.key || x.title),
-    candidateId: s(x.candidateId || x.candidate_id || x.id),
+    id: rowId,
+    rowId,
+    candidateId,
     index: String(index + 1).padStart(2, "0"),
     title: s(x.title || x.label || x.key || "Untitled item"),
     value: s(
@@ -137,7 +186,7 @@ export default function SetupStudioIntakeModal({
 
   const items = arr(knowledgeItems)
     .map((item, index) => normalizeKnowledgeItem(item, index))
-    .filter((item) => item.id || item.title || item.value);
+    .filter((item) => item.rowId || item.title || item.value);
 
   const avgConfidence = items.length
     ? Math.round(
@@ -281,21 +330,23 @@ export default function SetupStudioIntakeModal({
           <div className="space-y-2">
             {items.map((item) => (
               <SetupStudioKnowledgeLine
-                key={item.id || item.title || item.index}
+                key={item.rowId}
                 item={item}
-                busy={actingKnowledgeId === item.id}
+                busy={!!item.candidateId && actingKnowledgeId === item.candidateId}
                 onApprove={() =>
                   onApproveKnowledge?.({
                     ...item,
-                    id: item.id,
-                    candidateId: item.candidateId || item.id,
+                    id: item.rowId,
+                    rowId: item.rowId,
+                    candidateId: item.candidateId,
                   })
                 }
                 onReject={() =>
                   onRejectKnowledge?.({
                     ...item,
-                    id: item.id,
-                    candidateId: item.candidateId || item.id,
+                    id: item.rowId,
+                    rowId: item.rowId,
+                    candidateId: item.candidateId,
                   })
                 }
               />
