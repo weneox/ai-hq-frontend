@@ -42,10 +42,18 @@ function humanizeWarning(value = "") {
   if (x === "http_403") return "This website blocked direct access.";
   if (x === "http_429") return "This website rate-limited the request.";
   if (x === "fetch_failed") return "The website could not be read.";
-  if (x === "non_html_response") return "The source did not return a readable webpage.";
-  if (x === "website_fetch_timeout") return "The website took too long to respond.";
-  if (x === "website_entry_timeout") return "The first page took too long to load.";
-  if (x === "sitemap_fetch_timeout") return "The sitemap timed out, but some draft data may still exist.";
+  if (x === "non_html_response")
+    return "The source did not return a readable webpage.";
+  if (x === "website_fetch_timeout")
+    return "The website took too long to respond.";
+  if (x === "website_entry_timeout")
+    return "The first page took too long to load.";
+  if (x === "sitemap_fetch_timeout")
+    return "The sitemap timed out, but some draft data may still exist.";
+  if (x === "weak_website_extraction")
+    return "The source was readable, but the extracted business signals were weak.";
+  if (x === "website_trust_guard_blocked_candidate_creation")
+    return "The source was too weak to create trusted knowledge automatically.";
 
   return s(value).replaceAll("_", " ");
 }
@@ -85,9 +93,18 @@ function SnapshotRow({ label, value }) {
       <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
         {label || "Field"}
       </div>
-      <div className="mt-1.5 text-sm leading-6 text-slate-700">{value || "—"}</div>
+      <div className="mt-1.5 text-sm leading-6 text-slate-700">
+        {value || "—"}
+      </div>
     </div>
   );
+}
+
+function sourceBadgeLabel(sourceLabel = "") {
+  const x = s(sourceLabel);
+  if (!x) return "";
+  if (x.toLowerCase() === "manual") return "Manual input";
+  return x;
 }
 
 export default function SetupStudioIdentityStage({
@@ -104,26 +121,31 @@ export default function SetupStudioIdentityStage({
 
   const barrierWarning = warnings.find(isBarrierWarning) || "";
   const barrierState = !!barrierWarning;
+  const sourceBadge = sourceBadgeLabel(sourceLabel);
 
   const resolvedTitle =
     !barrierState && s(currentTitle)
       ? s(currentTitle)
       : barrierState
         ? "This source needs manual review."
-        : "Your first business draft is ready.";
+        : rows.length
+          ? "Your first business draft is ready."
+          : "Your business draft needs a quick review.";
 
   const resolvedDescription =
     !barrierState && s(currentDescription)
       ? s(currentDescription)
       : barrierState
         ? humanizeWarning(barrierWarning)
-        : "Review the first identity draft, fix anything important, then continue.";
+        : rows.length
+          ? "Review the first structured draft, fix anything important, then continue."
+          : "The system did not produce many strong fields yet. Refine the draft manually and continue.";
 
   return (
     <SetupStudioStageShell
       eyebrow="identity"
       title="Review the first business draft."
-      body="This is the first structured version of the business. Keep it simple, clean, and believable."
+      body="This is the first structured version of the business. Keep it clean, believable, and minimal."
     >
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="rounded-[30px] border border-slate-200 bg-white p-6 sm:p-7">
@@ -133,9 +155,9 @@ export default function SetupStudioIdentityStage({
               review draft
             </span>
 
-            {sourceLabel ? (
+            {sourceBadge ? (
               <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                {sourceLabel}
+                {sourceBadge}
               </span>
             ) : null}
 
@@ -158,7 +180,7 @@ export default function SetupStudioIdentityStage({
 
           {warnings.length ? (
             <div className="mt-6 space-y-3">
-              {warnings.slice(0, 2).map((warning, index) => (
+              {warnings.slice(0, 3).map((warning, index) => (
                 <div
                   key={`${warning}-${index}`}
                   className={`flex items-start gap-3 rounded-2xl border px-4 py-3.5 text-sm ${
@@ -201,7 +223,8 @@ export default function SetupStudioIdentityStage({
               ))
             ) : (
               <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm leading-6 text-slate-500">
-                No structured fields are visible yet. Use refine to complete the draft manually.
+                No structured fields are visible yet. Use refine to complete the
+                draft manually.
               </div>
             )}
           </div>

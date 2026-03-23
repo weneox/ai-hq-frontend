@@ -1,9 +1,11 @@
 import { motion } from "framer-motion";
 import {
+  AlertTriangle,
   BadgeCheck,
   Brain,
   FileText,
   Globe2,
+  Info,
   Mail,
   MapPin,
   Phone,
@@ -44,9 +46,9 @@ function normalizeRows(rows = []) {
     .filter((item) => item.label || item.value);
 }
 
-function countLines(value = "") {
+function countLogicalLines(value = "") {
   return s(value)
-    .split("\n")
+    .split(/\n+/)
     .map((line) => line.trim())
     .filter(Boolean).length;
 }
@@ -63,20 +65,32 @@ function labelClassName() {
   return "mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400";
 }
 
-function MicroLabel({ icon: Icon, children }) {
+function MicroLabel({ icon: Icon, children, tone = "default" }) {
+  const toneClass =
+    tone === "warn"
+      ? "border-amber-200 bg-amber-50 text-amber-700"
+      : tone === "success"
+        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+        : "border-slate-200 bg-slate-50 text-slate-500";
+
   return (
-    <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+    <div
+      className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] ${toneClass}`}
+    >
       {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
       {children}
     </div>
   );
 }
 
-function Section({ title, children, className = "" }) {
+function Section({ title, children, className = "", right = null }) {
   return (
-    <section className={`rounded-[24px] border border-slate-200 bg-white ${className}`}>
-      <div className="border-b border-slate-200 px-4 py-3.5">
+    <section
+      className={`rounded-[24px] border border-slate-200 bg-white ${className}`}
+    >
+      <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-4 py-3.5">
         <div className="text-sm font-semibold text-slate-950">{title}</div>
+        {right}
       </div>
 
       <div className="px-4 py-4">{children}</div>
@@ -146,6 +160,23 @@ function FormatRow({ icon: Icon, title, value }) {
   );
 }
 
+function TonePill({ children, tone = "default" }) {
+  const toneClass =
+    tone === "warn"
+      ? "border-amber-200 bg-amber-50 text-amber-700"
+      : tone === "danger"
+        ? "border-rose-200 bg-rose-50 text-rose-700"
+        : "border-slate-200 bg-slate-50 text-slate-600";
+
+  return (
+    <div
+      className={`rounded-full border px-3 py-1.5 text-[11px] font-medium ${toneClass}`}
+    >
+      {children}
+    </div>
+  );
+}
+
 export default function SetupStudioRefineModal({
   savingBusiness,
   businessForm,
@@ -155,9 +186,12 @@ export default function SetupStudioRefineModal({
   onSetManualSection,
   onSaveBusiness,
   onClose,
+  reviewDraft,
 }) {
   const rows = normalizeRows(discoveryProfileRows);
   const form = obj(businessForm);
+  const draft = obj(reviewDraft);
+  const overview = obj(draft.overview);
 
   const sections = {
     servicesText: s(manualSections?.servicesText),
@@ -165,32 +199,67 @@ export default function SetupStudioRefineModal({
     policiesText: s(manualSections?.policiesText),
   };
 
-  const serviceCount = countLines(sections.servicesText);
-  const faqCount = countLines(sections.faqsText);
-  const policyCount = countLines(sections.policiesText);
+  const serviceCount = countLogicalLines(sections.servicesText);
+  const faqCount = countLogicalLines(sections.faqsText);
+  const policyCount = countLogicalLines(sections.policiesText);
+
+  const quickSummary = s(
+    draft.quickSummary ||
+      overview.summaryShort ||
+      overview.companySummaryShort ||
+      form.description
+  );
+
+  const sourceLabel = s(draft.sourceLabel || draft.sourceType || "Draft");
+  const sourceUrl = s(draft.sourceUrl || overview.websiteUrl || form.websiteUrl);
+
+  const warnings = arr(draft.warnings)
+    .map((item) => s(item))
+    .filter(Boolean);
+
+  const reviewFlags = arr(draft.reviewFlags)
+    .map((item) => s(item))
+    .filter(Boolean);
 
   const keyFacts = [
     {
       icon: Globe2,
       label: "Website",
-      value: s(form.websiteUrl),
+      value: s(form.websiteUrl || overview.websiteUrl),
     },
     {
       icon: Phone,
       label: "Phone",
-      value: s(form.primaryPhone),
+      value: s(form.primaryPhone || overview.primaryPhone),
     },
     {
       icon: Mail,
       label: "Email",
-      value: s(form.primaryEmail),
+      value: s(form.primaryEmail || overview.primaryEmail),
     },
     {
       icon: MapPin,
       label: "Address",
-      value: s(form.primaryAddress),
+      value: s(form.primaryAddress || overview.primaryAddress),
     },
   ].filter((item) => item.value);
+
+  const metaStats = [
+    {
+      label: "Services",
+      value: String(
+        Math.max(serviceCount, arr(draft.sections?.services).length, 0)
+      ),
+    },
+    {
+      label: "Knowledge",
+      value: String(Number(draft.stats?.knowledgeCount || 0)),
+    },
+    {
+      label: "Warnings",
+      value: String(warnings.length),
+    },
+  ];
 
   return (
     <motion.div
@@ -202,15 +271,30 @@ export default function SetupStudioRefineModal({
     >
       <div className="sticky top-0 z-10 border-b border-slate-200 bg-[#f6f6f7] px-5 py-4 sm:px-6">
         <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0 max-w-[720px]">
-            <MicroLabel icon={Brain}>Refine draft</MicroLabel>
+          <div className="min-w-0 max-w-[760px]">
+            <div className="flex flex-wrap items-center gap-2">
+              <MicroLabel icon={Brain}>Refine draft</MicroLabel>
+
+              {sourceLabel ? (
+                <MicroLabel icon={BadgeCheck} tone="success">
+                  {sourceLabel}
+                </MicroLabel>
+              ) : null}
+
+              {reviewFlags.length ? (
+                <MicroLabel icon={AlertTriangle} tone="warn">
+                  Review needed
+                </MicroLabel>
+              ) : null}
+            </div>
 
             <h2 className="mt-4 text-[24px] font-semibold leading-[1.04] tracking-[-0.04em] text-slate-950 sm:text-[30px]">
               Review and confirm the business draft
             </h2>
 
             <p className="mt-2 text-sm leading-7 text-slate-500">
-              Clean the core identity and keep only the structured details that matter.
+              Clean the core identity, keep only the structured details that matter,
+              then confirm the final business twin.
             </p>
           </div>
 
@@ -233,13 +317,26 @@ export default function SetupStudioRefineModal({
             onSubmit={onSaveBusiness}
             className="min-w-0 space-y-5"
           >
-            <Section title="Core business identity">
+            <Section
+              title="Core business identity"
+              right={
+                <div className="flex flex-wrap gap-2">
+                  {metaStats.map((item) => (
+                    <TonePill key={item.label}>
+                      {item.label}: {item.value}
+                    </TonePill>
+                  ))}
+                </div>
+              }
+            >
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <label className={labelClassName()}>Company name</label>
                   <input
                     value={s(form.companyName)}
-                    onChange={(e) => onSetBusinessField("companyName", e.target.value)}
+                    onChange={(e) =>
+                      onSetBusinessField?.("companyName", e.target.value)
+                    }
                     className={inputClassName()}
                     placeholder="Company name"
                     autoComplete="off"
@@ -250,7 +347,9 @@ export default function SetupStudioRefineModal({
                   <label className={labelClassName()}>Website</label>
                   <input
                     value={s(form.websiteUrl)}
-                    onChange={(e) => onSetBusinessField("websiteUrl", e.target.value)}
+                    onChange={(e) =>
+                      onSetBusinessField?.("websiteUrl", e.target.value)
+                    }
                     className={inputClassName()}
                     placeholder="yourbusiness.com"
                     autoComplete="off"
@@ -263,7 +362,9 @@ export default function SetupStudioRefineModal({
                   <label className={labelClassName()}>Primary phone</label>
                   <input
                     value={s(form.primaryPhone)}
-                    onChange={(e) => onSetBusinessField("primaryPhone", e.target.value)}
+                    onChange={(e) =>
+                      onSetBusinessField?.("primaryPhone", e.target.value)
+                    }
                     className={inputClassName()}
                     placeholder="+994 ..."
                     autoComplete="off"
@@ -274,7 +375,9 @@ export default function SetupStudioRefineModal({
                   <label className={labelClassName()}>Primary email</label>
                   <input
                     value={s(form.primaryEmail)}
-                    onChange={(e) => onSetBusinessField("primaryEmail", e.target.value)}
+                    onChange={(e) =>
+                      onSetBusinessField?.("primaryEmail", e.target.value)
+                    }
                     className={inputClassName()}
                     placeholder="info@company.com"
                     autoComplete="off"
@@ -286,7 +389,9 @@ export default function SetupStudioRefineModal({
                 <label className={labelClassName()}>Primary address</label>
                 <input
                   value={s(form.primaryAddress)}
-                  onChange={(e) => onSetBusinessField("primaryAddress", e.target.value)}
+                  onChange={(e) =>
+                    onSetBusinessField?.("primaryAddress", e.target.value)
+                  }
                   className={inputClassName()}
                   placeholder="Primary address"
                   autoComplete="off"
@@ -298,7 +403,9 @@ export default function SetupStudioRefineModal({
                   <label className={labelClassName()}>Timezone</label>
                   <input
                     value={s(form.timezone)}
-                    onChange={(e) => onSetBusinessField("timezone", e.target.value)}
+                    onChange={(e) =>
+                      onSetBusinessField?.("timezone", e.target.value)
+                    }
                     className={inputClassName()}
                     placeholder="Asia/Baku"
                     autoComplete="off"
@@ -309,7 +416,9 @@ export default function SetupStudioRefineModal({
                   <label className={labelClassName()}>Primary language</label>
                   <select
                     value={s(form.language || "az")}
-                    onChange={(e) => onSetBusinessField("language", e.target.value)}
+                    onChange={(e) =>
+                      onSetBusinessField?.("language", e.target.value)
+                    }
                     className={inputClassName()}
                   >
                     <option value="az">Azerbaijani</option>
@@ -324,8 +433,10 @@ export default function SetupStudioRefineModal({
                 <label className={labelClassName()}>Business summary</label>
                 <textarea
                   value={s(form.description)}
-                  onChange={(e) => onSetBusinessField("description", e.target.value)}
-                  className={textAreaClassName("min-h-[140px]")}
+                  onChange={(e) =>
+                    onSetBusinessField?.("description", e.target.value)
+                  }
+                  className={textAreaClassName("min-h-[150px]")}
                   placeholder="Describe what the business does and who it serves."
                 />
               </div>
@@ -344,7 +455,7 @@ export default function SetupStudioRefineModal({
                     onChange={(e) =>
                       onSetManualSection?.("servicesText", e.target.value)
                     }
-                    className={textAreaClassName("min-h-[110px]")}
+                    className={textAreaClassName("min-h-[120px]")}
                     placeholder={
                       "Hair coloring | Premium color service\nConsultation | First visit consultation"
                     }
@@ -365,7 +476,7 @@ export default function SetupStudioRefineModal({
                     onChange={(e) =>
                       onSetManualSection?.("faqsText", e.target.value)
                     }
-                    className={textAreaClassName("min-h-[110px]")}
+                    className={textAreaClassName("min-h-[120px]")}
                     placeholder={
                       "Do you work on weekends? | Yes, Saturdays are open from 10:00 to 18:00"
                     }
@@ -377,7 +488,7 @@ export default function SetupStudioRefineModal({
 
                 <div>
                   <SectionHeader
-                    title="Policies"
+                    title="Policies and notes"
                     count={policyCount}
                     hint="Title | Description"
                   />
@@ -386,7 +497,7 @@ export default function SetupStudioRefineModal({
                     onChange={(e) =>
                       onSetManualSection?.("policiesText", e.target.value)
                     }
-                    className={textAreaClassName("min-h-[110px]")}
+                    className={textAreaClassName("min-h-[120px]")}
                     placeholder={
                       "Booking policy | Appointments should be confirmed in advance"
                     }
@@ -400,6 +511,80 @@ export default function SetupStudioRefineModal({
           </form>
 
           <div className="min-w-0 space-y-5">
+            <Section title="Draft overview">
+              <div className="space-y-3">
+                {quickSummary ? (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                      Summary
+                    </div>
+                    <div className="mt-2 text-sm leading-7 text-slate-700">
+                      {quickSummary}
+                    </div>
+                  </div>
+                ) : null}
+
+                {sourceUrl ? (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                      Source
+                    </div>
+                    <div className="mt-2 break-words text-sm leading-6 text-slate-700">
+                      {sourceUrl}
+                    </div>
+                  </div>
+                ) : null}
+
+                {!quickSummary && !sourceUrl ? (
+                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-500">
+                    The draft summary will appear here after analysis.
+                  </div>
+                ) : null}
+              </div>
+            </Section>
+
+            {!!reviewFlags.length || !!warnings.length ? (
+              <Section title="Review signals">
+                <div className="space-y-3">
+                  {reviewFlags.length ? (
+                    <div>
+                      <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                        Review flags
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        {reviewFlags.map((item, index) => (
+                          <TonePill key={`${item}-${index}`} tone="warn">
+                            {item}
+                          </TonePill>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {warnings.length ? (
+                    <div>
+                      <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                        Warnings
+                      </div>
+
+                      <div className="space-y-2">
+                        {warnings.slice(0, 6).map((item, index) => (
+                          <div
+                            key={`${item}-${index}`}
+                            className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-sm leading-6 text-amber-800"
+                          >
+                            <Info className="mt-0.5 h-4 w-4 shrink-0" />
+                            <span>{item}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </Section>
+            ) : null}
+
             <Section title="Extracted snapshot">
               <div className="mb-4">
                 <MicroLabel icon={BadgeCheck}>Snapshot</MicroLabel>
@@ -469,7 +654,7 @@ export default function SetupStudioRefineModal({
       <div className="sticky bottom-0 z-10 border-t border-slate-200 bg-[#f6f6f7] px-5 py-4 sm:px-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm text-slate-500">
-            Confirming will write this draft into the canonical business layer.
+            Confirming will write this reviewed draft into the canonical business layer.
           </div>
 
           <div className="flex flex-wrap items-center gap-3">

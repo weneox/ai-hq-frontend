@@ -1,5 +1,10 @@
 import { ArrowRight, Plus } from "lucide-react";
 import SetupStudioStageShell from "../components/SetupStudioStageShell.jsx";
+import {
+  GhostButton,
+  TinyChip,
+  TinyLabel,
+} from "../components/SetupStudioUi.jsx";
 
 function s(v, d = "") {
   return String(v ?? d).trim();
@@ -37,24 +42,6 @@ function normalizeService(item = {}, index = 0) {
   };
 }
 
-function ActionButton({ active = false, icon: Icon, children, onClick, disabled }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={`inline-flex h-11 items-center justify-center gap-2 rounded-full px-4 text-sm font-medium transition ${
-        active
-          ? "bg-slate-950 text-white hover:bg-slate-800 disabled:opacity-50"
-          : "border border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:text-slate-950 disabled:opacity-50"
-      }`}
-    >
-      <Icon className="h-4 w-4" />
-      {children}
-    </button>
-  );
-}
-
 export default function SetupStudioServiceStage({
   serviceSuggestionTitle,
   meta,
@@ -70,7 +57,6 @@ export default function SetupStudioServiceStage({
   const serviceCount = normalizedServices.length;
   const hasSuggestion = !!s(serviceSuggestionTitle);
   const isCreating = !!savingServiceSuggestion;
-
   const readinessScore = num(meta?.readinessScore, 0);
 
   const headline =
@@ -82,7 +68,7 @@ export default function SetupStudioServiceStage({
 
   const supportingCopy =
     serviceCount > 0
-      ? "You already have enough to move forward. Add more detail later inside the workspace."
+      ? "You already have enough to move forward. More service detail can be refined later inside the workspace."
       : hasSuggestion
         ? "A first service suggestion is ready from the current draft."
         : "One believable service is enough for the first launch pass.";
@@ -91,12 +77,17 @@ export default function SetupStudioServiceStage({
     <SetupStudioStageShell
       eyebrow="services"
       title="Shape the first service layer."
-      body="You do not need a full catalog here. Just enough structure to make the business real."
+      body="You do not need a full catalog here. Just enough structure to make the business feel real."
     >
       <div className="space-y-6">
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
           <div className="rounded-[30px] border border-slate-200 bg-white p-6">
-            <h3 className="text-[28px] font-semibold leading-[1.02] tracking-[-0.04em] text-slate-950 sm:text-[34px]">
+            <div className="flex flex-wrap items-center gap-2">
+              <TinyLabel>Service seed</TinyLabel>
+              <TinyChip>{serviceCount} current</TinyChip>
+            </div>
+
+            <h3 className="mt-5 text-[28px] font-semibold leading-[1.02] tracking-[-0.04em] text-slate-950 sm:text-[34px]">
               {headline}
             </h3>
 
@@ -116,7 +107,7 @@ export default function SetupStudioServiceStage({
             ) : null}
 
             <div className="mt-8 flex flex-wrap gap-3">
-              <ActionButton
+              <GhostButton
                 active
                 icon={Plus}
                 onClick={onCreateSeed}
@@ -127,11 +118,11 @@ export default function SetupStudioServiceStage({
                   : serviceCount > 0
                     ? "Create another seed"
                     : "Create seed"}
-              </ActionButton>
+              </GhostButton>
 
-              <ActionButton icon={ArrowRight} onClick={onSkip}>
+              <GhostButton icon={ArrowRight} onClick={onSkip}>
                 {serviceCount > 0 ? "Continue" : "Skip for now"}
-              </ActionButton>
+              </GhostButton>
             </div>
           </div>
 
@@ -173,9 +164,9 @@ export default function SetupStudioServiceStage({
               </div>
             </div>
 
-            <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
+            <TinyChip>
               {serviceCount} item{serviceCount === 1 ? "" : "s"}
-            </div>
+            </TinyChip>
           </div>
 
           <div className="mt-5">

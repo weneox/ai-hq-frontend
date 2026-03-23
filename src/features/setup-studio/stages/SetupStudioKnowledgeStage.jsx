@@ -26,7 +26,8 @@ function n(v, d = 0) {
 
 function humanConfidence(item = {}) {
   const x = obj(item);
-  const value = typeof x.confidence === "number" ? x.confidence : Number(x.confidence || 0);
+  const value =
+    typeof x.confidence === "number" ? x.confidence : Number(x.confidence || 0);
 
   if (value >= 0.85) return "high";
   if (value >= 0.6) return "medium";
@@ -69,8 +70,17 @@ function normalizeKnowledgeItem(item = {}, index = 0) {
 
   return {
     ...x,
-    id: s(x.id || x.candidateId || x.candidate_id || x.key || x.title || `knowledge-${index + 1}`),
-    candidateId: s(x.candidateId || x.candidate_id || x.id || `knowledge-${index + 1}`),
+    id: s(
+      x.id ||
+        x.candidateId ||
+        x.candidate_id ||
+        x.key ||
+        x.title ||
+        `knowledge-${index + 1}`
+    ),
+    candidateId: s(
+      x.candidateId || x.candidate_id || x.id || `knowledge-${index + 1}`
+    ),
     title: s(x.title || x.label || x.key || "Untitled item"),
     value: s(
       x.value ||
@@ -104,6 +114,8 @@ function groupLabel(category = "") {
   if (x === "service" || x === "services") return "Service";
   if (x === "product" || x === "products") return "Product";
   if (x === "contact" || x === "contacts") return "Contact";
+  if (x === "summary") return "Summary";
+  if (x === "location") return "Location";
   return "Knowledge";
 }
 
@@ -113,12 +125,25 @@ function humanizeWarning(value = "") {
   if (x === "http_403") return "This website blocked direct access.";
   if (x === "http_429") return "This website rate-limited the request.";
   if (x === "fetch_failed") return "The website could not be read.";
-  if (x === "non_html_response") return "The source did not return a readable webpage.";
-  if (x === "website_fetch_timeout") return "The website took too long to respond.";
-  if (x === "website_entry_timeout") return "The first page took too long to load.";
-  if (x === "sitemap_fetch_timeout") return "The sitemap timed out, but some draft data may still exist.";
+  if (x === "non_html_response")
+    return "The source did not return a readable webpage.";
+  if (x === "website_fetch_timeout")
+    return "The website took too long to respond.";
+  if (x === "website_entry_timeout")
+    return "The first page took too long to load.";
+  if (x === "sitemap_fetch_timeout")
+    return "The sitemap timed out, but some draft data may still exist.";
+  if (x === "weak_website_extraction")
+    return "The source was readable, but the extracted business signals were weak.";
 
   return s(value).replaceAll("_", " ");
+}
+
+function sourceBadgeLabel(sourceLabel = "") {
+  const x = s(sourceLabel);
+  if (!x) return "";
+  if (x.toLowerCase() === "manual") return "Manual input";
+  return x;
 }
 
 function ActionButton({ active = false, icon: Icon, children, onClick }) {
@@ -159,10 +184,13 @@ export default function SetupStudioKnowledgeStage({
     .slice(0, 6);
 
   const warningList = arr(warnings).map((x) => s(x)).filter(Boolean);
+  const sourceBadge = sourceBadgeLabel(sourceLabel);
 
   const avgConfidence = items.length
     ? Math.round(
-        (items.reduce((sum, item) => sum + n(item.confidence, 0), 0) / items.length) * 100
+        (items.reduce((sum, item) => sum + n(item.confidence, 0), 0) /
+          items.length) *
+          100
       )
     : 0;
 
@@ -170,15 +198,15 @@ export default function SetupStudioKnowledgeStage({
     <SetupStudioStageShell
       eyebrow="knowledge"
       title="Keep only what should shape runtime."
-      body="Approve the useful signals. Reject generic or noisy items. The goal is a clean business memory, not a long list."
+      body="Approve useful signals. Reject generic or noisy items. The goal is a clean business memory, not a long list."
     >
       <div className="space-y-6">
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
           <div className="rounded-[30px] border border-slate-200 bg-white p-6">
             <div className="flex flex-wrap items-center gap-2">
-              {sourceLabel ? (
+              {sourceBadge ? (
                 <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  {sourceLabel}
+                  {sourceBadge}
                 </span>
               ) : null}
 
@@ -188,7 +216,7 @@ export default function SetupStudioKnowledgeStage({
             </div>
 
             <p className="mt-5 text-[15px] leading-7 text-slate-600">
-              Review the strongest candidates only. Weak memory here will hurt
+              Review only the strongest candidates. Weak memory here will harm
               downstream replies.
             </p>
 
@@ -328,7 +356,7 @@ export default function SetupStudioKnowledgeStage({
           </ActionButton>
 
           <ActionButton icon={ExternalLink} onClick={onToggleKnowledge}>
-            Open full intake
+            Toggle knowledge
           </ActionButton>
         </div>
       </div>

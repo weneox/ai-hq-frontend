@@ -56,3 +56,28 @@ export function GhostButton({
     </button>
   );
 }
+
+export function MetricCard({ label, value, className = "" }) {
+  return (
+    <div
+      className={cx(
+        "rounded-[24px] border border-slate-200 bg-white px-4 py-5 text-center",
+        className
+      )}
+    >
+      <div className="text-[30px] font-semibold tracking-[-0.05em] text-slate-950 sm:text-[34px]">
+        {value}
+      </div>
+      <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">
+        {label}
+      </div>
+    </div>
+  );
+}
+
+export default {
+  TinyLabel,
+  TinyChip,
+  GhostButton,
+  MetricCard,
+};
