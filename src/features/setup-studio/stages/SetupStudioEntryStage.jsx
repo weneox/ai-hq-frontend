@@ -376,24 +376,25 @@ function SourceModal({
         className="relative z-10 w-full max-w-[620px] rounded-[34px] border border-white/80 bg-[rgba(250,250,250,.98)] p-7 shadow-[0_32px_80px_-36px_rgba(15,23,42,.28)] sm:p-8"
       >
         <div className="flex items-start justify-between gap-5">
-          <div className="flex min-w-0 items-start gap-4">
-            <img
-              src={source.icon}
-              alt={source.label}
-              className="mt-1 h-9 w-9 shrink-0 object-contain"
-            />
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 items-center gap-4">
+              <img
+                src={source.icon}
+                alt={source.label}
+                className="h-10 w-10 shrink-0 object-contain"
+              />
 
-            <div className="min-w-0">
               <h3
                 style={DISPLAY_FONT_STYLE}
-                className="text-[26px] font-semibold leading-[1.02] tracking-[-0.05em] text-slate-950 sm:text-[28px]"
+                className="truncate text-[26px] font-semibold leading-none tracking-[-0.05em] text-slate-950 sm:text-[28px]"
               >
                 {source.title}
               </h3>
-              <p className="mt-2 text-[15px] leading-7 text-slate-500">
-                {source.description}
-              </p>
             </div>
+
+            <p className="ml-14 mt-3 text-[15px] leading-7 text-slate-500">
+              {source.description}
+            </p>
           </div>
 
           <button
