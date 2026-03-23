@@ -75,8 +75,39 @@ import {
   deriveVisibleEvents,
 } from "./screen/reviewState.js";
 
+const DEFAULT_BUSINESS_FORM = {
+  companyName: "",
+  description: "",
+  timezone: "Asia/Baku",
+  language: "az",
+  websiteUrl: "",
+  primaryPhone: "",
+  primaryEmail: "",
+  primaryAddress: "",
+};
+
+const DEFAULT_MANUAL_SECTIONS = {
+  servicesText: "",
+  faqsText: "",
+  policiesText: "",
+};
+
+const DEFAULT_DISCOVERY_FORM = {
+  websiteUrl: "",
+  note: "",
+};
+
 function lowerText(value = "") {
   return s(value).toLowerCase();
+}
+
+function sourceLabelFor(type = "") {
+  const x = s(type).toLowerCase();
+  if (x === "google_maps" || x === "googlemaps") return "Google Maps";
+  if (x === "instagram") return "Instagram";
+  if (x === "linkedin") return "LinkedIn";
+  if (x === "facebook") return "Facebook";
+  return "Website";
 }
 
 function isBarrierLikeIdentityText(value = "", warnings = []) {
@@ -230,22 +261,9 @@ export default function SetupStudioScreen() {
   const [freshEntryMode, setFreshEntryMode] = useState(true);
   const [error, setError] = useState("");
 
-  const [businessForm, setBusinessForm] = useState({
-    companyName: "",
-    description: "",
-    timezone: "Asia/Baku",
-    language: "az",
-    websiteUrl: "",
-    primaryPhone: "",
-    primaryEmail: "",
-    primaryAddress: "",
-  });
-
-  const [manualSections, setManualSections] = useState({
-    servicesText: "",
-    faqsText: "",
-    policiesText: "",
-  });
+  const [businessForm, setBusinessForm] = useState(DEFAULT_BUSINESS_FORM);
+  const [manualSections, setManualSections] = useState(DEFAULT_MANUAL_SECTIONS);
+  const [discoveryForm, setDiscoveryForm] = useState(DEFAULT_DISCOVERY_FORM);
 
   const [currentReview, setCurrentReview] = useState(createEmptyReviewState);
   const [reviewDraft, setReviewDraft] = useState(createEmptyLegacyDraft);
@@ -253,11 +271,6 @@ export default function SetupStudioScreen() {
   const [activeSourceScope, setActiveSourceScope] = useState(
     createEmptySourceScope
   );
-
-  const [discoveryForm, setDiscoveryForm] = useState({
-    websiteUrl: "",
-    note: "",
-  });
 
   const [knowledgeCandidates, setKnowledgeCandidates] = useState([]);
   const [services, setServices] = useState([]);
@@ -280,6 +293,27 @@ export default function SetupStudioScreen() {
     runtimePlaybookCount: 0,
   });
 
+  function setBusinessField(key, value) {
+    setBusinessForm((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
+  }
+
+  function setManualSection(key, value) {
+    setManualSections((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
+  }
+
+  function setDiscoveryField(key, value) {
+    setDiscoveryForm((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
+  }
+
   function updateActiveSourceScope(sourceType = "", sourceUrl = "") {
     const normalizedUrl = s(sourceUrl);
     const normalizedType =
@@ -296,7 +330,6 @@ export default function SetupStudioScreen() {
 
     activeSourceRef.current = next;
     setActiveSourceScope(next);
-
     return next;
   }
 
@@ -337,41 +370,23 @@ export default function SetupStudioScreen() {
 
   function resetBusinessTwinDraftForNewScan(nextSourceUrl = "") {
     setBusinessForm((prev) => ({
-      ...prev,
-      companyName: "",
-      description: "",
+      ...DEFAULT_BUSINESS_FORM,
+      timezone: s(prev.timezone || "Asia/Baku"),
+      language: s(prev.language || "az"),
       websiteUrl: s(nextSourceUrl),
-      primaryPhone: "",
-      primaryEmail: "",
-      primaryAddress: "",
     }));
 
-    setManualSections({
-      servicesText: "",
-      faqsText: "",
-      policiesText: "",
-    });
+    setManualSections(DEFAULT_MANUAL_SECTIONS);
   }
 
-  function setBusinessField(key, value) {
-    setBusinessForm((prev) => ({
-      ...prev,
-      [key]: value,
-    }));
-  }
-
-  function setManualSection(key, value) {
-    setManualSections((prev) => ({
-      ...prev,
-      [key]: value,
-    }));
-  }
-
-  function setDiscoveryField(key, value) {
-    setDiscoveryForm((prev) => ({
-      ...prev,
-      [key]: value,
-    }));
+  function seedBusinessFormFromBootProfile(profile = {}) {
+    setBusinessForm((prev) =>
+      formFromProfile(profile, {
+        ...DEFAULT_BUSINESS_FORM,
+        timezone: s(prev.timezone || "Asia/Baku"),
+        language: s(prev.language || "az"),
+      })
+    );
   }
 
   function syncDiscoveryStateFromReview(review = {}, { preserveCounts = true } = {}) {
@@ -465,15 +480,11 @@ export default function SetupStudioScreen() {
         return preserveBusinessForm ? prev : formFromProfile(legacy.overview, prev);
       }
 
-      if (preserveBusinessForm) {
-        return hydrateBusinessFormFromProfile(prev, preferredProfile, {
-          force: false,
-        });
-      }
-
-      return hydrateBusinessFormFromProfile(prev, preferredProfile, {
-        force: true,
-      });
+      return hydrateBusinessFormFromProfile(
+        preserveBusinessForm ? prev : formFromProfile(legacy.overview, prev),
+        preferredProfile,
+        { force: !preserveBusinessForm }
+      );
     });
 
     setManualSections((prev) => ({
@@ -524,18 +535,18 @@ export default function SetupStudioScreen() {
           sourceScope.sourceUrl
         );
 
-      if (activateReviewSession && shouldApplyIntoActiveStudio) {
-        setFreshEntryMode(false);
-      }
+      setCurrentReview(normalized);
+      setReviewDraft(legacy);
 
       if (!shouldApplyIntoActiveStudio) {
-        setCurrentReview(normalized);
-        setReviewDraft(legacy);
-
         return {
           currentReview: normalized,
           reviewDraft: legacy,
         };
+      }
+
+      if (activateReviewSession) {
+        setFreshEntryMode(false);
       }
 
       return applyReviewState(payload, { preserveBusinessForm });
@@ -591,101 +602,51 @@ export default function SetupStudioScreen() {
       const serviceItems = extractItems(servicesPayload);
 
       const nextMeta = normalizeBootMeta(boot, pendingKnowledge, serviceItems);
-      setMeta(nextMeta);
 
+      setMeta(nextMeta);
       setKnowledgeCandidates(pendingKnowledge);
       setServices(serviceItems);
 
-      if (hydrateReview) {
-        const reviewState = normalizeReviewState(reviewPayload);
-        const legacyDraft = mapCurrentReviewToLegacyDraft(reviewState);
-        const sourceScope = resolveActiveSourceScope({
-          sourceType: activeSourceType,
-          sourceUrl: activeSourceUrl,
-        });
-
-        const shouldApplyIntoActiveStudio =
-          !preserveBusinessForm ||
-          !s(sourceScope.sourceUrl) ||
-          reviewStateMatchesSource(
-            reviewState,
-            legacyDraft,
-            sourceScope.sourceType,
-            sourceScope.sourceUrl
-          );
-
-        setCurrentReview(reviewState);
-        setReviewDraft(legacyDraft);
-
-        if (shouldApplyIntoActiveStudio) {
-          const reviewInfo = resolveReviewSourceInfo(reviewState, legacyDraft);
-          if (s(reviewInfo.sourceUrl)) {
-            updateActiveSourceScope(reviewInfo.sourceType, reviewInfo.sourceUrl);
-          }
-
-          const baseProfile = chooseBestProfileForForm(
-            legacyDraft?.overview,
-            profile
-          );
-
-          setBusinessForm((prev) => {
-            if (!preserveBusinessForm) {
-              return hydrateBusinessFormFromProfile(
-                {
-                  ...prev,
-                  companyName: s(profile?.companyName),
-                  description: s(profile?.description),
-                  timezone: s(profile?.timezone || "Asia/Baku"),
-                  language:
-                    resolveMainLanguageValue(
-                      profile?.mainLanguage,
-                      profile?.primaryLanguage,
-                      profile?.language,
-                      firstLanguage(profile)
-                    ) || "az",
-                  websiteUrl: s(profile?.websiteUrl || profile?.website_url),
-                  primaryPhone: s(profile?.primaryPhone || profile?.primary_phone),
-                  primaryEmail: s(profile?.primaryEmail || profile?.primary_email),
-                  primaryAddress: s(
-                    profile?.primaryAddress || profile?.primary_address
-                  ),
-                },
-                baseProfile,
-                { force: true }
-              );
-            }
-
-            return hydrateBusinessFormFromProfile(prev, baseProfile, {
-              force: false,
-            });
-          });
-
-          const nextManualSections = buildManualSectionsFromReview(reviewState);
-          setManualSections((prev) => ({
-            servicesText:
-              preserveBusinessForm && s(prev.servicesText)
-                ? s(prev.servicesText)
-                : s(nextManualSections.servicesText),
-            faqsText:
-              preserveBusinessForm && s(prev.faqsText)
-                ? s(prev.faqsText)
-                : s(nextManualSections.faqsText),
-            policiesText:
-              preserveBusinessForm && s(prev.policiesText)
-                ? s(prev.policiesText)
-                : s(nextManualSections.policiesText),
-          }));
-
-          syncDiscoveryStateFromReview(reviewState, { preserveCounts: false });
-
-          applyUiHintsFromMeta({
-            nextMeta,
-            pendingKnowledge,
-            setShowKnowledge,
-            setShowRefine,
-          });
+      if (!hydrateReview) {
+        if (!preserveBusinessForm) {
+          clearStudioReviewState({ preserveActiveSource: false });
+          seedBusinessFormFromBootProfile(profile);
         }
 
+        return {
+          boot,
+          workspace,
+          setup,
+          profile,
+          pendingKnowledge,
+          serviceItems,
+          meta: nextMeta,
+          currentReview: createEmptyReviewState(),
+        };
+      }
+
+      const reviewState = normalizeReviewState(reviewPayload);
+      const legacyDraft = mapCurrentReviewToLegacyDraft(reviewState);
+
+      const sourceScope = resolveActiveSourceScope({
+        sourceType: activeSourceType,
+        sourceUrl: activeSourceUrl,
+      });
+
+      const shouldApplyIntoActiveStudio =
+        !preserveBusinessForm ||
+        !s(sourceScope.sourceUrl) ||
+        reviewStateMatchesSource(
+          reviewState,
+          legacyDraft,
+          sourceScope.sourceType,
+          sourceScope.sourceUrl
+        );
+
+      setCurrentReview(reviewState);
+      setReviewDraft(legacyDraft);
+
+      if (!shouldApplyIntoActiveStudio) {
         return {
           boot,
           workspace,
@@ -698,27 +659,65 @@ export default function SetupStudioScreen() {
         };
       }
 
-      if (!preserveBusinessForm) {
-        clearStudioReviewState({ preserveActiveSource: false });
+      const reviewInfo = resolveReviewSourceInfo(reviewState, legacyDraft);
 
-        setBusinessForm((prev) => ({
-          ...prev,
-          companyName: s(profile?.companyName),
-          description: s(profile?.description),
-          timezone: s(profile?.timezone || "Asia/Baku"),
-          language:
-            resolveMainLanguageValue(
-              profile?.mainLanguage,
-              profile?.primaryLanguage,
-              profile?.language,
-              firstLanguage(profile)
-            ) || "az",
-          websiteUrl: s(profile?.websiteUrl || profile?.website_url),
-          primaryPhone: s(profile?.primaryPhone || profile?.primary_phone),
-          primaryEmail: s(profile?.primaryEmail || profile?.primary_email),
-          primaryAddress: s(profile?.primaryAddress || profile?.primary_address),
-        }));
+      if (s(reviewInfo.sourceUrl)) {
+        updateActiveSourceScope(reviewInfo.sourceType, reviewInfo.sourceUrl);
       }
+
+      const baseProfile = chooseBestProfileForForm(
+        legacyDraft?.overview,
+        profile
+      );
+
+      setBusinessForm((prev) => {
+        if (!preserveBusinessForm) {
+          return hydrateBusinessFormFromProfile(
+            formFromProfile(profile, {
+              ...DEFAULT_BUSINESS_FORM,
+              timezone: s(profile?.timezone || "Asia/Baku"),
+              language:
+                resolveMainLanguageValue(
+                  profile?.mainLanguage,
+                  profile?.primaryLanguage,
+                  profile?.language,
+                  firstLanguage(profile)
+                ) || "az",
+            }),
+            baseProfile,
+            { force: true }
+          );
+        }
+
+        return hydrateBusinessFormFromProfile(prev, baseProfile, {
+          force: false,
+        });
+      });
+
+      const nextManualSections = buildManualSectionsFromReview(reviewState);
+      setManualSections((prev) => ({
+        servicesText:
+          preserveBusinessForm && s(prev.servicesText)
+            ? s(prev.servicesText)
+            : s(nextManualSections.servicesText),
+        faqsText:
+          preserveBusinessForm && s(prev.faqsText)
+            ? s(prev.faqsText)
+            : s(nextManualSections.faqsText),
+        policiesText:
+          preserveBusinessForm && s(prev.policiesText)
+            ? s(prev.policiesText)
+            : s(nextManualSections.policiesText),
+      }));
+
+      syncDiscoveryStateFromReview(reviewState, { preserveCounts: false });
+
+      applyUiHintsFromMeta({
+        nextMeta,
+        pendingKnowledge,
+        setShowKnowledge,
+        setShowRefine,
+      });
 
       return {
         boot,
@@ -728,7 +727,7 @@ export default function SetupStudioScreen() {
         pendingKnowledge,
         serviceItems,
         meta: nextMeta,
-        currentReview: createEmptyReviewState(),
+        currentReview: reviewState,
       };
     } catch (e) {
       const message = String(
@@ -846,7 +845,7 @@ export default function SetupStudioScreen() {
         mode: "running",
         lastUrl: sourceUrl,
         lastSourceType: sourceType,
-        sourceLabel: sourceType === "google_maps" ? "Google Maps" : "Website",
+        sourceLabel: sourceLabelFor(sourceType),
         message: scanStartLabel(sourceType),
         warnings: [],
         shouldReview: false,
@@ -894,7 +893,9 @@ export default function SetupStudioScreen() {
       const resultMetadata = {
         reviewRequired:
           !!(result?.reviewRequired ?? legacyImportedDraft?.reviewRequired ?? false),
-        reviewFlags: arr(result?.reviewFlags || legacyImportedDraft?.reviewFlags || []),
+        reviewFlags: arr(
+          result?.reviewFlags || legacyImportedDraft?.reviewFlags || []
+        ),
         fieldConfidence: obj(
           result?.fieldConfidence || legacyImportedDraft?.fieldConfidence || {}
         ),
@@ -942,13 +943,10 @@ export default function SetupStudioScreen() {
 
       setBusinessForm((prev) => {
         const blankBase = {
-          ...prev,
-          companyName: "",
-          description: "",
+          ...DEFAULT_BUSINESS_FORM,
+          timezone: s(prev.timezone || "Asia/Baku"),
+          language: s(prev.language || "az"),
           websiteUrl: sourceUrl,
-          primaryPhone: "",
-          primaryEmail: "",
-          primaryAddress: "",
         };
 
         const mergedFromHelper = shouldApplyExtractedIdentityToForm
@@ -985,13 +983,20 @@ export default function SetupStudioScreen() {
       const sourceRunId = s(result?.run?.id || legacyImportedDraft?.sourceRunId);
       const snapshotId = s(legacyImportedDraft?.snapshotId || result?.snapshot?.id);
 
+      const scopedImportedReview =
+        !barrierOnlyResult && incomingReviewAligned
+          ? importedReview
+          : createEmptyReviewState();
+
+      const scopedImportedDraft =
+        !barrierOnlyResult && incomingReviewAligned
+          ? legacyImportedDraft
+          : createEmptyLegacyDraft();
+
       const immediateDiscoveryState = {
         lastUrl: sourceUrl,
         lastSourceType: sourceType,
-        sourceLabel: s(
-          result?.sourceLabel ||
-            (sourceType === "google_maps" ? "Google Maps" : "Website")
-        ),
+        sourceLabel: s(result?.sourceLabel || sourceLabelFor(sourceType)),
         intakeContext: obj(result?.intakeContext),
         snapshot: obj(result?.snapshot),
         profile: bestIncomingProfile,
@@ -1013,31 +1018,21 @@ export default function SetupStudioScreen() {
       const importedVisibleKnowledgeItems = barrierOnlyResult
         ? []
         : deriveVisibleKnowledgeItems({
-            reviewDraft: incomingReviewAligned
-              ? legacyImportedDraft
-              : createEmptyLegacyDraft(),
-            currentReview: incomingReviewAligned
-              ? importedReview
-              : createEmptyReviewState(),
+            reviewDraft: scopedImportedDraft,
+            currentReview: scopedImportedReview,
             discoveryState: immediateDiscoveryState,
           });
 
       const importedVisibleServiceItems = barrierOnlyResult
         ? []
         : deriveVisibleServiceItems({
-            reviewDraft: incomingReviewAligned
-              ? legacyImportedDraft
-              : createEmptyLegacyDraft(),
-            currentReview: incomingReviewAligned
-              ? importedReview
-              : createEmptyReviewState(),
+            reviewDraft: scopedImportedDraft,
+            currentReview: scopedImportedReview,
             discoveryState: immediateDiscoveryState,
           });
 
       const importedVisibleSources = deriveVisibleSources({
-        currentReview: incomingReviewAligned
-          ? importedReview
-          : createEmptyReviewState(),
+        currentReview: scopedImportedReview,
         discoveryState: immediateDiscoveryState,
       });
 
@@ -1057,10 +1052,7 @@ export default function SetupStudioScreen() {
         mode: s(result?.mode) || "success",
         lastUrl: sourceUrl,
         lastSourceType: sourceType,
-        sourceLabel: s(
-          result?.sourceLabel ||
-            (sourceType === "google_maps" ? "Google Maps" : "Website")
-        ),
+        sourceLabel: s(result?.sourceLabel || sourceLabelFor(sourceType)),
         message:
           resultWarnings.length > 0
             ? resultWarnings[0]
@@ -1153,7 +1145,7 @@ export default function SetupStudioScreen() {
         mode: "error",
         lastUrl: sourceUrl,
         lastSourceType: sourceType,
-        sourceLabel: sourceType === "google_maps" ? "Google Maps" : "Website",
+        sourceLabel: sourceLabelFor(sourceType),
         message,
         hasResults: false,
         resultCount: 0,
@@ -1765,6 +1757,7 @@ export default function SetupStudioScreen() {
       onSetManualSection={setManualSection}
       onSetDiscoveryField={setDiscoveryField}
       onScanBusiness={onScanBusiness}
+      onContinueFlow={() => onScanBusiness(discoveryForm)}
       onSaveBusiness={onSaveBusiness}
       onApproveKnowledge={onApproveKnowledge}
       onRejectKnowledge={onRejectKnowledge}
