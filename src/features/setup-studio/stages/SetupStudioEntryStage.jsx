@@ -1,16 +1,30 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, Check, Link2, Mic, Square, X } from "lucide-react";
+import {
+  ArrowRight,
+  Check,
+  Link2,
+  Loader2,
+  Mic,
+  PlugZap,
+  Square,
+  X,
+} from "lucide-react";
 
 import websiteIcon from "../../../assets/setup-studio/channels/weblink.webp";
 import instagramIcon from "../../../assets/setup-studio/channels/instagram.svg";
 import facebookIcon from "../../../assets/setup-studio/channels/facebook.svg";
 import linkedinIcon from "../../../assets/setup-studio/channels/linkedin.svg";
 import googleMapsIcon from "../../../assets/setup-studio/channels/google-maps.svg";
+import {
+  getMetaChannelStatus,
+  getMetaConnectUrl,
+} from "../../../api/settings.js";
 
 const DISPLAY_FONT_STYLE = {
-  fontFamily: '"Sora", "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif',
+  fontFamily:
+    '"Sora", "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif',
 };
 
 const INPUT_RESET_STYLE = {
@@ -42,6 +56,38 @@ function lower(v) {
   return s(v).toLowerCase();
 }
 
+function arr(v, d = []) {
+  return Array.isArray(v) ? v : d;
+}
+
+function instagramProfileUrlFromChannel(channel = {}) {
+  const username = s(channel?.external_username).replace(/^@+/, "");
+  if (username) return `https://instagram.com/${username}`;
+  return "";
+}
+
+function normalizeInstagramStatusPayload(raw = {}) {
+  const channel = obj(raw?.channel);
+  const connected =
+    Boolean(raw?.connected) &&
+    Boolean(raw?.hasToken) &&
+    !!s(channel?.external_user_id || channel?.external_username || channel?.external_page_id);
+
+  return {
+    loading: false,
+    connecting: false,
+    connected,
+    hasToken: Boolean(raw?.hasToken),
+    username: s(channel?.external_username).replace(/^@+/, ""),
+    profileUrl: instagramProfileUrlFromChannel(channel),
+    displayName: s(channel?.display_name),
+    externalUserId: s(channel?.external_user_id),
+    externalPageId: s(channel?.external_page_id),
+    channel,
+    error: "",
+  };
+}
+
 const SOURCE_OPTIONS = [
   {
     key: "website",
@@ -62,7 +108,7 @@ const SOURCE_OPTIONS = [
     icon: instagramIcon,
     placeholder: "@yourbrand or instagram.com/yourbrand",
     title: "Instagram",
-    description: "Add a public profile link or handle.",
+    description: "Connect the real account, or add a public profile link manually.",
     actionLabel: "Save source",
     glow: "rgba(236,72,153,.26)",
     glowSoft: "rgba(251,191,36,.12)",
@@ -305,7 +351,12 @@ function NeoxWordmark() {
   );
 }
 
-function SourceChip({ source, active = false, onClick }) {
+function SourceChip({
+  source,
+  active = false,
+  statusText = "",
+  onClick,
+}) {
   return (
     <button
       type="button"
@@ -337,6 +388,11 @@ function SourceChip({ source, active = false, onClick }) {
           className="h-[22px] w-[22px] object-contain"
         />
         <span className="whitespace-nowrap">{source.label}</span>
+        {statusText ? (
+          <span className="rounded-full bg-white/90 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+            {statusText}
+          </span>
+        ) : null}
         {active ? <Check className="h-[15px] w-[15px] text-slate-900" /> : null}
       </span>
     </button>
@@ -351,8 +407,15 @@ function SourceModal({
   onSave,
   onRemove,
   onClose,
+  instagramMeta = {},
+  onInstagramConnect,
+  onUseConnectedInstagram,
 }) {
   if (!source) return null;
+
+  const isInstagram = source.key === "instagram";
+  const connected = Boolean(instagramMeta?.connected);
+  const usingConnectedDraft = hasExistingValue && s(value) && lower(s(instagramMeta?.profileUrl)) === lower(s(value));
 
   return (
     <motion.div
@@ -406,6 +469,86 @@ function SourceModal({
           </button>
         </div>
 
+        {isInstagram ? (
+          <div className="mt-6 rounded-[28px] border border-[rgba(15,23,42,.08)] bg-white/80 p-5">
+            {instagramMeta?.loading ? (
+              <div className="flex items-center gap-3 text-[14px] text-slate-500">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Checking connected Instagram account...
+              </div>
+            ) : connected ? (
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                      Connected account
+                    </div>
+                    <div className="mt-2 flex items-center gap-2 text-[18px] font-semibold tracking-[-0.03em] text-slate-950">
+                      <img
+                        src={instagramIcon}
+                        alt="Instagram"
+                        className="h-[18px] w-[18px] object-contain"
+                      />
+                      <span className="truncate">
+                        @{s(instagramMeta?.username || "instagram")}
+                      </span>
+                    </div>
+                    {s(instagramMeta?.displayName) ? (
+                      <div className="mt-1 text-[14px] text-slate-500">
+                        {s(instagramMeta.displayName)}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={onUseConnectedInstagram}
+                    className={`inline-flex h-11 items-center justify-center rounded-full px-5 text-[14px] font-medium transition ${
+                      usingConnectedDraft
+                        ? "bg-emerald-50 text-emerald-700"
+                        : "bg-slate-950 text-white hover:bg-slate-800"
+                    }`}
+                  >
+                    {usingConnectedDraft ? "Using connected account" : "Use connected account"}
+                  </button>
+                </div>
+
+                {s(instagramMeta?.profileUrl) ? (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-[13px] text-slate-600">
+                    {instagramMeta.profileUrl}
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="text-[14px] leading-6 text-slate-500">
+                  Connect the real Instagram account first, then use it directly in the setup flow.
+                </div>
+
+                <button
+                  type="button"
+                  onClick={onInstagramConnect}
+                  disabled={instagramMeta?.connecting}
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-slate-950 px-5 text-[14px] font-medium text-white transition hover:bg-slate-800 disabled:opacity-60"
+                >
+                  {instagramMeta?.connecting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <PlugZap className="h-4 w-4" />
+                  )}
+                  {instagramMeta?.connecting ? "Connecting..." : "Connect Instagram"}
+                </button>
+              </div>
+            )}
+
+            {s(instagramMeta?.error) ? (
+              <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] text-rose-700">
+                {instagramMeta.error}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
         <div className="mt-8">
           <div className="flex h-[60px] items-center gap-3 rounded-full border border-[rgba(15,23,42,.08)] bg-[#f7f8fa] px-5 transition focus-within:border-[rgba(15,23,42,.14)] focus-within:bg-white">
             <Link2 className="h-[16px] w-[16px] shrink-0 text-slate-400" />
@@ -419,7 +562,7 @@ function SourceModal({
               placeholder={source.placeholder}
               className="min-w-0 placeholder:text-slate-400"
               style={INPUT_RESET_STYLE}
-              autoFocus
+              autoFocus={!isInstagram}
             />
           </div>
 
@@ -487,6 +630,19 @@ export default function SetupStudioEntryStage({
   const [isListening, setIsListening] = useState(false);
   const [speechError, setSpeechError] = useState("");
   const [isComposerFocused, setIsComposerFocused] = useState(false);
+  const [instagramMeta, setInstagramMeta] = useState({
+    loading: true,
+    connecting: false,
+    connected: false,
+    hasToken: false,
+    username: "",
+    profileUrl: "",
+    displayName: "",
+    externalUserId: "",
+    externalPageId: "",
+    channel: null,
+    error: "",
+  });
 
   useEffect(() => {
     composerRef.current = composerValue;
@@ -506,6 +662,105 @@ export default function SetupStudioEntryStage({
   const hasComposerContent = !!s(composerValue);
   const canContinue = !!(hasComposerContent || hasRealSource);
   const showGlow = isComposerFocused || hasComposerContent || isListening;
+
+  const refreshInstagramStatus = useCallback(async () => {
+    try {
+      setInstagramMeta((prev) => ({
+        ...prev,
+        loading: true,
+        error: "",
+      }));
+
+      const status = await getMetaChannelStatus();
+
+      setInstagramMeta((prev) => ({
+        ...prev,
+        ...normalizeInstagramStatusPayload(status),
+      }));
+
+      return normalizeInstagramStatusPayload(status);
+    } catch (error) {
+      const message = s(error?.message || "Failed to load Instagram status");
+      setInstagramMeta((prev) => ({
+        ...prev,
+        loading: false,
+        connected: false,
+        hasToken: false,
+        username: "",
+        profileUrl: "",
+        displayName: "",
+        externalUserId: "",
+        externalPageId: "",
+        channel: null,
+        error: message,
+      }));
+      return null;
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshInstagramStatus();
+  }, [refreshInstagramStatus]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const params = new URLSearchParams(window.location.search);
+    const metaConnected = s(params.get("meta_connected"));
+    const metaError = s(params.get("meta_error"));
+
+    if (!metaConnected && !metaError) return;
+
+    if (metaError) {
+      setInstagramMeta((prev) => ({
+        ...prev,
+        error: metaError,
+        connecting: false,
+      }));
+    }
+
+    refreshInstagramStatus().then((status) => {
+      if (
+        metaConnected === "1" &&
+        status?.connected &&
+        !s(obj(sourceDraftsRef.current.instagram).value)
+      ) {
+        const connectedUrl = s(status.profileUrl);
+        if (connectedUrl) {
+          const nextDrafts = {
+            ...sourceDraftsRef.current,
+            instagram: {
+              value: connectedUrl,
+              mode: "connected",
+              username: s(status.username),
+            },
+          };
+
+          const nextComposer = cleanComposerText(composerRef.current, nextDrafts);
+
+          setSourceDrafts(nextDrafts);
+          setComposerValue(nextComposer);
+
+          const next = buildInterpretation(nextComposer, nextDrafts);
+          onSetDiscoveryField?.("sourceType", next.sourceType || "");
+          onSetDiscoveryField?.("sourceValue", next.sourceValue || "");
+          onSetDiscoveryField?.("websiteUrl", next.websiteUrl || "");
+          onSetDiscoveryField?.("note", next.note || "");
+
+          onSetBusinessField?.("websiteUrl", next.websiteUrl || "");
+          onSetBusinessField?.("description", next.description || "");
+        }
+      }
+    });
+
+    params.delete("meta_connected");
+    params.delete("meta_error");
+    params.delete("channel");
+
+    const nextQuery = params.toString();
+    const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ""}${window.location.hash || ""}`;
+    window.history.replaceState({}, "", nextUrl);
+  }, [onSetBusinessField, onSetDiscoveryField, refreshInstagramStatus]);
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
@@ -527,9 +782,19 @@ export default function SetupStudioEntryStage({
 
   useEffect(() => {
     if (!activeSource) return;
+
+    if (activeSource.key === "instagram") {
+      const current = obj(sourceDrafts[source.key]);
+      const currentValue = s(current.value);
+      const connectedUrl = s(instagramMeta.profileUrl);
+      const fallbackValue = currentValue || connectedUrl;
+      setModalValue(fallbackValue);
+      return;
+    }
+
     const prev = obj(sourceDrafts[activeSource.key]);
     setModalValue(s(prev.value));
-  }, [activeSource, sourceDrafts]);
+  }, [activeSource, sourceDrafts, instagramMeta.profileUrl]);
 
   useEffect(() => {
     if (!activeSourceKey) return;
@@ -591,7 +856,13 @@ export default function SetupStudioEntryStage({
       ...sourceDraftsRef.current,
       [activeSource.key]: {
         value: nextValue,
-        mode: "manual",
+        mode:
+          activeSource.key === "instagram" &&
+          lower(nextValue) === lower(s(instagramMeta.profileUrl))
+            ? "connected"
+            : "manual",
+        username:
+          activeSource.key === "instagram" ? s(instagramMeta.username) : "",
       },
     };
 
@@ -608,6 +879,46 @@ export default function SetupStudioEntryStage({
 
     const nextDrafts = { ...sourceDraftsRef.current };
     delete nextDrafts[activeSource.key];
+
+    const nextComposer = cleanComposerText(composerRef.current, nextDrafts);
+
+    setSourceDrafts(nextDrafts);
+    setComposerValue(nextComposer);
+    syncState(nextComposer, nextDrafts);
+    closeSourceModal();
+  }
+
+  async function handleInstagramConnect() {
+    try {
+      setInstagramMeta((prev) => ({
+        ...prev,
+        connecting: true,
+        error: "",
+      }));
+
+      const url = await getMetaConnectUrl();
+      window.location.assign(url);
+    } catch (error) {
+      setInstagramMeta((prev) => ({
+        ...prev,
+        connecting: false,
+        error: s(error?.message || "Failed to start Instagram connect"),
+      }));
+    }
+  }
+
+  function handleUseConnectedInstagram() {
+    const connectedUrl = s(instagramMeta.profileUrl);
+    if (!connectedUrl) return;
+
+    const nextDrafts = {
+      ...sourceDraftsRef.current,
+      instagram: {
+        value: connectedUrl,
+        mode: "connected",
+        username: s(instagramMeta.username),
+      },
+    };
 
     const nextComposer = cleanComposerText(composerRef.current, nextDrafts);
 
@@ -847,13 +1158,29 @@ export default function SetupStudioEntryStage({
                   const source = sourceByKey(key);
                   if (!source) return null;
 
-                  const isActive = !!s(obj(sourceDrafts[key]).value);
+                  const record = obj(sourceDrafts[key]);
+                  const isInstagram = key === "instagram";
+                  const hasAttachedValue = !!s(record.value);
+                  const hasConnectedAccount = isInstagram && !!instagramMeta.connected;
 
                   return (
                     <SourceChip
                       key={source.key}
                       source={source}
-                      active={isActive}
+                      active={hasAttachedValue}
+                      statusText={
+                        isInstagram
+                          ? hasAttachedValue
+                            ? record.mode === "connected"
+                              ? "Live"
+                              : "Added"
+                            : hasConnectedAccount
+                              ? "Connected"
+                              : ""
+                          : hasAttachedValue
+                            ? "Added"
+                            : ""
+                      }
                       onClick={() => openSourceModal(source.key)}
                     />
                   );
@@ -874,6 +1201,9 @@ export default function SetupStudioEntryStage({
             onSave={handleSaveSource}
             onRemove={handleRemoveSource}
             onClose={closeSourceModal}
+            instagramMeta={instagramMeta}
+            onInstagramConnect={handleInstagramConnect}
+            onUseConnectedInstagram={handleUseConnectedInstagram}
           />
         ) : null}
       </AnimatePresence>
