@@ -13,6 +13,23 @@ const DISPLAY_FONT_STYLE = {
   fontFamily: '"Sora", "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif',
 };
 
+const INPUT_RESET_STYLE = {
+  all: "unset",
+  flex: "1 1 auto",
+  width: "100%",
+  minWidth: 0,
+  border: "0",
+  outline: "0",
+  boxShadow: "none",
+  background: "transparent",
+  color: "#0f172a",
+  fontSize: "16px",
+  lineHeight: "24px",
+  appearance: "none",
+  WebkitAppearance: "none",
+  MozAppearance: "none",
+};
+
 function s(v) {
   return String(v ?? "").replace(/\u00a0/g, " ").trim();
 }
@@ -389,7 +406,7 @@ function SourceModal({
         </div>
 
         <div className="mt-8">
-          <div className="flex h-[60px] items-center gap-3 rounded-full border border-[rgba(15,23,42,.08)] bg-[#f7f8fa] px-5 transition focus-within:border-[rgba(15,23,42,.16)] focus-within:bg-white">
+          <div className="flex h-[60px] items-center gap-3 rounded-full border border-[rgba(15,23,42,.08)] bg-[#f7f8fa] px-5 transition focus-within:border-[rgba(15,23,42,.14)] focus-within:bg-white">
             <Link2 className="h-[16px] w-[16px] shrink-0 text-slate-400" />
             <input
               type="text"
@@ -399,15 +416,8 @@ function SourceModal({
               value={value}
               onChange={(e) => onChange(e.target.value)}
               placeholder={source.placeholder}
-              className="min-w-0 flex-1 rounded-none border-0 bg-transparent p-0 text-[16px] leading-none text-slate-900 outline-none ring-0 placeholder:text-slate-400 focus:outline-none focus:ring-0"
-              style={{
-                appearance: "none",
-                WebkitAppearance: "none",
-                boxShadow: "none",
-                borderRadius: 0,
-                WebkitBoxShadow: "0 0 0 1000px transparent inset",
-                WebkitTextFillColor: "#0f172a",
-              }}
+              className="min-w-0 placeholder:text-slate-400"
+              style={INPUT_RESET_STYLE}
               autoFocus
             />
           </div>
