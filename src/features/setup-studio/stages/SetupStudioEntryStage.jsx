@@ -784,7 +784,7 @@ export default function SetupStudioEntryStage({
     if (!activeSource) return;
 
     if (activeSource.key === "instagram") {
-      const current = obj(sourceDrafts[source.key]);
+      const current = obj(sourceDrafts[activeSource.key]);
       const currentValue = s(current.value);
       const connectedUrl = s(instagramMeta.profileUrl);
       const fallbackValue = currentValue || connectedUrl;
