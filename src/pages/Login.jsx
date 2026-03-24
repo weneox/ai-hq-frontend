@@ -1,23 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, useMotionTemplate, useMotionValue } from "framer-motion";
 import {
   AlertCircle,
   ArrowRight,
   Building2,
-  CheckCircle2,
   Eye,
   EyeOff,
-  KeyRound,
   Loader2,
   Lock,
   Mail,
-  ShieldCheck,
-  Sparkles,
   WifiOff,
 } from "lucide-react";
 import { getAuthMe, loginUser } from "../api/auth.js";
-import LoginBackgroundScene from "../components/auth/LoginBackgroundScene.jsx";
 
 const RESERVED_SUBDOMAINS = new Set([
   "www",
@@ -52,17 +47,14 @@ function getTenantKeyFromHost() {
 
   if (host === "localhost" || host === "127.0.0.1") {
     const url = new URL(window.location.href);
-    const qp =
+    return s(
       url.searchParams.get("tenant") ||
-      url.searchParams.get("tenantKey") ||
-      url.searchParams.get("workspace") ||
-      "";
-    return s(qp).toLowerCase();
+        url.searchParams.get("tenantKey") ||
+        url.searchParams.get("workspace")
+    ).toLowerCase();
   }
 
-  if (host === "weneox.com" || host === "hq.weneox.com") {
-    return "";
-  }
+  if (host === "weneox.com" || host === "hq.weneox.com") return "";
 
   if (host.endsWith(".weneox.com")) {
     const sub = host.slice(0, -".weneox.com".length).trim().toLowerCase();
@@ -71,6 +63,12 @@ function getTenantKeyFromHost() {
   }
 
   return "";
+}
+
+function normalizeTenantKey(value) {
+  return s(value)
+    .toLowerCase()
+    .replace(/\s+/g, "-");
 }
 
 function formatWorkspaceName(key) {
@@ -84,12 +82,6 @@ function formatWorkspaceName(key) {
     .join(" ");
 }
 
-function normalizeTenantKey(value) {
-  return s(value)
-    .toLowerCase()
-    .replace(/\s+/g, "-");
-}
-
 function isServiceUnavailableError(error) {
   const message = s(error?.message).toLowerCase();
   return (
@@ -98,57 +90,40 @@ function isServiceUnavailableError(error) {
     message.includes("networkerror") ||
     message.includes("network request failed") ||
     message.includes("auth check failed") ||
-    message.includes("vte_api_base is not set".toLowerCase())
+    message.includes("vite_api_base is not set")
   );
 }
 
-function getFriendlyError(error, fallback = "We could not sign you in.") {
+function getFriendlyError(error, fallback = "Unable to continue.") {
   if (isServiceUnavailableError(error)) {
-    return "Authentication is temporarily unavailable. You can keep this page open and try again in a moment.";
+    return "Authentication is temporarily unavailable. Try again shortly.";
   }
 
-  const message =
+  return s(
     error?.response?.data?.error ||
-    error?.response?.data?.message ||
-    error?.message ||
-    fallback;
-
-  return s(message, fallback);
-}
-
-function Surface({ children, className = "" }) {
-  return (
-    <div
-      className={`rounded-[28px] border border-white/70 bg-white/80 shadow-[0_30px_80px_-40px_rgba(15,23,42,.35)] backdrop-blur-[18px] ${className}`}
-    >
-      {children}
-    </div>
+      error?.response?.data?.message ||
+      error?.message ||
+      fallback,
+    fallback
   );
 }
 
-function StatusPanel({
-  tone = "info",
-  icon: Icon,
-  title,
-  body,
-}) {
+function StatusLine({ icon: Icon, title, body, tone = "neutral" }) {
   const toneClass =
     tone === "error"
-      ? "border-rose-200 bg-rose-50/90 text-rose-900"
+      ? "border-rose-200/70 bg-rose-50/90 text-rose-900"
       : tone === "warning"
-        ? "border-amber-200 bg-amber-50/90 text-amber-900"
-        : tone === "success"
-          ? "border-emerald-200 bg-emerald-50/90 text-emerald-900"
-          : "border-slate-200 bg-slate-50/90 text-slate-900";
+        ? "border-amber-200/70 bg-amber-50/90 text-amber-950"
+        : "border-black/8 bg-white/72 text-slate-800";
 
   return (
-    <div className={`rounded-2xl border px-4 py-3.5 ${toneClass}`}>
+    <div className={`rounded-[20px] border px-4 py-3 ${toneClass}`}>
       <div className="flex items-start gap-3">
-        <div className="mt-0.5 shrink-0">
-          <Icon className="h-4 w-4" />
-        </div>
+        <Icon className="mt-0.5 h-4 w-4 shrink-0" />
         <div className="min-w-0">
-          <div className="text-sm font-semibold">{title}</div>
+          <div className="text-[12px] font-semibold uppercase tracking-[0.18em]">
+            {title}
+          </div>
           <div className="mt-1 text-sm leading-6 opacity-80">{body}</div>
         </div>
       </div>
@@ -159,20 +134,31 @@ function StatusPanel({
 function Field({
   label,
   icon: Icon,
-  right = null,
   children,
+  right = null,
+  focused = false,
+  invalid = false,
 }) {
+  const stateClass = invalid
+    ? "border-rose-300/90 bg-rose-50/70 shadow-[0_0_0_1px_rgba(244,63,94,.08)]"
+    : focused
+      ? "border-slate-900/18 bg-white/95 shadow-[0_18px_40px_-24px_rgba(15,23,42,.35)]"
+      : "border-black/10 bg-white/78 hover:border-black/16";
+
   return (
     <label className="block">
       <div className="mb-2 flex items-center justify-between gap-3">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
           {label}
         </span>
         {right}
       </div>
-      <div className="flex h-14 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,.7)] transition focus-within:border-slate-300 focus-within:ring-4 focus-within:ring-slate-200/50">
+
+      <div
+        className={`flex h-15 items-center gap-3 rounded-[22px] border px-4 transition duration-200 ${stateClass}`}
+      >
         <span className="shrink-0 text-slate-400">
-          <Icon className="h-[18px] w-[18px]" />
+          <Icon className="h-[17px] w-[17px]" />
         </span>
         {children}
       </div>
@@ -184,18 +170,23 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const pointerX = useMotionValue(50);
+  const pointerY = useMotionValue(36);
+  const glow = useMotionTemplate`radial-gradient(520px circle at ${pointerX}% ${pointerY}%, rgba(255,255,255,.92), rgba(255,255,255,.34) 34%, rgba(255,255,255,.06) 62%, transparent 78%)`;
+
   const detectedTenantKey = useMemo(() => getTenantKeyFromHost(), []);
   const redirectTo = location.state?.from?.pathname || "/";
 
   const [checking, setChecking] = useState(true);
-  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [focusedField, setFocusedField] = useState("");
   const [serviceNotice, setServiceNotice] = useState({
     visible: false,
-    tone: "warning",
     title: "",
     body: "",
+    tone: "warning",
   });
 
   const [form, setForm] = useState({
@@ -230,21 +221,21 @@ export default function Login() {
 
         setServiceNotice({
           visible: false,
-          tone: "warning",
           title: "",
           body: "",
+          tone: "warning",
         });
-      } catch (error) {
+      } catch (authError) {
         if (!alive) return;
 
         setServiceNotice({
           visible: true,
-          tone: "warning",
-          title: "Auth service unavailable",
+          title: "Service unavailable",
           body: getFriendlyError(
-            error,
-            "We could not verify your current session right now."
+            authError,
+            "We could not verify your session."
           ),
+          tone: "warning",
         });
       } finally {
         if (alive) setChecking(false);
@@ -281,7 +272,7 @@ export default function Login() {
     const password = String(form.password || "");
 
     if (!tenantKey) {
-      setError("Enter your workspace key.");
+      setError("Enter your workspace.");
       return;
     }
 
@@ -302,288 +293,266 @@ export default function Login() {
       });
 
       window.location.replace(redirectTo);
-    } catch (err) {
-      const unavailable = isServiceUnavailableError(err);
-
-      if (unavailable) {
+    } catch (submitError) {
+      if (isServiceUnavailableError(submitError)) {
         setServiceNotice({
           visible: true,
+          title: "Authentication paused",
+          body: getFriendlyError(submitError),
           tone: "warning",
-          title: "Authentication is temporarily unavailable",
-          body: getFriendlyError(err),
         });
         setError("");
       } else {
-        setError(getFriendlyError(err));
+        setError(getFriendlyError(submitError, "Sign in failed."));
       }
     } finally {
       setLoading(false);
     }
   }
 
+  function handlePointerMove(event) {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const x = ((event.clientX - bounds.left) / bounds.width) * 100;
+    const y = ((event.clientY - bounds.top) / bounds.height) * 100;
+    pointerX.set(Math.max(0, Math.min(100, x)));
+    pointerY.set(Math.max(0, Math.min(100, y)));
+  }
+
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#f3efe8] text-slate-950">
-      <LoginBackgroundScene />
+    <div className="relative min-h-screen overflow-hidden bg-[#ebe6dd] text-slate-950">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,.95),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(208,214,226,.55),transparent_28%),linear-gradient(180deg,#f4efe7_0%,#e7e1d7_100%)]" />
+      <div className="absolute inset-y-0 left-[11vw] hidden w-px bg-black/6 xl:block" />
+      <div className="absolute inset-y-0 right-[10vw] hidden w-px bg-black/5 xl:block" />
+      <div className="absolute left-[8vw] top-[14vh] h-[32vh] w-[18vw] rounded-full bg-white/65 blur-[80px]" />
+      <div className="absolute right-[6vw] top-[10vh] h-[56vh] w-[24vw] rounded-full bg-[#c9d1dd]/50 blur-[90px]" />
+      <div className="absolute bottom-[8vh] left-[22vw] h-[26vh] w-[28vw] rounded-full bg-[#f8f3ec]/85 blur-[70px]" />
 
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,.16),rgba(243,239,232,.54))]" />
+      <main className="relative z-10 flex min-h-screen items-center justify-center px-4 py-6 sm:px-6 lg:px-8">
+        <motion.section
+          initial={{ opacity: 0, y: 18, scale: 0.992 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.48, ease: [0.22, 1, 0.36, 1] }}
+          onMouseMove={handlePointerMove}
+          className="relative w-full max-w-[1180px] overflow-hidden rounded-[34px] border border-white/70 bg-[rgba(251,249,245,.72)] shadow-[0_50px_120px_-54px_rgba(15,23,42,.42)] backdrop-blur-[24px]"
+        >
+          <motion.div
+            aria-hidden="true"
+            style={{ background: glow }}
+            className="pointer-events-none absolute inset-0 opacity-95"
+          />
 
-      <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-[1280px] items-center px-4 py-10 sm:px-6 lg:px-8">
-        <div className="grid w-full items-center gap-8 lg:grid-cols-[minmax(0,1.04fr)_440px]">
-          <motion.section
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-            className="hidden lg:block"
-          >
-            <div className="max-w-[640px]">
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/70 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-600 shadow-[0_12px_30px_-20px_rgba(15,23,42,.25)]">
-                <Sparkles className="h-3.5 w-3.5" />
-                Premium workspace access
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(120deg,rgba(255,255,255,.55),transparent_26%,transparent_74%,rgba(255,255,255,.35))]" />
+          <div className="absolute left-[clamp(1rem,4vw,2.5rem)] top-[clamp(1rem,4vw,2.4rem)] h-[calc(100%-2rem)] w-[min(44%,390px)] rounded-[28px] border border-white/55 bg-[linear-gradient(180deg,rgba(255,255,255,.48),rgba(255,255,255,.14))] shadow-[inset_0_1px_0_rgba(255,255,255,.45)] backdrop-blur-[10px] sm:h-[calc(100%-2.4rem)] sm:w-[min(42%,410px)]" />
+          <div className="absolute right-[clamp(1rem,4vw,2.5rem)] top-[clamp(1rem,4vw,2.4rem)] h-[88px] w-[88px] rounded-full border border-white/55 bg-white/28 blur-[1px]" />
+          <div className="absolute bottom-[clamp(1rem,4vw,2.4rem)] right-[clamp(1rem,4vw,2.5rem)] h-[120px] w-[120px] rounded-[28px] border border-white/45 bg-[linear-gradient(180deg,rgba(255,255,255,.38),rgba(255,255,255,.14))]" />
+
+          <div className="relative grid min-h-[760px] grid-cols-1 lg:grid-cols-[minmax(280px,34%)_1fr]">
+            <div className="relative flex min-h-[260px] flex-col justify-between p-6 sm:p-8 lg:p-10">
+              <div>
+                <div className="inline-flex items-center gap-3">
+                  <div className="inline-flex h-10 w-10 items-center justify-center rounded-[16px] bg-slate-950 text-white shadow-[0_20px_40px_-24px_rgba(15,23,42,.7)]">
+                    <div className="h-2.5 w-2.5 rounded-full bg-white" />
+                  </div>
+                  <div className="text-[12px] font-semibold uppercase tracking-[0.28em] text-slate-600">
+                    AIHQ
+                  </div>
+                </div>
+
+                <div className="mt-10 max-w-[220px]">
+                  <div className="font-['Cormorant_Garamond',Georgia,serif] text-[54px] leading-[0.9] tracking-[-0.05em] text-slate-950 sm:text-[64px]">
+                    Enter
+                  </div>
+                  <div className="mt-4 text-[12px] uppercase tracking-[0.22em] text-slate-500">
+                    {workspaceName || activeTenantKey || "Private system"}
+                  </div>
+                </div>
               </div>
 
-              <h1 className="mt-6 max-w-[560px] font-['Sora',ui-sans-serif,system-ui] text-[48px] font-semibold leading-[0.96] tracking-[-0.06em] text-slate-950">
-                A stable login screen, even when auth is having a bad day.
-              </h1>
-
-              <p className="mt-5 max-w-[560px] text-[17px] leading-8 text-slate-600">
-                Sign in to your AIHQ workspace with a cleaner, more resilient auth
-                experience. If the backend is temporarily unavailable, the page
-                stays polished and explains the issue clearly.
-              </p>
-
-              <div className="mt-10 grid max-w-[560px] gap-4 sm:grid-cols-2">
-                <Surface className="p-5">
-                  <div className="flex items-center gap-3">
-                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-950 text-white">
-                      <ShieldCheck className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold text-slate-950">
-                        Protected workspace access
-                      </div>
-                      <div className="mt-1 text-sm leading-6 text-slate-600">
-                        Session-aware routing keeps healthy logins fast.
-                      </div>
-                    </div>
+              <div className="hidden lg:block">
+                <div className="flex items-end justify-between gap-4">
+                  <div className="max-w-[180px] text-[13px] leading-6 text-slate-500">
+                    Quiet, controlled access.
                   </div>
-                </Surface>
-
-                <Surface className="p-5">
-                  <div className="flex items-center gap-3">
-                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-[#d97706] text-white">
-                      <WifiOff className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold text-slate-950">
-                        Graceful degraded state
-                      </div>
-                      <div className="mt-1 text-sm leading-6 text-slate-600">
-                        Backend failures become clear inline guidance, not raw fetch errors.
-                      </div>
-                    </div>
-                  </div>
-                </Surface>
+                  <div className="h-px w-16 bg-black/10" />
+                </div>
               </div>
             </div>
-          </motion.section>
 
-          <motion.section
-            initial={{ opacity: 0, y: 20, scale: 0.992 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <Surface className="overflow-hidden p-5 sm:p-7">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-950 text-white shadow-[0_16px_30px_-18px_rgba(15,23,42,.6)]">
-                    <KeyRound className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
-                      AIHQ
+            <div className="relative flex items-center px-4 pb-4 sm:px-6 sm:pb-6 lg:px-8 lg:pb-8">
+              <div className="relative ml-auto w-full max-w-[620px] rounded-[30px] border border-black/8 bg-[rgba(255,255,255,.58)] p-5 shadow-[0_30px_70px_-44px_rgba(15,23,42,.44)] backdrop-blur-[22px] sm:p-7 lg:p-8">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                      Login
                     </div>
-                    <div className="mt-0.5 text-sm font-medium text-slate-700">
-                      Secure workspace login
-                    </div>
+                    <h1 className="mt-4 max-w-[360px] font-['Sora',ui-sans-serif,system-ui] text-[32px] font-semibold leading-[0.98] tracking-[-0.05em] text-slate-950 sm:text-[40px]">
+                      Back inside.
+                    </h1>
+                    <p className="mt-3 max-w-[320px] text-sm leading-7 text-slate-600">
+                      Use your workspace credentials.
+                    </p>
+                  </div>
+
+                  <div className="rounded-full border border-black/8 bg-white/72 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-600">
+                    {checking ? "Checking" : "Ready"}
                   </div>
                 </div>
 
-                <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">
-                  <ShieldCheck className="h-3.5 w-3.5" />
-                  Protected
+                <div className="mt-6 space-y-3">
+                  {serviceNotice.visible ? (
+                    <StatusLine
+                      icon={WifiOff}
+                      title={serviceNotice.title}
+                      body={serviceNotice.body}
+                      tone={serviceNotice.tone}
+                    />
+                  ) : null}
+
+                  {checking ? (
+                    <StatusLine
+                      icon={Loader2}
+                      title="Session"
+                      body="Checking your current sign-in state."
+                    />
+                  ) : null}
+
+                  {error ? (
+                    <StatusLine
+                      icon={AlertCircle}
+                      title="Unable to continue"
+                      body={error}
+                      tone="error"
+                    />
+                  ) : null}
                 </div>
-              </div>
 
-              <div className="mt-8">
-                <h2 className="font-['Sora',ui-sans-serif,system-ui] text-[32px] font-semibold leading-[1.02] tracking-[-0.05em] text-slate-950">
-                  Welcome back
-                </h2>
-                <p className="mt-3 text-[15px] leading-7 text-slate-600">
-                  {activeTenantKey
-                    ? `Continue into ${workspaceName || activeTenantKey}.`
-                    : "Sign in to your AIHQ workspace."}
-                </p>
+                <form className="mt-7 space-y-5" onSubmit={onSubmit}>
+                  <Field
+                    label="Workspace"
+                    icon={Building2}
+                    focused={focusedField === "tenantKey"}
+                    invalid={!s(form.tenantKey) && !!error}
+                  >
+                    <input
+                      type="text"
+                      name="tenantKey"
+                      placeholder="company-name"
+                      value={form.tenantKey}
+                      onChange={onChange}
+                      onFocus={() => setFocusedField("tenantKey")}
+                      onBlur={() => setFocusedField("")}
+                      autoComplete="organization"
+                      spellCheck={false}
+                      className="h-full w-full bg-transparent text-[15px] outline-none placeholder:text-slate-400"
+                    />
+                  </Field>
 
-                {activeTenantKey ? (
-                  <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[12px] font-medium text-slate-700">
-                    <Building2 className="h-4 w-4" />
-                    {activeTenantKey}
-                  </div>
-                ) : null}
-              </div>
+                  <Field
+                    label="Email"
+                    icon={Mail}
+                    focused={focusedField === "email"}
+                    invalid={!s(form.email) && !!error}
+                  >
+                    <input
+                      type="email"
+                      name="email"
+                      placeholder="name@company.com"
+                      value={form.email}
+                      onChange={onChange}
+                      onFocus={() => setFocusedField("email")}
+                      onBlur={() => setFocusedField("")}
+                      autoComplete="email"
+                      className="h-full w-full bg-transparent text-[15px] outline-none placeholder:text-slate-400"
+                    />
+                  </Field>
 
-              {serviceNotice.visible ? (
-                <div className="mt-6">
-                  <StatusPanel
-                    tone={serviceNotice.tone}
-                    icon={WifiOff}
-                    title={serviceNotice.title}
-                    body={serviceNotice.body}
-                  />
-                </div>
-              ) : null}
+                  <Field
+                    label="Password"
+                    icon={Lock}
+                    focused={focusedField === "password"}
+                    invalid={!s(form.password) && !!error}
+                    right={
+                      <button
+                        type="button"
+                        className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400 transition hover:text-slate-700"
+                      >
+                        Reset
+                      </button>
+                    }
+                  >
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      name="password"
+                      placeholder="Password"
+                      value={form.password}
+                      onChange={onChange}
+                      onFocus={() => setFocusedField("password")}
+                      onBlur={() => setFocusedField("")}
+                      autoComplete="current-password"
+                      className="h-full w-full bg-transparent text-[15px] outline-none placeholder:text-slate-400"
+                    />
 
-              {checking ? (
-                <div className="mt-6">
-                  <StatusPanel
-                    tone="info"
-                    icon={Loader2}
-                    title="Checking your session"
-                    body="We’re verifying whether you already have an active login."
-                  />
-                </div>
-              ) : null}
-
-              <form className="mt-6 space-y-5" onSubmit={onSubmit}>
-                <Field label="Workspace" icon={Building2}>
-                  <input
-                    type="text"
-                    name="tenantKey"
-                    placeholder="company-name"
-                    value={form.tenantKey}
-                    onChange={onChange}
-                    autoComplete="organization"
-                    spellCheck={false}
-                    className="h-full w-full bg-transparent text-[15px] outline-none placeholder:text-slate-400"
-                  />
-                </Field>
-
-                <Field label="Email" icon={Mail}>
-                  <input
-                    type="email"
-                    name="email"
-                    placeholder="name@company.com"
-                    value={form.email}
-                    onChange={onChange}
-                    autoComplete="email"
-                    className="h-full w-full bg-transparent text-[15px] outline-none placeholder:text-slate-400"
-                  />
-                </Field>
-
-                <Field
-                  label="Password"
-                  icon={Lock}
-                  right={
                     <button
                       type="button"
-                      className="text-xs font-medium text-slate-500 transition hover:text-slate-900"
+                      className="shrink-0 text-slate-400 transition hover:text-slate-800"
+                      onClick={() => setShowPassword((prev) => !prev)}
+                      aria-label="Toggle password visibility"
                     >
-                      Forgot password?
+                      {showPassword ? (
+                        <EyeOff className="h-[18px] w-[18px]" />
+                      ) : (
+                        <Eye className="h-[18px] w-[18px]" />
+                      )}
                     </button>
-                  }
-                >
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    name="password"
-                    placeholder="Enter your password"
-                    value={form.password}
-                    onChange={onChange}
-                    autoComplete="current-password"
-                    className="h-full w-full bg-transparent text-[15px] outline-none placeholder:text-slate-400"
-                  />
-                  <button
-                    type="button"
-                    className="shrink-0 text-slate-400 transition hover:text-slate-800"
-                    onClick={() => setShowPassword((prev) => !prev)}
-                    aria-label="Toggle password visibility"
+                  </Field>
+
+                  <div className="flex items-center justify-between gap-4 pt-1">
+                    <label className="flex items-center gap-3 text-sm text-slate-600">
+                      <input
+                        type="checkbox"
+                        name="remember"
+                        checked={form.remember}
+                        onChange={onChange}
+                        className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-300"
+                      />
+                      <span>Remember</span>
+                    </label>
+
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                      {activeTenantKey ? workspaceName || activeTenantKey : "Workspace"}
+                    </div>
+                  </div>
+
+                  <motion.button
+                    whileHover={loading || checking ? {} : { y: -1 }}
+                    whileTap={loading || checking ? {} : { scale: 0.995 }}
+                    type="submit"
+                    disabled={loading || checking}
+                    className="group relative inline-flex h-[62px] w-full items-center justify-between overflow-hidden rounded-[24px] border border-slate-950 bg-slate-950 px-5 text-left text-white shadow-[0_28px_44px_-26px_rgba(15,23,42,.78)] transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-70"
                   >
-                    {showPassword ? (
-                      <EyeOff className="h-[18px] w-[18px]" />
-                    ) : (
-                      <Eye className="h-[18px] w-[18px]" />
-                    )}
-                  </button>
-                </Field>
+                    <span className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,.10),transparent_28%,transparent_72%,rgba(255,255,255,.08))]" />
+                    <span className="relative">
+                      <span className="block text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">
+                        Continue
+                      </span>
+                      <span className="mt-1 block text-[15px] font-medium">
+                        {loading ? "Signing in..." : "Open session"}
+                      </span>
+                    </span>
 
-                <label className="flex items-center gap-3 text-sm text-slate-600">
-                  <input
-                    type="checkbox"
-                    name="remember"
-                    checked={form.remember}
-                    onChange={onChange}
-                    className="h-4 w-4 rounded border-slate-300 text-slate-950 focus:ring-slate-300"
-                  />
-                  <span>Remember me on this device</span>
-                </label>
-
-                {error ? (
-                  <StatusPanel
-                    tone="error"
-                    icon={AlertCircle}
-                    title="Sign-in failed"
-                    body={error}
-                  />
-                ) : null}
-
-                <button
-                  type="submit"
-                  disabled={loading || checking}
-                  className="inline-flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 text-[15px] font-medium text-white shadow-[0_22px_36px_-20px_rgba(15,23,42,.75)] transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Signing in...
-                    </>
-                  ) : (
-                    <>
-                      Continue
-                      <ArrowRight className="h-4 w-4" />
-                    </>
-                  )}
-                </button>
-              </form>
-
-              <div className="mt-6 flex items-center gap-3 text-[12px] text-slate-400">
-                <div className="h-px flex-1 bg-slate-200" />
-                <span className="uppercase tracking-[0.18em]">Workspace status</span>
-                <div className="h-px flex-1 bg-slate-200" />
+                    <span className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/12 bg-white/8 transition group-hover:translate-x-[2px]">
+                      {loading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <ArrowRight className="h-4 w-4" />
+                      )}
+                    </span>
+                  </motion.button>
+                </form>
               </div>
-
-              <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                  <div className="flex items-center gap-2 text-slate-900">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                    <span className="text-sm font-medium">Clean form states</span>
-                  </div>
-                  <div className="mt-2 text-sm leading-6 text-slate-600">
-                    Loading, inline validation, and auth availability are handled inside the card.
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                  <div className="flex items-center gap-2 text-slate-900">
-                    <ShieldCheck className="h-4 w-4 text-slate-700" />
-                    <span className="text-sm font-medium">Flow preserved</span>
-                  </div>
-                  <div className="mt-2 text-sm leading-6 text-slate-600">
-                    Once the backend is healthy again, the existing session check and login redirect continue to work.
-                  </div>
-                </div>
-              </div>
-            </Surface>
-          </motion.section>
-        </div>
+            </div>
+          </div>
+        </motion.section>
       </main>
     </div>
   );
