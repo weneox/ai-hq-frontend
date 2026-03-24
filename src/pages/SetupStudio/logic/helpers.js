@@ -4,8 +4,8 @@ import {
   s,
   normalizeIncomingSourceType,
   detectSourceTypeFromUrl,
-} from "../screen/shared.js";
-import { isWebsiteBarrierWarning } from "../screen/profile.js";
+} from "../state/shared.js";
+import { isWebsiteBarrierWarning } from "../state/profile.js";
 import { UUID_RE } from "./constants.js";
 
 export function lowerText(value = "") {
