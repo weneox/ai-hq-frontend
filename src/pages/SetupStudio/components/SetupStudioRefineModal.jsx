@@ -371,7 +371,7 @@ export default function SetupStudioRefineModal({
                       onSetBusinessField?.("companyName", e.target.value)
                     }
                     className={inputClassName()}
-                    placeholder="Company name"
+                    placeholder=""
                     autoComplete="off"
                   />
                 </div>
@@ -384,7 +384,7 @@ export default function SetupStudioRefineModal({
                       onSetBusinessField?.("websiteUrl", e.target.value)
                     }
                     className={inputClassName()}
-                    placeholder="yourbusiness.com"
+                    placeholder=""
                     autoComplete="off"
                   />
                 </div>
@@ -399,7 +399,7 @@ export default function SetupStudioRefineModal({
                       onSetBusinessField?.("primaryPhone", e.target.value)
                     }
                     className={inputClassName()}
-                    placeholder="+994 ..."
+                    placeholder=""
                     autoComplete="off"
                   />
                 </div>
@@ -412,7 +412,7 @@ export default function SetupStudioRefineModal({
                       onSetBusinessField?.("primaryEmail", e.target.value)
                     }
                     className={inputClassName()}
-                    placeholder="info@company.com"
+                    placeholder=""
                     autoComplete="off"
                   />
                 </div>
@@ -426,7 +426,7 @@ export default function SetupStudioRefineModal({
                     onSetBusinessField?.("primaryAddress", e.target.value)
                   }
                   className={inputClassName()}
-                  placeholder="Primary address"
+                  placeholder=""
                   autoComplete="off"
                 />
               </div>

@@ -293,9 +293,12 @@ export default function SetupStudioScreen() {
 
     setBusinessForm((prev) => {
       if (!hasMeaningfulProfile(preferredProfile)) {
-        return preserveBusinessForm
-          ? prev
-          : formFromProfile(legacy.overview, prev);
+        return {
+          ...DEFAULT_BUSINESS_FORM,
+          timezone: s(prev.timezone || "Asia/Baku"),
+          language: s(prev.language || "az"),
+          websiteUrl: s(reviewInfo.sourceUrl),
+        };
       }
 
       return hydrateBusinessFormFromProfile(

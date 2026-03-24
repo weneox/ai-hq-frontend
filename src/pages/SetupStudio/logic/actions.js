@@ -69,6 +69,7 @@ import {
   sourceLabelFor,
   lowerText,
 } from "./helpers.js";
+import { DEFAULT_BUSINESS_FORM } from "./constants.js";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -388,23 +389,29 @@ export function createSetupStudioActions(ctx) {
         updateActiveSourceScope(reviewInfo.sourceType, reviewInfo.sourceUrl);
       }
 
-      const baseProfile = chooseBestProfileForForm(
-        legacyDraft?.overview,
-        profile
-      );
+      const baseProfile = chooseBestProfileForForm(legacyDraft?.overview);
 
       setBusinessForm((prev) => {
+        if (!hasMeaningfulProfile(baseProfile)) {
+          return {
+            ...DEFAULT_BUSINESS_FORM,
+            timezone: s(prev.timezone || "Asia/Baku"),
+            language: s(prev.language || "az"),
+            websiteUrl: s(reviewInfo.sourceUrl),
+          };
+        }
+
         if (!preserveBusinessForm) {
           return hydrateBusinessFormFromProfile(
-            formFromProfile(profile, {
+            formFromProfile(baseProfile, {
               ...prev,
-              timezone: s(profile?.timezone || "Asia/Baku"),
+              timezone: s(baseProfile?.timezone || "Asia/Baku"),
               language:
                 resolveMainLanguageValue(
-                  profile?.mainLanguage,
-                  profile?.primaryLanguage,
-                  profile?.language,
-                  firstLanguage(profile)
+                  baseProfile?.mainLanguage,
+                  baseProfile?.primaryLanguage,
+                  baseProfile?.language,
+                  firstLanguage(baseProfile)
                 ) || "az",
             }),
             baseProfile,
