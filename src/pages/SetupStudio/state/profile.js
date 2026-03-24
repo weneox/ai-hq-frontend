@@ -65,6 +65,16 @@ export function deriveSuggestedServicePayload({
 
 export function formFromProfile(profile = {}, prev = {}) {
   const x = obj(profile);
+  const rawCompanyName = s(
+    x.companyName ||
+      x.company_name ||
+      x.displayName ||
+      x.display_name ||
+      x.name
+  );
+  const safeCompanyName = isPlaceholderBusinessName(rawCompanyName)
+    ? ""
+    : rawCompanyName;
   const resolvedLanguage =
     resolveMainLanguageValue(
       x.mainLanguage,
@@ -79,12 +89,7 @@ export function formFromProfile(profile = {}, prev = {}) {
   return {
     ...prev,
     companyName: s(
-      x.companyName ||
-        x.company_name ||
-        x.displayName ||
-        x.display_name ||
-        x.name ||
-        prev.companyName
+      safeCompanyName || (!rawCompanyName ? prev.companyName : "")
     ),
     description: s(
       x.summaryShort ||
@@ -113,11 +118,10 @@ export function formFromProfile(profile = {}, prev = {}) {
 
 export function hasExtractedIdentityProfile(profile = {}) {
   const x = obj(profile);
+  const extractedName = extractProfileName(x);
 
   return !!(
-    s(
-      x.companyName || x.company_name || x.displayName || x.display_name || x.name
-    ) ||
+    extractedName ||
     s(
       x.summaryShort ||
         x.summary_short ||
@@ -188,13 +192,14 @@ export function safeDraftKey(value = "", fallback = "item") {
 
 export function extractProfileName(profile = {}) {
   const x = obj(profile);
-  return s(
+  const name = s(
     x.companyName ||
       x.company_name ||
       x.displayName ||
       x.display_name ||
       x.name
   );
+  return isPlaceholderBusinessName(name) ? "" : name;
 }
 
 export function hasMeaningfulProfile(profile = {}) {
