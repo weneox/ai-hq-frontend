@@ -1,5 +1,3 @@
-// FILE: src/pages/SetupStudio/SetupStudioScreen.jsx
-
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -765,14 +763,13 @@ export default function SetupStudioScreen() {
       onSetBusinessField={setBusinessField}
       onSetManualSection={setManualSection}
       onSetDiscoveryField={setDiscoveryField}
+      onScanBusiness={actions.onScanBusiness}
+      onContinueFlow={() => actions.onScanBusiness(discoveryForm)}
       onSaveBusiness={actions.onSaveBusiness}
       onApproveKnowledge={actions.onApproveKnowledge}
       onRejectKnowledge={actions.onRejectKnowledge}
       onCreateSuggestedService={actions.onCreateSuggestedService}
       onOpenWorkspace={actions.onOpenWorkspace}
-      onContinueFlow={(nextDiscoveryForm) =>
-        actions.onScanBusiness(nextDiscoveryForm || discoveryForm)
-      }
       onReloadReviewDraft={() =>
         actions.loadCurrentReview({
           preserveBusinessForm: true,
