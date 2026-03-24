@@ -32,25 +32,70 @@ function maybeUuid(value = "") {
   return UUID_RE.test(x) ? x : "";
 }
 
+function maybeId(value = "") {
+  const x = s(value);
+  if (!x) return "";
+  if (x === "[object Object]") return "";
+  return x;
+}
+
+function firstNonEmpty(values = []) {
+  for (const value of values) {
+    const x = maybeId(value);
+    if (x) return x;
+  }
+  return "";
+}
+
 function pickCandidateUuid(item = {}) {
   const x = obj(item);
   const candidate = obj(x.candidate);
 
-  return (
-    maybeUuid(x.candidateId) ||
-    maybeUuid(x.candidate_id) ||
-    maybeUuid(x.knowledgeCandidateId) ||
-    maybeUuid(x.knowledge_candidate_id) ||
-    maybeUuid(x.reviewCandidateId) ||
-    maybeUuid(x.review_candidate_id) ||
-    maybeUuid(x.candidateUuid) ||
-    maybeUuid(x.candidate_uuid) ||
-    maybeUuid(x.uuid) ||
-    maybeUuid(candidate.id) ||
-    maybeUuid(candidate.candidateId) ||
-    maybeUuid(candidate.candidate_id) ||
-    maybeUuid(x.id)
-  );
+  return firstNonEmpty([
+    maybeUuid(x.candidateId),
+    maybeUuid(x.candidate_id),
+    maybeUuid(x.knowledgeCandidateId),
+    maybeUuid(x.knowledge_candidate_id),
+    maybeUuid(x.reviewCandidateId),
+    maybeUuid(x.review_candidate_id),
+    maybeUuid(x.candidateUuid),
+    maybeUuid(x.candidate_uuid),
+    maybeUuid(x.uuid),
+    maybeUuid(candidate.id),
+    maybeUuid(candidate.candidateId),
+    maybeUuid(candidate.candidate_id),
+    maybeUuid(x.id),
+  ]);
+}
+
+function pickCandidateRef(item = {}) {
+  const x = obj(item);
+  const candidate = obj(x.candidate);
+
+  return firstNonEmpty([
+    x.candidateId,
+    x.candidate_id,
+    x.knowledgeCandidateId,
+    x.knowledge_candidate_id,
+    x.reviewCandidateId,
+    x.review_candidate_id,
+    x.candidateRef,
+    x.candidate_ref,
+    x.candidateKey,
+    x.candidate_key,
+    x.candidateUuid,
+    x.candidate_uuid,
+    x.uuid,
+    candidate.id,
+    candidate.candidateId,
+    candidate.candidate_id,
+    x.id,
+    x.itemId,
+    x.item_id,
+    x.key,
+    x.itemKey,
+    x.item_key,
+  ]);
 }
 
 function pickRowId(item = {}, index = 0) {
@@ -112,14 +157,18 @@ function pickEvidenceUrl(item = {}, evidence = []) {
 function normalizeKnowledgeItem(item = {}, index = 0) {
   const x = obj(item);
   const evidence = normalizeEvidenceList(x);
-  const candidateId = pickCandidateUuid(x);
   const rowId = pickRowId(x, index);
+  const candidateUuid = pickCandidateUuid(x);
+  const candidateRef = pickCandidateRef(x);
+  const actionId = candidateRef || candidateUuid || rowId;
 
   return {
     ...x,
-    id: rowId,
+    id: actionId,
+    actionId,
     rowId,
-    candidateId,
+    candidateId: candidateRef,
+    candidateUuid,
     title: s(x.title || x.label || x.key || "Untitled item"),
     value: s(
       x.value ||
@@ -224,6 +273,7 @@ export default function SetupStudioKnowledgeStage({
 
   const warningList = arr(warnings).map((x) => s(x)).filter(Boolean);
   const sourceBadge = sourceBadgeLabel(sourceLabel);
+  const actingId = s(actingKnowledgeId);
 
   const avgConfidence = items.length
     ? Math.round(
@@ -297,8 +347,11 @@ export default function SetupStudioKnowledgeStage({
         {items.length ? (
           <div className="space-y-3">
             {items.map((item) => {
-              const busy = !!item.candidateId && actingKnowledgeId === item.candidateId;
-              const disabled = !item.candidateId || busy;
+              const busy = !!actingId &&
+                [item.actionId, item.candidateId, item.candidateUuid, item.rowId]
+                  .map((value) => s(value))
+                  .filter(Boolean)
+                  .includes(actingId);
 
               return (
                 <div
@@ -349,13 +402,18 @@ export default function SetupStudioKnowledgeStage({
                     <div className="flex shrink-0 flex-wrap gap-2">
                       <button
                         type="button"
-                        disabled={disabled}
+                        disabled={busy}
                         onClick={() =>
                           onApproveKnowledge?.({
                             ...item,
-                            id: item.rowId,
+                            id: item.actionId,
+                            actionId: item.actionId,
                             rowId: item.rowId,
-                            candidateId: item.candidateId,
+                            candidateId:
+                              item.candidateUuid ||
+                              item.candidateId ||
+                              item.actionId,
+                            candidateUuid: item.candidateUuid,
                           })
                         }
                         className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-slate-950 px-4 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-50"
@@ -366,13 +424,18 @@ export default function SetupStudioKnowledgeStage({
 
                       <button
                         type="button"
-                        disabled={disabled}
+                        disabled={busy}
                         onClick={() =>
                           onRejectKnowledge?.({
                             ...item,
-                            id: item.rowId,
+                            id: item.actionId,
+                            actionId: item.actionId,
                             rowId: item.rowId,
-                            candidateId: item.candidateId,
+                            candidateId:
+                              item.candidateUuid ||
+                              item.candidateId ||
+                              item.actionId,
+                            candidateUuid: item.candidateUuid,
                           })
                         }
                         className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:text-slate-950 disabled:opacity-50"
