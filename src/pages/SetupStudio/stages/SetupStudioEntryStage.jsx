@@ -351,41 +351,48 @@ function useTypingExamples(enabled = true) {
     let mounted = true;
     let timeoutId;
 
-    function tick() {
+    function tick(currentIndex, currentCharIndex, isDeleting) {
       if (!mounted) return;
 
-      const current = examples[exampleIndex % examples.length] || "";
+      const current = examples[currentIndex % examples.length] || "";
 
-      if (!deleting) {
-        charIndex += 1;
-        setDisplay(current.slice(0, charIndex));
+      if (!isDeleting) {
+        const nextCharIndex = currentCharIndex + 1;
+        setDisplay(current.slice(0, nextCharIndex));
 
-        if (charIndex >= current.length) {
+        if (nextCharIndex >= current.length) {
           timeoutId = window.setTimeout(() => {
-            deleting = true;
-            tick();
+            tick(currentIndex, nextCharIndex, true);
           }, 1350);
           return;
         }
 
-        timeoutId = window.setTimeout(tick, 24);
+        timeoutId = window.setTimeout(() => {
+          tick(currentIndex, nextCharIndex, false);
+        }, 24);
         return;
       }
 
-      charIndex -= 1;
-      setDisplay(current.slice(0, Math.max(0, charIndex)));
+      const nextCharIndex = currentCharIndex - 1;
+      setDisplay(current.slice(0, Math.max(0, nextCharIndex)));
 
-      if (charIndex <= 0) {
-        deleting = false;
-        setExampleIndex((prev) => (prev + 1) % examples.length);
-        timeoutId = window.setTimeout(tick, 220);
+      if (nextCharIndex <= 0) {
+        const nextIndex = (currentIndex + 1) % examples.length;
+        setExampleIndex(nextIndex);
+        timeoutId = window.setTimeout(() => {
+          tick(nextIndex, 0, false);
+        }, 220);
         return;
       }
 
-      timeoutId = window.setTimeout(tick, 14);
+      timeoutId = window.setTimeout(() => {
+        tick(currentIndex, nextCharIndex, true);
+      }, 14);
     }
 
-    timeoutId = window.setTimeout(tick, 420);
+    timeoutId = window.setTimeout(() => {
+      tick(exampleIndex, 0, false);
+    }, 420);
 
     return () => {
       mounted = false;
@@ -398,35 +405,14 @@ function useTypingExamples(enabled = true) {
 
 function NeoxWordmark() {
   return (
-    <div className="relative inline-flex select-none items-center justify-center">
+    <div className="inline-flex select-none items-center justify-center">
       <div
         style={DISPLAY_FONT_STYLE}
-        className="relative inline-flex items-end gap-[8px] text-[30px] font-semibold leading-none tracking-[-0.06em] sm:text-[34px] lg:text-[38px]"
+        className="inline-flex items-end gap-[8px] text-[30px] font-semibold leading-none tracking-[-0.06em] sm:text-[34px] lg:text-[38px]"
       >
-        <span className="relative text-slate-950">
-          <span className="relative z-10">NEOX</span>
-          <span
-            className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,#0f172a_0%,#0f172a_22%,#8be9ff_34%,#d8fff2_42%,#0f172a_54%,#0f172a_100%)] bg-[length:220%_100%] bg-clip-text text-transparent opacity-85"
-            style={{
-              WebkitBackgroundClip: "text",
-              animation: "neox-wordmark-flow 4.2s linear infinite",
-            }}
-          >
-            NEOX
-          </span>
-        </span>
-
-        <span className="relative bg-[linear-gradient(180deg,#4b5563_0%,#0f172a_100%)] bg-clip-text text-transparent">
-          <span className="relative z-10">AI Studio</span>
-          <span
-            className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,#475569_0%,#475569_26%,#9be7ff_42%,#defef6_50%,#475569_62%,#0f172a_100%)] bg-[length:220%_100%] bg-clip-text text-transparent opacity-75"
-            style={{
-              WebkitBackgroundClip: "text",
-              animation: "neox-wordmark-flow 4.2s linear infinite",
-            }}
-          >
-            AI Studio
-          </span>
+        <span className="text-slate-950">NEOX</span>
+        <span className="bg-[linear-gradient(180deg,#4b5563_0%,#0f172a_100%)] bg-clip-text text-transparent">
+          AI Studio
         </span>
       </div>
     </div>
@@ -445,7 +431,7 @@ function SourceAction({
       onClick={onClick}
       className={`group inline-flex h-[42px] items-center gap-2 rounded-full px-3.5 text-[14px] font-medium tracking-[-0.02em] transition ${
         attached
-          ? "bg-white text-slate-900 shadow-[0_10px_24px_-18px_rgba(15,23,42,.14)]"
+          ? "bg-white text-slate-900 shadow-[0_10px_24px_-18px_rgba(15,23,42,.12)]"
           : "text-slate-500 hover:text-slate-900"
       }`}
     >
@@ -648,7 +634,7 @@ function SourceModal({
           )}
 
           <div className="mt-7 flex flex-wrap items-center gap-5">
-            {(!isInstagram || !connected) ? (
+            {(!isInstagram || !connected) && (
               <button
                 type="button"
                 onClick={onSave}
@@ -657,7 +643,7 @@ function SourceModal({
               >
                 {source.actionLabel}
               </button>
-            ) : null}
+            )}
 
             {hasExistingValue ? (
               <button
@@ -735,7 +721,10 @@ export default function SetupStudioEntryStage({
     sourceDraftsRef.current = sourceDrafts;
   }, [sourceDrafts]);
 
-  const activeSource = useMemo(() => sourceByKey(activeSourceKey), [activeSourceKey]);
+  const activeSource = useMemo(
+    () => sourceByKey(activeSourceKey),
+    [activeSourceKey]
+  );
 
   const interpretation = useMemo(() => {
     return buildInterpretation(composerValue, sourceDrafts);
@@ -744,7 +733,8 @@ export default function SetupStudioEntryStage({
   const hasRealSource = !!s(interpretation.sourceValue);
   const hasComposerContent = !!s(composerValue);
   const canContinue = !!(hasComposerContent || hasRealSource);
-  const shouldRunTyping = !hasComposerContent && !isListening && !isComposerFocused;
+  const shouldRunTyping =
+    !hasComposerContent && !isListening && !isComposerFocused;
   const typingExample = useTypingExamples(shouldRunTyping);
 
   const refreshInstagramStatus = useCallback(async () => {
@@ -820,7 +810,10 @@ export default function SetupStudioEntryStage({
             },
           };
 
-          const nextComposer = cleanComposerText(composerRef.current, nextDrafts);
+          const nextComposer = cleanComposerText(
+            composerRef.current,
+            nextDrafts
+          );
 
           setSourceDrafts(nextDrafts);
           setComposerValue(nextComposer);
@@ -842,7 +835,9 @@ export default function SetupStudioEntryStage({
     params.delete("channel");
 
     const nextQuery = params.toString();
-    const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ""}${window.location.hash || ""}`;
+    const nextUrl = `${window.location.pathname}${
+      nextQuery ? `?${nextQuery}` : ""
+    }${window.location.hash || ""}`;
     window.history.replaceState({}, "", nextUrl);
   }, [onSetBusinessField, onSetDiscoveryField, refreshInstagramStatus]);
 
@@ -852,7 +847,7 @@ export default function SetupStudioEntryStage({
     const SpeechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition;
 
-    setSpeechSupported(!!SpeechRecognition));
+    setSpeechSupported(!!SpeechRecognition);
 
     return () => {
       if (recognitionRef.current) {
@@ -901,7 +896,10 @@ export default function SetupStudioEntryStage({
     };
   }, [activeSourceKey]);
 
-  function syncState(nextText = composerRef.current, nextDrafts = sourceDraftsRef.current) {
+  function syncState(
+    nextText = composerRef.current,
+    nextDrafts = sourceDraftsRef.current
+  ) {
     const next = buildInterpretation(nextText, nextDrafts);
 
     onSetDiscoveryField?.("sourceType", next.sourceType || "");
@@ -1142,13 +1140,6 @@ export default function SetupStudioEntryStage({
 
   return (
     <>
-      <style>{`
-        @keyframes neox-wordmark-flow {
-          0% { background-position: 0% 50%; }
-          100% { background-position: 200% 50%; }
-        }
-      `}</style>
-
       <section className="w-full bg-transparent">
         <div className="mx-auto max-w-[1280px] px-4 py-[42px] sm:px-6 sm:py-[56px] lg:px-8 lg:py-[64px]">
           <div className="mx-auto w-full max-w-[1180px] text-center">
