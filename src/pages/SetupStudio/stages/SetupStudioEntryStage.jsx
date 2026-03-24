@@ -1101,7 +1101,7 @@ export default function SetupStudioEntryStage({
                 style={DISPLAY_FONT_STYLE}
                 className="mx-auto mt-6 max-w-[980px] text-[30px] font-semibold leading-[1.02] tracking-[-0.072em] text-slate-950 sm:text-[42px] lg:text-[58px]"
               >
-                Build your business draft from real signals.
+                TEST NEOX 123.
               </h1>
 
               <p className="mx-auto mt-5 max-w-[700px] text-[15px] leading-7 tracking-[-0.02em] text-slate-500 sm:text-[16px]">
