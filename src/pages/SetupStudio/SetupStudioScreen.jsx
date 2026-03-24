@@ -19,7 +19,7 @@ import {
   createEmptySourceScope,
   resolveMainLanguageValue,
   normalizeReviewState,
-} from "./screen/shared.js";
+} from "./state/shared.js";
 
 import {
   deriveSuggestedServicePayload,
@@ -30,7 +30,7 @@ import {
   shouldPreferCandidateCompanyName,
   hydrateBusinessFormFromProfile,
   chooseBestProfileForForm,
-} from "./screen/profile.js";
+} from "./state/profile.js";
 
 import {
   mapCurrentReviewToLegacyDraft,
@@ -41,7 +41,7 @@ import {
   deriveVisibleServiceItems,
   deriveVisibleSources,
   deriveVisibleEvents,
-} from "./screen/reviewState.js";
+} from "./state/reviewState.js";
 
 import {
   DEFAULT_BUSINESS_FORM,
