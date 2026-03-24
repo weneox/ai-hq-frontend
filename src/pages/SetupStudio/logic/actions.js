@@ -69,6 +69,121 @@ import {
   lowerText,
 } from "./helpers.js";
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function maybeUuid(value = "") {
+  const x = s(value);
+  return UUID_RE.test(x) ? x : "";
+}
+
+function pickDirectKnowledgeCandidateUuid(item = {}) {
+  const x = obj(item);
+  const candidate = obj(x.candidate);
+
+  return (
+    maybeUuid(x.candidateUuid) ||
+    maybeUuid(x.candidate_uuid) ||
+    maybeUuid(x.candidateId) ||
+    maybeUuid(x.candidate_id) ||
+    maybeUuid(x.knowledgeCandidateId) ||
+    maybeUuid(x.knowledge_candidate_id) ||
+    maybeUuid(x.reviewCandidateId) ||
+    maybeUuid(x.review_candidate_id) ||
+    maybeUuid(x.uuid) ||
+    maybeUuid(candidate.id) ||
+    maybeUuid(candidate.uuid) ||
+    maybeUuid(candidate.candidateId) ||
+    maybeUuid(candidate.candidate_id) ||
+    ""
+  );
+}
+
+function knowledgeSignature(item = {}) {
+  const x = obj(item);
+  const candidate = obj(x.candidate);
+
+  const evidenceUrl = s(
+    x.evidenceUrl ||
+      x.evidence_url ||
+      x.url ||
+      x.link ||
+      obj(arr(x.evidence)[0]).url ||
+      obj(arr(x.evidence)[0]).pageUrl
+  );
+
+  return [
+    s(x.rowId || x.row_id),
+    s(x.id),
+    s(x.key),
+    s(x.itemKey || x.item_key),
+    s(x.title || x.label),
+    s(x.value || x.valueText || x.value_text || x.description),
+    evidenceUrl,
+    s(candidate.id || candidate.uuid || candidate.candidateId),
+  ]
+    .filter(Boolean)
+    .join("::")
+    .toLowerCase();
+}
+
+function resolveKnowledgeCandidateUuid({
+  item,
+  visibleKnowledgeItems,
+  pickKnowledgeCandidateId,
+}) {
+  const fromCtx = maybeUuid(
+    typeof pickKnowledgeCandidateId === "function"
+      ? pickKnowledgeCandidateId(item)
+      : ""
+  );
+
+  if (fromCtx) return fromCtx;
+
+  const direct = pickDirectKnowledgeCandidateUuid(item);
+  if (direct) return direct;
+
+  const targetSig = knowledgeSignature(item);
+  const targetRowId = s(item?.rowId || item?.row_id);
+  const targetId = s(item?.id);
+  const targetTitle = s(item?.title || item?.label);
+  const targetValue = s(
+    item?.value || item?.valueText || item?.value_text || item?.description
+  );
+
+  const matched = arr(visibleKnowledgeItems).find((entry) => {
+    const sig = knowledgeSignature(entry);
+
+    if (targetSig && sig && targetSig === sig) return true;
+    if (targetRowId && targetRowId === s(entry?.rowId || entry?.row_id))
+      return true;
+    if (targetId && targetId === s(entry?.id)) return true;
+
+    return (
+      targetTitle &&
+      targetValue &&
+      targetTitle === s(entry?.title || entry?.label) &&
+      targetValue ===
+        s(
+          entry?.value ||
+            entry?.valueText ||
+            entry?.value_text ||
+            entry?.description
+        )
+    );
+  });
+
+  const matchedFromCtx = maybeUuid(
+    typeof pickKnowledgeCandidateId === "function"
+      ? pickKnowledgeCandidateId(matched)
+      : ""
+  );
+
+  if (matchedFromCtx) return matchedFromCtx;
+
+  return pickDirectKnowledgeCandidateUuid(matched);
+}
+
 export function createSetupStudioActions(ctx) {
   const {
     navigate,
@@ -945,10 +1060,14 @@ export function createSetupStudioActions(ctx) {
   }
 
   async function onApproveKnowledge(item) {
-    const candidateId = ctx.pickKnowledgeCandidateId(item);
+    const candidateId = resolveKnowledgeCandidateUuid({
+      item,
+      visibleKnowledgeItems,
+      pickKnowledgeCandidateId: ctx.pickKnowledgeCandidateId,
+    });
 
     if (!candidateId) {
-      setError("Bu knowledge item üçün candidate UUID tapılmadı.");
+      setError("Bu knowledge item review candidate UUID-si ilə gəlməyib.");
       return { ok: false };
     }
 
@@ -992,10 +1111,14 @@ export function createSetupStudioActions(ctx) {
   }
 
   async function onRejectKnowledge(item) {
-    const candidateId = ctx.pickKnowledgeCandidateId(item);
+    const candidateId = resolveKnowledgeCandidateUuid({
+      item,
+      visibleKnowledgeItems,
+      pickKnowledgeCandidateId: ctx.pickKnowledgeCandidateId,
+    });
 
     if (!candidateId) {
-      setError("Bu knowledge item üçün candidate UUID tapılmadı.");
+      setError("Bu knowledge item review candidate UUID-si ilə gəlməyib.");
       return { ok: false };
     }
 
