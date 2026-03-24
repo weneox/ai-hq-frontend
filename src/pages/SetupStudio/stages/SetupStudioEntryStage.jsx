@@ -398,14 +398,35 @@ function useTypingExamples(enabled = true) {
 
 function NeoxWordmark() {
   return (
-    <div className="inline-flex select-none items-center justify-center">
+    <div className="relative inline-flex select-none items-center justify-center">
       <div
         style={DISPLAY_FONT_STYLE}
-        className="inline-flex items-end gap-[8px] text-[30px] font-semibold leading-none tracking-[-0.06em] text-slate-900 sm:text-[34px] lg:text-[38px]"
+        className="relative inline-flex items-end gap-[8px] text-[30px] font-semibold leading-none tracking-[-0.06em] sm:text-[34px] lg:text-[38px]"
       >
-        <span>NEOX</span>
-        <span className="bg-[linear-gradient(180deg,#475569_0%,#0f172a_100%)] bg-clip-text text-transparent">
-          AI Studio
+        <span className="relative text-slate-950">
+          <span className="relative z-10">NEOX</span>
+          <span
+            className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,#0f172a_0%,#0f172a_22%,#8be9ff_34%,#d8fff2_42%,#0f172a_54%,#0f172a_100%)] bg-[length:220%_100%] bg-clip-text text-transparent opacity-85"
+            style={{
+              WebkitBackgroundClip: "text",
+              animation: "neox-wordmark-flow 4.2s linear infinite",
+            }}
+          >
+            NEOX
+          </span>
+        </span>
+
+        <span className="relative bg-[linear-gradient(180deg,#4b5563_0%,#0f172a_100%)] bg-clip-text text-transparent">
+          <span className="relative z-10">AI Studio</span>
+          <span
+            className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,#475569_0%,#475569_26%,#9be7ff_42%,#defef6_50%,#475569_62%,#0f172a_100%)] bg-[length:220%_100%] bg-clip-text text-transparent opacity-75"
+            style={{
+              WebkitBackgroundClip: "text",
+              animation: "neox-wordmark-flow 4.2s linear infinite",
+            }}
+          >
+            AI Studio
+          </span>
         </span>
       </div>
     </div>
@@ -423,9 +444,9 @@ function SourceAction({
       type="button"
       onClick={onClick}
       className={`group inline-flex h-[42px] items-center gap-2 rounded-full px-3.5 text-[14px] font-medium tracking-[-0.02em] transition ${
-        attached || connectedOnly
+        attached
           ? "bg-white text-slate-900 shadow-[0_10px_24px_-18px_rgba(15,23,42,.14)]"
-          : "text-slate-500 hover:bg-white/70 hover:text-slate-900"
+          : "text-slate-500 hover:text-slate-900"
       }`}
     >
       <img
@@ -436,20 +457,12 @@ function SourceAction({
 
       <span>{source.label}</span>
 
-      {attached || connectedOnly ? (
-        <span
-          className={`inline-flex h-[18px] w-[18px] items-center justify-center rounded-full ${
-            attached
-              ? "bg-emerald-500 text-white"
-              : "bg-slate-100 text-slate-500"
-          }`}
-        >
-          {attached ? (
-            <Check className="h-[12px] w-[12px]" />
-          ) : (
-            <span className="h-[6px] w-[6px] rounded-full bg-current" />
-          )}
+      {attached ? (
+        <span className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-full bg-emerald-500 text-white">
+          <Check className="h-[12px] w-[12px]" />
         </span>
+      ) : connectedOnly ? (
+        <span className="inline-flex h-[8px] w-[8px] rounded-full bg-emerald-500" />
       ) : null}
     </button>
   );
@@ -471,17 +484,16 @@ function SourceModal({
 
   const isInstagram = source.key === "instagram";
   const connected = Boolean(instagramMeta?.connected);
-  const usingConnectedDraft =
-    hasExistingValue &&
-    s(value) &&
-    lower(s(instagramMeta?.profileUrl)) === lower(s(value));
+  const connectedHandle = s(instagramMeta?.username)
+    ? `@${s(instagramMeta.username)}`
+    : "@instagram";
 
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[95] flex items-center justify-center bg-[rgba(15,23,42,.12)] px-4 py-6 backdrop-blur-[12px]"
+      className="fixed inset-0 z-[95] flex items-center justify-center bg-[rgba(15,23,42,.14)] px-4 py-6 backdrop-blur-[14px]"
     >
       <button
         type="button"
@@ -495,7 +507,7 @@ function SourceModal({
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 18, scale: 0.985 }}
         transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-        className="relative z-10 w-full max-w-[620px] overflow-hidden rounded-[30px] border border-white/80 bg-[rgba(249,249,249,.96)] shadow-[0_32px_80px_-36px_rgba(15,23,42,.28)]"
+        className="relative z-10 w-full max-w-[620px] overflow-hidden rounded-[30px] border border-white/80 bg-[rgba(249,249,249,.98)] shadow-[0_32px_80px_-36px_rgba(15,23,42,.28)]"
       >
         <div className="relative px-7 pb-7 pt-7 sm:px-8">
           <div className="flex items-start justify-between gap-5">
@@ -530,81 +542,84 @@ function SourceModal({
           </div>
 
           {isInstagram ? (
-            <div className="mt-6 rounded-[24px] border border-[rgba(15,23,42,.07)] bg-white/72 px-5 py-5">
+            <div className="mt-7">
               {instagramMeta?.loading ? (
                 <div className="flex items-center gap-3 text-[14px] text-slate-500">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Checking connected Instagram account...
                 </div>
               ) : connected ? (
-                <div className="space-y-4">
-                  <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div className="min-w-0">
-                      <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                        Connected account
-                      </div>
+                <div className="rounded-[24px] border border-[rgba(15,23,42,.07)] bg-white/80 px-5 py-5">
+                  <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    Connected account
+                  </div>
 
-                      <div className="mt-2 flex items-center gap-2 text-[18px] font-semibold tracking-[-0.03em] text-slate-950">
-                        <img
-                          src={instagramIcon}
-                          alt="Instagram"
-                          className="h-[18px] w-[18px] object-contain"
-                        />
-                        <span className="truncate">
-                          @{s(instagramMeta?.username || "instagram")}
-                        </span>
-                      </div>
-
-                      {s(instagramMeta?.displayName) ? (
-                        <div className="mt-1 text-[14px] text-slate-500">
-                          {s(instagramMeta.displayName)}
+                  <div className="mt-4 flex items-center justify-between gap-4">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <img
+                        src={instagramIcon}
+                        alt="Instagram"
+                        className="h-[22px] w-[22px] shrink-0 object-contain"
+                      />
+                      <div className="min-w-0 text-left">
+                        <div className="truncate text-[28px] font-semibold tracking-[-0.04em] text-slate-950">
+                          {connectedHandle}
                         </div>
-                      ) : null}
+                      </div>
                     </div>
 
                     <button
                       type="button"
                       onClick={onUseConnectedInstagram}
-                      className={`inline-flex h-11 items-center justify-center rounded-full px-5 text-[14px] font-medium transition ${
-                        usingConnectedDraft
-                          ? "bg-emerald-50 text-emerald-700"
-                          : "bg-slate-950 text-white hover:bg-slate-800"
-                      }`}
+                      className="inline-flex h-11 shrink-0 items-center justify-center rounded-full bg-slate-950 px-5 text-[14px] font-medium text-white transition hover:bg-slate-800"
                     >
-                      {usingConnectedDraft
-                        ? "Using connected account"
-                        : "Use connected account"}
+                      Use connected account
                     </button>
                   </div>
-
-                  {s(instagramMeta?.profileUrl) ? (
-                    <div className="text-[13px] text-slate-500">
-                      {instagramMeta.profileUrl}
-                    </div>
-                  ) : null}
                 </div>
               ) : (
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div className="text-[14px] leading-6 text-slate-500">
-                    Connect the real Instagram account first, then use it directly in the setup flow.
+                <>
+                  <div className="rounded-[24px] border border-[rgba(15,23,42,.07)] bg-white/72 px-5 py-5">
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                      <div className="text-[14px] leading-6 text-slate-500">
+                        Connect the real Instagram account first, or add a public profile manually.
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={onInstagramConnect}
+                        disabled={instagramMeta?.connecting}
+                        className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-slate-950 px-5 text-[14px] font-medium text-white transition hover:bg-slate-800 disabled:opacity-60"
+                      >
+                        {instagramMeta?.connecting ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <PlugZap className="h-4 w-4" />
+                        )}
+                        {instagramMeta?.connecting
+                          ? "Connecting..."
+                          : "Connect Instagram"}
+                      </button>
+                    </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={onInstagramConnect}
-                    disabled={instagramMeta?.connecting}
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-slate-950 px-5 text-[14px] font-medium text-white transition hover:bg-slate-800 disabled:opacity-60"
-                  >
-                    {instagramMeta?.connecting ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <PlugZap className="h-4 w-4" />
-                    )}
-                    {instagramMeta?.connecting
-                      ? "Connecting..."
-                      : "Connect Instagram"}
-                  </button>
-                </div>
+                  <div className="mt-7">
+                    <div className="flex min-h-[56px] items-center gap-3 border-b border-[rgba(15,23,42,.10)] px-1 pb-3">
+                      <Link2 className="h-[16px] w-[16px] shrink-0 text-slate-400" />
+                      <input
+                        type="text"
+                        name={`${source.key}-source`}
+                        autoComplete="off"
+                        spellCheck={false}
+                        value={value}
+                        onChange={(e) => onChange(e.target.value)}
+                        placeholder={source.placeholder}
+                        style={INPUT_RESET_STYLE}
+                        autoFocus
+                      />
+                    </div>
+                  </div>
+                </>
               )}
 
               {s(instagramMeta?.error) ? (
@@ -613,25 +628,27 @@ function SourceModal({
                 </div>
               ) : null}
             </div>
-          ) : null}
-
-          <div className="mt-8">
-            <div className="flex min-h-[56px] items-center gap-3 border-b border-[rgba(15,23,42,.10)] px-1 pb-3">
-              <Link2 className="h-[16px] w-[16px] shrink-0 text-slate-400" />
-              <input
-                type="text"
-                name={`${source.key}-source`}
-                autoComplete="off"
-                spellCheck={false}
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                placeholder={source.placeholder}
-                style={INPUT_RESET_STYLE}
-                autoFocus={!isInstagram}
-              />
+          ) : (
+            <div className="mt-8">
+              <div className="flex min-h-[56px] items-center gap-3 border-b border-[rgba(15,23,42,.10)] px-1 pb-3">
+                <Link2 className="h-[16px] w-[16px] shrink-0 text-slate-400" />
+                <input
+                  type="text"
+                  name={`${source.key}-source`}
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={value}
+                  onChange={(e) => onChange(e.target.value)}
+                  placeholder={source.placeholder}
+                  style={INPUT_RESET_STYLE}
+                  autoFocus
+                />
+              </div>
             </div>
+          )}
 
-            <div className="mt-6 flex flex-wrap items-center gap-5">
+          <div className="mt-7 flex flex-wrap items-center gap-5">
+            {(!isInstagram || !connected) ? (
               <button
                 type="button"
                 onClick={onSave}
@@ -640,25 +657,25 @@ function SourceModal({
               >
                 {source.actionLabel}
               </button>
+            ) : null}
 
-              {hasExistingValue ? (
-                <button
-                  type="button"
-                  onClick={onRemove}
-                  className="inline-flex h-10 items-center justify-center text-[14px] font-medium text-slate-500 transition hover:text-slate-950"
-                >
-                  Remove
-                </button>
-              ) : null}
-
+            {hasExistingValue ? (
               <button
                 type="button"
-                onClick={onClose}
+                onClick={onRemove}
                 className="inline-flex h-10 items-center justify-center text-[14px] font-medium text-slate-500 transition hover:text-slate-950"
               >
-                Cancel
+                Remove
               </button>
-            </div>
+            ) : null}
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-10 items-center justify-center text-[14px] font-medium text-slate-500 transition hover:text-slate-950"
+            >
+              Cancel
+            </button>
           </div>
         </div>
       </motion.div>
@@ -835,7 +852,7 @@ export default function SetupStudioEntryStage({
     const SpeechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition;
 
-    setSpeechSupported(!!SpeechRecognition);
+    setSpeechSupported(!!SpeechRecognition));
 
     return () => {
       if (recognitionRef.current) {
@@ -1125,9 +1142,16 @@ export default function SetupStudioEntryStage({
 
   return (
     <>
+      <style>{`
+        @keyframes neox-wordmark-flow {
+          0% { background-position: 0% 50%; }
+          100% { background-position: 200% 50%; }
+        }
+      `}</style>
+
       <section className="w-full bg-transparent">
-        <div className="mx-auto max-w-[1280px] px-4 py-[44px] sm:px-6 sm:py-[60px] lg:px-8 lg:py-[70px]">
-          <div className="mx-auto w-full max-w-[1120px] text-center">
+        <div className="mx-auto max-w-[1280px] px-4 py-[42px] sm:px-6 sm:py-[56px] lg:px-8 lg:py-[64px]">
+          <div className="mx-auto w-full max-w-[1180px] text-center">
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -1137,7 +1161,7 @@ export default function SetupStudioEntryStage({
 
               <h1
                 style={DISPLAY_FONT_STYLE}
-                className="mx-auto mt-5 max-w-[820px] text-[34px] font-semibold leading-[1.08] tracking-[-0.055em] text-slate-950 sm:text-[42px] lg:text-[50px]"
+                className="mx-auto mt-5 max-w-[1040px] text-[31px] font-semibold leading-[1.1] tracking-[-0.045em] text-slate-950 sm:text-[38px] lg:text-[44px]"
               >
                 Build your business draft from real signals.
               </h1>
@@ -1147,13 +1171,9 @@ export default function SetupStudioEntryStage({
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.24, delay: 0.04 }}
-              className="relative mx-auto mt-10 w-full max-w-[1300px]"
+              className="relative mx-auto mt-10 w-full max-w-[1320px]"
             >
-              <div className="pointer-events-none absolute inset-x-[7%] bottom-[-24px] h-[110px] rounded-[999px] bg-[radial-gradient(ellipse_at_center,rgba(110,231,183,.16)_0%,rgba(125,211,252,.14)_34%,rgba(125,211,252,0)_76%)] blur-[22px]" />
-
-              <div className="relative overflow-hidden rounded-[34px] border border-[rgba(15,23,42,.07)] bg-[linear-gradient(180deg,rgba(255,255,255,.86)_0%,rgba(248,249,250,.78)_100%)] shadow-[0_22px_52px_-34px_rgba(15,23,42,.16)] backdrop-blur-[14px]">
-                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(190,242,255,.12),transparent_34%),radial-gradient(circle_at_50%_100%,rgba(110,231,183,.08),transparent_26%)]" />
-
+              <div className="relative overflow-hidden rounded-[34px] border border-[rgba(15,23,42,.07)] bg-[linear-gradient(180deg,rgba(255,255,255,.90)_0%,rgba(249,249,250,.84)_100%)] shadow-[0_20px_44px_-30px_rgba(15,23,42,.12)] backdrop-blur-[12px]">
                 <div className="relative px-7 pb-6 pt-7 sm:px-9 sm:pb-7 sm:pt-8">
                   <div className="relative min-h-[108px] text-left sm:min-h-[118px]">
                     <textarea
@@ -1188,7 +1208,7 @@ export default function SetupStudioEntryStage({
                   <div className="mt-4 border-t border-[rgba(15,23,42,.06)] pt-4">
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                       <div className="min-w-0 flex-1 text-left">
-                        <div className="flex flex-wrap items-center gap-2.5">
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-2.5">
                           {VISIBLE_SOURCE_KEYS.map((key) => {
                             const source = sourceByKey(key);
                             if (!source) return null;
@@ -1212,20 +1232,20 @@ export default function SetupStudioEntryStage({
                           })}
                         </div>
 
-                        <div className="mt-4 flex flex-wrap items-center gap-3">
+                        <div className="mt-4 flex flex-wrap items-center gap-4">
                           <button
                             type="button"
                             onClick={handleVoiceAction}
-                            className={`inline-flex h-[46px] items-center gap-3 rounded-full px-4 text-[14px] font-medium tracking-[-0.02em] transition ${
+                            className={`inline-flex h-[48px] items-center gap-3 rounded-full px-5 text-[15px] font-medium tracking-[-0.02em] transition ${
                               isListening
                                 ? "bg-rose-50 text-rose-700"
-                                : "bg-white text-slate-700 shadow-[0_10px_24px_-18px_rgba(15,23,42,.14)] hover:text-slate-950"
+                                : "bg-white text-slate-700 shadow-[0_10px_24px_-18px_rgba(15,23,42,.12)] hover:text-slate-950"
                             }`}
                           >
                             {isListening ? (
                               <Square className="h-[14px] w-[14px] fill-current" />
                             ) : (
-                              <Mic className="h-[17px] w-[17px]" />
+                              <Mic className="h-[18px] w-[18px]" />
                             )}
                             <span>
                               {isListening
