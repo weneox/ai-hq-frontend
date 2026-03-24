@@ -347,6 +347,7 @@ export default function SetupStudioScene({
                   onSaveBusiness={onSaveBusiness}
                   onClose={onToggleRefine}
                   reviewDraft={reviewDraft}
+                  reviewSources={reviewSources}
                 />
               </div>
             </div>
@@ -400,6 +401,7 @@ export default function SetupStudioScene({
                 discoveryProfileRows={discoveryProfileRows}
                 discoveryWarnings={arr(discoveryState?.warnings)}
                 sourceLabel={sourceLabel}
+                reviewSources={reviewSources}
                 onNext={goNextFromIdentity}
                 onToggleRefine={onToggleRefine}
               />
@@ -476,6 +478,7 @@ export default function SetupStudioScene({
                 onSaveBusiness={onSaveBusiness}
                 onClose={onToggleRefine}
                 reviewDraft={reviewDraft}
+                reviewSources={reviewSources}
               />
             </div>
           </div>

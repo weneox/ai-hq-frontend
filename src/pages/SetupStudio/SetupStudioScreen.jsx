@@ -7,7 +7,7 @@ import {
   arr,
   obj,
   s,
-  profilePreviewRows,
+  profilePreviewRowsWithProvenance,
   discoveryModeLabel,
   deriveStudioProgress,
 } from "./lib/setupStudioHelpers.js";
@@ -243,6 +243,7 @@ export default function SetupStudioScreen() {
       hasResults:
         prev.hasResults ||
         hasMeaningfulProfile(profile) ||
+        arr(normalized?.bundleSources).length > 0 ||
         arr(normalized?.sources).length > 0 ||
         arr(normalized?.events).length > 0 ||
         arr(legacy.reviewQueue).length > 0 ||
@@ -251,6 +252,7 @@ export default function SetupStudioScreen() {
         ? prev.resultCount
         : arr(legacy.reviewQueue).length +
           arr(legacy.sections?.services).length +
+          arr(normalized?.bundleSources).length +
           arr(normalized?.sources).length +
           arr(normalized?.events).length,
       profile: Object.keys(profile).length ? profile : obj(prev.profile),
@@ -410,8 +412,14 @@ export default function SetupStudioScreen() {
   }, [freshEntryMode, scopedReviewDraft, discoveryState.profile]);
 
   const discoveryProfileRows = useMemo(
-    () => (freshEntryMode ? [] : profilePreviewRows(draftBackedProfile)),
-    [freshEntryMode, draftBackedProfile]
+    () =>
+      freshEntryMode
+        ? []
+        : profilePreviewRowsWithProvenance(
+            draftBackedProfile,
+            scopedReviewDraft?.fieldProvenance
+          ),
+    [freshEntryMode, draftBackedProfile, scopedReviewDraft?.fieldProvenance]
   );
 
   const hasVisibleResults = useMemo(() => {

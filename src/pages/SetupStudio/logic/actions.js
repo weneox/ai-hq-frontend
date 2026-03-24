@@ -1,5 +1,6 @@
 import { getAppBootstrap } from "../../../api/app.js";
 import {
+  importBundleForSetup,
   importSourceForSetup,
   analyzeSetupIntake,
   getCurrentSetupReview,
@@ -529,6 +530,11 @@ export function createSetupStudioActions(ctx) {
       sourceUrl
     );
     const hasRequestedSources = requestedSources.length > 0;
+    const shouldUseBundledImport = !!(
+      hasImportableSource &&
+      requestedSources.length > 1 &&
+      requestedPrimarySourceType === "website"
+    );
 
     const requestedPrimarySourceType = s(
       request.requestedPrimarySourceType || requestedPrimarySource?.sourceType
@@ -610,24 +616,36 @@ export function createSetupStudioActions(ctx) {
       }));
 
       let importResult = null;
+      let analyzeResult = null;
+      let reviewPayload = {};
 
       if (hasImportableSource) {
-        importResult = await importSourceForSetup({
+        const importPayload = {
           sourceType,
           url: sourceUrl,
           sourceUrl,
           note: request.note,
           businessNote: request.note,
+          manualText: analyzePayload.manualText,
+          answers: analyzePayload.answers,
           sources: requestedSources,
           primarySource: requestedPrimarySource,
-        });
+        };
+
+        if (shouldUseBundledImport) {
+          importResult = await importBundleForSetup(importPayload);
+          reviewPayload = await getCurrentSetupReview({ eventLimit: 30 });
+        } else {
+          importResult = await importSourceForSetup(importPayload);
+        }
       }
 
-      const analyzeResult = await analyzeSetupIntake(analyzePayload);
+      if (!shouldUseBundledImport) {
+        analyzeResult = await analyzeSetupIntake(analyzePayload);
+        reviewPayload = analyzeResult?.review || importResult?.review || {};
+      }
 
-      const importedReview = normalizeReviewState(
-        analyzeResult?.review || importResult?.review || {}
-      );
+      const importedReview = normalizeReviewState(reviewPayload);
       const legacyImportedDraft = mapCurrentReviewToLegacyDraft(importedReview);
       const reviewInfo = resolveReviewSourceInfo(
         importedReview,
@@ -748,8 +766,13 @@ export function createSetupStudioActions(ctx) {
         barrierOnly: barrierOnlyResult,
       });
 
-      if (analyzeResult?.review) {
-        applyReviewState(analyzeResult.review, {
+      if (
+        importedReview?.session ||
+        Object.keys(obj(importedReview?.draft)).length ||
+        arr(importedReview?.bundleSources).length ||
+        arr(importedReview?.sources).length
+      ) {
+        applyReviewState(reviewPayload, {
           preserveBusinessForm: true,
           fallbackProfile: bestIncomingProfile,
         });

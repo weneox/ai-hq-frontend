@@ -31,6 +31,10 @@ export function importSourceForSetup(payload = {}) {
   return apiPost("/api/setup/import/source", payload);
 }
 
+export function importBundleForSetup(payload = {}) {
+  return apiPost("/api/setup/import/bundle", payload);
+}
+
 export function analyzeSetupIntake(payload = {}) {
   return apiPost("/api/setup/review/current/analyze", payload);
 }

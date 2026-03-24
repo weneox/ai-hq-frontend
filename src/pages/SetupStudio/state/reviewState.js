@@ -209,6 +209,13 @@ export function normalizeVisibleServiceItem(item = {}) {
 
 export function normalizeVisibleSourceItem(item = {}) {
   const x = obj(item);
+  const role = s(x.role || x.sourceRole || x.source_role);
+  const isPrimary =
+    typeof x.isPrimary === "boolean"
+      ? x.isPrimary
+      : typeof x.primary === "boolean"
+        ? x.primary
+        : role.toLowerCase() === "primary";
 
   return {
     id: s(
@@ -228,6 +235,9 @@ export function normalizeVisibleSourceItem(item = {}) {
     status: s(x.status),
     runId: s(x.runId || x.run_id),
     snapshotId: s(x.snapshotId || x.snapshot_id),
+    role,
+    isPrimary,
+    isSupporting: !isPrimary && role.toLowerCase() === "supporting",
     metadataJson: obj(x.metadataJson || x.metadata_json || x.metadata),
   };
 }
@@ -264,6 +274,9 @@ function draftItemsToText(items = [], mode = "default") {
 export function mapCurrentReviewToLegacyDraft(review = {}) {
   const session = review?.session || null;
   const draft = obj(review?.draft);
+  const draftSummary = obj(review?.reviewDraftSummary);
+  const contributionSummary = obj(review?.contributionSummary);
+  const fieldProvenance = obj(review?.fieldProvenance);
 
   const payloadProfile = obj(draft?.draftPayload?.profile);
   const businessProfile = obj(draft?.businessProfile);
@@ -308,7 +321,10 @@ export function mapCurrentReviewToLegacyDraft(review = {}) {
     sourceRunId: s(sourceSummary?.latestRunId || latestImport?.runId),
     snapshotId: s(draft?.lastSnapshotId),
     quickSummary: s(
-      payloadProfile?.summaryShort ||
+      draftSummary?.quickSummary ||
+        draftSummary?.summary ||
+        draftSummary?.description ||
+        payloadProfile?.summaryShort ||
         payloadProfile?.companySummaryShort ||
         mergedProfile?.summaryShort ||
         mergedProfile?.description ||
@@ -324,26 +340,51 @@ export function mapCurrentReviewToLegacyDraft(review = {}) {
     reviewQueue: knowledgeItems,
     existing: {},
     stats: {
-      pendingReviewCount,
-      knowledgeCount: knowledgeItems.length,
-      serviceCount: services.length,
-      warningCount: arr(draft?.warnings).length,
+      pendingReviewCount: Number(
+        contributionSummary?.pendingReviewCount || pendingReviewCount
+      ),
+      knowledgeCount: Number(
+        contributionSummary?.knowledgeCount || knowledgeItems.length
+      ),
+      serviceCount: Number(
+        contributionSummary?.serviceCount || services.length
+      ),
+      warningCount: Number(
+        contributionSummary?.warningCount ||
+          arr(draftSummary?.warnings).length ||
+          arr(draft?.warnings).length
+      ),
     },
-    completeness: obj(draft?.completeness),
+    completeness: Object.keys(obj(draftSummary?.completeness)).length
+      ? obj(draftSummary.completeness)
+      : obj(draft?.completeness),
     confidenceSummary: obj(draft?.confidenceSummary),
-    warnings: arr(draft?.warnings),
+    warnings: arr(draftSummary?.warnings).length
+      ? arr(draftSummary.warnings)
+      : arr(draft?.warnings),
     rawDraft: draft,
     session,
     draft,
     sources: arr(review?.sources),
     events: arr(review?.events),
+    bundleSources: arr(review?.bundleSources),
+    contributionSummary,
+    fieldProvenance,
+    reviewDraftSummary: draftSummary,
     reviewRequired: !!(
-      draftMeta.reviewRequired || profileMeta.reviewRequired
+      (draftSummary.reviewRequired ??
+        draftMeta.reviewRequired ??
+        profileMeta.reviewRequired) ||
+        false
     ),
-    reviewFlags: arr(draftMeta.reviewFlags).length
+    reviewFlags: arr(draftSummary?.reviewFlags).length
+      ? arr(draftSummary.reviewFlags)
+      : arr(draftMeta.reviewFlags).length
       ? arr(draftMeta.reviewFlags)
       : arr(profileMeta.reviewFlags),
-    fieldConfidence: Object.keys(draftMeta.fieldConfidence).length
+    fieldConfidence: Object.keys(obj(draftSummary?.fieldConfidence)).length
+      ? obj(draftSummary.fieldConfidence)
+      : Object.keys(draftMeta.fieldConfidence).length
       ? obj(draftMeta.fieldConfidence)
       : obj(profileMeta.fieldConfidence),
     mainLanguage: draftMeta.mainLanguage || profileMeta.mainLanguage || "",
@@ -383,9 +424,20 @@ export function resolveReviewSourceInfo(review = {}, legacyDraft = {}) {
   const payload = obj(draft?.draftPayload);
   const profile = obj(draft?.businessProfile || payload?.profile);
   const primarySource = obj(payload?.intakeContext?.primarySource);
+  const bundlePrimarySource =
+    arr(normalizedReview?.bundleSources).find((item) => {
+      const x = obj(item);
+      return !!(
+        x.isPrimary ||
+        x.primary ||
+        s(x.role || x.sourceRole || x.source_role).toLowerCase() === "primary"
+      );
+    }) || obj(arr(normalizedReview?.bundleSources)[0]);
   const firstSource = obj(arr(normalizedReview?.sources)[0]);
 
   const sourceType = firstNonEmpty(
+    bundlePrimarySource?.sourceType,
+    bundlePrimarySource?.source_type,
     latestImport?.sourceType,
     sourceSummary?.primarySourceType,
     payload?.sourceType,
@@ -398,6 +450,9 @@ export function resolveReviewSourceInfo(review = {}, legacyDraft = {}) {
   );
 
   const sourceUrl = firstNonEmpty(
+    bundlePrimarySource?.url,
+    bundlePrimarySource?.sourceUrl,
+    bundlePrimarySource?.source_url,
     latestImport?.sourceUrl,
     sourceSummary?.primarySourceUrl,
     payload?.sourceUrl,
@@ -642,7 +697,11 @@ export function deriveVisibleSources({
   currentReview = {},
   discoveryState = {},
 }) {
-  const reviewSources = arr(currentReview?.sources).map((item) =>
+  const reviewSources = arr(
+    currentReview?.bundleSources?.length
+      ? currentReview.bundleSources
+      : currentReview?.sources
+  ).map((item) =>
     normalizeVisibleSourceItem(item)
   );
 

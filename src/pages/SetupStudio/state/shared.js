@@ -34,12 +34,32 @@ function lower(value = "") {
   return s(value).toLowerCase();
 }
 
+function firstArray(...values) {
+  for (const value of values) {
+    if (Array.isArray(value)) return value;
+  }
+  return [];
+}
+
+function firstObject(...values) {
+  for (const value of values) {
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      return value;
+    }
+  }
+  return {};
+}
+
 export function createEmptyReviewState() {
   return {
     session: null,
     draft: {},
     sources: [],
     events: [],
+    bundleSources: [],
+    contributionSummary: {},
+    fieldProvenance: {},
+    reviewDraftSummary: {},
   };
 }
 
@@ -68,6 +88,10 @@ export function createEmptyLegacyDraft() {
     fieldConfidence: {},
     mainLanguage: "",
     primaryLanguage: "",
+    bundleSources: [],
+    contributionSummary: {},
+    fieldProvenance: {},
+    reviewDraftSummary: {},
   };
 }
 
@@ -701,6 +725,19 @@ export function normalizeReviewState(payload = {}) {
     draft: obj(review?.draft),
     sources: arr(review?.sources),
     events: arr(review?.events),
+    bundleSources: firstArray(payload?.bundleSources, review?.bundleSources),
+    contributionSummary: firstObject(
+      payload?.contributionSummary,
+      review?.contributionSummary
+    ),
+    fieldProvenance: firstObject(
+      payload?.fieldProvenance,
+      review?.fieldProvenance
+    ),
+    reviewDraftSummary: firstObject(
+      payload?.reviewDraftSummary,
+      review?.reviewDraftSummary
+    ),
   };
 }
 

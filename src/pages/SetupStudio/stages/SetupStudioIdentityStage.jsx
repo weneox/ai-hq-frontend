@@ -21,6 +21,7 @@ function normalizeRows(rows = []) {
         return {
           label: s(item[0]),
           value: s(item[1]),
+          provenance: "",
         };
       }
 
@@ -28,10 +29,11 @@ function normalizeRows(rows = []) {
         return {
           label: s(item.label || item.key || item.title),
           value: s(item.value || item.text || item.description),
+          provenance: s(item.provenance),
         };
       }
 
-      return { label: "", value: "" };
+      return { label: "", value: "", provenance: "" };
     })
     .filter((item) => item.label || item.value);
 }
@@ -42,18 +44,24 @@ function humanizeWarning(value = "") {
   if (x === "http_403") return "This website blocked direct access.";
   if (x === "http_429") return "This website rate-limited the request.";
   if (x === "fetch_failed") return "The website could not be read.";
-  if (x === "non_html_response")
+  if (x === "non_html_response") {
     return "The source did not return a readable webpage.";
-  if (x === "website_fetch_timeout")
+  }
+  if (x === "website_fetch_timeout") {
     return "The website took too long to respond.";
-  if (x === "website_entry_timeout")
+  }
+  if (x === "website_entry_timeout") {
     return "The first page took too long to load.";
-  if (x === "sitemap_fetch_timeout")
+  }
+  if (x === "sitemap_fetch_timeout") {
     return "The sitemap timed out, but some draft data may still exist.";
-  if (x === "weak_website_extraction")
+  }
+  if (x === "weak_website_extraction") {
     return "The source was readable, but the extracted business signals were weak.";
-  if (x === "website_trust_guard_blocked_candidate_creation")
+  }
+  if (x === "website_trust_guard_blocked_candidate_creation") {
     return "The source was too weak to create trusted knowledge automatically.";
+  }
 
   return s(value).replaceAll("_", " ");
 }
@@ -87,15 +95,20 @@ function ActionButton({ active = false, icon: Icon, children, onClick }) {
   );
 }
 
-function SnapshotRow({ label, value }) {
+function SnapshotRow({ label, value, provenance = "" }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5">
       <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
         {label || "Field"}
       </div>
       <div className="mt-1.5 text-sm leading-6 text-slate-700">
-        {value || "—"}
+        {value || "-"}
       </div>
+      {provenance ? (
+        <div className="mt-2 text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">
+          {provenance}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -107,17 +120,33 @@ function sourceBadgeLabel(sourceLabel = "") {
   return x;
 }
 
+function sourceRoleLabel(source = {}) {
+  const role = s(source?.role).toLowerCase();
+  if (source?.isPrimary || role === "primary") return "Primary";
+  if (source?.isSupporting || role === "supporting") return "Supporting";
+  return "";
+}
+
 export default function SetupStudioIdentityStage({
   currentTitle,
   currentDescription,
   discoveryProfileRows,
   discoveryWarnings = [],
   sourceLabel = "",
+  reviewSources = [],
   onNext,
   onToggleRefine,
 }) {
   const rows = normalizeRows(discoveryProfileRows).slice(0, 8);
   const warnings = arr(discoveryWarnings).map((x) => s(x)).filter(Boolean);
+  const sources = arr(reviewSources)
+    .map((item) => ({
+      label: s(item?.label || item?.sourceType || item?.url),
+      url: s(item?.url),
+      role: sourceRoleLabel(item),
+    }))
+    .filter((item) => item.label || item.url)
+    .slice(0, 4);
 
   const barrierWarning = warnings.find(isBarrierWarning) || "";
   const barrierState = !!barrierWarning;
@@ -196,6 +225,26 @@ export default function SetupStudioIdentityStage({
             </div>
           ) : null}
 
+          {sources.length ? (
+            <div className="mt-6">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                Participating sources
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                {sources.map((item, index) => (
+                  <span
+                    key={`${item.label}-${item.url}-${index}`}
+                    className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500"
+                  >
+                    {item.label}
+                    {item.role ? ` ${item.role}` : ""}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
           <div className="mt-8 flex flex-wrap gap-3">
             <ActionButton active icon={ArrowRight} onClick={onNext}>
               {barrierState ? "Continue manually" : "Continue"}
@@ -219,6 +268,7 @@ export default function SetupStudioIdentityStage({
                   key={`${item.label}-${index}`}
                   label={item.label}
                   value={item.value}
+                  provenance={item.provenance}
                 />
               ))
             ) : (

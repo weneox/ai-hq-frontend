@@ -467,6 +467,97 @@ export function profilePreviewRows(profile = {}) {
   ].filter(([, value]) => value);
 }
 
+function provenanceSourceLabel(source = {}) {
+  const item = obj(source);
+
+  return (
+    sanitizeDiscoveryText(
+      item.label ||
+        item.sourceLabel ||
+        item.source_label ||
+        item.displayName ||
+        item.display_name ||
+        item.title ||
+        item.name ||
+        item.sourceType ||
+        item.source_type
+    ) || ""
+  );
+}
+
+export function summarizeFieldProvenance(value = {}) {
+  const provenance = obj(value);
+  const sourceList = arr(
+    provenance.sources || provenance.sourceList || provenance.contributors
+  );
+
+  const directSource = provenanceSourceLabel(provenance);
+  const primarySource = provenanceSourceLabel(
+    obj(provenance.primarySource || provenance.primary_source)
+  );
+
+  const sourceLabels = [
+    primarySource,
+    directSource,
+    ...sourceList.map((item) => provenanceSourceLabel(item)),
+  ].filter(Boolean);
+
+  const dedupedLabels = [...new Set(sourceLabels)];
+  const role = sanitizeDiscoveryText(
+    provenance.role || provenance.sourceRole || provenance.source_role
+  );
+
+  if (dedupedLabels.length && role) {
+    return `${dedupedLabels.join(", ")} (${role})`;
+  }
+
+  if (dedupedLabels.length) {
+    return dedupedLabels.join(", ");
+  }
+
+  return sanitizeDiscoveryText(
+    provenance.summary ||
+      provenance.note ||
+      provenance.reason ||
+      provenance.display
+  );
+}
+
+export function profilePreviewRowsWithProvenance(
+  profile = {},
+  fieldProvenance = {}
+) {
+  const provenanceMap = obj(fieldProvenance);
+  const rows = profilePreviewRows(profile);
+  const fieldKeys = [
+    "companyName",
+    "description",
+    "timezone",
+    "language",
+    "websiteUrl",
+    "primaryPhone",
+    "primaryEmail",
+    "primaryAddress",
+    "services",
+    "products",
+    "pricingHints",
+    "socialLinks",
+  ];
+
+  return rows.map((row, index) => {
+    const label = Array.isArray(row) ? s(row[0]) : s(row?.label);
+    const value = Array.isArray(row) ? s(row[1]) : s(row?.value);
+    const fieldKey = fieldKeys[index] || "";
+
+    return {
+      label,
+      value,
+      fieldKey,
+      provenance: summarizeFieldProvenance(provenanceMap[fieldKey]),
+    };
+  });
+}
+
 export function discoveryModeLabel(mode = "") {
   const value = s(mode).toLowerCase();
 
