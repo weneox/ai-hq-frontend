@@ -29,7 +29,6 @@ const DISPLAY_FONT_STYLE = {
 
 const INPUT_RESET_STYLE = {
   all: "unset",
-  flex: "1 1 auto",
   width: "100%",
   minWidth: 0,
   border: "0",
@@ -37,12 +36,19 @@ const INPUT_RESET_STYLE = {
   boxShadow: "none",
   background: "transparent",
   color: "#0f172a",
-  fontSize: "16px",
-  lineHeight: "24px",
+  fontSize: "15px",
+  lineHeight: "22px",
   appearance: "none",
   WebkitAppearance: "none",
   MozAppearance: "none",
 };
+
+const TYPING_EXAMPLES = [
+  "We are a dental clinic in Baku offering implants, whitening, and consultations in Azerbaijani and English.",
+  "We run a women’s fashion boutique with same-day delivery in Baku and most orders coming from Instagram.",
+  "We are a law firm helping startups with company setup, contracts, accounting coordination, and tax support.",
+  "We operate a premium beauty studio offering hair, nails, makeup, and bridal appointments by booking.",
+];
 
 function s(v) {
   return String(v ?? "").replace(/\u00a0/g, " ").trim();
@@ -71,7 +77,11 @@ function normalizeInstagramStatusPayload(raw = {}) {
   const connected =
     Boolean(raw?.connected) &&
     Boolean(raw?.hasToken) &&
-    !!s(channel?.external_user_id || channel?.external_username || channel?.external_page_id);
+    !!s(
+      channel?.external_user_id ||
+        channel?.external_username ||
+        channel?.external_page_id
+    );
 
   return {
     loading: false,
@@ -97,10 +107,6 @@ const SOURCE_OPTIONS = [
     title: "Website",
     description: "Add the main business website.",
     actionLabel: "Save source",
-    glow: "rgba(56,189,248,.34)",
-    glowSoft: "rgba(125,211,252,.18)",
-    tint: "rgba(56,189,248,.08)",
-    border: "rgba(56,189,248,.22)",
   },
   {
     key: "instagram",
@@ -110,10 +116,6 @@ const SOURCE_OPTIONS = [
     title: "Instagram",
     description: "Connect the real account, or add a public profile link manually.",
     actionLabel: "Save source",
-    glow: "rgba(236,72,153,.26)",
-    glowSoft: "rgba(251,191,36,.12)",
-    tint: "rgba(236,72,153,.07)",
-    border: "rgba(236,72,153,.18)",
   },
   {
     key: "facebook",
@@ -123,10 +125,6 @@ const SOURCE_OPTIONS = [
     title: "Facebook",
     description: "Add the public business page link.",
     actionLabel: "Save source",
-    glow: "rgba(59,130,246,.26)",
-    glowSoft: "rgba(147,197,253,.14)",
-    tint: "rgba(59,130,246,.07)",
-    border: "rgba(59,130,246,.18)",
   },
   {
     key: "linkedin",
@@ -136,10 +134,6 @@ const SOURCE_OPTIONS = [
     title: "LinkedIn",
     description: "Add the company page link.",
     actionLabel: "Save source",
-    glow: "rgba(14,165,233,.26)",
-    glowSoft: "rgba(56,189,248,.14)",
-    tint: "rgba(14,165,233,.07)",
-    border: "rgba(14,165,233,.18)",
   },
   {
     key: "google_maps",
@@ -149,10 +143,6 @@ const SOURCE_OPTIONS = [
     title: "Google Maps",
     description: "Add a Maps link, or the business name with city.",
     actionLabel: "Save source",
-    glow: "rgba(34,197,94,.28)",
-    glowSoft: "rgba(250,204,21,.14)",
-    tint: "rgba(34,197,94,.07)",
-    border: "rgba(34,197,94,.18)",
   },
 ];
 
@@ -335,67 +325,163 @@ function appendText(base = "", addition = "") {
   return `${a}${/[.!?]$/.test(a) ? " " : ". "}${b}`;
 }
 
+function useTypingExamples(enabled = true) {
+  const [display, setDisplay] = useState("");
+  const [exampleIndex, setExampleIndex] = useState(0);
+
+  useEffect(() => {
+    if (!enabled) {
+      setDisplay("");
+      return undefined;
+    }
+
+    const examples = TYPING_EXAMPLES;
+    let charIndex = 0;
+    let deleting = false;
+    let mounted = true;
+    let timeoutId;
+
+    function tick() {
+      if (!mounted) return;
+
+      const current = examples[exampleIndex % examples.length] || "";
+
+      if (!deleting) {
+        charIndex += 1;
+        setDisplay(current.slice(0, charIndex));
+
+        if (charIndex >= current.length) {
+          timeoutId = window.setTimeout(() => {
+            deleting = true;
+            tick();
+          }, 1350);
+          return;
+        }
+
+        timeoutId = window.setTimeout(tick, 24);
+        return;
+      }
+
+      charIndex -= 1;
+      setDisplay(current.slice(0, Math.max(0, charIndex)));
+
+      if (charIndex <= 0) {
+        deleting = false;
+        setExampleIndex((prev) => (prev + 1) % examples.length);
+        timeoutId = window.setTimeout(tick, 220);
+        return;
+      }
+
+      timeoutId = window.setTimeout(tick, 14);
+    }
+
+    timeoutId = window.setTimeout(tick, 420);
+
+    return () => {
+      mounted = false;
+      window.clearTimeout(timeoutId);
+    };
+  }, [enabled, exampleIndex]);
+
+  return display;
+}
+
 function NeoxWordmark() {
   return (
-    <div className="inline-flex select-none items-center justify-center">
+    <div className="relative inline-flex select-none items-center justify-center">
       <div
         style={DISPLAY_FONT_STYLE}
-        className="inline-flex items-end gap-[8px] text-[34px] font-semibold leading-none tracking-[-0.075em] sm:text-[38px] lg:text-[42px]"
+        className="relative inline-flex items-end gap-[8px] text-[34px] font-semibold leading-none tracking-[-0.075em] sm:text-[38px] lg:text-[42px]"
       >
-        <span className="text-slate-950">NEOX</span>
-        <span className="bg-[linear-gradient(180deg,#475569_0%,#0f172a_100%)] bg-clip-text text-transparent">
+        <span className="relative text-slate-950">
+          NEOX
+          <span className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_50%,rgba(125,211,252,.24),transparent_44%)] blur-[12px]" />
+        </span>
+
+        <span className="relative bg-[linear-gradient(180deg,#475569_0%,#0f172a_100%)] bg-clip-text text-transparent">
           AI Studio
+
+          <span className="pointer-events-none absolute left-[-20%] top-[52%] h-[2px] w-[138%] -translate-y-1/2 overflow-hidden rounded-full opacity-90">
+            <span className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0)_0%,rgba(190,242,255,.18)_26%,rgba(110,231,183,.14)_52%,rgba(255,255,255,0)_100%)]" />
+            <motion.span
+              initial={{ x: "-38%" }}
+              animate={{ x: "112%" }}
+              transition={{
+                duration: 3.8,
+                repeat: Infinity,
+                ease: "linear",
+              }}
+              className="absolute top-1/2 h-[10px] w-[96px] -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(186,230,253,.94)_0%,rgba(125,211,252,.56)_36%,rgba(125,211,252,0)_76%)] blur-[6px]"
+            />
+          </span>
         </span>
       </div>
     </div>
   );
 }
 
-function SourceChip({
+function SourceInlineAction({
   source,
-  active = false,
-  statusText = "",
+  attached = false,
+  connected = false,
   onClick,
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="group relative inline-flex h-[62px] items-center justify-center overflow-hidden rounded-full border border-white/90 bg-[rgba(255,255,255,.78)] px-7 text-[15px] font-medium tracking-[-0.02em] text-slate-700 shadow-[0_14px_28px_-26px_rgba(15,23,42,.20)] backdrop-blur-[12px] transition-[transform,box-shadow,border-color,background-color] duration-300 hover:-translate-y-[1px] hover:bg-white"
-      style={{
-        borderColor: active ? source.border : undefined,
-        backgroundColor: active ? source.tint : undefined,
-        boxShadow: active
-          ? "0 18px 36px -26px rgba(15,23,42,.20)"
-          : "0 14px 28px -26px rgba(15,23,42,.20)",
-      }}
+      className="group inline-flex items-center gap-2 text-[14px] font-medium tracking-[-0.02em] text-slate-500 transition hover:text-slate-950"
     >
-      <span
-        className="pointer-events-none absolute inset-y-0 left-0 w-[48%] rounded-full opacity-0 blur-[18px] transition-opacity duration-300 group-hover:opacity-100"
-        style={{
-          background: `linear-gradient(90deg, ${source.glow} 0%, ${source.glowSoft} 34%, rgba(255,255,255,0) 90%)`,
-        }}
-      />
-      <span
-        className="pointer-events-none absolute -left-3 top-1/2 h-10 w-10 -translate-y-1/2 rounded-full opacity-0 blur-[16px] transition-opacity duration-300 group-hover:opacity-100"
-        style={{ backgroundColor: source.glow }}
+      <img
+        src={source.icon}
+        alt={source.label}
+        className="h-[15px] w-[15px] object-contain opacity-90"
       />
 
-      <span className="relative z-10 inline-flex items-center gap-3">
+      <span>{source.label}</span>
+
+      {attached ? (
+        <span className="text-[13px] text-emerald-600">
+          {connected ? "connected" : "attached"}
+        </span>
+      ) : null}
+
+      <span className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-full border border-slate-200 text-[12px] leading-none text-slate-400 transition group-hover:border-slate-300 group-hover:text-slate-700">
+        +
+      </span>
+    </button>
+  );
+}
+
+function AttachedSignal({
+  source,
+  label,
+  onClick,
+  onRemove,
+}) {
+  return (
+    <div className="inline-flex items-center gap-2 text-[14px] tracking-[-0.02em] text-slate-700">
+      <button
+        type="button"
+        onClick={onClick}
+        className="inline-flex items-center gap-2 transition hover:text-slate-950"
+      >
         <img
           src={source.icon}
           alt={source.label}
-          className="h-[22px] w-[22px] object-contain"
+          className="h-[15px] w-[15px] object-contain"
         />
-        <span className="whitespace-nowrap">{source.label}</span>
-        {statusText ? (
-          <span className="rounded-full bg-white/90 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-            {statusText}
-          </span>
-        ) : null}
-        {active ? <Check className="h-[15px] w-[15px] text-slate-900" /> : null}
-      </span>
-    </button>
+        <span className="font-medium">{label}</span>
+      </button>
+
+      <button
+        type="button"
+        onClick={onRemove}
+        className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+      >
+        <X className="h-[12px] w-[12px]" />
+      </button>
+    </div>
   );
 }
 
@@ -415,14 +501,17 @@ function SourceModal({
 
   const isInstagram = source.key === "instagram";
   const connected = Boolean(instagramMeta?.connected);
-  const usingConnectedDraft = hasExistingValue && s(value) && lower(s(instagramMeta?.profileUrl)) === lower(s(value));
+  const usingConnectedDraft =
+    hasExistingValue &&
+    s(value) &&
+    lower(s(instagramMeta?.profileUrl)) === lower(s(value));
 
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[95] flex items-center justify-center bg-[rgba(15,23,42,.14)] px-4 py-6 backdrop-blur-[12px]"
+      className="fixed inset-0 z-[95] flex items-center justify-center bg-[rgba(15,23,42,.12)] px-4 py-6 backdrop-blur-[12px]"
     >
       <button
         type="button"
@@ -436,163 +525,172 @@ function SourceModal({
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 18, scale: 0.985 }}
         transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-        className="relative z-10 w-full max-w-[620px] rounded-[34px] border border-white/80 bg-[rgba(250,250,250,.98)] p-7 shadow-[0_32px_80px_-36px_rgba(15,23,42,.28)] sm:p-8"
+        className="relative z-10 w-full max-w-[620px] overflow-hidden rounded-[30px] border border-white/80 bg-[rgba(249,249,249,.96)] shadow-[0_32px_80px_-36px_rgba(15,23,42,.28)]"
       >
-        <div className="flex items-start justify-between gap-5">
-          <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 items-center gap-4">
-              <img
-                src={source.icon}
-                alt={source.label}
-                className="h-10 w-10 shrink-0 object-contain"
-              />
+        <div className="absolute inset-x-0 top-0 h-[120px] bg-[radial-gradient(circle_at_50%_0%,rgba(186,230,253,.18),transparent_70%)]" />
 
-              <h3
-                style={DISPLAY_FONT_STYLE}
-                className="truncate text-[26px] font-semibold leading-none tracking-[-0.05em] text-slate-950 sm:text-[28px]"
-              >
-                {source.title}
-              </h3>
-            </div>
+        <div className="relative px-7 pb-7 pt-7 sm:px-8">
+          <div className="flex items-start justify-between gap-5">
+            <div className="min-w-0 flex-1">
+              <div className="flex min-w-0 items-center gap-4">
+                <img
+                  src={source.icon}
+                  alt={source.label}
+                  className="h-10 w-10 shrink-0 object-contain"
+                />
 
-            <p className="ml-14 mt-3 text-[15px] leading-7 text-slate-500">
-              {source.description}
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-slate-400 shadow-[0_10px_24px_-18px_rgba(15,23,42,.22)] transition hover:text-slate-700"
-          >
-            <X className="h-[18px] w-[18px]" />
-          </button>
-        </div>
-
-        {isInstagram ? (
-          <div className="mt-6 rounded-[28px] border border-[rgba(15,23,42,.08)] bg-white/80 p-5">
-            {instagramMeta?.loading ? (
-              <div className="flex items-center gap-3 text-[14px] text-slate-500">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Checking connected Instagram account...
-              </div>
-            ) : connected ? (
-              <div className="space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div className="min-w-0">
-                    <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                      Connected account
-                    </div>
-                    <div className="mt-2 flex items-center gap-2 text-[18px] font-semibold tracking-[-0.03em] text-slate-950">
-                      <img
-                        src={instagramIcon}
-                        alt="Instagram"
-                        className="h-[18px] w-[18px] object-contain"
-                      />
-                      <span className="truncate">
-                        @{s(instagramMeta?.username || "instagram")}
-                      </span>
-                    </div>
-                    {s(instagramMeta?.displayName) ? (
-                      <div className="mt-1 text-[14px] text-slate-500">
-                        {s(instagramMeta.displayName)}
-                      </div>
-                    ) : null}
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={onUseConnectedInstagram}
-                    className={`inline-flex h-11 items-center justify-center rounded-full px-5 text-[14px] font-medium transition ${
-                      usingConnectedDraft
-                        ? "bg-emerald-50 text-emerald-700"
-                        : "bg-slate-950 text-white hover:bg-slate-800"
-                    }`}
-                  >
-                    {usingConnectedDraft ? "Using connected account" : "Use connected account"}
-                  </button>
-                </div>
-
-                {s(instagramMeta?.profileUrl) ? (
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-[13px] text-slate-600">
-                    {instagramMeta.profileUrl}
-                  </div>
-                ) : null}
-              </div>
-            ) : (
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div className="text-[14px] leading-6 text-slate-500">
-                  Connect the real Instagram account first, then use it directly in the setup flow.
-                </div>
-
-                <button
-                  type="button"
-                  onClick={onInstagramConnect}
-                  disabled={instagramMeta?.connecting}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-slate-950 px-5 text-[14px] font-medium text-white transition hover:bg-slate-800 disabled:opacity-60"
+                <h3
+                  style={DISPLAY_FONT_STYLE}
+                  className="truncate text-[26px] font-semibold leading-none tracking-[-0.05em] text-slate-950 sm:text-[28px]"
                 >
-                  {instagramMeta?.connecting ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <PlugZap className="h-4 w-4" />
-                  )}
-                  {instagramMeta?.connecting ? "Connecting..." : "Connect Instagram"}
-                </button>
+                  {source.title}
+                </h3>
               </div>
-            )}
 
-            {s(instagramMeta?.error) ? (
-              <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] text-rose-700">
-                {instagramMeta.error}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-
-        <div className="mt-8">
-          <div className="flex h-[60px] items-center gap-3 rounded-full border border-[rgba(15,23,42,.08)] bg-[#f7f8fa] px-5 transition focus-within:border-[rgba(15,23,42,.14)] focus-within:bg-white">
-            <Link2 className="h-[16px] w-[16px] shrink-0 text-slate-400" />
-            <input
-              type="text"
-              name={`${source.key}-source`}
-              autoComplete="off"
-              spellCheck={false}
-              value={value}
-              onChange={(e) => onChange(e.target.value)}
-              placeholder={source.placeholder}
-              className="min-w-0 placeholder:text-slate-400"
-              style={INPUT_RESET_STYLE}
-              autoFocus={!isInstagram}
-            />
-          </div>
-
-          <div className="mt-6 flex flex-wrap items-center gap-4">
-            <button
-              type="button"
-              onClick={onSave}
-              disabled={!s(value)}
-              className="inline-flex h-12 items-center justify-center rounded-full bg-slate-950 px-6 text-[15px] font-medium text-white shadow-[0_16px_30px_-18px_rgba(15,23,42,.22)] transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {source.actionLabel}
-            </button>
-
-            {hasExistingValue ? (
-              <button
-                type="button"
-                onClick={onRemove}
-                className="inline-flex h-12 items-center justify-center rounded-full bg-white px-2 text-[15px] font-medium text-slate-500 transition hover:text-slate-900"
-              >
-                Remove
-              </button>
-            ) : null}
+              <p className="ml-14 mt-3 text-[15px] leading-7 text-slate-500">
+                {source.description}
+              </p>
+            </div>
 
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex h-12 items-center justify-center rounded-full bg-white px-2 text-[15px] font-medium text-slate-500 transition hover:text-slate-900"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-white hover:text-slate-700"
             >
-              Cancel
+              <X className="h-[18px] w-[18px]" />
             </button>
+          </div>
+
+          {isInstagram ? (
+            <div className="mt-6 rounded-[24px] border border-[rgba(15,23,42,.07)] bg-white/72 px-5 py-5">
+              {instagramMeta?.loading ? (
+                <div className="flex items-center gap-3 text-[14px] text-slate-500">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Checking connected Instagram account...
+                </div>
+              ) : connected ? (
+                <div className="space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                        Connected account
+                      </div>
+
+                      <div className="mt-2 flex items-center gap-2 text-[18px] font-semibold tracking-[-0.03em] text-slate-950">
+                        <img
+                          src={instagramIcon}
+                          alt="Instagram"
+                          className="h-[18px] w-[18px] object-contain"
+                        />
+                        <span className="truncate">
+                          @{s(instagramMeta?.username || "instagram")}
+                        </span>
+                      </div>
+
+                      {s(instagramMeta?.displayName) ? (
+                        <div className="mt-1 text-[14px] text-slate-500">
+                          {s(instagramMeta.displayName)}
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={onUseConnectedInstagram}
+                      className={`inline-flex h-11 items-center justify-center rounded-full px-5 text-[14px] font-medium transition ${
+                        usingConnectedDraft
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-slate-950 text-white hover:bg-slate-800"
+                      }`}
+                    >
+                      {usingConnectedDraft
+                        ? "Using connected account"
+                        : "Use connected account"}
+                    </button>
+                  </div>
+
+                  {s(instagramMeta?.profileUrl) ? (
+                    <div className="text-[13px] text-slate-500">
+                      {instagramMeta.profileUrl}
+                    </div>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="text-[14px] leading-6 text-slate-500">
+                    Connect the real Instagram account first, then use it directly in the setup flow.
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={onInstagramConnect}
+                    disabled={instagramMeta?.connecting}
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-slate-950 px-5 text-[14px] font-medium text-white transition hover:bg-slate-800 disabled:opacity-60"
+                  >
+                    {instagramMeta?.connecting ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <PlugZap className="h-4 w-4" />
+                    )}
+                    {instagramMeta?.connecting
+                      ? "Connecting..."
+                      : "Connect Instagram"}
+                  </button>
+                </div>
+              )}
+
+              {s(instagramMeta?.error) ? (
+                <div className="mt-4 text-[13px] text-rose-700">
+                  {instagramMeta.error}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className="mt-8">
+            <div className="flex min-h-[56px] items-center gap-3 border-b border-[rgba(15,23,42,.10)] px-1 pb-3">
+              <Link2 className="h-[16px] w-[16px] shrink-0 text-slate-400" />
+              <input
+                type="text"
+                name={`${source.key}-source`}
+                autoComplete="off"
+                spellCheck={false}
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                placeholder={source.placeholder}
+                style={INPUT_RESET_STYLE}
+                autoFocus={!isInstagram}
+              />
+            </div>
+
+            <div className="mt-6 flex flex-wrap items-center gap-5">
+              <button
+                type="button"
+                onClick={onSave}
+                disabled={!s(value)}
+                className="inline-flex h-11 items-center justify-center rounded-full bg-slate-950 px-6 text-[14px] font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {source.actionLabel}
+              </button>
+
+              {hasExistingValue ? (
+                <button
+                  type="button"
+                  onClick={onRemove}
+                  className="inline-flex h-10 items-center justify-center text-[14px] font-medium text-slate-500 transition hover:text-slate-950"
+                >
+                  Remove
+                </button>
+              ) : null}
+
+              <button
+                type="button"
+                onClick={onClose}
+                className="inline-flex h-10 items-center justify-center text-[14px] font-medium text-slate-500 transition hover:text-slate-950"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       </motion.div>
@@ -661,7 +759,8 @@ export default function SetupStudioEntryStage({
   const hasRealSource = !!s(interpretation.sourceValue);
   const hasComposerContent = !!s(composerValue);
   const canContinue = !!(hasComposerContent || hasRealSource);
-  const showGlow = isComposerFocused || hasComposerContent || isListening;
+  const shouldRunTyping = !hasComposerContent && !isListening && !isComposerFocused;
+  const typingExample = useTypingExamples(shouldRunTyping);
 
   const refreshInstagramStatus = useCallback(async () => {
     try {
@@ -874,18 +973,26 @@ export default function SetupStudioEntryStage({
     closeSourceModal();
   }
 
-  function handleRemoveSource() {
-    if (!activeSource) return;
+  function removeSourceByKey(sourceKey) {
+    if (!sourceKey) return;
 
     const nextDrafts = { ...sourceDraftsRef.current };
-    delete nextDrafts[activeSource.key];
+    delete nextDrafts[sourceKey];
 
     const nextComposer = cleanComposerText(composerRef.current, nextDrafts);
 
     setSourceDrafts(nextDrafts);
     setComposerValue(nextComposer);
     syncState(nextComposer, nextDrafts);
-    closeSourceModal();
+
+    if (activeSourceKey === sourceKey) {
+      closeSourceModal();
+    }
+  }
+
+  function handleRemoveSource() {
+    if (!activeSource) return;
+    removeSourceByKey(activeSource.key);
   }
 
   async function handleInstagramConnect() {
@@ -1048,11 +1155,33 @@ export default function SetupStudioEntryStage({
     onContinueFlow?.();
   }
 
+  const attachedSignals = useMemo(() => {
+    return VISIBLE_SOURCE_KEYS.map((key) => {
+      const source = sourceByKey(key);
+      const record = obj(sourceDrafts[key]);
+      const value = s(record.value);
+      if (!source || !value) return null;
+
+      const isInstagram = key === "instagram";
+      const label =
+        isInstagram && record.mode === "connected"
+          ? "Instagram connected"
+          : `${source.label} attached`;
+
+      return {
+        key,
+        source,
+        value,
+        label,
+      };
+    }).filter(Boolean);
+  }, [sourceDrafts]);
+
   return (
     <>
       <section className="w-full bg-transparent">
-        <div className="mx-auto max-w-[1260px] px-4 py-[56px] sm:px-6 sm:py-[72px] lg:px-8 lg:py-[84px]">
-          <div className="mx-auto w-full max-w-[1080px] text-center">
+        <div className="mx-auto max-w-[1280px] px-4 py-[54px] sm:px-6 sm:py-[72px] lg:px-8 lg:py-[84px]">
+          <div className="mx-auto w-full max-w-[1100px] text-center">
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -1062,129 +1191,181 @@ export default function SetupStudioEntryStage({
 
               <h1
                 style={DISPLAY_FONT_STYLE}
-                className="mx-auto mt-7 max-w-[1180px] text-[34px] font-semibold leading-[1.08] tracking-[-0.065em] text-slate-950 sm:text-[42px] lg:text-[54px]"
+                className="mx-auto mt-7 max-w-[1180px] text-[34px] font-semibold leading-[1.06] tracking-[-0.065em] text-slate-950 sm:text-[42px] lg:text-[56px]"
               >
                 Build your business draft from real signals.
               </h1>
+
+              <p className="mx-auto mt-4 max-w-[760px] text-[18px] leading-8 tracking-[-0.03em] text-slate-500 sm:text-[19px]">
+                Start with a short description, attach a source, or speak naturally.
+              </p>
             </motion.div>
 
             <motion.div
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.24, delay: 0.04 }}
-              className="relative mx-auto mt-10 w-full max-w-[1060px]"
+              className="relative mx-auto mt-11 w-full max-w-[1040px]"
             >
-              <div className="pointer-events-none absolute left-1/2 top-[calc(100%-8px)] z-0 h-[190px] w-[84%] -translate-x-1/2">
-                <div
-                  className={`absolute left-1/2 top-0 h-[128px] w-[54%] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,_rgba(86,255,180,.30)_0%,_rgba(86,255,180,.14)_36%,_rgba(86,255,180,0)_74%)] blur-[28px] transition-all duration-500 ${
-                    showGlow ? "scale-100 opacity-100" : "scale-90 opacity-0"
-                  }`}
-                />
-                <div
-                  className={`absolute left-1/2 top-[8px] h-[170px] w-[86%] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,_rgba(125,226,255,.20)_0%,_rgba(125,226,255,.10)_38%,_rgba(125,226,255,0)_78%)] blur-[44px] transition-all duration-700 ${
-                    showGlow ? "scale-100 opacity-100" : "scale-95 opacity-0"
-                  }`}
-                />
-                <div
-                  className={`absolute left-1/2 top-[18px] h-[96px] w-[36%] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,_rgba(255,255,255,.42)_0%,_rgba(255,255,255,0)_74%)] blur-[18px] transition-all duration-500 ${
-                    showGlow ? "opacity-100" : "opacity-0"
-                  }`}
-                />
-              </div>
+              <div className="pointer-events-none absolute inset-x-[4%] bottom-[-26px] h-[120px] rounded-[999px] bg-[radial-gradient(ellipse_at_center,rgba(110,231,183,.18)_0%,rgba(125,211,252,.16)_32%,rgba(125,211,252,0)_76%)] blur-[24px]" />
 
-              <div className="relative z-10 overflow-hidden rounded-[32px] border border-[rgba(15,23,42,.08)] bg-[rgba(255,255,255,.94)] shadow-[0_18px_40px_-28px_rgba(15,23,42,.14)] backdrop-blur-[10px]">
-                <textarea
-                  ref={textareaRef}
-                  value={composerValue}
-                  onChange={(e) => handleComposerChange(e.target.value)}
-                  onFocus={() => setIsComposerFocused(true)}
-                  onBlur={() => setIsComposerFocused(false)}
-                  rows={4}
-                  placeholder="Describe the business, what it offers, and what AI should understand first."
-                  className="min-h-[150px] w-full resize-none border-0 bg-transparent px-[26px] pt-[24px] text-[16px] font-normal leading-7 tracking-[-0.025em] text-slate-900 outline-none shadow-none placeholder:text-[rgba(100,116,139,.88)] focus:ring-0 sm:text-[17px]"
+              <div className="pointer-events-none absolute left-[8%] right-[8%] top-[-10px] h-[1px] bg-[linear-gradient(90deg,rgba(255,255,255,0)_0%,rgba(186,230,253,.46)_20%,rgba(110,231,183,.22)_52%,rgba(255,255,255,0)_100%)]" />
+
+              <div className="relative overflow-hidden rounded-[34px] border border-[rgba(15,23,42,.08)] bg-[linear-gradient(180deg,rgba(255,255,255,.84)_0%,rgba(248,249,250,.72)_100%)] shadow-[0_22px_52px_-34px_rgba(15,23,42,.18)] backdrop-blur-[14px]">
+                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(190,242,255,.16),transparent_34%),radial-gradient(circle_at_50%_100%,rgba(110,231,183,.10),transparent_26%)]" />
+
+                <motion.span
+                  initial={{ x: "-18%" }}
+                  animate={{ x: "108%" }}
+                  transition={{
+                    duration: 6,
+                    repeat: Infinity,
+                    ease: "linear",
+                  }}
+                  className="pointer-events-none absolute bottom-[14px] left-[-10%] h-[2px] w-[26%] rounded-full bg-[linear-gradient(90deg,rgba(255,255,255,0)_0%,rgba(186,230,253,.85)_48%,rgba(255,255,255,0)_100%)] opacity-80 blur-[1px]"
                 />
 
-                <div className="flex items-center justify-between border-t border-[rgba(15,23,42,.06)] px-4 py-4 sm:px-[18px]">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={handleVoiceAction}
-                      className={`inline-flex h-11 shrink-0 items-center gap-2.5 rounded-full border px-4 text-[14px] font-medium tracking-[-0.03em] transition ${
-                        isListening
-                          ? "border-rose-200 bg-rose-50 text-rose-700"
-                          : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:text-slate-950"
-                      }`}
-                    >
-                      {isListening ? (
-                        <Square className="h-[15px] w-[15px] fill-current" />
-                      ) : (
-                        <Mic className="h-[16px] w-[16px]" />
-                      )}
-                      {isListening ? "Listening..." : "Use voice"}
-                    </button>
+                <div className="relative px-6 pb-5 pt-6 sm:px-8 sm:pb-6 sm:pt-7">
+                  <div className="relative min-h-[168px] text-left sm:min-h-[184px]">
+                    <textarea
+                      ref={textareaRef}
+                      value={composerValue}
+                      onChange={(e) => handleComposerChange(e.target.value)}
+                      onFocus={() => setIsComposerFocused(true)}
+                      onBlur={() => setIsComposerFocused(false)}
+                      rows={5}
+                      className="relative z-10 min-h-[168px] w-full resize-none border-0 bg-transparent p-0 text-[17px] font-normal leading-[1.9] tracking-[-0.03em] text-slate-900 outline-none shadow-none focus:ring-0 sm:min-h-[184px] sm:text-[18px]"
+                    />
 
-                    <div className="hidden min-w-0 truncate text-[13px] text-slate-500 sm:block">
-                      {isListening
-                        ? "Describe the business naturally."
-                        : speechSupported
-                        ? "Speak for 10–20 seconds."
-                        : "Voice works in supported browsers."}
+                    {!composerValue ? (
+                      <div className="pointer-events-none absolute inset-0 z-0 text-left">
+                        <div className="max-w-[900px] pr-4 text-[17px] leading-[1.9] tracking-[-0.03em] text-slate-400 sm:text-[18px]">
+                          {typingExample}
+                          <motion.span
+                            animate={{ opacity: [0, 1, 0] }}
+                            transition={{
+                              duration: 0.9,
+                              repeat: Infinity,
+                              ease: "linear",
+                            }}
+                            className="ml-[2px] inline-block h-[1.15em] w-[2px] translate-y-[3px] bg-slate-300 align-top"
+                          />
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="mt-3 flex flex-col gap-5 border-t border-[rgba(15,23,42,.06)] pt-5 sm:mt-4 sm:flex-row sm:items-end sm:justify-between">
+                    <div className="min-w-0 flex-1 text-left">
+                      <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+                        {attachedSignals.length > 0 ? (
+                          attachedSignals.map((item, index) => (
+                            <div key={item.key} className="inline-flex items-center gap-5">
+                              <AttachedSignal
+                                source={item.source}
+                                label={item.label}
+                                onClick={() => openSourceModal(item.key)}
+                                onRemove={() => removeSourceByKey(item.key)}
+                              />
+                              {index < attachedSignals.length - 1 ? (
+                                <span className="hidden text-slate-300 sm:inline">·</span>
+                              ) : null}
+                            </div>
+                          ))
+                        ) : (
+                          <>
+                            {VISIBLE_SOURCE_KEYS.map((key, index) => {
+                              const source = sourceByKey(key);
+                              if (!source) return null;
+
+                              const isInstagram = key === "instagram";
+                              const connectedOnly =
+                                isInstagram &&
+                                !s(obj(sourceDrafts[key]).value) &&
+                                instagramMeta.connected;
+
+                              return (
+                                <div key={key} className="inline-flex items-center gap-5">
+                                  <SourceInlineAction
+                                    source={source}
+                                    attached={false}
+                                    connected={connectedOnly}
+                                    onClick={() => openSourceModal(key)}
+                                  />
+                                  {index < VISIBLE_SOURCE_KEYS.length - 1 ? (
+                                    <span className="hidden text-slate-300 sm:inline">·</span>
+                                  ) : null}
+                                </div>
+                              );
+                            })}
+                          </>
+                        )}
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-3 text-[13px] tracking-[-0.02em] text-slate-400">
+                        <button
+                          type="button"
+                          onClick={handleVoiceAction}
+                          className={`inline-flex items-center gap-2 transition ${
+                            isListening
+                              ? "text-rose-600"
+                              : "hover:text-slate-700"
+                          }`}
+                        >
+                          {isListening ? (
+                            <Square className="h-[13px] w-[13px] fill-current" />
+                          ) : (
+                            <Mic className="h-[14px] w-[14px]" />
+                          )}
+                          <span>
+                            {isListening
+                              ? "Listening..."
+                              : speechSupported
+                              ? "Use voice"
+                              : "Voice unavailable"}
+                          </span>
+                        </button>
+
+                        <span className="hidden sm:inline">·</span>
+
+                        <span>
+                          {isListening
+                            ? "Describe the business naturally."
+                            : "Write a short business description or attach a source."}
+                        </span>
+                      </div>
+
+                      {speechError ? (
+                        <div className="mt-3 text-[13px] text-rose-600">
+                          {speechError}
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="flex shrink-0 items-center justify-end">
+                      <button
+                        type="button"
+                        disabled={!canContinue || importingWebsite}
+                        onClick={handleContinue}
+                        className={`group inline-flex h-[50px] items-center gap-3 rounded-full px-5 text-[15px] font-medium tracking-[-0.03em] transition ${
+                          canContinue && !importingWebsite
+                            ? "bg-slate-950 text-white hover:bg-slate-800"
+                            : "bg-[rgba(15,23,42,.10)] text-white/90"
+                        }`}
+                      >
+                        <span>
+                          {importingWebsite ? "Analyzing..." : "Create draft"}
+                        </span>
+
+                        {importingWebsite ? (
+                          <Loader2 className="h-[16px] w-[16px] animate-spin" />
+                        ) : (
+                          <ArrowRight className="h-[16px] w-[16px] transition-transform duration-200 group-hover:translate-x-[2px]" />
+                        )}
+                      </button>
                     </div>
                   </div>
-
-                  <button
-                    type="button"
-                    disabled={!canContinue || importingWebsite}
-                    onClick={handleContinue}
-                    className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition ${
-                      canContinue && !importingWebsite
-                        ? "bg-[rgba(15,23,42,.18)] text-white hover:bg-[rgba(15,23,42,.30)]"
-                        : "bg-[rgba(15,23,42,.10)] text-white"
-                    }`}
-                  >
-                    <ArrowRight className="h-[18px] w-[18px]" />
-                  </button>
                 </div>
-
-                {speechError ? (
-                  <div className="border-t border-[rgba(15,23,42,.06)] px-5 py-3 text-left text-[13px] text-rose-600">
-                    {speechError}
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="relative z-10 mx-auto mt-11 flex max-w-[980px] flex-wrap items-center justify-center gap-x-4 gap-y-4">
-                {VISIBLE_SOURCE_KEYS.map((key) => {
-                  const source = sourceByKey(key);
-                  if (!source) return null;
-
-                  const record = obj(sourceDrafts[key]);
-                  const isInstagram = key === "instagram";
-                  const hasAttachedValue = !!s(record.value);
-                  const hasConnectedAccount = isInstagram && !!instagramMeta.connected;
-
-                  return (
-                    <SourceChip
-                      key={source.key}
-                      source={source}
-                      active={hasAttachedValue}
-                      statusText={
-                        isInstagram
-                          ? hasAttachedValue
-                            ? record.mode === "connected"
-                              ? "Live"
-                              : "Added"
-                            : hasConnectedAccount
-                              ? "Connected"
-                              : ""
-                          : hasAttachedValue
-                            ? "Added"
-                            : ""
-                      }
-                      onClick={() => openSourceModal(source.key)}
-                    />
-                  );
-                })}
               </div>
             </motion.div>
           </div>
