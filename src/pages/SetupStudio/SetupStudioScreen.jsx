@@ -306,18 +306,9 @@ export default function SetupStudioScreen() {
     });
 
     setManualSections((prev) => ({
-      servicesText:
-        preserveBusinessForm && s(prev.servicesText)
-          ? s(prev.servicesText)
-          : s(nextManualSections.servicesText),
-      faqsText:
-        preserveBusinessForm && s(prev.faqsText)
-          ? s(prev.faqsText)
-          : s(nextManualSections.faqsText),
-      policiesText:
-        preserveBusinessForm && s(prev.policiesText)
-          ? s(prev.policiesText)
-          : s(nextManualSections.policiesText),
+      servicesText: s(nextManualSections.servicesText),
+      faqsText: s(nextManualSections.faqsText),
+      policiesText: s(nextManualSections.policiesText),
     }));
 
     syncDiscoveryStateFromReview(normalized, { preserveCounts: false });
@@ -759,24 +750,24 @@ export default function SetupStudioScreen() {
       currentDescription={currentDescription}
       discoveryProfileRows={discoveryProfileRows}
       knowledgePreview={knowledgePreview}
-      knowledgeItems={visibleKnowledgeItems}
-      serviceSuggestionTitle={serviceSuggestionTitle}
+      knowledgeItems={[]}
+      serviceSuggestionTitle=""
       studioProgress={studioProgress}
-      services={visibleServiceItems}
+      services={[]}
       reviewSources={visibleSources}
       reviewEvents={visibleEvents}
       hasVisibleResults={hasVisibleResults}
-      visibleKnowledgeCount={visibleKnowledgeItems.length}
-      visibleServiceCount={visibleServiceItems.length}
+      visibleKnowledgeCount={0}
+      visibleServiceCount={0}
       onSetBusinessField={setBusinessField}
       onSetManualSection={setManualSection}
       onSetDiscoveryField={setDiscoveryField}
       onScanBusiness={actions.onScanBusiness}
       onContinueFlow={() => actions.onScanBusiness(discoveryForm)}
       onSaveBusiness={actions.onSaveBusiness}
-      onApproveKnowledge={actions.onApproveKnowledge}
-      onRejectKnowledge={actions.onRejectKnowledge}
-      onCreateSuggestedService={actions.onCreateSuggestedService}
+      onApproveKnowledge={null}
+      onRejectKnowledge={null}
+      onCreateSuggestedService={null}
       onOpenWorkspace={actions.onOpenWorkspace}
       onReloadReviewDraft={() =>
         actions.loadCurrentReview({
@@ -796,7 +787,7 @@ export default function SetupStudioScreen() {
         })
       }
       onToggleRefine={() => setShowRefine((prev) => !prev)}
-      onToggleKnowledge={() => setShowKnowledge((prev) => !prev)}
+      onToggleKnowledge={() => {}}
       discoveryModeLabel={discoveryModeLabel}
     />
   );

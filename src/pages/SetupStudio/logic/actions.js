@@ -419,18 +419,9 @@ export function createSetupStudioActions(ctx) {
 
       const nextManualSections = buildManualSectionsFromReview(reviewState);
       setManualSections((prev) => ({
-        servicesText:
-          preserveBusinessForm && s(prev.servicesText)
-            ? s(prev.servicesText)
-            : s(nextManualSections.servicesText),
-        faqsText:
-          preserveBusinessForm && s(prev.faqsText)
-            ? s(prev.faqsText)
-            : s(nextManualSections.faqsText),
-        policiesText:
-          preserveBusinessForm && s(prev.policiesText)
-            ? s(prev.policiesText)
-            : s(nextManualSections.policiesText),
+        servicesText: s(nextManualSections.servicesText),
+        faqsText: s(nextManualSections.faqsText),
+        policiesText: s(nextManualSections.policiesText),
       }));
 
       syncDiscoveryStateFromReview(reviewState, { preserveCounts: false });
