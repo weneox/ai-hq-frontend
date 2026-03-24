@@ -1,3 +1,5 @@
+// FILE: src/pages/SetupStudio/SetupStudioScene.jsx
+
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import { RefreshCw } from "lucide-react";
@@ -302,33 +304,35 @@ export default function SetupStudioScene({
     setStage("ready");
   }
 
+  const sceneClassName = `setup-studio-scene${showRefine ? " is-overlay-open" : ""}`;
+
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center px-6">
-        <div className="rounded-full border border-white/80 bg-[rgba(250,250,250,.82)] px-4 py-2 text-sm text-slate-600 shadow-[0_10px_24px_-20px_rgba(15,23,42,.28)] backdrop-blur-[10px]">
-          Setup studio hazırlanır...
-        </div>
+      <div className="setup-studio-loading">
+        <div className="setup-studio-loading__pill">Preparing setup studio...</div>
       </div>
     );
   }
 
   if (stage === "entry") {
     return (
-      <>
-        <SetupStudioEntryStage
-          importingWebsite={importingWebsite}
-          discoveryForm={discoveryForm}
-          businessForm={businessForm}
-          manualSections={manualSections}
-          onSetBusinessField={onSetBusinessField}
-          onSetManualSection={onSetManualSection}
-          onSetDiscoveryField={onSetDiscoveryField}
-          onContinueFlow={onContinueFlow}
-        />
+      <div className={sceneClassName}>
+        <div className="flex-1 overflow-y-auto">
+          <SetupStudioEntryStage
+            importingWebsite={importingWebsite}
+            discoveryForm={discoveryForm}
+            businessForm={businessForm}
+            manualSections={manualSections}
+            onSetBusinessField={onSetBusinessField}
+            onSetManualSection={onSetManualSection}
+            onSetDiscoveryField={onSetDiscoveryField}
+            onContinueFlow={onContinueFlow}
+          />
+        </div>
 
         <AnimatePresence>
           {showRefine ? (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,.18)] px-4 py-4 backdrop-blur-[14px]">
+            <div className="setup-studio-modal-backdrop fixed inset-0 z-50 flex items-center justify-center px-4 py-4">
               <button
                 type="button"
                 aria-label="Close refine modal"
@@ -352,16 +356,16 @@ export default function SetupStudioScene({
             </div>
           ) : null}
         </AnimatePresence>
-      </>
+      </div>
     );
   }
 
   return (
-    <>
-      <div className="min-h-screen overflow-y-auto">
-        <main className="mx-auto w-full max-w-[1200px] px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+    <div className={sceneClassName}>
+      <div className="flex-1 overflow-y-auto">
+        <main className="mx-auto w-full max-w-[1220px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-            <div className="text-[12px] font-medium text-slate-400">
+            <div className="inline-flex h-10 items-center rounded-full border border-white/90 bg-[rgba(255,255,255,.76)] px-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 shadow-[0_12px_24px_-22px_rgba(15,23,42,.22)] backdrop-blur-[10px]">
               {sourceLabel ? sourceLabel : "Setup studio"}
             </div>
 
@@ -369,7 +373,7 @@ export default function SetupStudioScene({
               type="button"
               onClick={onRefresh}
               disabled={refreshing}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-white/80 bg-[rgba(250,250,250,.82)] px-4 text-sm font-medium text-slate-700 shadow-[0_10px_24px_-20px_rgba(15,23,42,.28)] backdrop-blur-[10px] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-white/90 bg-[rgba(255,255,255,.76)] px-4 text-sm font-medium text-slate-700 shadow-[0_12px_24px_-22px_rgba(15,23,42,.22)] backdrop-blur-[10px] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
             >
               <RefreshCw
                 className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
@@ -457,7 +461,7 @@ export default function SetupStudioScene({
 
       <AnimatePresence>
         {showRefine ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,.18)] px-4 py-4 backdrop-blur-[14px]">
+          <div className="setup-studio-modal-backdrop fixed inset-0 z-50 flex items-center justify-center px-4 py-4">
             <button
               type="button"
               aria-label="Close refine modal"
@@ -481,6 +485,6 @@ export default function SetupStudioScene({
           </div>
         ) : null}
       </AnimatePresence>
-    </>
+    </div>
   );
 }

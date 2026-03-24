@@ -1,3 +1,5 @@
+// FILE: src/pages/SetupStudio/components/SetupStudioRefineModal.jsx
+
 import { motion } from "framer-motion";
 import {
   AlertTriangle,
@@ -54,15 +56,34 @@ function countLogicalLines(value = "") {
 }
 
 function inputClassName() {
-  return "h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-[14px] text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-slate-300";
+  return "h-12 w-full rounded-[18px] border border-slate-200 bg-white px-4 text-[14px] text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-slate-300";
 }
 
 function textAreaClassName(minHeightClass = "min-h-[120px]") {
-  return `${minHeightClass} w-full resize-none rounded-[22px] border border-slate-200 bg-white px-4 py-3.5 text-[14px] leading-7 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-slate-300`;
+  return `${minHeightClass} w-full resize-none rounded-[20px] border border-slate-200 bg-white px-4 py-3.5 text-[14px] leading-7 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-slate-300`;
 }
 
 function labelClassName() {
   return "mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400";
+}
+
+function TonePill({ children, tone = "default" }) {
+  const toneClass =
+    tone === "warn"
+      ? "border-amber-200 bg-amber-50 text-amber-700"
+      : tone === "danger"
+        ? "border-rose-200 bg-rose-50 text-rose-700"
+        : tone === "success"
+          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+          : "border-slate-200 bg-slate-50 text-slate-600";
+
+  return (
+    <div
+      className={`rounded-full border px-3 py-1.5 text-[11px] font-medium ${toneClass}`}
+    >
+      {children}
+    </div>
+  );
 }
 
 function MicroLabel({ icon: Icon, children, tone = "default" }) {
@@ -71,11 +92,11 @@ function MicroLabel({ icon: Icon, children, tone = "default" }) {
       ? "border-amber-200 bg-amber-50 text-amber-700"
       : tone === "success"
         ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-        : "border-slate-200 bg-slate-50 text-slate-500";
+        : "border-white/90 bg-white/88 text-slate-500";
 
   return (
     <div
-      className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] ${toneClass}`}
+      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] ${toneClass}`}
     >
       {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
       {children}
@@ -86,9 +107,9 @@ function MicroLabel({ icon: Icon, children, tone = "default" }) {
 function Section({ title, children, className = "", right = null }) {
   return (
     <section
-      className={`rounded-[24px] border border-slate-200 bg-white ${className}`}
+      className={`overflow-hidden rounded-[24px] border border-white/90 bg-[rgba(255,255,255,.82)] shadow-[0_14px_36px_-28px_rgba(15,23,42,.16)] backdrop-blur-[10px] ${className}`}
     >
-      <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-4 py-3.5">
+      <div className="flex items-center justify-between gap-4 border-b border-[rgba(15,23,42,.06)] px-4 py-3.5">
         <div className="text-sm font-semibold text-slate-950">{title}</div>
         {right}
       </div>
@@ -100,7 +121,7 @@ function Section({ title, children, className = "", right = null }) {
 
 function SnapshotRow({ label, value }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-3">
+    <div className="rounded-[18px] border border-slate-200 bg-slate-50/90 px-3.5 py-3">
       <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
         {label || "Field"}
       </div>
@@ -113,8 +134,8 @@ function SnapshotRow({ label, value }) {
 
 function KeyFactRow({ icon: Icon, label, value }) {
   return (
-    <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-3">
-      <div className="inline-flex h-8 w-8 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500">
+    <div className="flex items-start gap-3 rounded-[18px] border border-slate-200 bg-slate-50/90 px-3.5 py-3">
+      <div className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500">
         <Icon className="h-4 w-4" />
       </div>
 
@@ -150,29 +171,12 @@ function EmptySectionHint({ text }) {
 
 function FormatRow({ icon: Icon, title, value }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-3">
+    <div className="rounded-[18px] border border-slate-200 bg-slate-50/90 px-3.5 py-3">
       <div className="flex items-center gap-2 text-slate-900">
         <Icon className="h-4 w-4" />
         <span className="text-sm font-medium">{title}</span>
       </div>
       <div className="mt-1.5 text-sm text-slate-600">{value}</div>
-    </div>
-  );
-}
-
-function TonePill({ children, tone = "default" }) {
-  const toneClass =
-    tone === "warn"
-      ? "border-amber-200 bg-amber-50 text-amber-700"
-      : tone === "danger"
-        ? "border-rose-200 bg-rose-50 text-rose-700"
-        : "border-slate-200 bg-slate-50 text-slate-600";
-
-  return (
-    <div
-      className={`rounded-full border px-3 py-1.5 text-[11px] font-medium ${toneClass}`}
-    >
-      {children}
     </div>
   );
 }
@@ -267,11 +271,11 @@ export default function SetupStudioRefineModal({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 14, scale: 0.985 }}
       transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-      className="relative my-2 flex w-full max-w-[1120px] flex-col overflow-hidden rounded-[30px] border border-slate-200 bg-[#f6f6f7] shadow-[0_24px_60px_rgba(15,23,42,.14)] max-h-[calc(100vh-1rem)] sm:my-4 sm:max-h-[calc(100vh-2rem)]"
+      className="relative my-2 flex w-full max-w-[1140px] flex-col overflow-hidden rounded-[32px] border border-white/85 bg-[rgba(246,247,248,.92)] shadow-[0_28px_80px_-36px_rgba(15,23,42,.24)] backdrop-blur-[14px] max-h-[calc(100vh-1rem)] sm:my-4 sm:max-h-[calc(100vh-2rem)]"
     >
-      <div className="sticky top-0 z-10 border-b border-slate-200 bg-[#f6f6f7] px-5 py-4 sm:px-6">
+      <div className="sticky top-0 z-10 border-b border-[rgba(15,23,42,.06)] bg-[rgba(246,247,248,.94)] px-5 py-4 backdrop-blur-[12px] sm:px-6">
         <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0 max-w-[760px]">
+          <div className="min-w-0 max-w-[780px]">
             <div className="flex flex-wrap items-center gap-2">
               <MicroLabel icon={Brain}>Refine draft</MicroLabel>
 
@@ -288,7 +292,7 @@ export default function SetupStudioRefineModal({
               ) : null}
             </div>
 
-            <h2 className="mt-4 text-[24px] font-semibold leading-[1.04] tracking-[-0.04em] text-slate-950 sm:text-[30px]">
+            <h2 className="mt-4 text-[24px] font-semibold leading-[1.04] tracking-[-0.045em] text-slate-950 sm:text-[30px]">
               Review and confirm the business draft
             </h2>
 
@@ -303,7 +307,7 @@ export default function SetupStudioRefineModal({
             onClick={onClose}
             disabled={savingBusiness}
             aria-label="Close"
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-50"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/90 bg-white text-slate-600 transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-50"
           >
             <X className="h-4 w-4" />
           </button>
@@ -311,7 +315,7 @@ export default function SetupStudioRefineModal({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="grid gap-5 px-5 py-5 sm:px-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="grid gap-5 px-5 py-5 sm:px-6 xl:grid-cols-[minmax(0,1fr)_340px]">
           <form
             id={FORM_ID}
             onSubmit={onSaveBusiness}
@@ -514,7 +518,7 @@ export default function SetupStudioRefineModal({
             <Section title="Draft overview">
               <div className="space-y-3">
                 {quickSummary ? (
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                  <div className="rounded-[18px] border border-slate-200 bg-slate-50/90 px-4 py-4">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                       Summary
                     </div>
@@ -525,7 +529,7 @@ export default function SetupStudioRefineModal({
                 ) : null}
 
                 {sourceUrl ? (
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                  <div className="rounded-[18px] border border-slate-200 bg-slate-50/90 px-4 py-4">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                       Source
                     </div>
@@ -536,7 +540,7 @@ export default function SetupStudioRefineModal({
                 ) : null}
 
                 {!quickSummary && !sourceUrl ? (
-                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-500">
+                  <div className="rounded-[18px] border border-dashed border-slate-200 bg-slate-50/90 px-4 py-4 text-sm leading-6 text-slate-500">
                     The draft summary will appear here after analysis.
                   </div>
                 ) : null}
@@ -572,7 +576,7 @@ export default function SetupStudioRefineModal({
                         {warnings.slice(0, 6).map((item, index) => (
                           <div
                             key={`${item}-${index}`}
-                            className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-sm leading-6 text-amber-800"
+                            className="flex items-start gap-2 rounded-[18px] border border-amber-200 bg-amber-50 px-3.5 py-3 text-sm leading-6 text-amber-800"
                           >
                             <Info className="mt-0.5 h-4 w-4 shrink-0" />
                             <span>{item}</span>
@@ -600,7 +604,7 @@ export default function SetupStudioRefineModal({
                     />
                   ))
                 ) : (
-                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-500">
+                  <div className="rounded-[18px] border border-dashed border-slate-200 bg-slate-50/90 px-4 py-4 text-sm leading-6 text-slate-500">
                     No extracted snapshot is visible yet.
                   </div>
                 )}
@@ -620,7 +624,7 @@ export default function SetupStudioRefineModal({
                   ))}
                 </div>
               ) : (
-                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-500">
+                <div className="rounded-[18px] border border-dashed border-slate-200 bg-slate-50/90 px-4 py-4 text-sm leading-6 text-slate-500">
                   Key contact fields are still empty.
                 </div>
               )}
@@ -651,7 +655,7 @@ export default function SetupStudioRefineModal({
         </div>
       </div>
 
-      <div className="sticky bottom-0 z-10 border-t border-slate-200 bg-[#f6f6f7] px-5 py-4 sm:px-6">
+      <div className="sticky bottom-0 z-10 border-t border-[rgba(15,23,42,.06)] bg-[rgba(246,247,248,.94)] px-5 py-4 backdrop-blur-[12px] sm:px-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm text-slate-500">
             Confirming will write this reviewed draft into the canonical business layer.
@@ -662,7 +666,7 @@ export default function SetupStudioRefineModal({
               type="button"
               onClick={onClose}
               disabled={savingBusiness}
-              className="inline-flex h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-5 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-60"
+              className="inline-flex h-11 items-center justify-center rounded-full border border-white/90 bg-white px-5 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-60"
             >
               Close
             </button>
