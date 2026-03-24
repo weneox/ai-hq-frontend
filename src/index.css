@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -15,22 +15,20 @@
     "Segoe UI",
     sans-serif;
 
-  /* tailwind token base */
-  --bg: 210 16% 96%;
+  --bg: 210 18% 97%;
   --fg: 222 34% 10%;
   --muted: 220 10% 48%;
   --border: 214 18% 84%;
-  --surface: 0 0% 97%;
+  --surface: 0 0% 98%;
   --brand: 224 63% 8%;
   --brand-foreground: 0 0% 100%;
   --ring: 215 88% 62%;
   --radius: 24px;
 
-  /* studio palette */
-  --studio-bg: #f4f6f6;
-  --studio-bg-2: #f2f5f6;
-  --studio-panel: rgba(248, 248, 248, 0.94);
-  --studio-panel-solid: #f7f7f7;
+  --studio-bg: #f7f8f9;
+  --studio-bg-2: #eef2f4;
+  --studio-panel: rgba(255, 255, 255, 0.82);
+  --studio-panel-solid: #fafafa;
   --studio-line: rgba(19, 28, 45, 0.1);
   --studio-line-soft: rgba(19, 28, 45, 0.06);
 
@@ -40,18 +38,18 @@
   --studio-muted-2: #8d939d;
   --studio-placeholder: #8c9199;
 
-  --studio-white: rgba(255, 255, 255, 0.9);
-  --studio-chip: rgba(251, 251, 251, 0.82);
-  --studio-chip-border: rgba(255, 255, 255, 0.7);
+  --studio-white: rgba(255, 255, 255, 0.92);
+  --studio-chip: rgba(255, 255, 255, 0.74);
+  --studio-chip-border: rgba(255, 255, 255, 0.76);
 
   --studio-shadow-xs: 0 1px 0 rgba(255, 255, 255, 0.7);
-  --studio-shadow-sm: 0 10px 26px -22px rgba(15, 23, 42, 0.18);
-  --studio-shadow-md: 0 18px 40px -28px rgba(15, 23, 42, 0.16);
-  --studio-shadow-lg: 0 24px 56px -34px rgba(15, 23, 42, 0.18);
+  --studio-shadow-sm: 0 12px 26px -22px rgba(15, 23, 42, 0.16);
+  --studio-shadow-md: 0 20px 48px -34px rgba(15, 23, 42, 0.16);
+  --studio-shadow-lg: 0 30px 72px -42px rgba(15, 23, 42, 0.2);
 
-  --studio-glow-green: rgba(110, 231, 183, 0.28);
-  --studio-glow-blue: rgba(125, 211, 252, 0.24);
-  --studio-glow-top: rgba(186, 233, 227, 0.36);
+  --studio-glow-green: rgba(110, 231, 183, 0.18);
+  --studio-glow-blue: rgba(125, 211, 252, 0.14);
+  --studio-glow-top: rgba(186, 233, 227, 0.22);
 
   --selection: rgba(148, 210, 255, 0.28);
   --scroll-track: rgba(220, 227, 232, 0.4);
@@ -93,9 +91,18 @@ body {
   overflow-x: hidden;
   overflow-y: auto;
   background:
-    radial-gradient(circle at 76% 8%, rgba(186, 233, 227, 0.32), transparent 23%),
-    radial-gradient(circle at 52% 67%, rgba(123, 249, 215, 0.18), transparent 18%),
-    radial-gradient(circle at 68% 62%, rgba(125, 211, 252, 0.12), transparent 16%),
+    radial-gradient(
+      circle at 50% 0%,
+      rgba(186, 233, 227, 0.18) 0%,
+      rgba(186, 233, 227, 0.08) 18%,
+      transparent 36%
+    ),
+    radial-gradient(
+      circle at 82% 18%,
+      rgba(125, 211, 252, 0.12) 0%,
+      rgba(125, 211, 252, 0.04) 16%,
+      transparent 32%
+    ),
     linear-gradient(180deg, var(--studio-bg) 0%, var(--studio-bg-2) 100%);
 }
 
@@ -180,11 +187,11 @@ textarea,
 select {
   border: 1px solid rgba(19, 28, 45, 0.08);
   border-radius: 18px;
-  background: rgba(249, 249, 249, 0.88);
+  background: rgba(255, 255, 255, 0.82);
   color: var(--studio-text);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.84),
-    0 4px 16px -12px rgba(15, 23, 42, 0.12);
+    inset 0 1px 0 rgba(255, 255, 255, 0.88),
+    0 6px 18px -14px rgba(15, 23, 42, 0.1);
   transition:
     border-color 180ms ease,
     box-shadow 180ms ease,
@@ -202,9 +209,9 @@ input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus,
 textarea:focus,
 select:focus {
   border-color: rgba(80, 120, 200, 0.22);
-  background: rgba(250, 250, 250, 0.96);
+  background: rgba(255, 255, 255, 0.94);
   box-shadow:
-    0 0 0 4px rgba(148, 210, 255, 0.12),
+    0 0 0 4px rgba(148, 210, 255, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.92);
 }
 
@@ -247,18 +254,18 @@ textarea::placeholder {
 @layer components {
   .ui-glass-card {
     border: 1px solid rgba(19, 28, 45, 0.08);
-    background: rgba(249, 249, 249, 0.84);
+    background: rgba(255, 255, 255, 0.82);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.86),
-      0 16px 40px -30px rgba(15, 23, 42, 0.14);
+      inset 0 1px 0 rgba(255, 255, 255, 0.88),
+      0 18px 44px -34px rgba(15, 23, 42, 0.14);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
   }
 
   .ui-soft-card {
     border: 1px solid rgba(19, 28, 45, 0.07);
-    background: rgba(250, 250, 250, 0.8);
-    box-shadow: 0 10px 26px -22px rgba(15, 23, 42, 0.14);
+    background: rgba(255, 255, 255, 0.72);
+    box-shadow: 0 12px 26px -22px rgba(15, 23, 42, 0.14);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
   }
@@ -271,15 +278,15 @@ textarea::placeholder {
     justify-content: center;
     gap: 8px;
     border-radius: 999px;
-    border: 1px solid rgba(255, 255, 255, 0.68);
-    background: rgba(250, 250, 250, 0.78);
+    border: 1px solid rgba(255, 255, 255, 0.76);
+    background: rgba(255, 255, 255, 0.76);
     color: #646b76;
     font-size: 13px;
     font-weight: 500;
     letter-spacing: -0.02em;
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.92),
-      0 10px 24px -20px rgba(15, 23, 42, 0.18);
+      0 10px 22px -20px rgba(15, 23, 42, 0.14);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
   }
@@ -309,22 +316,22 @@ textarea::placeholder {
     min-height: 42px;
     padding: 0 14px;
     border-radius: 999px;
-    border: 1px solid rgba(255, 255, 255, 0.68);
-    background: rgba(250, 250, 250, 0.78);
+    border: 1px solid rgba(255, 255, 255, 0.76);
+    background: rgba(255, 255, 255, 0.74);
     color: #4f5662;
     font-size: 13px;
     font-weight: 500;
     letter-spacing: -0.02em;
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.92),
-      0 10px 24px -20px rgba(15, 23, 42, 0.18);
+      0 10px 22px -20px rgba(15, 23, 42, 0.14);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
   }
 
   .ui-button-secondary:hover:not(:disabled) {
     transform: translateY(-1px);
-    background: rgba(252, 252, 252, 0.9);
+    background: rgba(255, 255, 255, 0.9);
     color: var(--studio-text);
   }
 
@@ -356,8 +363,7 @@ textarea::placeholder {
   place-items: center;
   padding: 24px;
   background:
-    radial-gradient(circle at 76% 8%, rgba(186, 233, 227, 0.28), transparent 22%),
-    radial-gradient(circle at 52% 67%, rgba(123, 249, 215, 0.16), transparent 18%),
+    radial-gradient(circle at 50% 6%, rgba(186, 233, 227, 0.18), transparent 26%),
     linear-gradient(180deg, var(--studio-bg) 0%, var(--studio-bg-2) 100%);
 }
 
@@ -371,9 +377,9 @@ textarea::placeholder {
   color: #5a606b;
   font-size: 12px;
   font-weight: 600;
-  letter-spacing: -0.01em;
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  background: rgba(250, 250, 250, 0.8);
+  letter-spacing: 0.02em;
+  border: 1px solid rgba(255, 255, 255, 0.76);
+  background: rgba(255, 255, 255, 0.74);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.94),
     0 12px 28px -20px rgba(15, 23, 42, 0.16);
@@ -384,11 +390,10 @@ textarea::placeholder {
 .setup-studio-scene {
   position: relative;
   isolation: isolate;
-  height: 100vh;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-x: hidden;
   background: transparent;
 }
 
@@ -396,19 +401,19 @@ textarea::placeholder {
   content: "";
   position: absolute;
   left: 50%;
-  bottom: 8%;
-  width: min(720px, 58vw);
-  height: 160px;
+  top: 4%;
+  width: min(980px, 80vw);
+  height: 260px;
   transform: translateX(-50%);
   border-radius: 999px;
   background:
     radial-gradient(
       ellipse at center,
-      rgba(110, 231, 183, 0.24) 0%,
-      rgba(125, 211, 252, 0.14) 34%,
-      rgba(125, 211, 252, 0) 74%
+      rgba(186, 233, 227, 0.16) 0%,
+      rgba(125, 211, 252, 0.08) 34%,
+      rgba(125, 211, 252, 0) 78%
     );
-  filter: blur(26px);
+  filter: blur(30px);
   pointer-events: none;
   z-index: 0;
 }
@@ -416,13 +421,20 @@ textarea::placeholder {
 .setup-studio-scene::after {
   content: "";
   position: absolute;
-  top: -4%;
-  right: -6%;
-  width: min(560px, 36vw);
-  height: min(560px, 36vw);
+  left: 50%;
+  bottom: 4%;
+  width: min(740px, 64vw);
+  height: 140px;
+  transform: translateX(-50%);
   border-radius: 999px;
-  background: radial-gradient(circle, rgba(186, 233, 227, 0.24) 0%, transparent 70%);
-  filter: blur(18px);
+  background:
+    radial-gradient(
+      ellipse at center,
+      rgba(110, 231, 183, 0.14) 0%,
+      rgba(125, 211, 252, 0.06) 42%,
+      rgba(125, 211, 252, 0) 76%
+    );
+  filter: blur(26px);
   pointer-events: none;
   z-index: 0;
 }
@@ -444,7 +456,7 @@ textarea::placeholder {
 
 .setup-studio-modal-card {
   border: 1px solid rgba(19, 28, 45, 0.08);
-  background: rgba(249, 249, 249, 0.92);
+  background: rgba(255, 255, 255, 0.92);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.94),
     0 28px 70px -36px rgba(15, 23, 42, 0.24);
@@ -454,11 +466,11 @@ textarea::placeholder {
 
 .setup-studio-panel {
   position: relative;
-  border: 1px solid rgba(19, 28, 45, 0.1);
+  border: 1px solid rgba(19, 28, 45, 0.08);
   background: var(--studio-panel);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.94),
-    0 14px 36px -26px rgba(15, 23, 42, 0.16);
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 18px 44px -34px rgba(15, 23, 42, 0.14);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
@@ -466,19 +478,19 @@ textarea::placeholder {
 .setup-studio-panel::after {
   content: "";
   position: absolute;
-  left: 8%;
-  right: 8%;
-  bottom: -18px;
-  height: 58px;
+  left: 10%;
+  right: 10%;
+  bottom: -14px;
+  height: 44px;
   border-radius: 999px;
   background:
     radial-gradient(
       ellipse at center,
-      rgba(110, 231, 183, 0.3) 0%,
-      rgba(125, 211, 252, 0.18) 42%,
+      rgba(110, 231, 183, 0.18) 0%,
+      rgba(125, 211, 252, 0.08) 42%,
       rgba(125, 211, 252, 0) 76%
     );
-  filter: blur(20px);
+  filter: blur(18px);
   pointer-events: none;
   z-index: -1;
 }
@@ -494,15 +506,15 @@ textarea::placeholder {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.68);
-  background: rgba(250, 250, 250, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.76);
+  background: rgba(255, 255, 255, 0.74);
   color: #646b76;
   font-size: 13px;
   font-weight: 500;
   letter-spacing: -0.02em;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.92),
-    0 10px 24px -20px rgba(15, 23, 42, 0.18);
+    0 10px 22px -20px rgba(15, 23, 42, 0.14);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
@@ -569,12 +581,12 @@ textarea::placeholder {
 
 @media (max-width: 1024px) {
   .setup-studio-scene::before {
-    width: min(620px, 70vw);
+    width: min(820px, 84vw);
+    height: 220px;
   }
 
   .setup-studio-scene::after {
-    width: 360px;
-    height: 360px;
+    width: min(620px, 70vw);
   }
 }
 
@@ -591,29 +603,26 @@ textarea::placeholder {
 
   .setup-studio-scene {
     min-height: 100svh;
-    height: auto;
     overflow-x: hidden;
     overflow-y: auto;
   }
 
   .setup-studio-scene::before {
-    width: min(520px, 86vw);
-    height: 120px;
-    bottom: 12%;
+    width: min(520px, 90vw);
+    height: 180px;
+    top: 2%;
   }
 
   .setup-studio-scene::after {
-    width: 280px;
-    height: 280px;
-    top: 0;
-    right: -14%;
+    width: min(440px, 82vw);
+    height: 110px;
   }
 
   .setup-studio-panel::after {
-    left: 6%;
-    right: 6%;
-    height: 46px;
-    bottom: -14px;
+    left: 8%;
+    right: 8%;
+    height: 38px;
+    bottom: -12px;
   }
 
   .setup-studio-chip {
@@ -625,6 +634,10 @@ textarea::placeholder {
 
 @media (max-height: 860px) and (min-width: 861px) {
   .setup-studio-scene::before {
-    bottom: 6%;
+    top: 2%;
+  }
+
+  .setup-studio-scene::after {
+    bottom: 2%;
   }
 }
