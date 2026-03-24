@@ -1,4 +1,18 @@
-import { arr, obj, s } from "../lib/setupStudioHelpers.js";
+// src/pages/SetupStudio/state/shared.js
+
+export function s(value, fallback = "") {
+  return String(value ?? fallback).trim();
+}
+
+export function arr(value, fallback = []) {
+  return Array.isArray(value) ? value : fallback;
+}
+
+export function obj(value, fallback = {}) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value
+    : fallback;
+}
 
 export const KNOWN_LANGS = new Set(["az", "en", "tr", "ru"]);
 
@@ -539,10 +553,7 @@ export function normalizeScanRequest(input, discoveryForm = {}) {
   const discovery = obj(discoveryForm);
 
   const singularPayloadSource = normalizeStudioSourceRecord({
-    sourceType:
-      payload.sourceType ||
-      payload.type ||
-      discovery.sourceType,
+    sourceType: payload.sourceType || payload.type || discovery.sourceType,
     url:
       payload.url ||
       payload.sourceUrl ||
