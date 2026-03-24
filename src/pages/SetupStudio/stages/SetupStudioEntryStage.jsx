@@ -43,6 +43,20 @@ const INPUT_RESET_STYLE = {
   MozAppearance: "none",
 };
 
+const TEXTAREA_RESET_STYLE = {
+  width: "100%",
+  minWidth: 0,
+  border: "0",
+  outline: "0",
+  boxShadow: "none",
+  background: "transparent",
+  color: "#0f172a",
+  resize: "none",
+  appearance: "none",
+  WebkitAppearance: "none",
+  MozAppearance: "none",
+};
+
 const TYPING_EXAMPLES = [
   "We are a dental clinic in Baku offering implants, whitening, and consultations in Azerbaijani and English.",
   "We run a women’s fashion boutique with same-day delivery in Baku and most orders coming from Instagram.",
@@ -60,10 +74,6 @@ function obj(v, d = {}) {
 
 function lower(v) {
   return s(v).toLowerCase();
-}
-
-function arr(v, d = []) {
-  return Array.isArray(v) ? v : d;
 }
 
 function instagramProfileUrlFromChannel(channel = {}) {
@@ -388,100 +398,60 @@ function useTypingExamples(enabled = true) {
 
 function NeoxWordmark() {
   return (
-    <div className="relative inline-flex select-none items-center justify-center">
+    <div className="inline-flex select-none items-center justify-center">
       <div
         style={DISPLAY_FONT_STYLE}
-        className="relative inline-flex items-end gap-[8px] text-[34px] font-semibold leading-none tracking-[-0.075em] sm:text-[38px] lg:text-[42px]"
+        className="inline-flex items-end gap-[8px] text-[30px] font-semibold leading-none tracking-[-0.06em] text-slate-900 sm:text-[34px] lg:text-[38px]"
       >
-        <span className="relative text-slate-950">
-          NEOX
-          <span className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_50%,rgba(125,211,252,.24),transparent_44%)] blur-[12px]" />
-        </span>
-
-        <span className="relative bg-[linear-gradient(180deg,#475569_0%,#0f172a_100%)] bg-clip-text text-transparent">
+        <span>NEOX</span>
+        <span className="bg-[linear-gradient(180deg,#475569_0%,#0f172a_100%)] bg-clip-text text-transparent">
           AI Studio
-
-          <span className="pointer-events-none absolute left-[-20%] top-[52%] h-[2px] w-[138%] -translate-y-1/2 overflow-hidden rounded-full opacity-90">
-            <span className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0)_0%,rgba(190,242,255,.18)_26%,rgba(110,231,183,.14)_52%,rgba(255,255,255,0)_100%)]" />
-            <motion.span
-              initial={{ x: "-38%" }}
-              animate={{ x: "112%" }}
-              transition={{
-                duration: 3.8,
-                repeat: Infinity,
-                ease: "linear",
-              }}
-              className="absolute top-1/2 h-[10px] w-[96px] -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(186,230,253,.94)_0%,rgba(125,211,252,.56)_36%,rgba(125,211,252,0)_76%)] blur-[6px]"
-            />
-          </span>
         </span>
       </div>
     </div>
   );
 }
 
-function SourceInlineAction({
+function SourceAction({
   source,
   attached = false,
-  connected = false,
+  connectedOnly = false,
   onClick,
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="group inline-flex items-center gap-2 text-[14px] font-medium tracking-[-0.02em] text-slate-500 transition hover:text-slate-950"
+      className={`group inline-flex h-[42px] items-center gap-2 rounded-full px-3.5 text-[14px] font-medium tracking-[-0.02em] transition ${
+        attached || connectedOnly
+          ? "bg-white text-slate-900 shadow-[0_10px_24px_-18px_rgba(15,23,42,.14)]"
+          : "text-slate-500 hover:bg-white/70 hover:text-slate-900"
+      }`}
     >
       <img
         src={source.icon}
         alt={source.label}
-        className="h-[15px] w-[15px] object-contain opacity-90"
+        className="h-[16px] w-[16px] object-contain"
       />
 
       <span>{source.label}</span>
 
-      {attached ? (
-        <span className="text-[13px] text-emerald-600">
-          {connected ? "connected" : "attached"}
+      {attached || connectedOnly ? (
+        <span
+          className={`inline-flex h-[18px] w-[18px] items-center justify-center rounded-full ${
+            attached
+              ? "bg-emerald-500 text-white"
+              : "bg-slate-100 text-slate-500"
+          }`}
+        >
+          {attached ? (
+            <Check className="h-[12px] w-[12px]" />
+          ) : (
+            <span className="h-[6px] w-[6px] rounded-full bg-current" />
+          )}
         </span>
       ) : null}
-
-      <span className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-full border border-slate-200 text-[12px] leading-none text-slate-400 transition group-hover:border-slate-300 group-hover:text-slate-700">
-        +
-      </span>
     </button>
-  );
-}
-
-function AttachedSignal({
-  source,
-  label,
-  onClick,
-  onRemove,
-}) {
-  return (
-    <div className="inline-flex items-center gap-2 text-[14px] tracking-[-0.02em] text-slate-700">
-      <button
-        type="button"
-        onClick={onClick}
-        className="inline-flex items-center gap-2 transition hover:text-slate-950"
-      >
-        <img
-          src={source.icon}
-          alt={source.label}
-          className="h-[15px] w-[15px] object-contain"
-        />
-        <span className="font-medium">{label}</span>
-      </button>
-
-      <button
-        type="button"
-        onClick={onRemove}
-        className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-      >
-        <X className="h-[12px] w-[12px]" />
-      </button>
-    </div>
   );
 }
 
@@ -527,8 +497,6 @@ function SourceModal({
         transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
         className="relative z-10 w-full max-w-[620px] overflow-hidden rounded-[30px] border border-white/80 bg-[rgba(249,249,249,.96)] shadow-[0_32px_80px_-36px_rgba(15,23,42,.28)]"
       >
-        <div className="absolute inset-x-0 top-0 h-[120px] bg-[radial-gradient(circle_at_50%_0%,rgba(186,230,253,.18),transparent_70%)]" />
-
         <div className="relative px-7 pb-7 pt-7 sm:px-8">
           <div className="flex items-start justify-between gap-5">
             <div className="min-w-0 flex-1">
@@ -1155,33 +1123,11 @@ export default function SetupStudioEntryStage({
     onContinueFlow?.();
   }
 
-  const attachedSignals = useMemo(() => {
-    return VISIBLE_SOURCE_KEYS.map((key) => {
-      const source = sourceByKey(key);
-      const record = obj(sourceDrafts[key]);
-      const value = s(record.value);
-      if (!source || !value) return null;
-
-      const isInstagram = key === "instagram";
-      const label =
-        isInstagram && record.mode === "connected"
-          ? "Instagram connected"
-          : `${source.label} attached`;
-
-      return {
-        key,
-        source,
-        value,
-        label,
-      };
-    }).filter(Boolean);
-  }, [sourceDrafts]);
-
   return (
     <>
       <section className="w-full bg-transparent">
-        <div className="mx-auto max-w-[1280px] px-4 py-[54px] sm:px-6 sm:py-[72px] lg:px-8 lg:py-[84px]">
-          <div className="mx-auto w-full max-w-[1100px] text-center">
+        <div className="mx-auto max-w-[1280px] px-4 py-[44px] sm:px-6 sm:py-[60px] lg:px-8 lg:py-[70px]">
+          <div className="mx-auto w-full max-w-[1120px] text-center">
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -1191,55 +1137,39 @@ export default function SetupStudioEntryStage({
 
               <h1
                 style={DISPLAY_FONT_STYLE}
-                className="mx-auto mt-7 max-w-[1180px] text-[34px] font-semibold leading-[1.06] tracking-[-0.065em] text-slate-950 sm:text-[42px] lg:text-[56px]"
+                className="mx-auto mt-5 max-w-[820px] text-[34px] font-semibold leading-[1.08] tracking-[-0.055em] text-slate-950 sm:text-[42px] lg:text-[50px]"
               >
                 Build your business draft from real signals.
               </h1>
-
-              <p className="mx-auto mt-4 max-w-[760px] text-[18px] leading-8 tracking-[-0.03em] text-slate-500 sm:text-[19px]">
-                Start with a short description, attach a source, or speak naturally.
-              </p>
             </motion.div>
 
             <motion.div
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.24, delay: 0.04 }}
-              className="relative mx-auto mt-11 w-full max-w-[1040px]"
+              className="relative mx-auto mt-10 w-full max-w-[1300px]"
             >
-              <div className="pointer-events-none absolute inset-x-[4%] bottom-[-26px] h-[120px] rounded-[999px] bg-[radial-gradient(ellipse_at_center,rgba(110,231,183,.18)_0%,rgba(125,211,252,.16)_32%,rgba(125,211,252,0)_76%)] blur-[24px]" />
+              <div className="pointer-events-none absolute inset-x-[7%] bottom-[-24px] h-[110px] rounded-[999px] bg-[radial-gradient(ellipse_at_center,rgba(110,231,183,.16)_0%,rgba(125,211,252,.14)_34%,rgba(125,211,252,0)_76%)] blur-[22px]" />
 
-              <div className="pointer-events-none absolute left-[8%] right-[8%] top-[-10px] h-[1px] bg-[linear-gradient(90deg,rgba(255,255,255,0)_0%,rgba(186,230,253,.46)_20%,rgba(110,231,183,.22)_52%,rgba(255,255,255,0)_100%)]" />
+              <div className="relative overflow-hidden rounded-[34px] border border-[rgba(15,23,42,.07)] bg-[linear-gradient(180deg,rgba(255,255,255,.86)_0%,rgba(248,249,250,.78)_100%)] shadow-[0_22px_52px_-34px_rgba(15,23,42,.16)] backdrop-blur-[14px]">
+                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(190,242,255,.12),transparent_34%),radial-gradient(circle_at_50%_100%,rgba(110,231,183,.08),transparent_26%)]" />
 
-              <div className="relative overflow-hidden rounded-[34px] border border-[rgba(15,23,42,.08)] bg-[linear-gradient(180deg,rgba(255,255,255,.84)_0%,rgba(248,249,250,.72)_100%)] shadow-[0_22px_52px_-34px_rgba(15,23,42,.18)] backdrop-blur-[14px]">
-                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(190,242,255,.16),transparent_34%),radial-gradient(circle_at_50%_100%,rgba(110,231,183,.10),transparent_26%)]" />
-
-                <motion.span
-                  initial={{ x: "-18%" }}
-                  animate={{ x: "108%" }}
-                  transition={{
-                    duration: 6,
-                    repeat: Infinity,
-                    ease: "linear",
-                  }}
-                  className="pointer-events-none absolute bottom-[14px] left-[-10%] h-[2px] w-[26%] rounded-full bg-[linear-gradient(90deg,rgba(255,255,255,0)_0%,rgba(186,230,253,.85)_48%,rgba(255,255,255,0)_100%)] opacity-80 blur-[1px]"
-                />
-
-                <div className="relative px-6 pb-5 pt-6 sm:px-8 sm:pb-6 sm:pt-7">
-                  <div className="relative min-h-[168px] text-left sm:min-h-[184px]">
+                <div className="relative px-7 pb-6 pt-7 sm:px-9 sm:pb-7 sm:pt-8">
+                  <div className="relative min-h-[108px] text-left sm:min-h-[118px]">
                     <textarea
                       ref={textareaRef}
                       value={composerValue}
                       onChange={(e) => handleComposerChange(e.target.value)}
                       onFocus={() => setIsComposerFocused(true)}
                       onBlur={() => setIsComposerFocused(false)}
-                      rows={5}
-                      className="relative z-10 min-h-[168px] w-full resize-none border-0 bg-transparent p-0 text-[17px] font-normal leading-[1.9] tracking-[-0.03em] text-slate-900 outline-none shadow-none focus:ring-0 sm:min-h-[184px] sm:text-[18px]"
+                      rows={4}
+                      style={TEXTAREA_RESET_STYLE}
+                      className="relative z-10 min-h-[108px] w-full bg-transparent p-0 text-[18px] font-normal leading-[1.8] tracking-[-0.03em] text-slate-900 placeholder:text-transparent outline-none focus:outline-none focus:ring-0 sm:min-h-[118px]"
                     />
 
                     {!composerValue ? (
                       <div className="pointer-events-none absolute inset-0 z-0 text-left">
-                        <div className="max-w-[900px] pr-4 text-[17px] leading-[1.9] tracking-[-0.03em] text-slate-400 sm:text-[18px]">
+                        <div className="max-w-[920px] pr-4 text-[18px] leading-[1.8] tracking-[-0.03em] text-slate-400">
                           {typingExample}
                           <motion.span
                             animate={{ opacity: [0, 1, 0] }}
@@ -1248,121 +1178,100 @@ export default function SetupStudioEntryStage({
                               repeat: Infinity,
                               ease: "linear",
                             }}
-                            className="ml-[2px] inline-block h-[1.15em] w-[2px] translate-y-[3px] bg-slate-300 align-top"
+                            className="ml-[2px] inline-block h-[1.1em] w-[2px] translate-y-[3px] bg-slate-300 align-top"
                           />
                         </div>
                       </div>
                     ) : null}
                   </div>
 
-                  <div className="mt-3 flex flex-col gap-5 border-t border-[rgba(15,23,42,.06)] pt-5 sm:mt-4 sm:flex-row sm:items-end sm:justify-between">
-                    <div className="min-w-0 flex-1 text-left">
-                      <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
-                        {attachedSignals.length > 0 ? (
-                          attachedSignals.map((item, index) => (
-                            <div key={item.key} className="inline-flex items-center gap-5">
-                              <AttachedSignal
-                                source={item.source}
-                                label={item.label}
-                                onClick={() => openSourceModal(item.key)}
-                                onRemove={() => removeSourceByKey(item.key)}
+                  <div className="mt-4 border-t border-[rgba(15,23,42,.06)] pt-4">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                      <div className="min-w-0 flex-1 text-left">
+                        <div className="flex flex-wrap items-center gap-2.5">
+                          {VISIBLE_SOURCE_KEYS.map((key) => {
+                            const source = sourceByKey(key);
+                            if (!source) return null;
+
+                            const record = obj(sourceDrafts[key]);
+                            const attached = !!s(record.value);
+                            const connectedOnly =
+                              key === "instagram" &&
+                              !attached &&
+                              instagramMeta.connected;
+
+                            return (
+                              <SourceAction
+                                key={key}
+                                source={source}
+                                attached={attached}
+                                connectedOnly={connectedOnly}
+                                onClick={() => openSourceModal(key)}
                               />
-                              {index < attachedSignals.length - 1 ? (
-                                <span className="hidden text-slate-300 sm:inline">·</span>
-                              ) : null}
-                            </div>
-                          ))
-                        ) : (
-                          <>
-                            {VISIBLE_SOURCE_KEYS.map((key, index) => {
-                              const source = sourceByKey(key);
-                              if (!source) return null;
+                            );
+                          })}
+                        </div>
 
-                              const isInstagram = key === "instagram";
-                              const connectedOnly =
-                                isInstagram &&
-                                !s(obj(sourceDrafts[key]).value) &&
-                                instagramMeta.connected;
+                        <div className="mt-4 flex flex-wrap items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={handleVoiceAction}
+                            className={`inline-flex h-[46px] items-center gap-3 rounded-full px-4 text-[14px] font-medium tracking-[-0.02em] transition ${
+                              isListening
+                                ? "bg-rose-50 text-rose-700"
+                                : "bg-white text-slate-700 shadow-[0_10px_24px_-18px_rgba(15,23,42,.14)] hover:text-slate-950"
+                            }`}
+                          >
+                            {isListening ? (
+                              <Square className="h-[14px] w-[14px] fill-current" />
+                            ) : (
+                              <Mic className="h-[17px] w-[17px]" />
+                            )}
+                            <span>
+                              {isListening
+                                ? "Listening..."
+                                : speechSupported
+                                ? "Use voice"
+                                : "Voice unavailable"}
+                            </span>
+                          </button>
 
-                              return (
-                                <div key={key} className="inline-flex items-center gap-5">
-                                  <SourceInlineAction
-                                    source={source}
-                                    attached={false}
-                                    connected={connectedOnly}
-                                    onClick={() => openSourceModal(key)}
-                                  />
-                                  {index < VISIBLE_SOURCE_KEYS.length - 1 ? (
-                                    <span className="hidden text-slate-300 sm:inline">·</span>
-                                  ) : null}
-                                </div>
-                              );
-                            })}
-                          </>
-                        )}
+                          <div className="text-[14px] tracking-[-0.02em] text-slate-400">
+                            {isListening
+                              ? "Describe the business naturally."
+                              : "Write a short business description or attach your sources."}
+                          </div>
+                        </div>
+
+                        {speechError ? (
+                          <div className="mt-3 text-[14px] text-rose-600">
+                            {speechError}
+                          </div>
+                        ) : null}
                       </div>
 
-                      <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-3 text-[13px] tracking-[-0.02em] text-slate-400">
+                      <div className="flex shrink-0 items-center justify-end">
                         <button
                           type="button"
-                          onClick={handleVoiceAction}
-                          className={`inline-flex items-center gap-2 transition ${
-                            isListening
-                              ? "text-rose-600"
-                              : "hover:text-slate-700"
+                          disabled={!canContinue || importingWebsite}
+                          onClick={handleContinue}
+                          className={`group inline-flex h-[56px] items-center gap-3 rounded-full px-7 text-[16px] font-medium tracking-[-0.03em] transition ${
+                            canContinue && !importingWebsite
+                              ? "bg-slate-950 text-white hover:bg-slate-800"
+                              : "bg-[rgba(15,23,42,.10)] text-white/90"
                           }`}
                         >
-                          {isListening ? (
-                            <Square className="h-[13px] w-[13px] fill-current" />
-                          ) : (
-                            <Mic className="h-[14px] w-[14px]" />
-                          )}
                           <span>
-                            {isListening
-                              ? "Listening..."
-                              : speechSupported
-                              ? "Use voice"
-                              : "Voice unavailable"}
+                            {importingWebsite ? "Analyzing..." : "Create draft"}
                           </span>
+
+                          {importingWebsite ? (
+                            <Loader2 className="h-[17px] w-[17px] animate-spin" />
+                          ) : (
+                            <ArrowRight className="h-[17px] w-[17px] transition-transform duration-200 group-hover:translate-x-[2px]" />
+                          )}
                         </button>
-
-                        <span className="hidden sm:inline">·</span>
-
-                        <span>
-                          {isListening
-                            ? "Describe the business naturally."
-                            : "Write a short business description or attach a source."}
-                        </span>
                       </div>
-
-                      {speechError ? (
-                        <div className="mt-3 text-[13px] text-rose-600">
-                          {speechError}
-                        </div>
-                      ) : null}
-                    </div>
-
-                    <div className="flex shrink-0 items-center justify-end">
-                      <button
-                        type="button"
-                        disabled={!canContinue || importingWebsite}
-                        onClick={handleContinue}
-                        className={`group inline-flex h-[50px] items-center gap-3 rounded-full px-5 text-[15px] font-medium tracking-[-0.03em] transition ${
-                          canContinue && !importingWebsite
-                            ? "bg-slate-950 text-white hover:bg-slate-800"
-                            : "bg-[rgba(15,23,42,.10)] text-white/90"
-                        }`}
-                      >
-                        <span>
-                          {importingWebsite ? "Analyzing..." : "Create draft"}
-                        </span>
-
-                        {importingWebsite ? (
-                          <Loader2 className="h-[16px] w-[16px] animate-spin" />
-                        ) : (
-                          <ArrowRight className="h-[16px] w-[16px] transition-transform duration-200 group-hover:translate-x-[2px]" />
-                        )}
-                      </button>
                     </div>
                   </div>
                 </div>
