@@ -9,6 +9,8 @@ import {
   isWebsiteBarrierWarning,
   sanitizeExtractedBusinessName,
   sanitizeExtractedBusinessSummary,
+  sanitizeExtractedContactValue,
+  sanitizeExtractedAddress,
 } from "../state/profile.js";
 import { UUID_RE } from "./constants.js";
 
@@ -645,6 +647,17 @@ export function buildSafeUiProfile({
       profile.website ||
       (sourceType === "website" ? sourceUrl : "")
   );
+  const safePhone = sanitizeExtractedContactValue(
+    profile.primaryPhone || profile.phone,
+    "phone"
+  );
+  const safeEmail = sanitizeExtractedContactValue(
+    profile.primaryEmail || profile.email,
+    "email"
+  );
+  const safeAddress = sanitizeExtractedAddress(
+    profile.primaryAddress || profile.address
+  );
 
   const safeName = barrierOnly
     ? ""
@@ -716,9 +729,15 @@ export function buildSafeUiProfile({
     description: safeSummaryLong || safeSummaryShort,
     websiteUrl: safeWebsiteUrl,
     website: safeWebsiteUrl,
+    primaryPhone: safePhone,
+    phone: safePhone,
+    primaryEmail: safeEmail,
+    email: safeEmail,
+    primaryAddress: safeAddress,
+    address: safeAddress,
     mainLanguage: safeMainLanguage,
     primaryLanguage: safePrimaryLanguage,
-    language: safeMainLanguage || s(profile.language),
+    language: safeMainLanguage || s(profile.language || "en"),
     reviewRequired: !!reviewRequired,
     reviewFlags: arr(reviewFlags),
     fieldConfidence: obj(fieldConfidence),

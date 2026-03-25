@@ -6,7 +6,7 @@ export function TinyLabel({ children, className = "" }) {
   return (
     <div
       className={cx(
-        "inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/78 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 backdrop-blur-[10px]",
+        "inline-flex items-center gap-2 rounded-full bg-white/78 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500",
         className
       )}
     >
@@ -22,15 +22,15 @@ export function TinyChip({
 }) {
   const toneClass =
     tone === "warn"
-      ? "border-amber-200/80 bg-amber-50/90 text-amber-800"
+      ? "bg-amber-50 text-amber-800"
       : tone === "success"
-        ? "border-emerald-200/80 bg-emerald-50/90 text-emerald-700"
-        : "border-white/70 bg-white/74 text-slate-600";
+        ? "bg-emerald-50 text-emerald-700"
+        : "bg-white/76 text-slate-600";
 
   return (
     <div
       className={cx(
-        "inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-medium backdrop-blur-[10px]",
+        "inline-flex items-center rounded-full px-3 py-1.5 text-[11px] font-medium",
         toneClass,
         className
       )}
@@ -58,7 +58,7 @@ export function GhostButton({
         "inline-flex h-11 items-center justify-center gap-2 rounded-full px-4 text-sm font-medium transition",
         active
           ? "bg-slate-950 text-white shadow-[0_16px_34px_-22px_rgba(15,23,42,.65)] hover:bg-slate-800"
-          : "border border-white/75 bg-white/78 text-slate-700 backdrop-blur-[10px] hover:border-slate-200 hover:bg-white hover:text-slate-950",
+          : "bg-white/82 text-slate-700 hover:bg-white hover:text-slate-950",
         disabled ? "cursor-not-allowed opacity-50" : "",
         className
       )}
@@ -76,13 +76,8 @@ export function MetricCard({
   className = "",
 }) {
   return (
-    <div
-      className={cx(
-        "rounded-[26px] border border-white/72 bg-white/78 px-4 py-5 text-left shadow-[0_18px_40px_-34px_rgba(15,23,42,.42)] backdrop-blur-[12px]",
-        className
-      )}
-    >
-      <div className="text-[28px] font-semibold tracking-[-0.05em] text-slate-950 sm:text-[32px]">
+    <div className={cx("min-w-0", className)}>
+      <div className="text-[30px] font-semibold tracking-[-0.05em] text-slate-950 sm:text-[34px]">
         {value}
       </div>
       <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
@@ -95,26 +90,20 @@ export function MetricCard({
   );
 }
 
-export function StagePanel({
+export function StageSection({
   children,
   className = "",
-  tone = "default",
+  border = true,
 }) {
-  const toneClass =
-    tone === "subtle"
-      ? "bg-[rgba(255,255,255,0.58)]"
-      : "bg-[rgba(255,255,255,0.74)]";
-
   return (
-    <div
+    <section
       className={cx(
-        "rounded-[30px] border border-white/72 px-5 py-5 shadow-[0_20px_44px_-34px_rgba(15,23,42,.34)] backdrop-blur-[14px] sm:px-6 sm:py-6",
-        toneClass,
+        border ? "border-t border-slate-200/80 pt-6 first:border-t-0 first:pt-0" : "",
         className
       )}
     >
       {children}
-    </div>
+    </section>
   );
 }
 
@@ -153,6 +142,6 @@ export default {
   TinyChip,
   GhostButton,
   MetricCard,
-  StagePanel,
+  StageSection,
   SectionHeading,
 };

@@ -3,8 +3,8 @@ import { ArrowRight, Plus } from "lucide-react";
 import SetupStudioStageShell from "../components/SetupStudioStageShell.jsx";
 import {
   GhostButton,
-  SectionHeading,
-  StagePanel,
+  MetricCard,
+  StageSection,
   TinyChip,
   TinyLabel,
 } from "../components/SetupStudioUi.jsx";
@@ -68,95 +68,73 @@ export default function SetupStudioServiceStage({
       title="Set the first service shape."
       body="Keep this compact. One believable service is enough to move forward."
     >
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
-        <div className="space-y-4">
-          <StagePanel className="space-y-5">
-            <div className="flex flex-wrap items-center gap-2">
-              <TinyLabel>Service layer</TinyLabel>
-              <TinyChip>{serviceCount} current</TinyChip>
-              {hasSuggestion ? <TinyChip tone="success">Suggestion ready</TinyChip> : null}
-            </div>
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_220px]">
+        <div className="max-w-[900px]">
+          <div className="flex flex-wrap items-center gap-2">
+            <TinyLabel>Service layer</TinyLabel>
+            <TinyChip>{serviceCount} current</TinyChip>
+            {hasSuggestion ? <TinyChip tone="success">Suggestion ready</TinyChip> : null}
+          </div>
 
-            {hasSuggestion ? (
-              <div className="rounded-[24px] bg-white/72 px-4 py-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                  Suggested service
-                </div>
-                <div className="mt-2 text-[22px] font-semibold tracking-[-0.04em] text-slate-950">
-                  {serviceSuggestionTitle}
-                </div>
+          {hasSuggestion ? (
+            <StageSection className="mt-7">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                Suggested service
               </div>
-            ) : null}
+              <div className="mt-2 text-[28px] font-semibold tracking-[-0.04em] text-slate-950">
+                {serviceSuggestionTitle}
+              </div>
+            </StageSection>
+          ) : null}
 
-            <div className="flex flex-wrap gap-3">
-              <GhostButton
-                active
-                icon={Plus}
-                onClick={onCreateSeed}
-                disabled={isCreating || (!hasSuggestion && serviceCount === 0)}
-              >
-                {isCreating ? "Creating..." : serviceCount ? "Add seed" : "Create seed"}
-              </GhostButton>
-              <GhostButton icon={ArrowRight} onClick={onSkip}>
-                {serviceCount ? "Continue" : "Skip"}
-              </GhostButton>
-            </div>
-          </StagePanel>
-
-          <StagePanel className="space-y-4">
-            <SectionHeading
-              label="Current"
-              title={
-                serviceCount
-                  ? "Visible services"
-                  : "No service has been saved yet"
-              }
-              body={
-                serviceCount
-                  ? "These are the current service seeds."
-                  : "You can keep moving and refine this later."
-              }
-            />
-
+          <StageSection className="mt-7">
             {serviceCount ? (
-              <div className="grid gap-3 md:grid-cols-2">
-                {normalizedServices.slice(0, 6).map((item) => (
-                  <div
-                    key={item.id}
-                    className="rounded-[24px] bg-white/72 px-4 py-4"
-                  >
-                    <div className="text-[18px] font-semibold tracking-[-0.03em] text-slate-950">
-                      {item.title}
-                    </div>
-                    <div className="mt-2 text-sm leading-6 text-slate-600">
-                      {truncate(item.description, 180) || "No description yet."}
-                    </div>
+              normalizedServices.slice(0, 6).map((item) => (
+                <div
+                  key={item.id}
+                  className="border-t border-slate-200/80 py-4 first:border-t-0 first:pt-0"
+                >
+                  <div className="text-[18px] font-semibold tracking-[-0.03em] text-slate-950">
+                    {item.title}
                   </div>
-                ))}
-              </div>
+                  <div className="mt-2 max-w-[760px] text-sm leading-6 text-slate-600">
+                    {truncate(item.description, 180) || "No description yet."}
+                  </div>
+                </div>
+              ))
             ) : (
-              <div className="rounded-[24px] bg-white/70 px-4 py-4 text-sm leading-6 text-slate-500">
-                Start with one simple service if you want the workspace to feel more complete.
+              <div className="text-sm leading-6 text-slate-500">
+                No service has been saved yet.
               </div>
             )}
-          </StagePanel>
+          </StageSection>
+
+          <StageSection className="mt-7 flex flex-wrap gap-3">
+            <GhostButton
+              active
+              icon={Plus}
+              onClick={onCreateSeed}
+              disabled={isCreating || (!hasSuggestion && serviceCount === 0)}
+            >
+              {isCreating ? "Creating..." : serviceCount ? "Add seed" : "Create seed"}
+            </GhostButton>
+            <GhostButton icon={ArrowRight} onClick={onSkip}>
+              {serviceCount ? "Continue" : "Skip"}
+            </GhostButton>
+          </StageSection>
         </div>
 
-        <div className="grid gap-4">
-          <StagePanel tone="subtle">
-            <SectionHeading
-              label="Readiness"
-              title={`${readinessScore}%`}
-              body="Service detail can stay light during setup."
-            />
-          </StagePanel>
-          <StagePanel tone="subtle">
-            <SectionHeading
-              label="Guideline"
-              title="Stay believable"
-              body="Avoid long catalogs. Keep only the first clear offer."
-            />
-          </StagePanel>
+        <div className="grid content-start gap-8">
+          <MetricCard
+            label="Readiness"
+            value={`${readinessScore}%`}
+            detail="Service detail can stay light during setup."
+          />
+          <MetricCard
+            label="Guideline"
+            value="Simple"
+            detail="Avoid long catalogs. Keep only the first clear offer."
+          />
         </div>
       </div>
     </SetupStudioStageShell>

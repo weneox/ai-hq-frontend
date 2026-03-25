@@ -1,10 +1,10 @@
 import { motion } from "framer-motion";
-import { FileText, Globe2, Loader2, Mic } from "lucide-react";
+import { FileText, Loader2, Mic } from "lucide-react";
 
 import SetupStudioStageShell from "../components/SetupStudioStageShell.jsx";
 import {
   MetricCard,
-  StagePanel,
+  StageSection,
   TinyChip,
   TinyLabel,
 } from "../components/SetupStudioUi.jsx";
@@ -29,7 +29,6 @@ function bool(v, d = false) {
 
 function sourceLabel(sourceType = "", lastUrl = "") {
   const x = s(sourceType).toLowerCase();
-
   if (x === "google_maps") return "Google Maps";
   if (x === "instagram") return "Instagram";
   if (x === "linkedin") return "LinkedIn";
@@ -51,11 +50,9 @@ function buildDefaultScanLines({
   if (hasSourceInput) {
     lines.push(sourceName ? `Reading ${sourceName}` : "Reading source");
   }
-
   if (hasManualInput) {
-    lines.push("Blending manual notes");
+    lines.push("Merging manual notes");
   }
-
   if (hasVoiceInput) {
     lines.push("Transcribing voice input");
   }
@@ -109,15 +106,14 @@ export default function SetupStudioScanningStage({
       title="Building your review draft."
       body="A temporary draft is being prepared from the current source and any notes you added."
     >
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
-        <StagePanel className="space-y-6">
+      <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_220px]">
+        <div>
           <div className="flex flex-wrap items-center gap-2">
             <TinyLabel>
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
               In progress
             </TinyLabel>
-            {clippedUrl ? <TinyChip>{clippedUrl}</TinyChip> : null}
-            {!clippedUrl ? <TinyChip>{sourceName}</TinyChip> : null}
+            {clippedUrl ? <TinyChip>{clippedUrl}</TinyChip> : <TinyChip>{sourceName}</TinyChip>}
             {resolvedHasManualInput ? (
               <TinyChip>
                 <FileText className="mr-1 h-3.5 w-3.5" />
@@ -132,7 +128,7 @@ export default function SetupStudioScanningStage({
             ) : null}
           </div>
 
-          <div className="space-y-3">
+          <div className="mt-8 space-y-1">
             {safeLines.map((line, index) => {
               const active = index === activeIndex;
               const done = index < activeIndex;
@@ -143,62 +139,45 @@ export default function SetupStudioScanningStage({
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.03 }}
-                  className={`flex items-center gap-4 rounded-[24px] px-4 py-4 ${
-                    active
-                      ? "bg-slate-950 text-white"
-                      : done
-                        ? "bg-emerald-50 text-emerald-900"
-                        : "bg-white/70 text-slate-500"
-                  }`}
+                  className="grid grid-cols-[42px_minmax(0,1fr)_auto] items-center gap-4 border-t border-slate-200/80 py-4 first:border-t-0 first:pt-0"
                 >
                   <div
-                    className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                    className={`inline-flex h-10 w-10 items-center justify-center rounded-full text-xs font-semibold ${
                       active
-                        ? "bg-white text-slate-950"
+                        ? "bg-slate-950 text-white"
                         : done
-                          ? "bg-emerald-600 text-white"
-                          : "bg-slate-100 text-slate-500"
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-white/78 text-slate-500"
                     }`}
                   >
                     {String(index + 1).padStart(2, "0")}
                   </div>
 
-                  <div className="flex-1 text-sm font-medium">{line}</div>
+                  <div className={`text-sm font-medium ${active ? "text-slate-950" : done ? "text-slate-700" : "text-slate-500"}`}>
+                    {line}
+                  </div>
 
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] opacity-70">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                     {active ? "live" : done ? "done" : "queued"}
                   </div>
                 </motion.div>
               );
             })}
           </div>
-        </StagePanel>
+        </div>
 
-        <div className="grid gap-4">
+        <StageSection border={false} className="grid gap-8 content-start lg:pt-2">
           <MetricCard
             label="Source"
             value={sourceName}
-            detail="The current input stays isolated in its own review session."
+            detail="This run stays isolated in its own review session."
           />
           <MetricCard
             label="Draft"
             value="Temporary"
             detail="Only the reviewed draft can become saved business truth."
           />
-          <StagePanel tone="subtle" className="flex items-start gap-3">
-            <div className="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-slate-100 text-slate-500">
-              <Globe2 className="h-4 w-4" />
-            </div>
-            <div>
-              <div className="text-sm font-medium text-slate-950">
-                Calm review flow
-              </div>
-              <div className="mt-1 text-sm leading-6 text-slate-500">
-                Evidence stays separate. You will refine the editable draft next.
-              </div>
-            </div>
-          </StagePanel>
-        </div>
+        </StageSection>
       </div>
     </SetupStudioStageShell>
   );

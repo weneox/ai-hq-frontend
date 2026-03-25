@@ -3,8 +3,8 @@ import { ArrowRight, Check, ExternalLink, X } from "lucide-react";
 import SetupStudioStageShell from "../components/SetupStudioStageShell.jsx";
 import {
   GhostButton,
-  SectionHeading,
-  StagePanel,
+  MetricCard,
+  StageSection,
   TinyChip,
   TinyLabel,
 } from "../components/SetupStudioUi.jsx";
@@ -242,16 +242,16 @@ export default function SetupStudioKnowledgeStage({
       title="Keep only the signals that should survive."
       body="Approve what feels true. Reject what is generic, noisy, or weak."
     >
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
-        <div className="space-y-4">
-          <StagePanel className="space-y-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <TinyLabel>Knowledge review</TinyLabel>
-              {sourceLabel ? <TinyChip>{sourceLabel}</TinyChip> : null}
-              <TinyChip>{items.length} visible</TinyChip>
-            </div>
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_220px]">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <TinyLabel>Knowledge review</TinyLabel>
+            {sourceLabel ? <TinyChip>{sourceLabel}</TinyChip> : null}
+            <TinyChip>{items.length} visible</TinyChip>
+          </div>
 
-            {warningList.length ? (
+          {warningList.length ? (
+            <StageSection className="mt-6">
               <div className="flex flex-wrap gap-2">
                 {warningList.map((warning, index) => (
                   <TinyChip key={`${warning}-${index}`} tone="warn">
@@ -259,129 +259,123 @@ export default function SetupStudioKnowledgeStage({
                   </TinyChip>
                 ))}
               </div>
-            ) : null}
-          </StagePanel>
+            </StageSection>
+          ) : null}
 
-          {items.length ? (
-            items.map((item) => {
-              const busy = !!actingId &&
-                [item.actionId, item.candidateId, item.candidateUuid, item.rowId]
-                  .map((value) => s(value))
-                  .filter(Boolean)
-                  .includes(actingId);
+          <StageSection className="mt-6">
+            {items.length ? (
+              items.map((item) => {
+                const busy = !!actingId &&
+                  [item.actionId, item.candidateId, item.candidateUuid, item.rowId]
+                    .map((value) => s(value))
+                    .filter(Boolean)
+                    .includes(actingId);
 
-              return (
-                <StagePanel key={item.rowId} className="space-y-4">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <TinyChip>{groupLabel(item.category)}</TinyChip>
-                    {item.confidenceLabel ? (
-                      <TinyChip>{item.confidenceLabel}</TinyChip>
-                    ) : null}
-                    {item.source ? <TinyChip>{item.source}</TinyChip> : null}
-                  </div>
+                return (
+                  <div
+                    key={item.rowId}
+                    className="border-t border-slate-200/80 py-5 first:border-t-0 first:pt-0"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <TinyChip>{groupLabel(item.category)}</TinyChip>
+                      {item.confidenceLabel ? (
+                        <TinyChip>{item.confidenceLabel}</TinyChip>
+                      ) : null}
+                      {item.source ? <TinyChip>{item.source}</TinyChip> : null}
+                    </div>
 
-                  <div>
-                    <div className="text-[22px] font-semibold tracking-[-0.04em] text-slate-950">
+                    <div className="mt-4 text-[22px] font-semibold tracking-[-0.04em] text-slate-950">
                       {item.title}
                     </div>
-                    <div className="mt-2 text-sm leading-7 text-slate-600">
+                    <div className="mt-2 max-w-[760px] text-sm leading-7 text-slate-600">
                       {item.value || "No detail was extracted for this item."}
                     </div>
-                  </div>
 
-                  <div className="flex flex-wrap items-center gap-3">
-                    <GhostButton
-                      active
-                      icon={Check}
-                      disabled={busy}
-                      onClick={() =>
-                        onApproveKnowledge?.({
-                          ...item,
-                          id: item.actionId,
-                          actionId: item.actionId,
-                          rowId: item.rowId,
-                          candidateId:
-                            item.candidateUuid ||
-                            item.candidateId ||
-                            item.actionId,
-                          candidateUuid: item.candidateUuid,
-                        })
-                      }
-                    >
-                      {busy ? "Saving..." : "Approve"}
-                    </GhostButton>
-
-                    <GhostButton
-                      icon={X}
-                      disabled={busy}
-                      onClick={() =>
-                        onRejectKnowledge?.({
-                          ...item,
-                          id: item.actionId,
-                          actionId: item.actionId,
-                          rowId: item.rowId,
-                          candidateId:
-                            item.candidateUuid ||
-                            item.candidateId ||
-                            item.actionId,
-                          candidateUuid: item.candidateUuid,
-                        })
-                      }
-                    >
-                      Reject
-                    </GhostButton>
-
-                    {item.evidenceUrl ? (
-                      <a
-                        href={item.evidenceUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 text-sm font-medium text-slate-600 transition hover:text-slate-950"
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                      <GhostButton
+                        active
+                        icon={Check}
+                        disabled={busy}
+                        onClick={() =>
+                          onApproveKnowledge?.({
+                            ...item,
+                            id: item.actionId,
+                            actionId: item.actionId,
+                            rowId: item.rowId,
+                            candidateId:
+                              item.candidateUuid ||
+                              item.candidateId ||
+                              item.actionId,
+                            candidateUuid: item.candidateUuid,
+                          })
+                        }
                       >
-                        Evidence
-                        <ExternalLink className="h-4 w-4" />
-                      </a>
-                    ) : null}
-                  </div>
-                </StagePanel>
-              );
-            })
-          ) : (
-            <StagePanel className="text-center">
-              <div className="text-base font-semibold text-slate-900">
-                No strong review items yet
-              </div>
-              <div className="mt-2 text-sm leading-6 text-slate-500">
-                Continue once the draft itself looks right.
-              </div>
-            </StagePanel>
-          )}
+                        {busy ? "Saving..." : "Approve"}
+                      </GhostButton>
 
-          <div className="flex flex-wrap gap-3">
+                      <GhostButton
+                        icon={X}
+                        disabled={busy}
+                        onClick={() =>
+                          onRejectKnowledge?.({
+                            ...item,
+                            id: item.actionId,
+                            actionId: item.actionId,
+                            rowId: item.rowId,
+                            candidateId:
+                              item.candidateUuid ||
+                              item.candidateId ||
+                              item.actionId,
+                            candidateUuid: item.candidateUuid,
+                          })
+                        }
+                      >
+                        Reject
+                      </GhostButton>
+
+                      {item.evidenceUrl ? (
+                        <a
+                          href={item.evidenceUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-sm font-medium text-slate-600 transition hover:text-slate-950"
+                        >
+                          Evidence
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="text-sm leading-6 text-slate-500">
+                No strong review items yet.
+              </div>
+            )}
+          </StageSection>
+
+          <StageSection className="mt-6 flex flex-wrap gap-3">
             <GhostButton active icon={ArrowRight} onClick={onNext}>
               Continue
             </GhostButton>
             <GhostButton icon={ExternalLink} onClick={onToggleKnowledge}>
               Hide review
             </GhostButton>
-          </div>
+          </StageSection>
         </div>
 
-        <div className="grid gap-4">
-          <StagePanel tone="subtle">
-            <SectionHeading
-              label="Quality"
-              title={`${avgConfidence}% average confidence`}
-              body="Use confidence as a hint, not a rule."
-            />
-          </StagePanel>
-          <StagePanel tone="subtle">
-            <SectionHeading
-              label="Goal"
-              title="Small, clean memory"
-              body="The business twin should remember only durable facts."
-            />
-          </StagePanel>
+        <div className="grid content-start gap-8">
+          <MetricCard
+            label="Average confidence"
+            value={`${avgConfidence}%`}
+            detail="Use confidence as a hint, not a rule."
+          />
+          <MetricCard
+            label="Goal"
+            value="Clean"
+            detail="Keep only durable facts that should shape runtime."
+          />
         </div>
       </div>
     </SetupStudioStageShell>
