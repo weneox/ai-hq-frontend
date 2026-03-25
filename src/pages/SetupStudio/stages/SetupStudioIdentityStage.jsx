@@ -97,7 +97,7 @@ export default function SetupStudioIdentityStage({
     <SetupStudioStageShell
       eyebrow="identity"
       title="Shape one clean business identity."
-      body="Keep the draft specific. Evidence stays secondary."
+      body="Keep the draft specific. Open the review workspace to compare proposed truth against observed evidence."
     >
       <div className="max-w-[920px]">
         <div className="flex flex-wrap items-center gap-2">
@@ -181,7 +181,7 @@ export default function SetupStudioIdentityStage({
             Continue
           </GhostButton>
           <GhostButton icon={PencilLine} onClick={onToggleRefine}>
-            Review draft
+            Open review workspace
           </GhostButton>
         </StageSection>
       </div>

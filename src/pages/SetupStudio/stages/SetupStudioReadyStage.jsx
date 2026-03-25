@@ -51,7 +51,7 @@ export default function SetupStudioReadyStage({
     <SetupStudioStageShell
       eyebrow="ready"
       title="The draft is ready for review."
-      body="It stays temporary until you confirm the reviewed draft."
+      body="It stays temporary until you confirm the reviewed truth inside the review workspace."
       align="center"
     >
       <div className="mx-auto max-w-[900px]">
@@ -61,7 +61,7 @@ export default function SetupStudioReadyStage({
         </div>
 
         <div className="mx-auto mt-5 max-w-[620px] text-[18px] leading-8 text-slate-600">
-          Review once more, confirm the business twin, then continue into the workspace.
+          Review the proposed fields against visible evidence, finalize the reviewed truth, then continue into the workspace.
         </div>
 
         <StageSection border={false} className="mt-10 grid gap-8 sm:grid-cols-3 text-left">
@@ -84,7 +84,7 @@ export default function SetupStudioReadyStage({
 
         <StageSection className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <GhostButton icon={PencilLine} onClick={onToggleRefine}>
-            Review draft
+            Open review workspace
           </GhostButton>
           {hasKnowledge ? (
             <GhostButton icon={BadgeCheck} onClick={onToggleKnowledge}>

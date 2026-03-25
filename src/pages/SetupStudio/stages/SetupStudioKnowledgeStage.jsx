@@ -240,7 +240,7 @@ export default function SetupStudioKnowledgeStage({
     <SetupStudioStageShell
       eyebrow="knowledge"
       title="Keep only the signals that should survive."
-      body="Approve what feels true. Reject what is generic, noisy, or weak."
+      body="Approve what feels true. Reject what is generic, noisy, or weak, then finalize from the review workspace."
     >
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_220px]">
         <div>

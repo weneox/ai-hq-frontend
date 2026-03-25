@@ -401,6 +401,7 @@ export default function SetupStudioScene({
                   onClose={onToggleRefine}
                   reviewDraft={reviewDraft}
                   reviewSources={reviewSources}
+                  reviewSyncState={reviewSyncState}
                 />
               </div>
             </div>
@@ -546,6 +547,7 @@ export default function SetupStudioScene({
                 onClose={onToggleRefine}
                 reviewDraft={reviewDraft}
                 reviewSources={reviewSources}
+                reviewSyncState={reviewSyncState}
               />
             </div>
           </div>
