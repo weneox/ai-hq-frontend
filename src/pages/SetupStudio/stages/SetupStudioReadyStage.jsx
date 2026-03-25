@@ -29,6 +29,7 @@ export default function SetupStudioReadyStage({
   hasKnowledge,
   onToggleRefine,
   onToggleKnowledge,
+  onOpenTruth,
   onOpenWorkspace,
 }) {
   const readinessScore = num(meta?.readinessScore, 0);
@@ -91,6 +92,9 @@ export default function SetupStudioReadyStage({
               Review knowledge
             </GhostButton>
           ) : null}
+          <GhostButton onClick={onOpenTruth}>
+            View approved truth
+          </GhostButton>
           <GhostButton active icon={ArrowRight} onClick={onOpenWorkspace}>
             Open workspace
           </GhostButton>

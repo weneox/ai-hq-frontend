@@ -674,10 +674,15 @@ export default function SetupStudioEntryStage({
   discoveryForm,
   businessForm,
   manualSections,
+  hasStoredReview = false,
+  hasApprovedTruth = false,
   onSetBusinessField,
   onSetManualSection,
   onSetDiscoveryField,
   onContinueFlow,
+  onResumeReview,
+  onOpenReviewWorkspace,
+  onOpenTruth,
 }) {
   const textareaRef = useRef(null);
   const recognitionRef = useRef(null);
@@ -1164,6 +1169,52 @@ export default function SetupStudioEntryStage({
               transition={{ duration: 0.24, delay: 0.04 }}
               className="relative mx-auto mt-10 w-full max-w-[1320px]"
             >
+              {hasStoredReview || hasApprovedTruth ? (
+                <div className="mb-4 rounded-[28px] border border-[rgba(15,23,42,.07)] bg-white/82 px-5 py-4 text-left shadow-[0_16px_34px_-28px_rgba(15,23,42,.12)]">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="min-w-0">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                        Existing state
+                      </div>
+                      <div className="mt-1 text-[15px] leading-7 text-slate-600">
+                        Start from Entry, or explicitly resume the existing review and approved truth.
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3">
+                      {hasStoredReview ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={onResumeReview}
+                            className="inline-flex h-[44px] items-center justify-center rounded-full bg-white px-5 text-[14px] font-medium text-slate-700 shadow-[0_10px_24px_-18px_rgba(15,23,42,.12)] transition hover:text-slate-950"
+                          >
+                            Resume review
+                          </button>
+                          <button
+                            type="button"
+                            onClick={onOpenReviewWorkspace}
+                            className="inline-flex h-[44px] items-center justify-center rounded-full bg-white px-5 text-[14px] font-medium text-slate-700 shadow-[0_10px_24px_-18px_rgba(15,23,42,.12)] transition hover:text-slate-950"
+                          >
+                            Open review workspace
+                          </button>
+                        </>
+                      ) : null}
+
+                      {hasApprovedTruth ? (
+                        <button
+                          type="button"
+                          onClick={onOpenTruth}
+                          className="inline-flex h-[44px] items-center justify-center rounded-full bg-white px-5 text-[14px] font-medium text-slate-700 shadow-[0_10px_24px_-18px_rgba(15,23,42,.12)] transition hover:text-slate-950"
+                        >
+                          View approved truth
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
               <div className="relative overflow-hidden rounded-[34px] border border-[rgba(15,23,42,.07)] bg-[linear-gradient(180deg,rgba(255,255,255,.90)_0%,rgba(249,249,250,.84)_100%)] shadow-[0_20px_44px_-30px_rgba(15,23,42,.12)] backdrop-blur-[12px]">
                 <div className="relative px-7 pb-6 pt-7 sm:px-9 sm:pb-7 sm:pt-8">
                   <div className="relative min-h-[108px] text-left sm:min-h-[118px]">

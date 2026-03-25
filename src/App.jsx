@@ -17,6 +17,7 @@ import Leads from "./pages/Leads.jsx";
 import Comments from "./pages/Comments.jsx";
 import Voice from "./pages/Voice.jsx";
 import Login from "./pages/Login.jsx";
+import TruthViewerPage from "./pages/Truth/TruthViewerPage.jsx";
 
 import AdminLogin from "./pages/AdminLogin.jsx";
 import AdminTenants from "./pages/AdminTenants.jsx";
@@ -140,6 +141,7 @@ export default function App() {
           <Route path="leads" element={<Leads />} />
           <Route path="comments" element={<Comments />} />
           <Route path="voice" element={<Voice />} />
+          <Route path="truth" element={<TruthViewerPage />} />
           <Route path="executions" element={<Executions />} />
           <Route path="settings" element={<Settings />} />
           <Route path="analytics" element={<Analytics />} />

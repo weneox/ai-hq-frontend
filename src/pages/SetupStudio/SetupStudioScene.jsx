@@ -152,17 +152,21 @@ export default function SetupStudioScene({
   reviewEvents = [],
   reviewSyncState = {},
   hasVisibleResults,
+  hasStoredReview = false,
+  hasApprovedTruth = false,
   visibleKnowledgeCount = 0,
   visibleServiceCount = 0,
   onSetBusinessField,
   onSetManualSection,
   onSetDiscoveryField,
   onContinueFlow,
+  onResumeReview,
   onSaveBusiness,
   onApproveKnowledge,
   onRejectKnowledge,
   onCreateSuggestedService,
   onOpenWorkspace,
+  onOpenTruth,
   onReloadReviewDraft,
   onRefresh,
   onToggleRefine,
@@ -170,6 +174,7 @@ export default function SetupStudioScene({
   discoveryModeLabel,
 }) {
   const [stage, setStage] = useState("entry");
+  const [entryLocked, setEntryLocked] = useState(true);
 
   const sourceLabel = useMemo(
     () => sourceLabelFromProps(discoveryState, discoveryModeLabel),
@@ -284,6 +289,11 @@ export default function SetupStudioScene({
       return;
     }
 
+     if (entryLocked) {
+      setStage("entry");
+      return;
+    }
+
     if (!hasVisibleResults && !hasAnyReviewContent) {
       setStage("entry");
       return;
@@ -320,6 +330,7 @@ export default function SetupStudioScene({
     visibleKnowledgeCount,
     hasServiceStage,
     showKnowledge,
+    entryLocked,
   ]);
 
   function goNextFromIdentity() {
@@ -367,10 +378,21 @@ export default function SetupStudioScene({
           discoveryForm={discoveryForm}
           businessForm={businessForm}
           manualSections={manualSections}
+          hasStoredReview={hasStoredReview}
+          hasApprovedTruth={hasApprovedTruth}
           onSetBusinessField={onSetBusinessField}
           onSetManualSection={onSetManualSection}
           onSetDiscoveryField={onSetDiscoveryField}
-          onContinueFlow={onContinueFlow}
+          onContinueFlow={() => {
+            setEntryLocked(false);
+            onContinueFlow?.();
+          }}
+          onResumeReview={() => {
+            setEntryLocked(false);
+            onResumeReview?.();
+          }}
+          onOpenReviewWorkspace={onToggleRefine}
+          onOpenTruth={onOpenTruth}
         />
 
         <AnimatePresence>
@@ -506,6 +528,7 @@ export default function SetupStudioScene({
                 hasKnowledge={visibleKnowledgeCount > 0}
                 onToggleRefine={onToggleRefine}
                 onToggleKnowledge={onToggleKnowledge}
+                onOpenTruth={onOpenTruth}
                 onOpenWorkspace={onOpenWorkspace}
               />
             ) : null}

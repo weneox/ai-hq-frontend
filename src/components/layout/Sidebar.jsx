@@ -15,6 +15,7 @@ import {
   Users,
   MessageCircle,
   PhoneCall,
+  ScrollText,
 } from "lucide-react";
 import ExecutiveMark3D from "./ExecutiveMark3D.jsx";
 
@@ -31,6 +32,7 @@ const NAV_ITEMS = [
       { label: "Voice", icon: PhoneCall, to: "/voice", badgeKey: "voiceLive" },
     ],
   },
+  { label: "Business Truth", icon: ScrollText, to: "/truth" },
   { label: "Executions", icon: Orbit, to: "/executions" },
   { label: "Settings", icon: SlidersHorizontal, to: "/settings" },
 ];

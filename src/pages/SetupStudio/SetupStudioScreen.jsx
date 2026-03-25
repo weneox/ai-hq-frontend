@@ -106,6 +106,17 @@ export default function SetupStudioScreen() {
     ...DEFAULT_SETUP_META,
   });
 
+  const hasStoredReview = useMemo(() => {
+    return !!(
+      s(currentReview?.session?.id) ||
+      Object.keys(obj(currentReview?.draft)).length ||
+      arr(currentReview?.sources).length ||
+      arr(currentReview?.bundleSources).length ||
+      s(reviewDraft?.quickSummary) ||
+      Object.keys(obj(reviewDraft?.overview)).length
+    );
+  }, [currentReview, reviewDraft]);
+
   function setBusinessField(key, value) {
     setBusinessForm((prev) => ({
       ...prev,
@@ -461,14 +472,16 @@ export default function SetupStudioScreen() {
   ]);
 
   const scopedCurrentReview = useMemo(() => {
-    if (freshEntryMode || !activeReviewAligned) return createEmptyReviewState();
+    if (hasStoredReview) return currentReview;
+    if (!activeReviewAligned) return createEmptyReviewState();
     return currentReview;
-  }, [freshEntryMode, activeReviewAligned, currentReview]);
+  }, [hasStoredReview, activeReviewAligned, currentReview]);
 
   const scopedReviewDraft = useMemo(() => {
-    if (freshEntryMode || !activeReviewAligned) return createEmptyLegacyDraft();
+    if (hasStoredReview) return reviewDraft;
+    if (!activeReviewAligned) return createEmptyLegacyDraft();
     return reviewDraft;
-  }, [freshEntryMode, activeReviewAligned, reviewDraft]);
+  }, [hasStoredReview, activeReviewAligned, reviewDraft]);
 
   const visibleKnowledgeItems = useMemo(() => {
     if (freshEntryMode) return [];
@@ -766,8 +779,8 @@ export default function SetupStudioScreen() {
 
   useEffect(() => {
     actions.loadData({
-      hydrateReview: false,
-      preserveBusinessForm: false,
+      hydrateReview: true,
+      preserveBusinessForm: true,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -868,6 +881,8 @@ export default function SetupStudioScreen() {
       reviewEvents={visibleEvents}
       reviewSyncState={reviewSyncState}
       hasVisibleResults={hasVisibleResults}
+      hasStoredReview={hasStoredReview}
+      hasApprovedTruth={!!meta.setupCompleted}
       visibleKnowledgeCount={visibleKnowledgeItems.length}
       visibleServiceCount={visibleServiceItems.length}
       onSetBusinessField={setBusinessField}
@@ -875,11 +890,20 @@ export default function SetupStudioScreen() {
       onSetDiscoveryField={setDiscoveryField}
       onScanBusiness={actions.onScanBusiness}
       onContinueFlow={() => actions.onScanBusiness(discoveryForm)}
+      onResumeReview={() =>
+        actions.loadCurrentReview({
+          preserveBusinessForm: true,
+          activateReviewSession: true,
+          activeSourceType: activeSourceScope.sourceType,
+          activeSourceUrl: activeSourceScope.sourceUrl,
+        })
+      }
       onSaveBusiness={actions.onSaveBusiness}
       onApproveKnowledge={actions.onApproveKnowledge}
       onRejectKnowledge={actions.onRejectKnowledge}
       onCreateSuggestedService={actions.onCreateSuggestedService}
       onOpenWorkspace={actions.onOpenWorkspace}
+      onOpenTruth={() => navigate("/truth")}
       onReloadReviewDraft={() =>
         actions.loadCurrentReview({
           preserveBusinessForm: true,
@@ -892,7 +916,7 @@ export default function SetupStudioScreen() {
         actions.loadData({
           silent: true,
           preserveBusinessForm: !freshEntryMode,
-          hydrateReview: !freshEntryMode,
+          hydrateReview: true,
           activeSourceType: activeSourceScope.sourceType,
           activeSourceUrl: activeSourceScope.sourceUrl,
         })
