@@ -55,29 +55,42 @@ function countLogicalLines(value = "") {
     .filter(Boolean).length;
 }
 
-function inputClassName() {
-  return "h-11 w-full max-w-full rounded-2xl border border-slate-200 bg-white px-4 text-[14px] text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-slate-300";
+function inputClassName(needsReview = false) {
+  return [
+    "h-12 w-full max-w-full rounded-[20px] border bg-white/80 px-4 text-[14px] text-slate-950 outline-none transition placeholder:text-slate-400",
+    needsReview
+      ? "border-amber-200 bg-[linear-gradient(180deg,rgba(255,251,235,0.96),rgba(255,255,255,0.92))] shadow-[inset_0_1px_0_rgba(255,255,255,0.86)] focus:border-amber-300"
+      : "border-slate-200/80 focus:border-slate-300",
+  ].join(" ");
 }
 
-function textAreaClassName(minHeightClass = "min-h-[120px]") {
-  return `${minHeightClass} block w-full max-w-full resize-none rounded-[22px] border border-slate-200 bg-white px-4 py-3.5 text-[14px] leading-7 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-slate-300`;
+function textAreaClassName(minHeightClass = "min-h-[120px]", needsReview = false) {
+  return [
+    minHeightClass,
+    "block w-full max-w-full resize-none rounded-[22px] border px-4 py-3.5 text-[14px] leading-7 text-slate-950 outline-none transition placeholder:text-slate-400",
+    needsReview
+      ? "border-amber-200 bg-[linear-gradient(180deg,rgba(255,251,235,0.96),rgba(255,255,255,0.92))] shadow-[inset_0_1px_0_rgba(255,255,255,0.86)] focus:border-amber-300"
+      : "border-slate-200/80 bg-white/80 focus:border-slate-300",
+  ].join(" ");
 }
 
-function labelClassName() {
-  return "mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400";
+function needsReview(value = "") {
+  return !s(value);
 }
 
-function MicroLabel({ icon: Icon, children, tone = "default" }) {
+function CanvasChip({ icon: Icon, children, tone = "default" }) {
   const toneClass =
     tone === "warn"
-      ? "border-amber-200 bg-amber-50 text-amber-700"
+      ? "border-amber-200/90 bg-amber-50/90 text-amber-700"
       : tone === "success"
-        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-        : "border-slate-200 bg-slate-50 text-slate-500";
+        ? "border-emerald-200/90 bg-emerald-50/90 text-emerald-700"
+        : tone === "danger"
+          ? "border-rose-200/90 bg-rose-50/90 text-rose-700"
+          : "border-slate-200/90 bg-white/76 text-slate-600";
 
   return (
     <div
-      className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] ${toneClass}`}
+      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] ${toneClass}`}
     >
       {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
       {children}
@@ -85,103 +98,88 @@ function MicroLabel({ icon: Icon, children, tone = "default" }) {
   );
 }
 
-function Section({ title, children, className = "", right = null }) {
+function StatPill({ label, value }) {
   return (
-    <section
-      className={`min-w-0 rounded-[24px] border border-slate-200 bg-white ${className}`}
-    >
-      <div className="flex min-w-0 items-center justify-between gap-4 border-b border-slate-200 px-4 py-3.5">
-        <div className="min-w-0 text-sm font-semibold text-slate-950">
-          {title}
-        </div>
-        {right}
-      </div>
-
-      <div className="min-w-0 px-4 py-4">{children}</div>
-    </section>
+    <div className="rounded-full border border-slate-200/80 bg-white/70 px-3 py-1.5 text-[11px] font-medium text-slate-600">
+      <span className="font-semibold text-slate-900">{value}</span> {label}
+    </div>
   );
 }
 
-function SnapshotRow({ label, value, provenance = "" }) {
+function SectionDivider({ title, subtitle = "" }) {
   return (
-    <div className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-3">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-        {label || "Field"}
-      </div>
-      <div className="mt-1.5 break-words text-sm leading-6 text-slate-700">
-        {value || "-"}
-      </div>
-      {provenance ? (
-        <div className="mt-2 break-words text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">
-          {provenance}
+    <div className="border-t border-slate-200/80 pt-8">
+      <div className="max-w-[720px]">
+        <div className="text-[12px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+          {title}
         </div>
+        {subtitle ? (
+          <div className="mt-2 text-sm leading-7 text-slate-500">{subtitle}</div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function FieldHeader({ label, needsAttention = false, hint = "" }) {
+  return (
+    <div className="mb-2.5 flex items-center justify-between gap-3">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+        {label}
+      </div>
+      {needsAttention ? (
+        <div className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-700">
+          Needs review
+        </div>
+      ) : hint ? (
+        <div className="text-[11px] text-slate-400">{hint}</div>
       ) : null}
     </div>
   );
 }
 
-function KeyFactRow({ icon: Icon, label, value }) {
+function SnapshotLine({ label, value, provenance = "" }) {
   return (
-    <div className="flex min-w-0 items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-3">
-      <div className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500">
-        <Icon className="h-4 w-4" />
-      </div>
-
-      <div className="min-w-0">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-          {label}
-        </div>
-        <div className="mt-1 break-words text-sm leading-6 text-slate-700">
-          {value}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function SectionHeader({ title, count, hint }) {
-  return (
-    <div className="mb-2 flex min-w-0 items-center justify-between gap-3">
+    <div className="grid gap-2 border-b border-slate-200/70 py-3 last:border-b-0 md:grid-cols-[160px_minmax(0,1fr)]">
       <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-        {title}
+        {label || "Field"}
       </div>
-      <div className="text-right text-[11px] text-slate-400">
-        {count} line{count === 1 ? "" : "s"}
-        {hint ? ` · ${hint}` : ""}
+      <div className="min-w-0">
+        <div className="break-words text-sm leading-7 text-slate-700">{value || "-"}</div>
+        {provenance ? (
+          <div className="mt-1 text-[11px] uppercase tracking-[0.14em] text-slate-400">
+            {provenance}
+          </div>
+        ) : null}
       </div>
     </div>
   );
 }
 
-function EmptySectionHint({ text }) {
-  return <div className="mt-2 text-xs leading-6 text-slate-400">{text}</div>;
+function SourceLine({ label, url, role }) {
+  return (
+    <div className="border-b border-slate-200/70 py-3 last:border-b-0">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="text-sm font-medium text-slate-900">{label || "Source"}</div>
+        {role ? <CanvasChip tone="success">{role}</CanvasChip> : null}
+      </div>
+      {url ? (
+        <div className="mt-1 break-all text-sm text-slate-500">{url}</div>
+      ) : null}
+    </div>
+  );
 }
 
-function FormatRow({ icon: Icon, title, value }) {
+function FormatHint({ icon: Icon, title, value }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-3">
-      <div className="flex items-center gap-2 text-slate-900">
+    <div className="flex items-start gap-3 border-b border-slate-200/70 py-3 last:border-b-0">
+      <div className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl bg-white/80 text-slate-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)]">
         <Icon className="h-4 w-4" />
-        <span className="text-sm font-medium">{title}</span>
       </div>
-      <div className="mt-1.5 text-sm text-slate-600">{value}</div>
-    </div>
-  );
-}
-
-function TonePill({ children, tone = "default" }) {
-  const toneClass =
-    tone === "warn"
-      ? "border-amber-200 bg-amber-50 text-amber-700"
-      : tone === "danger"
-        ? "border-rose-200 bg-rose-50 text-rose-700"
-        : "border-slate-200 bg-slate-50 text-slate-600";
-
-  return (
-    <div
-      className={`rounded-full border px-3 py-1.5 text-[11px] font-medium ${toneClass}`}
-    >
-      {children}
+      <div>
+        <div className="text-sm font-medium text-slate-900">{title}</div>
+        <div className="mt-1 text-sm text-slate-500">{value}</div>
+      </div>
     </div>
   );
 }
@@ -243,60 +241,22 @@ export default function SetupStudioRefineModal({
       role: sourceRoleLabel(item),
     }))
     .filter((item) => item.label || item.url)
-    .slice(0, 5);
-
-  const keyFacts = [
-    {
-      icon: Globe2,
-      label: "Website",
-      value: s(form.websiteUrl || overview.websiteUrl),
-    },
-    {
-      icon: Phone,
-      label: "Phone",
-      value: s(form.primaryPhone || overview.primaryPhone),
-    },
-    {
-      icon: Mail,
-      label: "Email",
-      value: s(form.primaryEmail || overview.primaryEmail),
-    },
-    {
-      icon: MapPin,
-      label: "Address",
-      value: s(form.primaryAddress || overview.primaryAddress),
-    },
-  ].filter((item) => item.value);
-
-  const metaStats = [
-    {
-      label: "Services",
-      value: String(serviceCount),
-    },
-    {
-      label: "FAQ",
-      value: String(faqCount),
-    },
-    {
-      label: "Warnings",
-      value: String(warnings.length),
-    },
-  ];
+    .slice(0, 6);
 
   const completenessItems = [
-    {
-      label: "Filled",
-      value: s(completeness.filledFields || completeness.filled || ""),
-    },
-    {
-      label: "Missing",
-      value: s(completeness.missingFields || completeness.missing || ""),
-    },
-    {
-      label: "Status",
-      value: s(completeness.label || completeness.status || ""),
-    },
-  ].filter((item) => item.value);
+    s(completeness.filledFields || completeness.filled),
+    s(completeness.missingFields || completeness.missing),
+    s(completeness.label || completeness.status),
+  ].filter(Boolean);
+
+  const attentionCount = [
+    needsReview(form.companyName),
+    needsReview(form.websiteUrl),
+    needsReview(form.primaryPhone),
+    needsReview(form.primaryEmail),
+    needsReview(form.primaryAddress),
+    needsReview(form.description),
+  ].filter(Boolean).length;
 
   return (
     <motion.div
@@ -304,31 +264,40 @@ export default function SetupStudioRefineModal({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 14, scale: 0.985 }}
       transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-      className="relative my-2 flex w-full max-w-[1120px] max-w-full flex-col overflow-hidden overflow-x-hidden rounded-[30px] border border-slate-200 bg-[#f6f6f7] shadow-[0_24px_60px_rgba(15,23,42,.14)] max-h-[calc(100vh-1rem)] sm:my-4 sm:max-h-[calc(100vh-2rem)]"
+      className="relative my-2 flex w-full max-w-[1180px] flex-col overflow-hidden rounded-[34px] border border-slate-200/90 bg-[linear-gradient(180deg,#fbfbfb_0%,#f4f4f5_100%)] shadow-[0_32px_90px_rgba(15,23,42,.16)] max-h-[calc(100vh-1rem)] sm:my-4 sm:max-h-[calc(100vh-2rem)]"
     >
-      <div className="sticky top-0 z-10 border-b border-slate-200 bg-[#f6f6f7] px-5 py-4 sm:px-6">
-        <div className="flex min-w-0 items-start justify-between gap-4">
-          <div className="min-w-0 max-w-[760px]">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(820px_circle_at_top_left,rgba(255,255,255,0.88),transparent_38%),radial-gradient(720px_circle_at_100%_0%,rgba(226,232,240,0.36),transparent_34%)]" />
+
+      <div className="sticky top-0 z-10 border-b border-slate-200/80 bg-[rgba(250,250,250,0.88)] px-6 py-5 backdrop-blur-[18px] sm:px-7">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 max-w-[820px]">
             <div className="flex flex-wrap items-center gap-2">
-              <MicroLabel icon={Brain}>Refine draft</MicroLabel>
-              <MicroLabel icon={BadgeCheck} tone="success">
+              <CanvasChip icon={Brain}>Business twin review</CanvasChip>
+              <CanvasChip icon={BadgeCheck} tone="success">
                 Current review draft
-              </MicroLabel>
-              {reviewFlags.length ? (
-                <MicroLabel icon={AlertTriangle} tone="warn">
-                  Review needed
-                </MicroLabel>
+              </CanvasChip>
+              {attentionCount > 0 ? (
+                <CanvasChip icon={AlertTriangle} tone="warn">
+                  {attentionCount} field{attentionCount === 1 ? "" : "s"} need review
+                </CanvasChip>
               ) : null}
             </div>
 
-            <h2 className="mt-4 text-[24px] font-semibold leading-[1.04] tracking-[-0.04em] text-slate-950 sm:text-[30px]">
-              Review and confirm the business draft
+            <h2 className="mt-4 text-[27px] font-semibold leading-[1.02] tracking-[-0.05em] text-slate-950 sm:text-[34px]">
+              Shape one clean business twin before it becomes canonical.
             </h2>
 
-            <p className="mt-2 text-sm leading-7 text-slate-500">
-              This modal now reflects only the current review session draft before
-              finalizing into the canonical business layer.
+            <p className="mt-3 max-w-[760px] text-sm leading-7 text-slate-500">
+              Review the extracted identity, strengthen weak fields, and finalize one continuous
+              business layer instead of editing isolated fragments.
             </p>
+
+            <div className="mt-4 flex flex-wrap gap-2.5">
+              <StatPill label="services" value={serviceCount} />
+              <StatPill label="faq lines" value={faqCount} />
+              <StatPill label="policy lines" value={policyCount} />
+              <StatPill label="warnings" value={warnings.length} />
+            </div>
           </div>
 
           <button
@@ -336,109 +305,117 @@ export default function SetupStudioRefineModal({
             onClick={onClose}
             disabled={savingBusiness}
             aria-label="Close"
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-50"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200/90 bg-white/86 text-slate-600 transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-50"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
-        <div className="grid min-w-0 gap-5 overflow-x-hidden px-5 py-5 sm:px-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-          <form
-            id={FORM_ID}
-            onSubmit={onSaveBusiness}
-            className="min-w-0 space-y-5"
-          >
-            <Section
-              title="Core business identity"
-              right={
-                <div className="flex flex-wrap gap-2">
-                  {metaStats.map((item) => (
-                    <TonePill key={item.label}>
-                      {item.label}: {item.value}
-                    </TonePill>
-                  ))}
+      <div className="relative min-h-0 flex-1 overflow-y-auto">
+        <div className="grid gap-0 px-6 py-6 sm:px-7 xl:grid-cols-[minmax(0,1.28fr)_340px]">
+          <form id={FORM_ID} onSubmit={onSaveBusiness} className="min-w-0 pr-0 xl:pr-10">
+            <div className="space-y-8">
+              <div className="space-y-4">
+                <div className="max-w-[760px]">
+                  <div className="text-[12px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                    Overview
+                  </div>
+                  <div className="mt-3 text-sm leading-7 text-slate-600">
+                    {quickSummary ||
+                      "This review draft is ready for manual confirmation. Fill any weak identity fields before finalizing."}
+                  </div>
                 </div>
-              }
-            >
-              <div className="grid gap-4 md:grid-cols-2">
+
+                {(reviewFlags.length || warnings.length || sources.length) ? (
+                  <div className="flex flex-wrap gap-2">
+                    {reviewFlags.map((item, index) => (
+                      <CanvasChip key={`${item}-${index}`} icon={AlertTriangle} tone="warn">
+                        {item}
+                      </CanvasChip>
+                    ))}
+                    {warnings.slice(0, 2).map((item, index) => (
+                      <CanvasChip key={`${item}-${index}`} icon={Info} tone="danger">
+                        {item}
+                      </CanvasChip>
+                    ))}
+                    {sources.slice(0, 2).map((item, index) => (
+                      <CanvasChip key={`${item.label}-${index}`} icon={Globe2}>
+                        {item.label}
+                      </CanvasChip>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+
+              <SectionDivider
+                title="Core identity"
+                subtitle="Make the essentials feel credible and publishable. Empty fields are surfaced with a softer review treatment instead of separate warning cards."
+              />
+
+              <div className="grid gap-5 md:grid-cols-2">
                 <div className="min-w-0">
-                  <label className={labelClassName()}>Company name</label>
+                  <FieldHeader label="Company name" needsAttention={needsReview(form.companyName)} />
                   <input
                     value={s(form.companyName)}
-                    onChange={(e) =>
-                      onSetBusinessField?.("companyName", e.target.value)
-                    }
-                    className={inputClassName()}
-                    placeholder=""
+                    onChange={(e) => onSetBusinessField?.("companyName", e.target.value)}
+                    className={inputClassName(needsReview(form.companyName))}
+                    placeholder="SaytPro"
                     autoComplete="off"
                   />
                 </div>
 
                 <div className="min-w-0">
-                  <label className={labelClassName()}>Website</label>
+                  <FieldHeader label="Website" needsAttention={needsReview(form.websiteUrl)} />
                   <input
                     value={s(form.websiteUrl)}
-                    onChange={(e) =>
-                      onSetBusinessField?.("websiteUrl", e.target.value)
-                    }
-                    className={inputClassName()}
-                    placeholder=""
+                    onChange={(e) => onSetBusinessField?.("websiteUrl", e.target.value)}
+                    className={inputClassName(needsReview(form.websiteUrl))}
+                    placeholder="https://yourbusiness.com"
                     autoComplete="off"
                   />
                 </div>
-              </div>
 
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
                 <div className="min-w-0">
-                  <label className={labelClassName()}>Primary phone</label>
+                  <FieldHeader label="Primary phone" needsAttention={needsReview(form.primaryPhone)} />
                   <input
                     value={s(form.primaryPhone)}
-                    onChange={(e) =>
-                      onSetBusinessField?.("primaryPhone", e.target.value)
-                    }
-                    className={inputClassName()}
-                    placeholder=""
+                    onChange={(e) => onSetBusinessField?.("primaryPhone", e.target.value)}
+                    className={inputClassName(needsReview(form.primaryPhone))}
+                    placeholder="+994 50 123 45 67"
                     autoComplete="off"
                   />
                 </div>
 
                 <div className="min-w-0">
-                  <label className={labelClassName()}>Primary email</label>
+                  <FieldHeader label="Primary email" needsAttention={needsReview(form.primaryEmail)} />
                   <input
                     value={s(form.primaryEmail)}
-                    onChange={(e) =>
-                      onSetBusinessField?.("primaryEmail", e.target.value)
-                    }
-                    className={inputClassName()}
-                    placeholder=""
+                    onChange={(e) => onSetBusinessField?.("primaryEmail", e.target.value)}
+                    className={inputClassName(needsReview(form.primaryEmail))}
+                    placeholder="hello@yourbusiness.com"
                     autoComplete="off"
                   />
                 </div>
               </div>
 
-              <div className="mt-4 min-w-0">
-                <label className={labelClassName()}>Primary address</label>
+              <div className="min-w-0">
+                <FieldHeader label="Primary address" needsAttention={needsReview(form.primaryAddress)} />
                 <input
                   value={s(form.primaryAddress)}
-                  onChange={(e) =>
-                    onSetBusinessField?.("primaryAddress", e.target.value)
-                  }
-                  className={inputClassName()}
-                  placeholder=""
+                  onChange={(e) => onSetBusinessField?.("primaryAddress", e.target.value)}
+                  className={inputClassName(needsReview(form.primaryAddress))}
+                  placeholder="Baku, Azerbaijan"
                   autoComplete="off"
                 />
               </div>
 
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div className="grid gap-5 md:grid-cols-2">
                 <div className="min-w-0">
-                  <label className={labelClassName()}>Timezone</label>
+                  <FieldHeader label="Timezone" hint="Region context" />
                   <input
                     value={s(form.timezone)}
-                    onChange={(e) =>
-                      onSetBusinessField?.("timezone", e.target.value)
-                    }
+                    onChange={(e) => onSetBusinessField?.("timezone", e.target.value)}
                     className={inputClassName()}
                     placeholder="Asia/Baku"
                     autoComplete="off"
@@ -446,12 +423,10 @@ export default function SetupStudioRefineModal({
                 </div>
 
                 <div className="min-w-0">
-                  <label className={labelClassName()}>Primary language</label>
+                  <FieldHeader label="Primary language" hint="Runtime default" />
                   <select
                     value={s(form.language || "az")}
-                    onChange={(e) =>
-                      onSetBusinessField?.("language", e.target.value)
-                    }
+                    onChange={(e) => onSetBusinessField?.("language", e.target.value)}
                     className={inputClassName()}
                   >
                     <option value="az">Azerbaijani</option>
@@ -462,190 +437,131 @@ export default function SetupStudioRefineModal({
                 </div>
               </div>
 
-              <div className="mt-4 min-w-0">
-                <label className={labelClassName()}>Business summary</label>
+              <div className="min-w-0">
+                <FieldHeader
+                  label="Business summary"
+                  needsAttention={needsReview(form.description)}
+                  hint="What the business does and why it matters"
+                />
                 <textarea
                   value={s(form.description)}
-                  onChange={(e) =>
-                    onSetBusinessField?.("description", e.target.value)
-                  }
-                  className={textAreaClassName("min-h-[150px]")}
-                  placeholder="Describe what the business does and who it serves."
+                  onChange={(e) => onSetBusinessField?.("description", e.target.value)}
+                  className={textAreaClassName("min-h-[172px]", needsReview(form.description))}
+                  placeholder="We help businesses build and automate their digital presence."
                 />
               </div>
-            </Section>
 
-            <Section title="Structured draft">
-              <div className="space-y-5">
+              <SectionDivider
+                title="Structured operating layer"
+                subtitle="Keep this as clean working memory. Use compact, operator-friendly formatting instead of long prose."
+              />
+
+              <div className="space-y-6">
                 <div className="min-w-0">
-                  <SectionHeader
-                    title="Services"
-                    count={serviceCount}
-                    hint="Name | Description"
-                  />
+                  <FieldHeader label="Services" hint={`${serviceCount} line${serviceCount === 1 ? "" : "s"}`} />
                   <textarea
                     value={sections.servicesText}
-                    onChange={(e) =>
-                      onSetManualSection?.("servicesText", e.target.value)
-                    }
-                    className={textAreaClassName("min-h-[120px]")}
-                    placeholder={
-                      "Main service | Short description\nAnother service | Short description"
-                    }
+                    onChange={(e) => onSetManualSection?.("servicesText", e.target.value)}
+                    className={textAreaClassName("min-h-[126px]", !serviceCount)}
+                    placeholder={"Website design | Launch-ready business site\nAutomation setup | CRM, lead capture, and follow-up flows"}
                   />
-                  {serviceCount === 0 ? (
-                    <EmptySectionHint text="Format: Name | Description" />
-                  ) : null}
                 </div>
 
                 <div className="min-w-0">
-                  <SectionHeader
-                    title="FAQ"
-                    count={faqCount}
-                    hint="Question | Answer"
-                  />
+                  <FieldHeader label="FAQ" hint={`${faqCount} line${faqCount === 1 ? "" : "s"}`} />
                   <textarea
                     value={sections.faqsText}
-                    onChange={(e) =>
-                      onSetManualSection?.("faqsText", e.target.value)
-                    }
-                    className={textAreaClassName("min-h-[120px]")}
-                    placeholder={
-                      "Question | Answer\nAnother question | Another answer"
-                    }
+                    onChange={(e) => onSetManualSection?.("faqsText", e.target.value)}
+                    className={textAreaClassName("min-h-[126px]", !faqCount)}
+                    placeholder={"How long does a website launch take? | Usually 2-4 weeks depending on scope\nDo you manage ongoing updates? | Yes, through monthly support retainers"}
                   />
-                  {faqCount === 0 ? (
-                    <EmptySectionHint text="Format: Question | Answer" />
-                  ) : null}
                 </div>
 
                 <div className="min-w-0">
-                  <SectionHeader
-                    title="Policies and notes"
-                    count={policyCount}
-                    hint="Title | Description"
-                  />
+                  <FieldHeader label="Policies and notes" hint={`${policyCount} line${policyCount === 1 ? "" : "s"}`} />
                   <textarea
                     value={sections.policiesText}
-                    onChange={(e) =>
-                      onSetManualSection?.("policiesText", e.target.value)
-                    }
-                    className={textAreaClassName("min-h-[120px]")}
-                    placeholder={
-                      "Policy title | Short explanation\nAnother policy | Another explanation"
-                    }
+                    onChange={(e) => onSetManualSection?.("policiesText", e.target.value)}
+                    className={textAreaClassName("min-h-[126px]", !policyCount)}
+                    placeholder={"Payment terms | 50% upfront, 50% before launch\nSupport window | Client requests answered on business days"}
                   />
-                  {policyCount === 0 ? (
-                    <EmptySectionHint text="Format: Title | Description" />
-                  ) : null}
                 </div>
               </div>
-            </Section>
+            </div>
           </form>
 
-          <div className="min-w-0 space-y-5">
-            <Section title="Draft overview">
-              <div className="space-y-3">
-                {quickSummary ? (
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                      Summary
-                    </div>
-                    <div className="mt-2 break-words text-sm leading-7 text-slate-700">
-                      {quickSummary}
-                    </div>
-                  </div>
-                ) : null}
-
-                {sources.length ? (
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                      Participating sources
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {sources.map((item, index) => (
-                        <TonePill key={`${item.label}-${item.url}-${index}`}>
-                          {item.label}
-                          {item.role ? ` ${item.role}` : ""}
-                        </TonePill>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-
-                {!quickSummary && !sources.length ? (
-                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-500">
-                    The current draft summary will appear here after review hydration.
-                  </div>
-                ) : null}
-              </div>
-            </Section>
-
-            {!!reviewFlags.length || !!warnings.length || !!completenessItems.length ? (
-              <Section title="Review signals">
-                <div className="space-y-3">
+          <aside className="min-w-0 border-t border-slate-200/80 pt-8 xl:border-l xl:border-t-0 xl:pl-10 xl:pt-0">
+            <div className="space-y-8">
+              <div>
+                <div className="text-[12px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                  Review signals
+                </div>
+                <div className="mt-4 space-y-3">
                   {reviewFlags.length ? (
-                    <div>
-                      <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                        Review flags
-                      </div>
-
-                      <div className="flex flex-wrap gap-2">
-                        {reviewFlags.map((item, index) => (
-                          <TonePill key={`${item}-${index}`} tone="warn">
-                            {item}
-                          </TonePill>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {completenessItems.length ? (
-                    <div>
-                      <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                        Completeness
-                      </div>
-
-                      <div className="flex flex-wrap gap-2">
-                        {completenessItems.map((item) => (
-                          <TonePill key={item.label}>{`${item.label}: ${item.value}`}</TonePill>
-                        ))}
-                      </div>
+                    <div className="space-y-2">
+                      {reviewFlags.map((item, index) => (
+                        <div
+                          key={`${item}-${index}`}
+                          className="rounded-[18px] border border-amber-200/90 bg-amber-50/80 px-4 py-3 text-sm leading-6 text-amber-800"
+                        >
+                          {item}
+                        </div>
+                      ))}
                     </div>
                   ) : null}
 
                   {warnings.length ? (
-                    <div>
-                      <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                        Warnings
-                      </div>
+                    <div className="space-y-2">
+                      {warnings.slice(0, 6).map((item, index) => (
+                        <div
+                          key={`${item}-${index}`}
+                          className="rounded-[18px] border border-slate-200/80 bg-white/72 px-4 py-3 text-sm leading-6 text-slate-600"
+                        >
+                          {item}
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
 
-                      <div className="space-y-2">
-                        {warnings.slice(0, 6).map((item, index) => (
-                          <div
-                            key={`${item}-${index}`}
-                            className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-sm leading-6 text-amber-800"
-                          >
-                            <Info className="mt-0.5 h-4 w-4 shrink-0" />
-                            <span>{item}</span>
-                          </div>
-                        ))}
-                      </div>
+                  {completenessItems.length ? (
+                    <div className="flex flex-wrap gap-2">
+                      {completenessItems.map((item, index) => (
+                        <CanvasChip key={`${item}-${index}`}>{item}</CanvasChip>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {!reviewFlags.length && !warnings.length && !completenessItems.length ? (
+                    <div className="text-sm leading-7 text-slate-500">
+                      No special review signals are active on this draft.
                     </div>
                   ) : null}
                 </div>
-              </Section>
-            ) : null}
-
-            <Section title="Extracted snapshot">
-              <div className="mb-4">
-                <MicroLabel icon={BadgeCheck}>Snapshot</MicroLabel>
               </div>
 
-              <div className="space-y-3">
+              <SectionDivider title="Participating sources" subtitle="Visible context shaping this review session." />
+              <div className="space-y-1">
+                {sources.length ? (
+                  sources.map((item, index) => (
+                    <SourceLine
+                      key={`${item.label}-${item.url}-${index}`}
+                      label={item.label}
+                      url={item.url}
+                      role={item.role}
+                    />
+                  ))
+                ) : (
+                  <div className="text-sm leading-7 text-slate-500">
+                    No participating sources are visible yet.
+                  </div>
+                )}
+              </div>
+
+              <SectionDivider title="Extracted snapshot" subtitle="What the review session currently believes about the business." />
+              <div className="space-y-1">
                 {rows.length ? (
                   rows.slice(0, 8).map((item, index) => (
-                    <SnapshotRow
+                    <SnapshotLine
                       key={`${item.label}-${index}`}
                       label={item.label}
                       value={item.value}
@@ -653,61 +569,32 @@ export default function SetupStudioRefineModal({
                     />
                   ))
                 ) : (
-                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-500">
+                  <div className="text-sm leading-7 text-slate-500">
                     No extracted snapshot is visible yet.
                   </div>
                 )}
               </div>
-            </Section>
 
-            <Section title="Key facts">
-              {keyFacts.length ? (
-                <div className="space-y-3">
-                  {keyFacts.map((item) => (
-                    <KeyFactRow
-                      key={item.label}
-                      icon={item.icon}
-                      label={item.label}
-                      value={item.value}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-500">
-                  Key contact fields are still empty.
-                </div>
-              )}
-            </Section>
-
-            <Section title="Input format">
-              <div className="space-y-3">
-                <FormatRow
-                  icon={FileText}
-                  title="Services"
-                  value="Name | Description"
-                />
-
-                <FormatRow
-                  icon={Sparkles}
-                  title="FAQ"
-                  value="Question | Answer"
-                />
-
-                <FormatRow
-                  icon={BadgeCheck}
-                  title="Policies"
-                  value="Title | Description"
-                />
+              <SectionDivider title="Formatting guide" subtitle="Keep manual structure compact and runtime-friendly." />
+              <div className="space-y-1">
+                <FormatHint icon={FileText} title="Services" value="Name | Description" />
+                <FormatHint icon={Sparkles} title="FAQ" value="Question | Answer" />
+                <FormatHint icon={BadgeCheck} title="Policies" value="Title | Description" />
+                <FormatHint icon={Globe2} title="Business summary" value="One clean description, not marketing fragments." />
+                <FormatHint icon={Phone} title="Phone" value="+994 50 123 45 67" />
+                <FormatHint icon={Mail} title="Email" value="hello@yourbusiness.com" />
+                <FormatHint icon={MapPin} title="Address" value="Baku, Azerbaijan" />
               </div>
-            </Section>
-          </div>
+            </div>
+          </aside>
         </div>
       </div>
 
-      <div className="sticky bottom-0 z-10 border-t border-slate-200 bg-[#f6f6f7] px-5 py-4 sm:px-6">
+      <div className="sticky bottom-0 z-10 border-t border-slate-200/80 bg-[rgba(250,250,250,0.9)] px-6 py-4 backdrop-blur-[18px] sm:px-7">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="text-sm text-slate-500">
-            Confirming will write this reviewed draft into the canonical business layer.
+          <div className="max-w-[680px] text-sm leading-7 text-slate-500">
+            Finalizing will write this reviewed draft into the canonical business layer using the
+            current save flow.
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
@@ -715,7 +602,7 @@ export default function SetupStudioRefineModal({
               type="button"
               onClick={onClose}
               disabled={savingBusiness}
-              className="inline-flex h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-5 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-60"
+              className="inline-flex h-11 items-center justify-center rounded-full border border-slate-200/90 bg-white/86 px-5 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-60"
             >
               Close
             </button>
