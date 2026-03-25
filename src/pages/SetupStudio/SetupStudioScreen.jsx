@@ -753,24 +753,24 @@ export default function SetupStudioScreen() {
       currentDescription={currentDescription}
       discoveryProfileRows={discoveryProfileRows}
       knowledgePreview={knowledgePreview}
-      knowledgeItems={[]}
-      serviceSuggestionTitle=""
+      knowledgeItems={visibleKnowledgeItems}
+      serviceSuggestionTitle={serviceSuggestionTitle}
       studioProgress={studioProgress}
-      services={[]}
+      services={services}
       reviewSources={visibleSources}
       reviewEvents={visibleEvents}
       hasVisibleResults={hasVisibleResults}
-      visibleKnowledgeCount={0}
-      visibleServiceCount={0}
+      visibleKnowledgeCount={visibleKnowledgeItems.length}
+      visibleServiceCount={visibleServiceItems.length}
       onSetBusinessField={setBusinessField}
       onSetManualSection={setManualSection}
       onSetDiscoveryField={setDiscoveryField}
       onScanBusiness={actions.onScanBusiness}
       onContinueFlow={() => actions.onScanBusiness(discoveryForm)}
       onSaveBusiness={actions.onSaveBusiness}
-      onApproveKnowledge={null}
-      onRejectKnowledge={null}
-      onCreateSuggestedService={null}
+      onApproveKnowledge={actions.onApproveKnowledge}
+      onRejectKnowledge={actions.onRejectKnowledge}
+      onCreateSuggestedService={actions.onCreateSuggestedService}
       onOpenWorkspace={actions.onOpenWorkspace}
       onReloadReviewDraft={() =>
         actions.loadCurrentReview({
@@ -790,7 +790,7 @@ export default function SetupStudioScreen() {
         })
       }
       onToggleRefine={() => setShowRefine((prev) => !prev)}
-      onToggleKnowledge={() => {}}
+      onToggleKnowledge={() => setShowKnowledge((prev) => !prev)}
       discoveryModeLabel={discoveryModeLabel}
     />
   );

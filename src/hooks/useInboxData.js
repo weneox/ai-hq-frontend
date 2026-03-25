@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { apiGet, apiPost } from "../api/client.js";
 
 export function useInboxData({ filter, operatorName, navigate }) {
+  const actorName = String(operatorName || "").trim() || "operator";
   const [threads, setThreads] = useState([]);
   const [messages, setMessages] = useState([]);
   const [selectedThread, setSelectedThread] = useState(null);
@@ -142,8 +143,8 @@ export function useInboxData({ filter, operatorName, navigate }) {
       try {
         setBusyAction("assign");
         await apiPost(`/api/inbox/threads/${threadId}/assign`, {
-          assignedTo: operatorName,
-          actor: operatorName,
+          assignedTo: actorName,
+          actor: actorName,
         });
         await loadThreads(threadId);
         await syncSelected(threadId);
@@ -153,7 +154,7 @@ export function useInboxData({ filter, operatorName, navigate }) {
         setBusyAction("");
       }
     },
-    [loadThreads, operatorName, syncSelected]
+    [actorName, loadThreads, syncSelected]
   );
 
   const activateHandoff = useCallback(
@@ -165,8 +166,8 @@ export function useInboxData({ filter, operatorName, navigate }) {
         await apiPost(`/api/inbox/threads/${threadId}/handoff/activate`, {
           reason: "manual_review",
           priority: "high",
-          assignedTo: operatorName,
-          actor: operatorName,
+          assignedTo: actorName,
+          actor: actorName,
         });
         await loadThreads(threadId);
         await syncSelected(threadId);
@@ -176,7 +177,7 @@ export function useInboxData({ filter, operatorName, navigate }) {
         setBusyAction("");
       }
     },
-    [loadThreads, operatorName, syncSelected]
+    [actorName, loadThreads, syncSelected]
   );
 
   const releaseHandoff = useCallback(
@@ -186,7 +187,7 @@ export function useInboxData({ filter, operatorName, navigate }) {
       try {
         setBusyAction("release");
         await apiPost(`/api/inbox/threads/${threadId}/handoff/release`, {
-          actor: operatorName,
+          actor: actorName,
         });
         await loadThreads(threadId);
         await syncSelected(threadId);
@@ -196,7 +197,7 @@ export function useInboxData({ filter, operatorName, navigate }) {
         setBusyAction("");
       }
     },
-    [loadThreads, operatorName, syncSelected]
+    [actorName, loadThreads, syncSelected]
   );
 
   const setThreadStatus = useCallback(
@@ -207,7 +208,7 @@ export function useInboxData({ filter, operatorName, navigate }) {
         setBusyAction(status);
         await apiPost(`/api/inbox/threads/${threadId}/status`, {
           status,
-          actor: operatorName,
+          actor: actorName,
         });
         await loadThreads(threadId);
         await syncSelected(threadId);
@@ -217,7 +218,7 @@ export function useInboxData({ filter, operatorName, navigate }) {
         setBusyAction("");
       }
     },
-    [loadThreads, operatorName, syncSelected]
+    [actorName, loadThreads, syncSelected]
   );
 
   const sendOperatorReply = useCallback(
@@ -230,7 +231,7 @@ export function useInboxData({ filter, operatorName, navigate }) {
         await apiPost(`/api/inbox/threads/${selectedThreadArg.id}/messages`, {
           direction: "outbound",
           senderType: "agent",
-          operatorName,
+          operatorName: actorName,
           messageType: "text",
           text: replyText.trim(),
           releaseHandoff: false,
@@ -248,7 +249,7 @@ export function useInboxData({ filter, operatorName, navigate }) {
         setBusyAction("");
       }
     },
-    [loadThreads, operatorName, syncSelected]
+    [actorName, loadThreads, syncSelected]
   );
 
   const openLeadDetail = useCallback(

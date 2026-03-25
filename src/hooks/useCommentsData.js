@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiGet, apiPost } from "../api/client.js";
 import { mapCommentToUi, s } from "../features/comments/comment-utils.js";
+import { getAppSessionContext } from "../lib/appSession.js";
 
 export function useCommentsData() {
   const [items, setItems] = useState([]);
@@ -12,6 +13,28 @@ export function useCommentsData() {
   const [error, setError] = useState("");
   const [replyDraft, setReplyDraft] = useState("");
   const [actionLoading, setActionLoading] = useState("");
+  const [sessionContext, setSessionContext] = useState({
+    tenantKey: "",
+    actorName: "operator",
+  });
+
+  useEffect(() => {
+    let alive = true;
+
+    getAppSessionContext()
+      .then((next) => {
+        if (!alive) return;
+        setSessionContext({
+          tenantKey: s(next?.tenantKey).toLowerCase(),
+          actorName: s(next?.actorName || "operator"),
+        });
+      })
+      .catch(() => {});
+
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const loadComments = useCallback(async ({ silent = false } = {}) => {
     try {
@@ -21,8 +44,10 @@ export function useCommentsData() {
       setError("");
 
       const params = new URLSearchParams();
-      params.set("tenantKey", "neox");
       params.set("limit", "100");
+      if (sessionContext.tenantKey) {
+        params.set("tenantKey", sessionContext.tenantKey);
+      }
 
       const response = await apiGet(`/api/comments?${params.toString()}`);
       const mapped = Array.isArray(response?.comments)
@@ -36,7 +61,7 @@ export function useCommentsData() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [sessionContext.tenantKey]);
 
   useEffect(() => {
     loadComments();
@@ -112,7 +137,7 @@ export function useCommentsData() {
 
       const j = await apiPost(`/api/comments/${selected.id}/review`, {
         status,
-        actor: "ceo",
+        actor: sessionContext.actorName || "operator",
         note: status === "manual_review" ? "Sent to manual review" : "",
       });
 
@@ -142,7 +167,7 @@ export function useCommentsData() {
 
       const j = await apiPost(`/api/comments/${selected.id}/reply`, {
         replyText,
-        actor: "ceo",
+        actor: sessionContext.actorName || "operator",
         approved: true,
       });
 
@@ -165,7 +190,7 @@ export function useCommentsData() {
       setActionLoading("ignore");
 
       const j = await apiPost(`/api/comments/${selected.id}/ignore`, {
-        actor: "ceo",
+        actor: sessionContext.actorName || "operator",
         note: "Ignored from comments panel",
       });
 

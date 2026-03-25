@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createWsClient } from "../lib/ws.js";
 import {
   listLeads,
@@ -16,6 +16,7 @@ import {
   pickLeadValue,
   prettySource,
 } from "../features/leads/lead-utils.js";
+import { getAppSessionContext } from "../lib/appSession.js";
 
 export function useLeadsData({ requestedLeadId = "", navigate }) {
   const wsRef = useRef(null);
@@ -42,13 +43,42 @@ export function useLeadsData({ requestedLeadId = "", navigate }) {
     followUpAt: "",
     nextAction: "",
   });
+  const [sessionContext, setSessionContext] = useState({
+    tenantKey: "",
+    actorName: "operator",
+  });
 
-  async function loadLeadsData() {
+  useEffect(() => {
+    let alive = true;
+
+    getAppSessionContext()
+      .then((next) => {
+        if (!alive) return;
+        setSessionContext({
+          tenantKey: String(next?.tenantKey || "").trim().toLowerCase(),
+          actorName: String(next?.actorName || "operator").trim() || "operator",
+        });
+      })
+      .catch(() => {});
+
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const actorName = sessionContext.actorName || "operator";
+
+  const loadLeadsData = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
 
-      const j = await listLeads({ tenantKey: "neox" });
+      const params = {};
+      if (sessionContext.tenantKey) {
+        params.tenantKey = sessionContext.tenantKey;
+      }
+
+      const j = await listLeads(params);
       const arr = Array.isArray(j?.leads) ? j.leads : [];
 
       setLeads(arr);
@@ -75,7 +105,7 @@ export function useLeadsData({ requestedLeadId = "", navigate }) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [requestedLeadId, sessionContext.tenantKey]);
 
   async function loadEventsData(leadId) {
     if (!leadId) {
@@ -111,7 +141,7 @@ export function useLeadsData({ requestedLeadId = "", navigate }) {
 
   useEffect(() => {
     loadLeadsData();
-  }, []);
+  }, [loadLeadsData]);
 
   useEffect(() => {
     if (!requestedLeadId || !Array.isArray(leads) || !leads.length) return;
@@ -254,7 +284,7 @@ export function useLeadsData({ requestedLeadId = "", navigate }) {
     if (!selectedLead?.id) return;
     try {
       setSavingField("stage");
-      const j = await setLeadStage(selectedLead.id, value, "operator");
+      const j = await setLeadStage(selectedLead.id, value, actorName);
       patchLeadInState(j?.lead);
     } catch (e) {
       setError(String(e?.message || e));
@@ -267,7 +297,7 @@ export function useLeadsData({ requestedLeadId = "", navigate }) {
     if (!selectedLead?.id) return;
     try {
       setSavingField("status");
-      const j = await setLeadStatus(selectedLead.id, value, "operator");
+      const j = await setLeadStatus(selectedLead.id, value, actorName);
       patchLeadInState(j?.lead);
     } catch (e) {
       setError(String(e?.message || e));
@@ -280,7 +310,7 @@ export function useLeadsData({ requestedLeadId = "", navigate }) {
     if (!selectedLead?.id) return;
     try {
       setSavingField("owner");
-      const j = await setLeadOwner(selectedLead.id, form.owner, "operator");
+      const j = await setLeadOwner(selectedLead.id, form.owner, actorName);
       patchLeadInState(j?.lead);
     } catch (e) {
       setError(String(e?.message || e));
@@ -312,7 +342,7 @@ export function useLeadsData({ requestedLeadId = "", navigate }) {
       const j = await setLeadFollowUp(selectedLead.id, {
         followUpAt: fromDatetimeLocalValue(form.followUpAt),
         nextAction: form.nextAction,
-        actor: "operator",
+        actor: actorName,
       });
       patchLeadInState(j?.lead);
     } catch (e) {
@@ -326,7 +356,7 @@ export function useLeadsData({ requestedLeadId = "", navigate }) {
     if (!selectedLead?.id || !noteText.trim()) return;
     try {
       setSavingField("note");
-      const j = await addLeadNote(selectedLead.id, noteText.trim(), "operator");
+      const j = await addLeadNote(selectedLead.id, noteText.trim(), actorName);
       patchLeadInState(j?.lead);
       setNoteText("");
     } catch (e) {

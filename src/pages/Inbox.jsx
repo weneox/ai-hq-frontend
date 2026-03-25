@@ -21,13 +21,34 @@ import RetryQueuePanel from "../components/inbox/RetryQueuePanel.jsx";
 import ThreadOutboundAttemptsPanel from "../components/inbox/ThreadOutboundAttemptsPanel.jsx";
 
 import { useNavigate } from "react-router-dom";
+import { getAppSessionContext } from "../lib/appSession.js";
 
 export default function Inbox() {
   const navigate = useNavigate();
   const [filter, setFilter] = useState("all");
   const [wsState, setWsState] = useState("idle");
-  const [operatorName, setOperatorName] = useState("Emil");
+  const [tenantKey, setTenantKey] = useState("");
+  const [operatorName, setOperatorName] = useState("");
   const [replyText, setReplyText] = useState("");
+
+  useEffect(() => {
+    let alive = true;
+
+    getAppSessionContext()
+      .then((next) => {
+        if (!alive) return;
+        setTenantKey(String(next?.tenantKey || "").trim().toLowerCase());
+        setOperatorName((prev) => prev || String(next?.actorName || "operator").trim());
+      })
+      .catch(() => {
+        if (!alive) return;
+        setOperatorName((prev) => prev || "operator");
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const {
     threads,
@@ -139,7 +160,11 @@ export default function Inbox() {
         <InboxStatCard label="Resolved" value={stats.resolved} icon={CheckCircle2} tone="emerald" />
       </div>
 
-      <RetryQueuePanel tenantKey="neox" actor={operatorName || "operator"} className="mt-6" />
+      <RetryQueuePanel
+        tenantKey={tenantKey}
+        actor={operatorName || "operator"}
+        className="mt-6"
+      />
 
       <div className="mt-6 grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
         <div className="rounded-[30px] border border-white/10 bg-white/[0.03] p-5 shadow-[0_22px_60px_rgba(0,0,0,0.22)] backdrop-blur-xl">
