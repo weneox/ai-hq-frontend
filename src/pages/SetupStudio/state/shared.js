@@ -132,6 +132,7 @@ export function createEmptySourceScope() {
   return {
     sourceType: "",
     sourceUrl: "",
+    fingerprint: "",
   };
 }
 
@@ -674,12 +675,12 @@ export function normalizeScanRequest(input, discoveryForm = {}) {
 export function scanStartLabel(sourceType = "") {
   const x = normalizeIncomingSourceType(sourceType);
 
-  if (x === "google_maps") return "Google Maps scan başladı...";
-  if (x === "instagram") return "Instagram source hazırlandı...";
-  if (x === "facebook") return "Facebook source hazırlandı...";
-  if (x === "linkedin") return "LinkedIn source hazırlandı...";
-  if (x === "manual") return "Business draft hazırlanır...";
-  return "Website scan başladı...";
+  if (x === "google_maps") return "Google Maps scan started...";
+  if (x === "instagram") return "Instagram context is being prepared...";
+  if (x === "facebook") return "Facebook context is being prepared...";
+  if (x === "linkedin") return "LinkedIn context is being prepared...";
+  if (x === "manual") return "Building the temporary business draft...";
+  return "Website scan started...";
 }
 
 export function scanCompleteLabel(sourceType = "", candidateCount = 0) {
@@ -687,16 +688,16 @@ export function scanCompleteLabel(sourceType = "", candidateCount = 0) {
   const count = Number(candidateCount || 0);
 
   if (count > 0) {
-    return `${count} discovery hazırlandı.`;
+    return `${count} review candidates are ready.`;
   }
 
-  if (x === "google_maps") return "Google Maps import tamamlandı.";
-  if (x === "instagram") return "Instagram source hazırdır.";
-  if (x === "facebook") return "Facebook source hazırdır.";
-  if (x === "linkedin") return "LinkedIn source hazırdır.";
+  if (x === "google_maps") return "Google Maps import completed.";
+  if (x === "instagram") return "Instagram context is ready.";
+  if (x === "facebook") return "Facebook context is ready.";
+  if (x === "linkedin") return "LinkedIn context is ready.";
   if (x === "manual") return "Business draft generated.";
 
-  return "Website import tamamlandı.";
+  return "Website import completed.";
 }
 
 export function applyUiHintsFromMeta({

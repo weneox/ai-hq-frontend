@@ -231,6 +231,13 @@ export function createSetupStudioActions(ctx) {
     createEmptyLegacyDraft,
   } = ctx;
 
+  function clearActiveReviewSession() {
+    const empty = createEmptyReviewState();
+    setCurrentReview(empty);
+    setReviewDraft(createEmptyLegacyDraft());
+    return empty;
+  }
+
   async function loadCurrentReview({
     preserveBusinessForm = false,
     activateReviewSession = true,
@@ -257,15 +264,16 @@ export function createSetupStudioActions(ctx) {
           sourceScope.sourceUrl
         );
 
-      setCurrentReview(normalized);
-      setReviewDraft(legacy);
-
       if (!shouldApplyIntoActiveStudio) {
+        clearActiveReviewSession();
         return {
-          currentReview: normalized,
-          reviewDraft: legacy,
+          currentReview: createEmptyReviewState(),
+          reviewDraft: createEmptyLegacyDraft(),
         };
       }
+
+      setCurrentReview(normalized);
+      setReviewDraft(legacy);
 
       if (activateReviewSession) {
         setFreshEntryMode(false);
@@ -273,9 +281,7 @@ export function createSetupStudioActions(ctx) {
 
       return applyReviewState(payload, { preserveBusinessForm });
     } catch {
-      const empty = createEmptyReviewState();
-      setCurrentReview(empty);
-      setReviewDraft(createEmptyLegacyDraft());
+      const empty = clearActiveReviewSession();
 
       return {
         currentReview: empty,
@@ -367,10 +373,8 @@ export function createSetupStudioActions(ctx) {
           sourceScope.sourceUrl
         );
 
-      setCurrentReview(reviewState);
-      setReviewDraft(legacyDraft);
-
       if (!shouldApplyIntoActiveStudio) {
+        clearActiveReviewSession();
         return {
           boot,
           workspace,
@@ -379,9 +383,12 @@ export function createSetupStudioActions(ctx) {
           pendingKnowledge,
           serviceItems,
           meta: nextMeta,
-          currentReview: reviewState,
+          currentReview: createEmptyReviewState(),
         };
       }
+
+      setCurrentReview(reviewState);
+      setReviewDraft(legacyDraft);
 
       const reviewInfo = resolveReviewSourceInfo(reviewState, legacyDraft);
 
@@ -528,17 +535,16 @@ export function createSetupStudioActions(ctx) {
       sourceUrl
     );
     const hasRequestedSources = requestedSources.length > 0;
-    const shouldUseBundledImport = !!(
-      hasImportableSource &&
-      requestedSources.length > 1 &&
-      requestedPrimarySourceType === "website"
-    );
-
     const requestedPrimarySourceType = s(
       request.requestedPrimarySourceType || requestedPrimarySource?.sourceType
     );
     const requestedPrimarySourceUrl = s(
       request.requestedPrimarySourceUrl || requestedPrimarySource?.url
+    );
+    const shouldUseBundledImport = !!(
+      hasImportableSource &&
+      requestedSources.length > 1 &&
+      requestedPrimarySourceType === "website"
     );
 
     const analyzePayload = buildAnalyzePayloadFromStudioState({
@@ -561,7 +567,9 @@ export function createSetupStudioActions(ctx) {
       !analyzePayload.hasAnyInput &&
       !hasRequestedSources
     ) {
-      setError("Source, manual məlumat və ya biznes təsviri daxil edilməlidir.");
+      setError(
+        "Add a source, manual notes, or a business description before continuing."
+      );
       return;
     }
 
@@ -600,8 +608,8 @@ export function createSetupStudioActions(ctx) {
         message: hasImportableSource
           ? scanStartLabel(sourceType)
           : hasRequestedSources
-            ? `${sourceLabelFor(displaySourceType)} source context əlavə edildi...`
-            : "Business draft hazırlanır...",
+            ? `${sourceLabelFor(displaySourceType)} context attached to the temporary draft...`
+            : "Building the temporary business draft...",
         warnings: [],
         shouldReview: false,
         reviewRequired: false,
@@ -662,6 +670,21 @@ export function createSetupStudioActions(ctx) {
           analyzeResult?.sourceUrl ||
           (hasImportableSource ? displaySourceUrl : "")
       );
+      const expectedReviewSourceType = hasImportableSource
+        ? requestedPrimarySourceType || sourceType
+        : "manual";
+      const expectedReviewSourceUrl = hasImportableSource
+        ? requestedPrimarySourceUrl || sourceUrl
+        : "";
+      const importedReviewMatchesActiveSource =
+        expectedReviewSourceType === "manual"
+          ? !!s(importedReview?.session?.id)
+          : reviewStateMatchesSource(
+              importedReview,
+              legacyImportedDraft,
+              expectedReviewSourceType,
+              expectedReviewSourceUrl
+            );
 
       if (effectiveSourceUrl || effectiveSourceType === "manual") {
         updateActiveSourceScope(effectiveSourceType, effectiveSourceUrl);
@@ -677,10 +700,15 @@ export function createSetupStudioActions(ctx) {
 
       const contextualWarnings = [
         ...(!hasImportableSource && hasRequestedSources
-          ? ["Seçilən source-lar draft context kimi saxlanıldı."]
+          ? ["Selected sources were attached as temporary draft context."]
           : []),
         ...(hasImportableSource && request?.hasUnsupportedSources
-          ? ["Bəzi əlavə source-lar draft context kimi saxlanıldı."]
+          ? ["Additional sources were attached as supporting draft context."]
+          : []),
+        ...(!importedReviewMatchesActiveSource && hasImportableSource
+          ? [
+              "The backend review session did not match this source yet, so the editable draft stayed isolated.",
+            ]
           : []),
       ];
 
@@ -765,18 +793,18 @@ export function createSetupStudioActions(ctx) {
       });
 
       if (
-        importedReview?.session ||
-        Object.keys(obj(importedReview?.draft)).length ||
-        arr(importedReview?.bundleSources).length ||
-        arr(importedReview?.sources).length
+        importedReviewMatchesActiveSource &&
+        (importedReview?.session ||
+          Object.keys(obj(importedReview?.draft)).length ||
+          arr(importedReview?.bundleSources).length ||
+          arr(importedReview?.sources).length)
       ) {
         applyReviewState(reviewPayload, {
           preserveBusinessForm: true,
           fallbackProfile: bestIncomingProfile,
         });
       } else {
-        setCurrentReview(createEmptyReviewState());
-        setReviewDraft(createEmptyLegacyDraft());
+        clearActiveReviewSession();
       }
 
       const sourceId = s(
@@ -796,10 +824,14 @@ export function createSetupStudioActions(ctx) {
       );
 
       const scopedImportedReview =
-        !barrierOnlyResult ? importedReview : createEmptyReviewState();
+        !barrierOnlyResult && importedReviewMatchesActiveSource
+          ? importedReview
+          : createEmptyReviewState();
 
       const scopedImportedDraft =
-        !barrierOnlyResult ? legacyImportedDraft : createEmptyLegacyDraft();
+        !barrierOnlyResult && importedReviewMatchesActiveSource
+          ? legacyImportedDraft
+          : createEmptyLegacyDraft();
 
       const immediateDiscoveryState = {
         lastUrl: effectiveSourceUrl,
@@ -976,7 +1008,7 @@ export function createSetupStudioActions(ctx) {
       }
     } catch (e2) {
       const message = String(
-        e2?.message || e2 || "Business draft analiz edilə bilmədi."
+        e2?.message || e2 || "The business draft could not be prepared."
       );
 
       setDiscoveryState((prev) => ({
@@ -1009,7 +1041,9 @@ export function createSetupStudioActions(ctx) {
       const activeSessionId = s(currentReview?.session?.id);
 
       if (!activeSessionId) {
-        throw new Error("Aktiv setup review session tapılmadı.");
+        throw new Error(
+          "No active matching review session was found for this draft yet."
+        );
       }
 
       const businessProfilePatch = buildBusinessProfilePatch({
@@ -1072,7 +1106,7 @@ export function createSetupStudioActions(ctx) {
       return { ok: true };
     } catch (e2) {
       setError(
-        String(e2?.message || e2 || "Business twin finalize edilə bilmədi.")
+        String(e2?.message || e2 || "The business twin could not be finalized.")
       );
       return { ok: false };
     } finally {
@@ -1088,7 +1122,7 @@ export function createSetupStudioActions(ctx) {
     });
 
     if (!candidateId) {
-      setError("Bu knowledge item review candidate UUID-si ilə gəlməyib.");
+      setError("This knowledge item did not include a review candidate UUID.");
       return { ok: false };
     }
 
@@ -1139,7 +1173,7 @@ export function createSetupStudioActions(ctx) {
     });
 
     if (!candidateId) {
-      setError("Bu knowledge item review candidate UUID-si ilə gəlməyib.");
+      setError("This knowledge item did not include a review candidate UUID.");
       return { ok: false };
     }
 

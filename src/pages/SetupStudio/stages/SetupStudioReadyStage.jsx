@@ -6,6 +6,7 @@ import {
   TinyChip,
   TinyLabel,
 } from "../components/SetupStudioUi.jsx";
+import { humanizeStudioIssue } from "../logic/helpers.js";
 
 function arr(v) {
   return Array.isArray(v) ? v : [];
@@ -36,7 +37,7 @@ export default function SetupStudioReadyStage({
     studioProgress?.missingSteps?.length
       ? studioProgress.missingSteps
       : meta?.missingSteps
-  );
+  ).map((item) => humanizeStudioIssue(item));
 
   const readinessLabel = s(
     studioProgress?.readinessLabel || meta?.readinessLabel
@@ -45,7 +46,7 @@ export default function SetupStudioReadyStage({
   const nextStudioStage = s(studioProgress?.nextStudioStage).toLowerCase();
 
   const summaryLine = missingSteps.length
-    ? `Remaining: ${missingSteps.join(" · ")}`
+    ? `Remaining: ${missingSteps.join(" | ")}`
     : "Core onboarding now has enough structure to move into the workspace.";
 
   const isTrulyReady =

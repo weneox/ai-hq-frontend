@@ -5,6 +5,7 @@ import {
   PencilLine,
 } from "lucide-react";
 import SetupStudioStageShell from "../components/SetupStudioStageShell.jsx";
+import { humanizeStudioIssue } from "../logic/helpers.js";
 
 function arr(v) {
   return Array.isArray(v) ? v : [];
@@ -36,34 +37,6 @@ function normalizeRows(rows = []) {
       return { label: "", value: "", provenance: "" };
     })
     .filter((item) => item.label || item.value);
-}
-
-function humanizeWarning(value = "") {
-  const x = s(value).toLowerCase();
-
-  if (x === "http_403") return "This website blocked direct access.";
-  if (x === "http_429") return "This website rate-limited the request.";
-  if (x === "fetch_failed") return "The website could not be read.";
-  if (x === "non_html_response") {
-    return "The source did not return a readable webpage.";
-  }
-  if (x === "website_fetch_timeout") {
-    return "The website took too long to respond.";
-  }
-  if (x === "website_entry_timeout") {
-    return "The first page took too long to load.";
-  }
-  if (x === "sitemap_fetch_timeout") {
-    return "The sitemap timed out, but some draft data may still exist.";
-  }
-  if (x === "weak_website_extraction") {
-    return "The source was readable, but the extracted business signals were weak.";
-  }
-  if (x === "website_trust_guard_blocked_candidate_creation") {
-    return "The source was too weak to create trusted knowledge automatically.";
-  }
-
-  return s(value).replaceAll("_", " ");
 }
 
 function isBarrierWarning(value = "") {
@@ -165,7 +138,7 @@ export default function SetupStudioIdentityStage({
     !barrierState && s(currentDescription)
       ? s(currentDescription)
       : barrierState
-        ? humanizeWarning(barrierWarning)
+        ? humanizeStudioIssue(barrierWarning)
         : rows.length
           ? "Review the first structured draft, fix anything important, then continue."
           : "The system did not produce many strong fields yet. Refine the draft manually and continue.";
@@ -219,7 +192,7 @@ export default function SetupStudioIdentityStage({
                   }`}
                 >
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                  <span>{humanizeWarning(warning)}</span>
+                  <span>{humanizeStudioIssue(warning)}</span>
                 </div>
               ))}
             </div>

@@ -6,6 +6,7 @@ import {
   X,
 } from "lucide-react";
 import SetupStudioStageShell from "../components/SetupStudioStageShell.jsx";
+import { humanizeStudioIssue } from "../logic/helpers.js";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -207,26 +208,6 @@ function groupLabel(category = "") {
   return "Knowledge";
 }
 
-function humanizeWarning(value = "") {
-  const x = s(value).toLowerCase();
-
-  if (x === "http_403") return "This website blocked direct access.";
-  if (x === "http_429") return "This website rate-limited the request.";
-  if (x === "fetch_failed") return "The website could not be read.";
-  if (x === "non_html_response")
-    return "The source did not return a readable webpage.";
-  if (x === "website_fetch_timeout")
-    return "The website took too long to respond.";
-  if (x === "website_entry_timeout")
-    return "The first page took too long to load.";
-  if (x === "sitemap_fetch_timeout")
-    return "The sitemap timed out, but some draft data may still exist.";
-  if (x === "weak_website_extraction")
-    return "The source was readable, but the extracted business signals were weak.";
-
-  return s(value).replaceAll("_", " ");
-}
-
 function sourceBadgeLabel(sourceLabel = "") {
   const x = s(sourceLabel);
   if (!x) return "";
@@ -312,7 +293,7 @@ export default function SetupStudioKnowledgeStage({
             {warningList.length ? (
               <div className="mt-5 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3.5 text-sm text-amber-800">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>{humanizeWarning(warningList[0])}</span>
+                <span>{humanizeStudioIssue(warningList[0])}</span>
               </div>
             ) : null}
           </div>

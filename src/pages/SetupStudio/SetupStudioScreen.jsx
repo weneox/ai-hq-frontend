@@ -19,10 +19,13 @@ import {
   createEmptySourceScope,
   resolveMainLanguageValue,
   normalizeReviewState,
+  sourceIdentityKey,
 } from "./state/shared.js";
 
 import {
   deriveSuggestedServicePayload,
+  extractProfileName,
+  extractProfileSummary,
   formFromProfile,
   hasExtractedIdentityProfile,
   isWebsiteBarrierWarning,
@@ -127,12 +130,14 @@ export default function SetupStudioScreen() {
   function updateActiveSourceScope(sourceType = "", sourceUrl = "") {
     const normalizedUrl = s(sourceUrl);
     const normalizedType = normalizeStudioSourceType(sourceType, normalizedUrl);
+    const fingerprint = sourceIdentityKey(normalizedType, normalizedUrl);
 
     const next =
       normalizedUrl || normalizedType
         ? {
             sourceType: normalizedType,
             sourceUrl: normalizedUrl,
+            fingerprint,
           }
         : createEmptySourceScope();
 
@@ -161,6 +166,7 @@ export default function SetupStudioScreen() {
     return {
       sourceType: rawType,
       sourceUrl: rawUrl,
+      fingerprint: sourceIdentityKey(rawType, rawUrl),
     };
   }
 
@@ -231,8 +237,8 @@ export default function SetupStudioScreen() {
 
     setDiscoveryState((prev) => ({
       ...prev,
-      mainLanguage: metadata.mainLanguage || prev.mainLanguage || "",
-      primaryLanguage: metadata.primaryLanguage || prev.primaryLanguage || "",
+      mainLanguage: metadata.mainLanguage || "",
+      primaryLanguage: metadata.primaryLanguage || "",
       reviewRequired: metadata.reviewRequired,
       reviewFlags: arr(metadata.reviewFlags),
       fieldConfidence: obj(metadata.fieldConfidence),
@@ -241,7 +247,6 @@ export default function SetupStudioScreen() {
         normalized?.session?.status || prev.reviewSessionStatus
       ),
       hasResults:
-        prev.hasResults ||
         hasMeaningfulProfile(profile) ||
         arr(normalized?.bundleSources).length > 0 ||
         arr(normalized?.sources).length > 0 ||
@@ -255,18 +260,16 @@ export default function SetupStudioScreen() {
           arr(normalized?.bundleSources).length +
           arr(normalized?.sources).length +
           arr(normalized?.events).length,
-      profile: Object.keys(profile).length ? profile : obj(prev.profile),
-      warnings: arr(legacy.warnings).length
-        ? arr(legacy.warnings)
-        : arr(prev.warnings),
+      profile,
+      warnings: arr(legacy.warnings),
       candidateCount: preserveCounts
         ? prev.candidateCount
-        : Number(legacy.stats?.knowledgeCount || prev.candidateCount || 0),
-      sourceRunId: s(legacy.sourceRunId || prev.sourceRunId),
-      snapshotId: s(legacy.snapshotId || prev.snapshotId),
-      sourceId: s(legacy.sourceId || prev.sourceId),
-      lastSourceType: s(reviewInfo.sourceType || prev.lastSourceType),
-      lastUrl: s(reviewInfo.sourceUrl || prev.lastUrl),
+        : Number(legacy.stats?.knowledgeCount || 0),
+      sourceRunId: s(legacy.sourceRunId),
+      snapshotId: s(legacy.snapshotId),
+      sourceId: s(legacy.sourceId),
+      lastSourceType: s(reviewInfo.sourceType),
+      lastUrl: s(reviewInfo.sourceUrl),
     }));
   }
 
@@ -555,9 +558,7 @@ export default function SetupStudioScreen() {
     );
 
     const reviewName = sanitizeUiIdentityText(
-      scopedReviewDraft?.overview?.companyName ||
-        scopedReviewDraft?.overview?.displayName ||
-        scopedReviewDraft?.overview?.name,
+      extractProfileName(scopedReviewDraft?.overview),
       warningSet
     );
 
@@ -573,8 +574,8 @@ export default function SetupStudioScreen() {
       sanitizeUiIdentityText(
         scopedReviewDraft?.quickSummary ||
           businessForm.description ||
-          scopedReviewDraft?.overview?.summaryShort ||
-          discoveryState?.profile?.summaryShort,
+          extractProfileSummary(scopedReviewDraft?.overview) ||
+          extractProfileSummary(discoveryState?.profile),
         arr(discoveryState.warnings)
       ),
     [scopedReviewDraft, businessForm.description, discoveryState]

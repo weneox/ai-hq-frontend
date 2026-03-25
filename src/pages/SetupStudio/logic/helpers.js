@@ -5,7 +5,11 @@ import {
   normalizeIncomingSourceType,
   detectSourceTypeFromUrl,
 } from "../state/shared.js";
-import { isWebsiteBarrierWarning } from "../state/profile.js";
+import {
+  isWebsiteBarrierWarning,
+  sanitizeExtractedBusinessName,
+  sanitizeExtractedBusinessSummary,
+} from "../state/profile.js";
 import { UUID_RE } from "./constants.js";
 
 export function lowerText(value = "") {
@@ -97,6 +101,128 @@ export function sourceLabelFor(type = "") {
   if (x === "linkedin") return "LinkedIn";
   if (x === "facebook") return "Facebook";
   return "Website";
+}
+
+function titleCaseWords(value = "") {
+  return s(value)
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+export function humanizeStudioIssue(value = "") {
+  const raw = s(value);
+  const normalized = lowerText(raw);
+
+  if (!normalized) return "";
+
+  const exact = {
+    http_403: "Website blocked direct access.",
+    http_404: "The website page could not be found.",
+    http_429: "Website rate-limited the scan.",
+    fetch_failed: "Website could not be reached.",
+    non_html_response: "Website returned content that could not be reviewed.",
+    non_html_website_response: "Website returned content that could not be reviewed.",
+    website_fetch_timeout: "Website took too long to respond.",
+    website_entry_timeout: "Website entry page took too long to respond.",
+    sitemap_fetch_timeout: "Sitemap took too long to respond.",
+    sitemap_not_found_or_unreadable: "Sitemap could not be read.",
+    weak_website_extraction: "Website signals were too weak for a strong draft.",
+    partial_website_extraction: "Website could only be partially processed.",
+    website_processing_failed_before_review:
+      "Website could not be fully processed before review.",
+    website_fetch_barrier_detected: "Website blocked a full scan.",
+    website_entry_not_found: "Website entry page could not be found.",
+    backend_access_blocked_by_remote_site:
+      "Website blocked backend access before review.",
+    remote_site_rate_limited_backend_access:
+      "Website rate-limited backend access before review.",
+    remote_site_temporarily_unavailable:
+      "Website was temporarily unavailable during review.",
+    backend_could_not_reach_site:
+      "Backend could not reach the website.",
+    review_required: "Needs review.",
+    business_name_missing: "Missing or weak business name.",
+    company_name_missing: "Missing or weak business name.",
+    company_name_weak: "Missing or weak business name.",
+    weak_company_name: "Missing or weak business name.",
+    summary_weak: "Summary needs improvement.",
+    weak_summary: "Summary needs improvement.",
+    description_weak: "Summary needs improvement.",
+    weak_description: "Summary needs improvement.",
+    services_incomplete: "Services are still incomplete.",
+    weak_services: "Services are still incomplete.",
+    missing_services: "Services are still incomplete.",
+    address_weak: "Address needs review.",
+    unvan_zeifdir: "Address needs review.",
+    tesvir_zeifdir: "Summary needs improvement.",
+    ad_zeifdir: "Missing or weak business name.",
+    ad_yoxdur: "Missing or weak business name.",
+  };
+
+  if (exact[normalized]) return exact[normalized];
+
+  if (
+    (normalized.includes("business") || normalized.includes("company")) &&
+    normalized.includes("name") &&
+    /(weak|missing|review|invalid|empty)/.test(normalized)
+  ) {
+    return "Missing or weak business name.";
+  }
+
+  if (
+    /(summary|description|about|tesvir)/.test(normalized) &&
+    /(weak|missing|review|invalid|empty|poor)/.test(normalized)
+  ) {
+    return "Summary needs improvement.";
+  }
+
+  if (
+    /(services?|products?)/.test(normalized) &&
+    /(weak|missing|review|invalid|empty|incomplete)/.test(normalized)
+  ) {
+    return "Services are still incomplete.";
+  }
+
+  if (
+    /(address|location|unvan)/.test(normalized) &&
+    /(weak|missing|review|invalid|empty)/.test(normalized)
+  ) {
+    return "Address needs review.";
+  }
+
+  if (
+    /(email|mail)/.test(normalized) &&
+    /(weak|missing|review|invalid|empty)/.test(normalized)
+  ) {
+    return "Email needs review.";
+  }
+
+  if (
+    /(phone|mobile|telephone)/.test(normalized) &&
+    /(weak|missing|review|invalid|empty)/.test(normalized)
+  ) {
+    return "Phone needs review.";
+  }
+
+  if (
+    normalized.includes("website") &&
+    /(weak|failed|failure|error|timeout|barrier|blocked|partial|process|extract|crawl|fetch)/.test(
+      normalized
+    )
+  ) {
+    return "Website could not be fully processed.";
+  }
+
+  const readable = titleCaseWords(
+    normalized
+      .replace(/[_-]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+  );
+
+  return readable ? `${readable}.` : raw;
 }
 
 export function splitManualList(text = "") {
@@ -516,12 +642,14 @@ export function buildSafeUiProfile({
 
   const safeName = barrierOnly
     ? ""
-    : sanitizeUiIdentityText(
-        profile.companyName ||
-          profile.displayName ||
-          profile.companyTitle ||
-          profile.name,
-        warnings
+    : sanitizeExtractedBusinessName(
+        sanitizeUiIdentityText(
+          profile.companyName ||
+            profile.displayName ||
+            profile.companyTitle ||
+            profile.name,
+          warnings
+        )
       );
 
   const safeDisplayName = barrierOnly
@@ -532,19 +660,25 @@ export function buildSafeUiProfile({
     ? ""
     : sanitizeUiIdentityText(profile.companyTitle || safeName, warnings);
 
-  const safeSummaryShort = sanitizeUiIdentityText(
-    profile.companySummaryShort ||
-      profile.summaryShort ||
-      profile.shortDescription,
-    warnings
+  const safeSummaryShort = sanitizeExtractedBusinessSummary(
+    sanitizeUiIdentityText(
+      profile.companySummaryShort ||
+        profile.summaryShort ||
+        profile.shortDescription,
+      warnings
+    ),
+    safeName
   );
 
-  const safeSummaryLong = sanitizeUiIdentityText(
-    profile.companySummaryLong ||
-      profile.summaryLong ||
-      profile.description ||
-      safeSummaryShort,
-    warnings
+  const safeSummaryLong = sanitizeExtractedBusinessSummary(
+    sanitizeUiIdentityText(
+      profile.companySummaryLong ||
+        profile.summaryLong ||
+        profile.description ||
+        safeSummaryShort,
+      warnings
+    ),
+    safeName
   );
 
   const safeMainLanguage =

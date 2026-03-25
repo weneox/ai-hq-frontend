@@ -306,7 +306,7 @@ export default function SetupStudioScene({
     return (
       <div className="flex min-h-screen items-center justify-center px-6">
         <div className="rounded-full border border-white/80 bg-[rgba(250,250,250,.82)] px-4 py-2 text-sm text-slate-600 shadow-[0_10px_24px_-20px_rgba(15,23,42,.28)] backdrop-blur-[10px]">
-          Setup studio hazırlanır...
+          Preparing Setup Studio...
         </div>
       </div>
     );
@@ -363,7 +363,7 @@ export default function SetupStudioScene({
         <main className="mx-auto w-full max-w-[1200px] px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
             <div className="text-[12px] font-medium text-slate-400">
-              {sourceLabel ? sourceLabel : "Setup studio"}
+              {sourceLabel ? sourceLabel : "Setup Studio"}
             </div>
 
             <button

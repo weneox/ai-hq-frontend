@@ -11,6 +11,105 @@ import {
   normalizeIncomingSourceType,
 } from "./shared.js";
 
+const GENERIC_BUSINESS_NAME_VALUES = new Set([
+  "google maps",
+  "maps",
+  "website",
+  "services",
+  "service",
+  "products",
+  "product",
+  "business",
+  "company",
+  "home",
+  "contact",
+  "pricing",
+  "faq",
+  "faqs",
+  "policy",
+  "policies",
+  "instagram",
+  "facebook",
+  "linkedin",
+  "google",
+  "source",
+]);
+
+const GENERIC_SUMMARY_VALUES = new Set([
+  "home",
+  "contact",
+  "about",
+  "services",
+  "products",
+  "pricing",
+  "faq",
+  "policy",
+  "policies",
+  "website",
+  "google maps",
+  "instagram",
+  "facebook",
+  "linkedin",
+]);
+
+function normalizeToken(value = "") {
+  return s(value)
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/[|/\\]+/g, " ")
+    .trim();
+}
+
+function isLikelyUrl(value = "") {
+  const text = s(value);
+  return /^(https?:\/\/|www\.|[a-z0-9-]+\.[a-z]{2,})/i.test(text);
+}
+
+function isGenericSourceLabel(value = "") {
+  const normalized = normalizeToken(value);
+  if (!normalized) return true;
+  if (GENERIC_BUSINESS_NAME_VALUES.has(normalized)) return true;
+  if (/^(google|instagram|facebook|linkedin)(\s+(maps|page|profile|account))?$/i.test(normalized)) {
+    return true;
+  }
+  if (/^(website|source|business|company)(\s+(profile|page|details|info))?$/i.test(normalized)) {
+    return true;
+  }
+  return false;
+}
+
+export function sanitizeExtractedBusinessName(value = "") {
+  const text = s(value);
+  const normalized = normalizeToken(text);
+
+  if (!text) return "";
+  if (isLikelyUrl(text)) return "";
+  if (text.length <= 2) return "";
+  if (isGenericSourceLabel(normalized)) return "";
+  if (/^(home|contact|about|pricing|faq|policy|policies)$/i.test(normalized)) {
+    return "";
+  }
+
+  return text;
+}
+
+export function sanitizeExtractedBusinessSummary(value = "", companyName = "") {
+  const text = s(value);
+  const normalized = normalizeToken(text);
+  const safeCompanyName = normalizeToken(companyName);
+
+  if (!text) return "";
+  if (text.length < 24) return "";
+  if (isLikelyUrl(text)) return "";
+  if (GENERIC_SUMMARY_VALUES.has(normalized)) return "";
+  if (safeCompanyName && normalized === safeCompanyName) return "";
+  if (/^(services?|products?|pricing|faq|contact|about|policy|policies)$/i.test(normalized)) {
+    return "";
+  }
+
+  return text;
+}
+
 export function deriveSuggestedServicePayload({
   discoveryForm,
   discoveryState,
@@ -72,9 +171,15 @@ export function formFromProfile(profile = {}, prev = {}) {
       x.display_name ||
       x.name
   );
-  const safeCompanyName = isPlaceholderBusinessName(rawCompanyName)
-    ? ""
-    : rawCompanyName;
+  const safeCompanyName = sanitizeExtractedBusinessName(rawCompanyName);
+  const safeDescription = sanitizeExtractedBusinessSummary(
+    x.summaryShort ||
+      x.summary_short ||
+      x.summaryLong ||
+      x.summary_long ||
+      x.description,
+    safeCompanyName
+  );
   const resolvedLanguage =
     resolveMainLanguageValue(
       x.mainLanguage,
@@ -91,14 +196,7 @@ export function formFromProfile(profile = {}, prev = {}) {
     companyName: s(
       safeCompanyName || (!rawCompanyName ? prev.companyName : "")
     ),
-    description: s(
-      x.summaryShort ||
-        x.summary_short ||
-        x.summaryLong ||
-        x.summary_long ||
-        x.description ||
-        prev.description
-    ),
+    description: s(safeDescription || prev.description),
     timezone: s(x.timezone || prev.timezone || "Asia/Baku"),
     language: resolvedLanguage,
     websiteUrl: s(
@@ -119,16 +217,11 @@ export function formFromProfile(profile = {}, prev = {}) {
 export function hasExtractedIdentityProfile(profile = {}) {
   const x = obj(profile);
   const extractedName = extractProfileName(x);
+  const extractedSummary = extractProfileSummary(x);
 
   return !!(
     extractedName ||
-    s(
-      x.summaryShort ||
-        x.summary_short ||
-        x.summaryLong ||
-        x.summary_long ||
-        x.description
-    ) ||
+    extractedSummary ||
     s(x.primaryPhone || x.primary_phone || x.phone) ||
     s(x.primaryEmail || x.primary_email || x.email) ||
     s(x.primaryAddress || x.primary_address || x.address) ||
@@ -199,20 +292,26 @@ export function extractProfileName(profile = {}) {
       x.display_name ||
       x.name
   );
-  return isPlaceholderBusinessName(name) ? "" : name;
+  return sanitizeExtractedBusinessName(name);
+}
+
+export function extractProfileSummary(profile = {}) {
+  const x = obj(profile);
+  return sanitizeExtractedBusinessSummary(
+    x.summaryShort ||
+      x.summary_short ||
+      x.description ||
+      x.summaryLong ||
+      x.summary_long,
+    extractProfileName(x)
+  );
 }
 
 export function hasMeaningfulProfile(profile = {}) {
   const x = obj(profile);
   return !!(
     extractProfileName(x) ||
-    s(
-      x.summaryShort ||
-        x.summary_short ||
-        x.description ||
-        x.summaryLong ||
-        x.summary_long
-    ) ||
+    extractProfileSummary(x) ||
     s(x.websiteUrl || x.website_url) ||
     s(x.primaryPhone || x.primary_phone) ||
     s(x.primaryEmail || x.primary_email) ||
@@ -221,13 +320,7 @@ export function hasMeaningfulProfile(profile = {}) {
 }
 
 export function isPlaceholderBusinessName(value = "") {
-  const x = s(value).toLowerCase();
-
-  if (!x) return true;
-
-  return ["google maps", "maps", "website", "source", "business", "company"].includes(
-    x
-  );
+  return !sanitizeExtractedBusinessName(value);
 }
 
 export function shouldPreferCandidateCompanyName(
