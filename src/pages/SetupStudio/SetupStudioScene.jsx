@@ -11,6 +11,7 @@ import SetupStudioKnowledgeStage from "./stages/SetupStudioKnowledgeStage.jsx";
 import SetupStudioServiceStage from "./stages/SetupStudioServiceStage.jsx";
 import SetupStudioReadyStage from "./stages/SetupStudioReadyStage.jsx";
 import SetupStudioRefineModal from "./components/SetupStudioRefineModal.jsx";
+import FocusDialog from "../../components/ui/FocusDialog.jsx";
 
 function s(v, d = "") {
   return String(v ?? d).trim();
@@ -397,15 +398,14 @@ export default function SetupStudioScene({
 
         <AnimatePresence>
           {showRefine ? (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,.18)] px-4 py-4 backdrop-blur-[14px]">
-              <button
-                type="button"
-                aria-label="Close refine modal"
-                className="absolute inset-0"
-                onClick={onToggleRefine}
-              />
-
-              <div className="relative z-10 w-full max-w-[1180px]">
+            <FocusDialog
+              open={showRefine}
+              onClose={onToggleRefine}
+              title="Review workspace"
+              backdropClassName="bg-[rgba(15,23,42,.18)] backdrop-blur-[14px]"
+              panelClassName="w-full max-w-[1180px]"
+            >
+              <div>
                 <div className="mb-3">
                   <ReviewSyncBanner
                     reviewSyncState={reviewSyncState}
@@ -426,7 +426,7 @@ export default function SetupStudioScene({
                   reviewSyncState={reviewSyncState}
                 />
               </div>
-            </div>
+            </FocusDialog>
           ) : null}
         </AnimatePresence>
       </>
@@ -544,15 +544,14 @@ export default function SetupStudioScene({
 
       <AnimatePresence>
         {showRefine ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,.18)] px-4 py-4 backdrop-blur-[14px]">
-            <button
-              type="button"
-              aria-label="Close refine modal"
-              className="absolute inset-0"
-              onClick={onToggleRefine}
-            />
-
-            <div className="relative z-10 w-full max-w-[1180px]">
+          <FocusDialog
+            open={showRefine}
+            onClose={onToggleRefine}
+            title="Review workspace"
+            backdropClassName="bg-[rgba(15,23,42,.18)] backdrop-blur-[14px]"
+            panelClassName="w-full max-w-[1180px]"
+          >
+            <div>
               <div className="mb-3">
                 <ReviewSyncBanner
                   reviewSyncState={reviewSyncState}
@@ -573,7 +572,7 @@ export default function SetupStudioScene({
                 reviewSyncState={reviewSyncState}
               />
             </div>
-          </div>
+          </FocusDialog>
         ) : null}
       </AnimatePresence>
     </>

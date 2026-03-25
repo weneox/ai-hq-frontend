@@ -1,3 +1,4 @@
+import { Suspense, lazy } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import Shell from "./components/layout/Shell.jsx";
 import AdminShell from "./components/admin/AdminShell.jsx";
@@ -5,26 +6,38 @@ import AdminRouteGuard from "./components/admin/AdminRouteGuard.jsx";
 import UserRouteGuard from "./components/auth/UserRouteGuard.jsx";
 import GuestRouteGuard from "./components/guards/GuestRouteGuard.jsx";
 
-import CommandPage from "./pages/CommandPage.jsx";
-import Proposals from "./pages/Proposals.jsx";
-import Executions from "./pages/Executions.jsx";
-import Agents from "./pages/Agents.jsx";
-import Threads from "./pages/Threads.jsx";
-import Analytics from "./pages/Analytics.jsx";
-import Settings from "./pages/Settings.jsx";
-import Inbox from "./pages/Inbox.jsx";
-import Leads from "./pages/Leads.jsx";
-import Comments from "./pages/Comments.jsx";
-import Voice from "./pages/Voice.jsx";
-import Login from "./pages/Login.jsx";
-import TruthViewerPage from "./pages/Truth/TruthViewerPage.jsx";
+const CommandPage = lazy(() => import("./pages/CommandPage.jsx"));
+const Proposals = lazy(() => import("./pages/Proposals.jsx"));
+const Executions = lazy(() => import("./pages/Executions.jsx"));
+const Agents = lazy(() => import("./pages/Agents.jsx"));
+const Threads = lazy(() => import("./pages/Threads.jsx"));
+const Analytics = lazy(() => import("./pages/Analytics.jsx"));
+const Settings = lazy(() => import("./pages/Settings.jsx"));
+const Inbox = lazy(() => import("./pages/Inbox.jsx"));
+const Leads = lazy(() => import("./pages/Leads.jsx"));
+const Comments = lazy(() => import("./pages/Comments.jsx"));
+const Voice = lazy(() => import("./pages/Voice.jsx"));
+const Login = lazy(() => import("./pages/Login.jsx"));
+const TruthViewerPage = lazy(() => import("./pages/Truth/TruthViewerPage.jsx"));
+const AdminLogin = lazy(() => import("./pages/AdminLogin.jsx"));
+const AdminTenants = lazy(() => import("./pages/AdminTenants.jsx"));
+const AdminTeam = lazy(() => import("./pages/AdminTeam.jsx"));
+const AdminSecrets = lazy(() => import("./pages/AdminSecrets.jsx"));
+const SetupStudioRoute = lazy(() => import("./pages/SetupStudio/index.jsx"));
 
-import AdminLogin from "./pages/AdminLogin.jsx";
-import AdminTenants from "./pages/AdminTenants.jsx";
-import AdminTeam from "./pages/AdminTeam.jsx";
-import AdminSecrets from "./pages/AdminSecrets.jsx";
+function RouteFallback() {
+  return (
+    <div className="flex min-h-[40vh] items-center justify-center px-6 py-10">
+      <div className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-white/70 backdrop-blur-xl">
+        Loading...
+      </div>
+    </div>
+  );
+}
 
-import SetupStudioRoute from "./pages/SetupStudio/index.jsx";
+function withSuspense(element) {
+  return <Suspense fallback={<RouteFallback />}>{element}</Suspense>;
+}
 
 export default function App() {
   return (
@@ -34,12 +47,12 @@ export default function App() {
           path="/login"
           element={
             <GuestRouteGuard>
-              <Login />
+              {withSuspense(<Login />)}
             </GuestRouteGuard>
           }
         />
 
-        <Route path="/admin/login" element={<AdminLogin />} />
+        <Route path="/admin/login" element={withSuspense(<AdminLogin />)} />
 
         <Route
           path="/admin"
@@ -50,16 +63,16 @@ export default function App() {
           }
         >
           <Route index element={<Navigate to="/admin/tenants" replace />} />
-          <Route path="tenants" element={<AdminTenants />} />
-          <Route path="team" element={<AdminTeam />} />
-          <Route path="secrets" element={<AdminSecrets />} />
+          <Route path="tenants" element={withSuspense(<AdminTenants />)} />
+          <Route path="team" element={withSuspense(<AdminTeam />)} />
+          <Route path="secrets" element={withSuspense(<AdminSecrets />)} />
         </Route>
 
         <Route
           path="/setup/studio"
           element={
             <UserRouteGuard>
-              <SetupStudioRoute />
+              {withSuspense(<SetupStudioRoute />)}
             </UserRouteGuard>
           }
         />
@@ -135,18 +148,18 @@ export default function App() {
             </UserRouteGuard>
           }
         >
-          <Route index element={<CommandPage />} />
-          <Route path="proposals" element={<Proposals />} />
-          <Route path="inbox" element={<Inbox />} />
-          <Route path="leads" element={<Leads />} />
-          <Route path="comments" element={<Comments />} />
-          <Route path="voice" element={<Voice />} />
-          <Route path="truth" element={<TruthViewerPage />} />
-          <Route path="executions" element={<Executions />} />
-          <Route path="settings" element={<Settings />} />
-          <Route path="analytics" element={<Analytics />} />
-          <Route path="agents" element={<Agents />} />
-          <Route path="threads" element={<Threads />} />
+          <Route index element={withSuspense(<CommandPage />)} />
+          <Route path="proposals" element={withSuspense(<Proposals />)} />
+          <Route path="inbox" element={withSuspense(<Inbox />)} />
+          <Route path="leads" element={withSuspense(<Leads />)} />
+          <Route path="comments" element={withSuspense(<Comments />)} />
+          <Route path="voice" element={withSuspense(<Voice />)} />
+          <Route path="truth" element={withSuspense(<TruthViewerPage />)} />
+          <Route path="executions" element={withSuspense(<Executions />)} />
+          <Route path="settings" element={withSuspense(<Settings />)} />
+          <Route path="analytics" element={withSuspense(<Analytics />)} />
+          <Route path="agents" element={withSuspense(<Agents />)} />
+          <Route path="threads" element={withSuspense(<Threads />)} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

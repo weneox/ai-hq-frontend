@@ -21,6 +21,7 @@ import {
   getMetaChannelStatus,
   getMetaConnectUrl,
 } from "../../../api/settings.js";
+import FocusDialog from "../../../components/ui/FocusDialog.jsx";
 
 const DISPLAY_FONT_STYLE = {
   fontFamily:
@@ -475,25 +476,19 @@ function SourceModal({
     : "@instagram";
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[95] flex items-center justify-center bg-[rgba(15,23,42,.14)] px-4 py-6 backdrop-blur-[14px]"
+    <FocusDialog
+      open={!!source}
+      onClose={onClose}
+      title={`${source.title} source`}
+      backdropClassName="z-[95] bg-[rgba(15,23,42,.14)] backdrop-blur-[14px]"
+      panelClassName="w-full max-w-[620px]"
     >
-      <button
-        type="button"
-        aria-label="Close"
-        className="absolute inset-0"
-        onClick={onClose}
-      />
-
       <motion.div
         initial={{ opacity: 0, y: 18, scale: 0.985 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 18, scale: 0.985 }}
         transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-        className="relative z-10 w-full max-w-[620px] overflow-hidden rounded-[30px] border border-white/80 bg-[rgba(249,249,249,.98)] shadow-[0_32px_80px_-36px_rgba(15,23,42,.28)]"
+        className="overflow-hidden rounded-[30px] border border-white/80 bg-[rgba(249,249,249,.98)] shadow-[0_32px_80px_-36px_rgba(15,23,42,.28)]"
       >
         <div className="relative px-7 pb-7 pt-7 sm:px-8">
           <div className="flex items-start justify-between gap-5">
@@ -665,7 +660,7 @@ function SourceModal({
           </div>
         </div>
       </motion.div>
-    </motion.div>
+    </FocusDialog>
   );
 }
 

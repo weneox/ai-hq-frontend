@@ -150,8 +150,12 @@ select {
   -webkit-tap-highlight-color: transparent;
 }
 
-:where(button, a, input, textarea, select):focus-visible {
-  outline: none;
+:where(button, a, input, textarea, select, [tabindex]):focus-visible {
+  outline: 3px solid rgba(64, 156, 255, 0.9);
+  outline-offset: 3px;
+  box-shadow:
+    0 0 0 6px rgba(148, 210, 255, 0.22),
+    0 8px 24px -18px rgba(15, 23, 42, 0.2);
 }
 
 textarea {
@@ -206,6 +210,12 @@ select:focus {
   box-shadow:
     0 0 0 4px rgba(148, 210, 255, 0.12),
     inset 0 1px 0 rgba(255, 255, 255, 0.92);
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  border-color: rgba(64, 156, 255, 0.42);
 }
 
 input::placeholder,

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Outlet, useLocation } from "react-router-dom";
+import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar.jsx";
 import Header from "./Header.jsx";
-import { createWsClient } from "../../lib/ws.js";
+import { realtimeStore } from "../../lib/realtime/realtimeStore.js";
 
 const SIDEBAR_RAIL_W = 84;
 
@@ -94,8 +94,6 @@ export default function Shell() {
   const [expanded, setExpanded] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const location = useLocation();
-  const wsRef = useRef(null);
   const refreshTimerRef = useRef(0);
 
   const [shellStats, setShellStats] = useState({
@@ -187,16 +185,18 @@ export default function Shell() {
   }, [mobileOpen]);
 
   useEffect(() => {
-    setMobileOpen(false);
-  }, [location.pathname]);
-
-  useEffect(() => {
     loadShellStats();
-  }, [location.pathname]);
+  }, []);
 
   useEffect(() => {
-    const ws = createWsClient({
-      onEvent(evt) {
+    const unsubscribeStatus = realtimeStore.subscribeStatus((status) => {
+      setShellStats((prev) => ({
+        ...prev,
+        wsState: String(status?.state || "idle"),
+      }));
+    });
+
+    const unsubscribeEvents = realtimeStore.subscribeEvents((evt) => {
         const type = String(evt?.type || "");
 
         if (
@@ -216,24 +216,18 @@ export default function Shell() {
         ) {
           scheduleShellRefresh(120);
         }
-      },
-      onStatus(status) {
-        setShellStats((prev) => ({
-          ...prev,
-          wsState: String(status?.state || "idle"),
-        }));
-      },
     });
-
-    wsRef.current = ws;
-    ws.start();
+    if (!realtimeStore.canUseWs()) {
+      setShellStats((prev) => ({
+        ...prev,
+        wsState: "off",
+      }));
+    }
 
     return () => {
       clearTimeout(refreshTimerRef.current);
-      try {
-        ws.stop();
-      } catch {}
-      wsRef.current = null;
+      unsubscribeEvents();
+      unsubscribeStatus();
     };
   }, []);
 

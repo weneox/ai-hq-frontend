@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createWsClient } from "../lib/ws.js";
+import { realtimeStore } from "../lib/realtime/realtimeStore.js";
 import {
   listLeads,
   getLeadEvents,
@@ -19,7 +19,7 @@ import {
 import { getAppSessionContext } from "../lib/appSession.js";
 
 export function useLeadsData({ requestedLeadId = "", navigate }) {
-  const wsRef = useRef(null);
+  const selectedLeadRef = useRef(null);
 
   const [leads, setLeads] = useState([]);
   const [selectedLead, setSelectedLead] = useState(null);
@@ -144,6 +144,10 @@ export function useLeadsData({ requestedLeadId = "", navigate }) {
   }, [loadLeadsData]);
 
   useEffect(() => {
+    selectedLeadRef.current = selectedLead;
+  }, [selectedLead]);
+
+  useEffect(() => {
     if (!requestedLeadId || !Array.isArray(leads) || !leads.length) return;
     const found = leads.find((x) => String(x?.id || "") === requestedLeadId);
     if (found) setSelectedLead(found);
@@ -168,11 +172,11 @@ export function useLeadsData({ requestedLeadId = "", navigate }) {
   }, [selectedLead?.id]);
 
   useEffect(() => {
-    const client = createWsClient({
-      onStatus: (status) => {
-        setWsState(String(status?.state || "idle"));
-      },
-      onEvent: ({ type, payload }) => {
+    const unsubscribeStatus = realtimeStore.subscribeStatus((status) => {
+      setWsState(String(status?.state || "idle"));
+    });
+
+    const unsubscribeEvents = realtimeStore.subscribeEvents(({ type, payload }) => {
         if (!type) return;
 
         if (type === "lead.created" || type === "lead.updated") {
@@ -184,25 +188,19 @@ export function useLeadsData({ requestedLeadId = "", navigate }) {
 
         if (type === "lead.event.created") {
           const ev = payload?.event;
-          if (!ev?.id || !selectedLead?.id) return;
-          if (String(ev?.lead_id || "") !== String(selectedLead.id)) return;
+          const currentSelectedLead = selectedLeadRef.current;
+          if (!ev?.id || !currentSelectedLead?.id) return;
+          if (String(ev?.lead_id || "") !== String(currentSelectedLead.id)) return;
           setEvents((prev) => [ev, ...prev]);
         }
-      },
     });
-
-    wsRef.current = client;
-
-    if (client.canUseWs()) client.start();
-    else setWsState("off");
+    if (!realtimeStore.canUseWs()) setWsState("off");
 
     return () => {
-      try {
-        client.stop();
-      } catch {}
-      wsRef.current = null;
+      unsubscribeEvents();
+      unsubscribeStatus();
     };
-  }, [selectedLead?.id]);
+  }, []);
 
   const filteredLeads = useMemo(() => {
     if (stageFilter === "all") return leads;

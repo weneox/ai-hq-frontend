@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { createWsClient } from "../lib/ws.js";
+import { useEffect, useRef } from "react";
+import { realtimeStore } from "../lib/realtime/realtimeStore.js";
 
 function emitRetryQueueRefresh(detail = {}) {
   try {
@@ -22,12 +22,27 @@ export function useInboxRealtime({
   loadRelatedLead,
   setRelatedLead,
 }) {
+  const selectedThreadRef = useRef(selectedThread);
+  const loadThreadsRef = useRef(loadThreads);
+  const loadThreadDetailRef = useRef(loadThreadDetail);
+  const loadRelatedLeadRef = useRef(loadRelatedLead);
+
   useEffect(() => {
-    const client = createWsClient({
-      onStatus: (status) => {
-        setWsState(String(status?.state || "idle"));
-      },
-      onEvent: ({ type, payload }) => {
+    selectedThreadRef.current = selectedThread;
+  }, [selectedThread]);
+
+  useEffect(() => {
+    loadThreadsRef.current = loadThreads;
+    loadThreadDetailRef.current = loadThreadDetail;
+    loadRelatedLeadRef.current = loadRelatedLead;
+  }, [loadThreads, loadThreadDetail, loadRelatedLead]);
+
+  useEffect(() => {
+    const unsubscribeStatus = realtimeStore.subscribeStatus((status) => {
+      setWsState(String(status?.state || "idle"));
+    });
+
+    const unsubscribeEvents = realtimeStore.subscribeEvents(({ type, payload }) => {
         if (!type) return;
 
         if (type === "inbox.thread.created" || type === "inbox.thread.updated") {
@@ -68,19 +83,20 @@ export function useInboxRealtime({
           const threadId = payload?.threadId;
           const message = payload?.message;
           if (!threadId || !message?.id) return;
+          const currentSelectedThread = selectedThreadRef.current;
 
-          if (selectedThread?.id === threadId) {
+          if (currentSelectedThread?.id === threadId) {
             setMessages((prev) => {
               if (prev.some((m) => m.id === message.id)) return prev;
               return [...prev, message];
             });
           }
 
-          loadThreads(selectedThread?.id || threadId);
+          loadThreadsRef.current?.(currentSelectedThread?.id || threadId);
 
-          if (selectedThread?.id === threadId) {
-            loadThreadDetail(threadId);
-            loadRelatedLead(threadId);
+          if (currentSelectedThread?.id === threadId) {
+            loadThreadDetailRef.current?.(threadId);
+            loadRelatedLeadRef.current?.(threadId);
           }
 
           return;
@@ -90,17 +106,18 @@ export function useInboxRealtime({
           const threadId = payload?.threadId || payload?.message?.thread_id;
           const message = payload?.message;
           if (!threadId || !message?.id) return;
+          const currentSelectedThread = selectedThreadRef.current;
 
-          if (selectedThread?.id === threadId) {
+          if (currentSelectedThread?.id === threadId) {
             setMessages((prev) =>
               prev.map((m) => (m.id === message.id ? { ...m, ...message } : m))
             );
           }
 
-          loadThreads(selectedThread?.id || threadId);
+          loadThreadsRef.current?.(currentSelectedThread?.id || threadId);
 
-          if (selectedThread?.id === threadId) {
-            loadThreadDetail(threadId);
+          if (currentSelectedThread?.id === threadId) {
+            loadThreadDetailRef.current?.(threadId);
           }
 
           emitRetryQueueRefresh({
@@ -117,13 +134,14 @@ export function useInboxRealtime({
         ) {
           const attempt = payload?.attempt;
           const threadId = attempt?.thread_id || "";
+          const currentSelectedThread = selectedThreadRef.current;
           if (!attempt?.id) return;
 
           if (threadId) {
-            loadThreads(selectedThread?.id || threadId);
+            loadThreadsRef.current?.(currentSelectedThread?.id || threadId);
 
-            if (selectedThread?.id === threadId) {
-              loadThreadDetail(threadId);
+            if (currentSelectedThread?.id === threadId) {
+              loadThreadDetailRef.current?.(threadId);
             }
           }
 
@@ -143,34 +161,26 @@ export function useInboxRealtime({
         if (type === "lead.created" || type === "lead.updated") {
           const lead = payload?.lead;
           if (!lead?.id) return;
+          const currentSelectedThread = selectedThreadRef.current;
 
-          if (String(lead?.inbox_thread_id || "") === String(selectedThread?.id || "")) {
+          if (String(lead?.inbox_thread_id || "") === String(currentSelectedThread?.id || "")) {
             setRelatedLead(lead);
           }
         }
-      },
     });
-
-    if (client.canUseWs()) {
-      client.start();
-    } else {
+    if (!realtimeStore.canUseWs()) {
       setWsState("off");
     }
 
     return () => {
-      try {
-        client.stop();
-      } catch {}
+      unsubscribeEvents();
+      unsubscribeStatus();
     };
   }, [
-    selectedThread,
     setWsState,
     setThreads,
     setSelectedThread,
     setMessages,
-    loadThreads,
-    loadThreadDetail,
-    loadRelatedLead,
     setRelatedLead,
   ]);
 }

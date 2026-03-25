@@ -50,6 +50,7 @@ import {
   getAutoRevealKey,
   getCurrentDescription,
   getCurrentTitle,
+  getDraftBackedProfile,
   getDiscoveryProfileRows,
   getEffectiveMeta,
   getHasStoredReview,

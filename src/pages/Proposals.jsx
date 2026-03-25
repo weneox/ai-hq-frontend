@@ -18,8 +18,7 @@ import {
   publishDraft,
   analyzeDraft,
 } from "../api/proposals.js";
-
-import { createWsClient } from "../lib/ws.js";
+import { realtimeStore } from "../lib/realtime/realtimeStore.js";
 
 const BACKEND_STATUSES = [
   "draft",
@@ -193,7 +192,6 @@ export default function ProposalsPage() {
   const [toast, setToast] = useState("");
 
   const [wsStatus, setWsStatus] = useState({ state: "disconnected" });
-  const wsClientRef = useRef(null);
   const statusRef = useRef("draft");
 
   const [stats, setStats] = useState({
@@ -292,9 +290,11 @@ export default function ProposalsPage() {
   }, [status]);
 
   useEffect(() => {
-    const ws = createWsClient({
-      onStatus: (s) => setWsStatus(s),
-      onEvent: ({ type }) => {
+    const unsubscribeStatus = realtimeStore.subscribeStatus((nextStatus) => {
+      setWsStatus(nextStatus || { state: "idle" });
+    });
+
+    const unsubscribeEvents = realtimeStore.subscribeEvents(({ type }) => {
         const isProposalEvent =
           type === "proposal.created" || type === "proposal.updated";
         const isContentEvent = type === "content.updated";
@@ -310,19 +310,12 @@ export default function ProposalsPage() {
             { status: currentStatus }
           );
         }
-      },
     });
-
-    wsClientRef.current = ws;
-
-    if (ws.canUseWs()) ws.start();
-    else setWsStatus({ state: "off" });
+    if (!realtimeStore.canUseWs()) setWsStatus({ state: "off" });
 
     return () => {
-      try {
-        ws.stop();
-      } catch {}
-      wsClientRef.current = null;
+      unsubscribeEvents();
+      unsubscribeStatus();
     };
   }, []);
 
