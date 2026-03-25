@@ -2,14 +2,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { NavLink, useLocation } from "react-router-dom";
 import {
-  Bot,
   BriefcaseBusiness,
   ChevronDown,
   ChevronRight,
-  CircleGauge,
   Command,
   Orbit,
-  ScanEye,
   ShieldCheck,
   SlidersHorizontal,
   X,
@@ -22,8 +19,7 @@ import {
 import ExecutiveMark3D from "./ExecutiveMark3D.jsx";
 
 const NAV_ITEMS = [
-  { label: "Command", icon: Command, to: "/" },
-  { label: "Analytics", icon: CircleGauge, to: "/analytics" },
+  { label: "Command Demo", icon: Command, to: "/" },
   {
     label: "Operations",
     icon: FolderKanban,
@@ -36,8 +32,6 @@ const NAV_ITEMS = [
     ],
   },
   { label: "Executions", icon: Orbit, to: "/executions" },
-  { label: "Agents", icon: Bot, to: "/agents" },
-  { label: "Threads", icon: ScanEye, to: "/threads" },
   { label: "Settings", icon: SlidersHorizontal, to: "/settings" },
 ];
 

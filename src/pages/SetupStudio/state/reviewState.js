@@ -273,6 +273,7 @@ function draftItemsToText(items = [], mode = "default") {
 
 export function mapCurrentReviewToLegacyDraft(review = {}) {
   const session = review?.session || null;
+  const sessionMeta = obj(review?.sessionMeta);
   const draft = obj(review?.draft);
   const draftSummary = obj(review?.reviewDraftSummary);
   const contributionSummary = obj(review?.contributionSummary);
@@ -390,6 +391,29 @@ export function mapCurrentReviewToLegacyDraft(review = {}) {
     mainLanguage: draftMeta.mainLanguage || profileMeta.mainLanguage || "",
     primaryLanguage:
       draftMeta.primaryLanguage || profileMeta.primaryLanguage || "",
+    reviewSessionId: s(
+      sessionMeta.sessionId || session?.id || session?.sessionId || session?.session_id
+    ),
+    reviewSessionStatus: s(
+      sessionMeta.sessionStatus || session?.status || session?.reviewStatus
+    ),
+    reviewSessionRevision: s(
+      sessionMeta.revision ||
+        session?.revision ||
+        session?.reviewRevision ||
+        session?.version ||
+        session?.etag
+    ),
+    reviewFreshness: s(sessionMeta.freshness || session?.freshness || "unknown"),
+    reviewStale: !!(sessionMeta.stale || session?.stale || session?.isStale),
+    reviewConflicted: !!(
+      sessionMeta.conflicted || session?.conflicted || session?.conflict
+    ),
+    reviewConflictMessage: s(
+      sessionMeta.conflictMessage ||
+        session?.conflictMessage ||
+        session?.conflict_message
+    ),
   };
 }
 

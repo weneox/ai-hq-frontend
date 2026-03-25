@@ -50,9 +50,28 @@ function firstObject(...values) {
   return {};
 }
 
+function boolFrom(...values) {
+  for (const value of values) {
+    if (typeof value === "boolean") return value;
+  }
+  return false;
+}
+
 export function createEmptyReviewState() {
   return {
     session: null,
+    sessionMeta: {
+      sessionId: "",
+      sessionStatus: "",
+      revision: "",
+      freshness: "unknown",
+      stale: false,
+      conflicted: false,
+      hasRevision: false,
+      hasSessionId: false,
+      sourceFingerprint: "",
+      conflictMessage: "",
+    },
     draft: {},
     sources: [],
     events: [],
@@ -88,6 +107,13 @@ export function createEmptyLegacyDraft() {
     fieldConfidence: {},
     mainLanguage: "",
     primaryLanguage: "",
+    reviewSessionId: "",
+    reviewSessionStatus: "",
+    reviewSessionRevision: "",
+    reviewFreshness: "unknown",
+    reviewStale: false,
+    reviewConflicted: false,
+    reviewConflictMessage: "",
     bundleSources: [],
     contributionSummary: {},
     fieldProvenance: {},
@@ -116,6 +142,11 @@ export function createIdleDiscoveryState() {
     snapshotId: "",
     reviewSessionId: "",
     reviewSessionStatus: "",
+    reviewSessionRevision: "",
+    reviewFreshness: "unknown",
+    reviewStale: false,
+    reviewConflicted: false,
+    reviewConflictMessage: "",
     hasResults: false,
     resultCount: 0,
     importedKnowledgeItems: [],
@@ -718,11 +749,259 @@ export function applyUiHintsFromMeta({
   }
 }
 
-export function normalizeReviewState(payload = {}) {
-  const review = obj(payload?.review || payload);
+function normalizeFreshnessValue(
+  value = "",
+  { stale = false, conflicted = false, hasRevision = false } = {}
+) {
+  const raw = lower(value);
+
+  if (conflicted || raw.includes("conflict")) return "conflict";
+
+  if (
+    stale ||
+    raw.includes("stale") ||
+    raw.includes("expired") ||
+    raw.includes("out_of_date") ||
+    raw.includes("out-of-date") ||
+    raw.includes("outdated")
+  ) {
+    return "stale";
+  }
+
+  if (
+    raw === "fresh" ||
+    raw === "current" ||
+    raw === "synced" ||
+    raw === "aligned"
+  ) {
+    return "fresh";
+  }
+
+  if (hasRevision) return "unverified";
+  return "unknown";
+}
+
+function normalizeSessionId(session = {}, meta = {}, payload = {}, review = {}) {
+  return firstNonEmpty(
+    session.id,
+    session.sessionId,
+    session.session_id,
+    meta.reviewSessionId,
+    meta.review_session_id,
+    payload.reviewSessionId,
+    payload.review_session_id,
+    payload.sessionId,
+    payload.session_id,
+    review.reviewSessionId,
+    review.review_session_id
+  );
+}
+
+function normalizeSessionRevision(
+  session = {},
+  meta = {},
+  payload = {},
+  review = {}
+) {
+  return firstNonEmpty(
+    session.revision,
+    session.reviewRevision,
+    session.review_revision,
+    session.version,
+    session.revisionId,
+    session.revision_id,
+    session.etag,
+    session.eTag,
+    meta.reviewRevision,
+    meta.review_revision,
+    meta.revision,
+    meta.version,
+    meta.etag,
+    payload.reviewRevision,
+    payload.review_revision,
+    payload.revision,
+    payload.version,
+    review.reviewRevision,
+    review.review_revision,
+    review.revision,
+    review.version
+  );
+}
+
+export function extractReviewSessionMeta(payload = {}) {
+  const root = obj(payload);
+  const review = obj(root?.review || root);
+  const session = firstObject(review?.session, root?.session);
+  const meta = firstObject(
+    review?.reviewMeta,
+    review?.review_meta,
+    review?.meta,
+    review?.metadata,
+    root?.reviewMeta,
+    root?.review_meta,
+    root?.meta,
+    root?.metadata,
+    session?.reviewMeta,
+    session?.review_meta,
+    session?.meta,
+    session?.metadata
+  );
+
+  const sessionId = normalizeSessionId(session, meta, root, review);
+  const revision = normalizeSessionRevision(session, meta, root, review);
+  const sessionStatus = firstNonEmpty(
+    session.status,
+    session.reviewStatus,
+    session.review_status,
+    meta.reviewSessionStatus,
+    meta.review_session_status,
+    meta.status,
+    root.reviewSessionStatus,
+    root.review_session_status,
+    review.reviewSessionStatus,
+    review.review_session_status
+  );
+
+  const conflictMessage = firstNonEmpty(
+    session.conflictMessage,
+    session.conflict_message,
+    meta.conflictMessage,
+    meta.conflict_message,
+    root.conflictMessage,
+    root.conflict_message,
+    review.conflictMessage,
+    review.conflict_message,
+    root.reason,
+    review.reason,
+    meta.reason
+  );
+
+  const sourceFingerprint = firstNonEmpty(
+    session.sourceFingerprint,
+    session.source_fingerprint,
+    meta.sourceFingerprint,
+    meta.source_fingerprint,
+    root.sourceFingerprint,
+    root.source_fingerprint,
+    review.sourceFingerprint,
+    review.source_fingerprint
+  );
+
+  const freshnessHint = firstNonEmpty(
+    session.freshness,
+    session.syncState,
+    session.sync_state,
+    meta.freshness,
+    meta.syncState,
+    meta.sync_state,
+    root.freshness,
+    review.freshness,
+    sessionStatus
+  );
+
+  const conflicted =
+    boolFrom(
+      session.conflicted,
+      session.conflict,
+      session.hasConflict,
+      session.has_conflict,
+      meta.conflicted,
+      meta.conflict,
+      meta.hasConflict,
+      meta.has_conflict,
+      root.conflicted,
+      root.conflict,
+      review.conflicted,
+      review.conflict
+    ) ||
+    lower(freshnessHint).includes("conflict") ||
+    lower(sessionStatus).includes("conflict");
+
+  const stale =
+    boolFrom(
+      session.stale,
+      session.isStale,
+      session.is_stale,
+      meta.stale,
+      meta.isStale,
+      meta.is_stale,
+      root.stale,
+      root.isStale,
+      root.is_stale,
+      review.stale,
+      review.isStale,
+      review.is_stale
+    ) ||
+    /stale|expired|out[_-]?of[_-]?date|outdated/.test(lower(freshnessHint)) ||
+    /stale|expired|out[_-]?of[_-]?date|outdated/.test(lower(sessionStatus));
+
+  const freshness = normalizeFreshnessValue(freshnessHint, {
+    stale,
+    conflicted,
+    hasRevision: !!revision,
+  });
 
   return {
-    session: review?.session || null,
+    sessionId,
+    sessionStatus,
+    revision,
+    freshness,
+    stale: freshness === "stale",
+    conflicted: freshness === "conflict",
+    hasRevision: !!revision,
+    hasSessionId: !!sessionId,
+    sourceFingerprint,
+    conflictMessage,
+  };
+}
+
+export function normalizeReviewState(payload = {}) {
+  const review = obj(payload?.review || payload);
+  const sessionMeta = extractReviewSessionMeta(payload);
+  const rawSession = firstObject(review?.session, payload?.session);
+  const session =
+    sessionMeta.hasSessionId || Object.keys(rawSession).length
+      ? {
+          ...rawSession,
+          id: firstNonEmpty(
+            rawSession.id,
+            rawSession.sessionId,
+            rawSession.session_id,
+            sessionMeta.sessionId
+          ),
+          status: firstNonEmpty(
+            rawSession.status,
+            rawSession.reviewStatus,
+            rawSession.review_status,
+            sessionMeta.sessionStatus
+          ),
+          revision: firstNonEmpty(
+            rawSession.revision,
+            rawSession.reviewRevision,
+            rawSession.review_revision,
+            rawSession.version,
+            rawSession.etag,
+            sessionMeta.revision
+          ),
+          freshness: sessionMeta.freshness,
+          stale: sessionMeta.stale,
+          conflicted: sessionMeta.conflicted,
+          sourceFingerprint: firstNonEmpty(
+            rawSession.sourceFingerprint,
+            rawSession.source_fingerprint,
+            sessionMeta.sourceFingerprint
+          ),
+          conflictMessage: firstNonEmpty(
+            rawSession.conflictMessage,
+            rawSession.conflict_message,
+            sessionMeta.conflictMessage
+          ),
+        }
+      : null;
+
+  return {
+    session,
+    sessionMeta,
     draft: obj(review?.draft),
     sources: arr(review?.sources),
     events: arr(review?.events),

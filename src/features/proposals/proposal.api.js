@@ -1,3 +1,5 @@
+import { apiGet } from "../../api/client.js";
+
 export async function fetchLatestDraft(apiBase, proposalId) {
   if (!apiBase || !proposalId) return null;
 
@@ -5,14 +7,8 @@ export async function fetchLatestDraft(apiBase, proposalId) {
     String(proposalId)
   )}`;
 
-  const r = await fetch(url, {
-    method: "GET",
-    headers: { Accept: "application/json" },
-  });
-
-  if (!r.ok) return null;
-
-  const j = await r.json().catch(() => null);
+  const j = await apiGet(url).catch(() => null);
+  if (!j) return null;
 
   const item =
     j?.content ||

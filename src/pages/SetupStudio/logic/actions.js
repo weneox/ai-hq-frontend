@@ -186,6 +186,92 @@ function resolveKnowledgeCandidateUuid({
   return pickDirectKnowledgeCandidateUuid(matched);
 }
 
+function currentReviewConcurrencyMeta(review = {}, discoveryState = {}) {
+  const session = obj(review?.session);
+
+  return {
+    sessionId: s(
+      session.id ||
+        session.sessionId ||
+        session.session_id ||
+        discoveryState?.reviewSessionId
+    ),
+    sessionStatus: s(
+      session.status ||
+        session.reviewStatus ||
+        session.review_status ||
+        discoveryState?.reviewSessionStatus
+    ),
+    revision: s(
+      session.revision ||
+        session.reviewRevision ||
+        session.review_revision ||
+        session.version ||
+        session.etag ||
+        discoveryState?.reviewSessionRevision
+    ),
+    freshness: s(session.freshness || discoveryState?.reviewFreshness || "unknown"),
+    stale: !!(
+      session.stale ||
+      session.isStale ||
+      discoveryState?.reviewStale ||
+      s(session.freshness || discoveryState?.reviewFreshness).toLowerCase() === "stale"
+    ),
+    conflicted: !!(
+      session.conflicted ||
+      session.conflict ||
+      discoveryState?.reviewConflicted ||
+      s(session.freshness || discoveryState?.reviewFreshness).toLowerCase() === "conflict"
+    ),
+    message: s(
+      session.conflictMessage ||
+        session.conflict_message ||
+        discoveryState?.reviewConflictMessage
+    ),
+  };
+}
+
+function buildReviewConcurrencyPayload(meta = {}) {
+  const sessionId = s(meta.sessionId);
+  const revision = s(meta.revision);
+  const payload = {};
+
+  if (sessionId) {
+    payload.sessionId = sessionId;
+    payload.reviewSessionId = sessionId;
+  }
+
+  if (revision) {
+    payload.revision = revision;
+    payload.reviewRevision = revision;
+    payload.version = revision;
+  }
+
+  return payload;
+}
+
+function parseReviewConcurrencyError(error, meta = {}) {
+  const message = String(error?.message || error || "").trim();
+  const lowered = lowerText(message);
+  const conflicted =
+    /conflict|revision mismatch|version mismatch|precondition|409|412/.test(
+      lowered
+    );
+  const stale =
+    !conflicted &&
+    /stale|expired|out[_ -]?of[_ -]?date|outdated/.test(lowered);
+
+  return {
+    sessionId: s(meta.sessionId),
+    sessionStatus: s(meta.sessionStatus),
+    revision: s(meta.revision),
+    freshness: conflicted ? "conflict" : stale ? "stale" : s(meta.freshness || "unknown"),
+    stale,
+    conflicted,
+    message,
+  };
+}
+
 export function createSetupStudioActions(ctx) {
   const {
     navigate,
@@ -197,6 +283,7 @@ export function createSetupStudioActions(ctx) {
     reviewDraft,
     discoveryState,
     activeSourceScope,
+    activeReviewAligned,
     visibleKnowledgeItems,
 
     autoRevealRef,
@@ -238,6 +325,19 @@ export function createSetupStudioActions(ctx) {
     return empty;
   }
 
+  function setReviewSyncIssue(issue = {}) {
+    setDiscoveryState((prev) => ({
+      ...prev,
+      reviewSessionId: s(issue.sessionId || prev.reviewSessionId),
+      reviewSessionStatus: s(issue.sessionStatus || prev.reviewSessionStatus),
+      reviewSessionRevision: s(issue.revision || prev.reviewSessionRevision),
+      reviewFreshness: s(issue.freshness || prev.reviewFreshness || "unknown"),
+      reviewStale: !!issue.stale,
+      reviewConflicted: !!issue.conflicted,
+      reviewConflictMessage: s(issue.message || issue.conflictMessage),
+    }));
+  }
+
   async function loadCurrentReview({
     preserveBusinessForm = false,
     activateReviewSession = true,
@@ -265,10 +365,24 @@ export function createSetupStudioActions(ctx) {
         );
 
       if (!shouldApplyIntoActiveStudio) {
-        clearActiveReviewSession();
+        setCurrentReview(normalized);
+        setReviewDraft(legacy);
+        setReviewSyncIssue({
+          sessionId: s(normalized?.session?.id || legacy?.reviewSessionId),
+          sessionStatus: s(normalized?.session?.status || legacy?.reviewSessionStatus),
+          revision: s(normalized?.session?.revision || legacy?.reviewSessionRevision),
+          freshness: "source_mismatch",
+          message:
+            "A review session exists, but it belongs to a different source than the active draft.",
+        });
+
+        if (activateReviewSession) {
+          setFreshEntryMode(false);
+        }
+
         return {
-          currentReview: createEmptyReviewState(),
-          reviewDraft: createEmptyLegacyDraft(),
+          currentReview: normalized,
+          reviewDraft: legacy,
         };
       }
 
@@ -280,12 +394,17 @@ export function createSetupStudioActions(ctx) {
       }
 
       return applyReviewState(payload, { preserveBusinessForm });
-    } catch {
-      const empty = clearActiveReviewSession();
+    } catch (e) {
+      setReviewSyncIssue({
+        freshness: "unknown",
+        message: String(
+          e?.message || e || "The current review session could not be loaded."
+        ),
+      });
 
       return {
-        currentReview: empty,
-        reviewDraft: createEmptyLegacyDraft(),
+        currentReview,
+        reviewDraft,
       };
     }
   }
@@ -374,7 +493,21 @@ export function createSetupStudioActions(ctx) {
         );
 
       if (!shouldApplyIntoActiveStudio) {
-        clearActiveReviewSession();
+        setCurrentReview(reviewState);
+        setReviewDraft(legacyDraft);
+        setReviewSyncIssue({
+          sessionId: s(reviewState?.session?.id || legacyDraft?.reviewSessionId),
+          sessionStatus: s(
+            reviewState?.session?.status || legacyDraft?.reviewSessionStatus
+          ),
+          revision: s(
+            reviewState?.session?.revision || legacyDraft?.reviewSessionRevision
+          ),
+          freshness: "source_mismatch",
+          message:
+            "A review session was loaded, but it does not match the active source draft.",
+        });
+
         return {
           boot,
           workspace,
@@ -383,7 +516,7 @@ export function createSetupStudioActions(ctx) {
           pendingKnowledge,
           serviceItems,
           meta: nextMeta,
-          currentReview: createEmptyReviewState(),
+          currentReview: reviewState,
         };
       }
 
@@ -804,7 +937,33 @@ export function createSetupStudioActions(ctx) {
           fallbackProfile: bestIncomingProfile,
         });
       } else {
-        clearActiveReviewSession();
+        setCurrentReview(importedReview);
+        setReviewDraft(legacyImportedDraft);
+        setReviewSyncIssue({
+          sessionId: s(
+            importedReview?.session?.id || legacyImportedDraft?.reviewSessionId
+          ),
+          sessionStatus: s(
+            importedReview?.session?.status ||
+              legacyImportedDraft?.reviewSessionStatus
+          ),
+          revision: s(
+            importedReview?.session?.revision ||
+              legacyImportedDraft?.reviewSessionRevision
+          ),
+          freshness:
+            hasImportableSource && !importedReviewMatchesActiveSource
+              ? "source_mismatch"
+              : s(
+                  importedReview?.session?.freshness ||
+                    legacyImportedDraft?.reviewFreshness ||
+                    "unknown"
+                ),
+          message:
+            hasImportableSource && !importedReviewMatchesActiveSource
+              ? "The backend review session did not match this source yet, so editing remains isolated."
+              : s(legacyImportedDraft?.reviewConflictMessage),
+        });
       }
 
       const sourceId = s(
@@ -1038,11 +1197,33 @@ export function createSetupStudioActions(ctx) {
       setSavingBusiness(true);
       setError("");
 
-      const activeSessionId = s(currentReview?.session?.id);
+      const reviewMeta = currentReviewConcurrencyMeta(
+        currentReview,
+        discoveryState
+      );
+      const concurrencyPayload = buildReviewConcurrencyPayload(reviewMeta);
+      const activeSessionId = s(reviewMeta.sessionId);
 
       if (!activeSessionId) {
         throw new Error(
           "No active matching review session was found for this draft yet."
+        );
+      }
+
+      if (!activeReviewAligned) {
+        throw new Error(
+          "The loaded review session does not match the active source draft. Reload review before finalizing."
+        );
+      }
+
+      if (reviewMeta.conflicted || reviewMeta.stale) {
+        setReviewSyncIssue(reviewMeta);
+        throw new Error(
+          reviewMeta.conflicted
+            ? reviewMeta.message ||
+                "This review session is in conflict. Reload the draft before finalizing."
+            : reviewMeta.message ||
+                "This review session is stale. Reload the draft before finalizing."
         );
       }
 
@@ -1075,13 +1256,18 @@ export function createSetupStudioActions(ctx) {
           services: mergedServices,
           knowledgeItems: mergedKnowledgeItems,
         },
+        metadata: compactObject({
+          requestId: s(discoveryState.requestId),
+          ...concurrencyPayload,
+        }),
       });
 
       await finalizeCurrentSetupReview({
         reason: "setup_studio_finalize",
-        metadata: {
+        metadata: compactObject({
           requestId: s(discoveryState.requestId),
-        },
+          ...concurrencyPayload,
+        }),
       });
 
       setShowRefine(false);
@@ -1105,6 +1291,13 @@ export function createSetupStudioActions(ctx) {
 
       return { ok: true };
     } catch (e2) {
+      const reviewMeta = currentReviewConcurrencyMeta(currentReview, discoveryState);
+      const issue = parseReviewConcurrencyError(e2, reviewMeta);
+
+      if (issue.stale || issue.conflicted) {
+        setReviewSyncIssue(issue);
+      }
+
       setError(
         String(e2?.message || e2 || "The business twin could not be finalized.")
       );

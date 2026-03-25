@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import { FlaskConical } from "lucide-react";
 import AnalyticsTopbar from "../components/analytics/AnalyticsTopbar.jsx";
 import AnalyticsHero from "../components/analytics/AnalyticsHero.jsx";
 import MainChartSurface from "../components/analytics/MainChartSurface.jsx";
@@ -8,6 +9,27 @@ import ContentMixCard from "../components/analytics/ContentMixCard.jsx";
 import InsightCard from "../components/analytics/InsightCard.jsx";
 import { PLATFORMS } from "../components/analytics/analytics-data.js";
 import { buildSeries, compact } from "../components/analytics/analytics-utils.js";
+
+function InternalDemoBanner() {
+  return (
+    <div className="rounded-[24px] border border-amber-300/20 bg-amber-300/10 px-4 py-4 text-sm text-amber-50/90">
+      <div className="flex items-start gap-3">
+        <div className="mt-0.5 rounded-full border border-amber-200/20 bg-amber-200/10 p-2">
+          <FlaskConical className="h-4 w-4" />
+        </div>
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-100/70">
+            Internal demo route
+          </div>
+          <p className="mt-2 max-w-3xl leading-6 text-amber-50/88">
+            Analytics is not part of the default product navigation. This page remains reachable as
+            an internal/demo surface and is still powered by static analytics fixture data.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function Analytics() {
   const [activePlatform, setActivePlatform] = useState("instagram");
@@ -31,6 +53,8 @@ export default function Analytics() {
       <div className="pointer-events-none absolute right-[-120px] top-[100px] h-[360px] w-[360px] rounded-full bg-violet-400/8 blur-[140px]" />
 
       <main className="relative mx-auto flex w-full max-w-[1560px] flex-col gap-6 px-5 py-6 md:px-8 xl:px-10">
+        <InternalDemoBanner />
+
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}

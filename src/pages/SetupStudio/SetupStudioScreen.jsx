@@ -210,6 +210,7 @@ export default function SetupStudioScreen() {
     const legacy = mapCurrentReviewToLegacyDraft(normalized);
     const profile = obj(legacy.overview);
     const reviewInfo = resolveReviewSourceInfo(normalized, legacy);
+    const session = obj(normalized?.session);
 
     const metadata = {
       reviewRequired: !!legacy.reviewRequired,
@@ -245,6 +246,27 @@ export default function SetupStudioScreen() {
       reviewSessionId: s(normalized?.session?.id || prev.reviewSessionId),
       reviewSessionStatus: s(
         normalized?.session?.status || prev.reviewSessionStatus
+      ),
+      reviewSessionRevision: s(
+        session?.revision || legacy?.reviewSessionRevision || prev.reviewSessionRevision
+      ),
+      reviewFreshness: s(
+        session?.freshness || legacy?.reviewFreshness || prev.reviewFreshness || "unknown"
+      ),
+      reviewStale: !!(
+        session?.stale ||
+        legacy?.reviewStale ||
+        false
+      ),
+      reviewConflicted: !!(
+        session?.conflicted ||
+        legacy?.reviewConflicted ||
+        false
+      ),
+      reviewConflictMessage: s(
+        session?.conflictMessage ||
+          legacy?.reviewConflictMessage ||
+          ""
       ),
       hasResults:
         hasMeaningfulProfile(profile) ||
@@ -353,6 +375,89 @@ export default function SetupStudioScreen() {
     reviewDraft,
     discoveryState.lastSourceType,
     discoveryState.lastUrl,
+  ]);
+
+  const reviewSyncState = useMemo(() => {
+    const session = obj(currentReview?.session);
+    const sessionId = s(
+      session.id || session.sessionId || discoveryState.reviewSessionId
+    );
+    const revision = s(
+      session.revision ||
+        session.reviewRevision ||
+        session.version ||
+        session.etag ||
+        discoveryState.reviewSessionRevision
+    );
+    const freshness = s(
+      session.freshness || discoveryState.reviewFreshness || "unknown"
+    );
+    const stale = !!(
+      session.stale ||
+      session.isStale ||
+      discoveryState.reviewStale ||
+      freshness === "stale"
+    );
+    const conflicted = !!(
+      session.conflicted ||
+      session.conflict ||
+      discoveryState.reviewConflicted ||
+      freshness === "conflict"
+    );
+    const hasSession = !!sessionId;
+    const hasReviewContent = !!(
+      hasSession ||
+      Object.keys(obj(currentReview?.draft)).length ||
+      arr(currentReview?.sources).length ||
+      arr(currentReview?.bundleSources).length
+    );
+    const sourceMismatch =
+      !freshEntryMode &&
+      hasReviewContent &&
+      !activeReviewAligned &&
+      !!s(activeSourceScope.sourceUrl || discoveryState.lastUrl);
+
+    let message = s(
+      session.conflictMessage || discoveryState.reviewConflictMessage
+    );
+
+    if (!message && conflicted) {
+      message = "This review session is in conflict. Reload before finalizing.";
+    } else if (!message && stale) {
+      message = "This review session is stale. Reload before finalizing.";
+    } else if (!message && sourceMismatch) {
+      message =
+        "A review session exists, but it does not match the active source draft.";
+    } else if (!message && hasSession && !revision) {
+      message =
+        "Review session revision metadata is missing, so finalize remains backward-compatible but not concurrency-guaranteed.";
+    }
+
+    let level = "idle";
+    if (conflicted) level = "conflict";
+    else if (stale) level = "stale";
+    else if (sourceMismatch) level = "mismatch";
+    else if (hasSession && !revision) level = "unverified";
+    else if (hasSession) level = "ready";
+
+    return {
+      level,
+      sessionId,
+      revision,
+      freshness,
+      stale,
+      conflicted,
+      sourceMismatch,
+      hasSession,
+      message,
+      blocksFinalize: conflicted || stale || sourceMismatch,
+    };
+  }, [
+    currentReview,
+    discoveryState,
+    freshEntryMode,
+    activeReviewAligned,
+    activeSourceScope.sourceUrl,
   ]);
 
   const scopedCurrentReview = useMemo(() => {
@@ -623,6 +728,7 @@ export default function SetupStudioScreen() {
     reviewDraft,
     discoveryState,
     activeSourceScope,
+    activeReviewAligned,
     visibleKnowledgeItems,
 
     autoRevealRef,
@@ -760,6 +866,7 @@ export default function SetupStudioScreen() {
       services={services}
       reviewSources={visibleSources}
       reviewEvents={visibleEvents}
+      reviewSyncState={reviewSyncState}
       hasVisibleResults={hasVisibleResults}
       visibleKnowledgeCount={visibleKnowledgeItems.length}
       visibleServiceCount={visibleServiceItems.length}

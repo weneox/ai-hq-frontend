@@ -1,5 +1,5 @@
 // src/api/client.js
-// FINAL v1.1 — resilient API client for same-origin or explicit API base
+// FINAL v1.2 - resilient API client for same-origin or explicit API base
 
 const RAW = (import.meta.env.VITE_API_BASE || "").trim();
 const API_BASE = RAW ? RAW.replace(/\/+$/, "") : "";
@@ -10,6 +10,30 @@ function s(v, d = "") {
 
 function isAbsoluteUrl(value = "") {
   return /^https?:\/\//i.test(s(value));
+}
+
+function isPlainObject(value) {
+  return value && typeof value === "object" && !Array.isArray(value);
+}
+
+function normalizeHeaders(input = {}) {
+  if (input instanceof Headers) {
+    return Object.fromEntries(input.entries());
+  }
+
+  return isPlainObject(input) ? { ...input } : {};
+}
+
+function looksLikeHtmlDocument(value = "") {
+  const trimmed = s(value);
+  if (!trimmed) return false;
+
+  return (
+    /^<!doctype html/i.test(trimmed) ||
+    /^<html/i.test(trimmed) ||
+    trimmed.includes("<head") ||
+    trimmed.includes("<body")
+  );
 }
 
 export function getApiBase() {
@@ -51,19 +75,12 @@ async function readPayload(response) {
     }
   }
 
-  const trimmed = text.trim();
-  const looksLikeHtml =
-    /^<!doctype html/i.test(trimmed) ||
-    /^<html/i.test(trimmed) ||
-    trimmed.includes("<head") ||
-    trimmed.includes("<body");
-
-  if (looksLikeHtml) {
+  if (looksLikeHtmlDocument(text)) {
     return {
       ok: false,
       reason:
         "API returned HTML instead of JSON. Check VITE_API_BASE or your /api proxy/backend routing.",
-      raw: trimmed.slice(0, 600),
+      raw: text.trim().slice(0, 600),
     };
   }
 
@@ -79,7 +96,12 @@ async function readPayload(response) {
 
 function pickErr(payload, fallback) {
   const reason = s(payload?.reason);
-  const message = s(payload?.message || payload?.details?.message);
+  const message = s(
+    payload?.message ||
+      payload?.details?.message ||
+      payload?.details?.error ||
+      payload?.details?.reason
+  );
   const errorCode = s(payload?.error);
   const raw = s(payload?.raw);
 
@@ -95,34 +117,58 @@ function pickErr(payload, fallback) {
   return fallback;
 }
 
-async function request(path, { method = "GET", body } = {}) {
-  const url = apiUrl(path);
+export async function apiRequest(path, options = {}) {
+  const {
+    method = "GET",
+    body,
+    headers: extraHeaders,
+    credentials = "include",
+    allowStatuses = [],
+    rawBody = false,
+  } = options;
 
+  const url = apiUrl(path);
   const headers = {
     Accept: "application/json",
+    ...normalizeHeaders(extraHeaders),
   };
 
   const init = {
     method,
-    credentials: "include",
+    credentials,
     headers,
   };
 
   if (body !== undefined) {
-    headers["Content-Type"] = "application/json; charset=utf-8";
-    init.body = JSON.stringify(body ?? {});
+    const hasContentType = Object.keys(headers).some(
+      (key) => key.toLowerCase() === "content-type"
+    );
+
+    if (rawBody) {
+      init.body = body;
+    } else {
+      if (!hasContentType) {
+        headers["Content-Type"] = "application/json; charset=utf-8";
+      }
+      init.body = JSON.stringify(body ?? {});
+    }
   }
 
   let response;
   try {
     response = await fetch(url, init);
   } catch (e) {
-    throw new Error(`Network error (${method} ${path}): ${String(e?.message || e)}`);
+    throw new Error(
+      `Network error (${method} ${path}): ${String(e?.message || e)}`
+    );
   }
 
   const payload = await readPayload(response);
+  const allowed = Array.isArray(allowStatuses)
+    ? allowStatuses.includes(response.status)
+    : false;
 
-  if (!response.ok || payload?.ok === false) {
+  if ((!response.ok || payload?.ok === false) && !allowed) {
     throw new Error(
       pickErr(payload, `${method} ${path} failed (${response.status})`)
     );
@@ -131,22 +177,22 @@ async function request(path, { method = "GET", body } = {}) {
   return payload;
 }
 
-export async function apiGet(path) {
-  return request(path, { method: "GET" });
+export async function apiGet(path, options = {}) {
+  return apiRequest(path, { ...options, method: "GET" });
 }
 
-export async function apiPost(path, body) {
-  return request(path, { method: "POST", body });
+export async function apiPost(path, body, options = {}) {
+  return apiRequest(path, { ...options, method: "POST", body });
 }
 
-export async function apiPut(path, body) {
-  return request(path, { method: "PUT", body });
+export async function apiPut(path, body, options = {}) {
+  return apiRequest(path, { ...options, method: "PUT", body });
 }
 
-export async function apiPatch(path, body) {
-  return request(path, { method: "PATCH", body });
+export async function apiPatch(path, body, options = {}) {
+  return apiRequest(path, { ...options, method: "PATCH", body });
 }
 
-export async function apiDelete(path) {
-  return request(path, { method: "DELETE" });
+export async function apiDelete(path, options = {}) {
+  return apiRequest(path, { ...options, method: "DELETE" });
 }

@@ -1,40 +1,28 @@
 // src/pages/CommandPage.jsx
-// PREMIUM v6 — compact balanced operational layout
-// - keeps the GOOD logic from v5
-// - fixes composition / height / balance
-// - smaller header
-// - draft + agent task balanced on top
-// - activity + lead/conversation balanced below
-//
-// Notes:
+// INTERNAL DEMO SURFACE
 // - demo data is still local in this file
-// - replace with real hooks/api later
+// - not a source-of-truth operational surface
+// - retained temporarily as a reachable internal/demo route
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowRight,
-  Bot,
   CheckCircle2,
   Clock3,
   Command,
   FileText,
   Inbox,
-  MessageSquare,
-  Plus,
   Send,
   Sparkles,
   Target,
   UserCog,
+  FlaskConical,
 } from "lucide-react";
 
 function cx(...arr) {
   return arr.filter(Boolean).join(" ");
 }
-
-/* -------------------------------------------------------------------------- */
-/* DEMO DATA                                                                   */
-/* -------------------------------------------------------------------------- */
 
 const TODAY_DRAFT = {
   id: "draft-2026-03-09",
@@ -45,7 +33,7 @@ const TODAY_DRAFT = {
   language: "az",
   updatedAt: "8 min ago",
   summary:
-    "Bugünkü kontent draftı hazırdır. Vizual istiqamət və caption mood-u artıq formalaşıb.",
+    "Bugunku kontent drafti hazirdir. Vizual istiqameti ve caption mood-u artiq formalasib.",
   previewPoints: [
     "Futuristic automation control scene",
     "Premium, modern, direct caption direction",
@@ -105,10 +93,6 @@ const LIVE_ACTIVITY = [
   },
 ];
 
-/* -------------------------------------------------------------------------- */
-/* UI HELPERS                                                                  */
-/* -------------------------------------------------------------------------- */
-
 function toneDot(tone) {
   const map = {
     violet: "bg-violet-400",
@@ -150,29 +134,51 @@ function Surface({ className = "", children }) {
   );
 }
 
+function InternalDemoBanner() {
+  return (
+    <div className="mb-5 rounded-[24px] border border-amber-300/20 bg-amber-300/10 px-4 py-4 text-sm text-amber-50/90">
+      <div className="flex items-start gap-3">
+        <div className="mt-0.5 rounded-full border border-amber-200/20 bg-amber-200/10 p-2">
+          <FlaskConical className="h-4 w-4" />
+        </div>
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-100/70">
+            Internal demo
+          </div>
+          <p className="mt-2 max-w-3xl leading-6 text-amber-50/88">
+            This Command screen is still powered by local demo data in this file. It remains
+            reachable for internal exploration only and should not be treated as a live operational
+            source of truth.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CompactHeader({ navigate }) {
   const chips = [
     {
       id: "draft",
-      label: TODAY_DRAFT.exists ? "1 new draft today" : "No new draft today",
+      label: TODAY_DRAFT.exists ? "1 demo draft today" : "No demo draft today",
       href: TODAY_DRAFT.exists ? `/proposals/${TODAY_DRAFT.id}` : "/proposals?tab=draft",
       tone: "violet",
     },
     {
       id: "lead",
-      label: `${LEAD_RADAR.hotCount} hot leads`,
+      label: `${LEAD_RADAR.hotCount} demo hot leads`,
       href: "/leads",
       tone: "emerald",
     },
     {
       id: "dm",
-      label: `${CONVERSATION_PULSE.todayDmTouched} DMs touched`,
+      label: `${CONVERSATION_PULSE.todayDmTouched} demo DMs touched`,
       href: "/inbox",
       tone: "sky",
     },
     {
       id: "comments",
-      label: `${CONVERSATION_PULSE.autoCommentsWaiting} comments waiting`,
+      label: `${CONVERSATION_PULSE.autoCommentsWaiting} demo comments waiting`,
       href: "/comments",
       tone: "amber",
     },
@@ -180,25 +186,27 @@ function CompactHeader({ navigate }) {
 
   return (
     <div className="mb-6">
-      <Eyebrow icon={Command}>Command</Eyebrow>
+      <Eyebrow icon={Command}>Command demo</Eyebrow>
 
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="max-w-3xl">
           <h1 className="text-[28px] font-semibold tracking-[-0.05em] text-white md:text-[40px]">
-            Today’s operational view.
+            Internal demo operational view.
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-7 text-white/48">
-            Bugünkü draft, agent task, lead radar, DM fəaliyyəti və auto comment vəziyyəti burda görünür.
+            This screen is retained as a demo-only landing surface. Real operational work should
+            happen in Setup Studio, Inbox, Leads, Comments, Voice, Proposals, Executions, and
+            Settings.
           </p>
         </div>
 
         <button
           type="button"
-          onClick={() => navigate("/agents")}
+          onClick={() => navigate("/proposals")}
           className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2.5 text-sm text-white/78 transition hover:border-white/16 hover:bg-white/[0.08] hover:text-white"
         >
-          <Bot className="h-4 w-4" />
-          Open agents
+          <FileText className="h-4 w-4" />
+          Open proposals
         </button>
       </div>
 
@@ -226,12 +234,12 @@ function TodayDraftCard({ navigate }) {
       <Surface className="border-violet-400/12">
         <div className="pointer-events-none absolute -left-10 top-0 h-40 w-40 rounded-full bg-violet-500/10 blur-[90px]" />
         <div className="relative">
-          <Eyebrow icon={FileText}>Today’s draft</Eyebrow>
+          <Eyebrow icon={FileText}>Demo draft</Eyebrow>
           <h2 className="text-[28px] font-semibold tracking-[-0.04em] text-white">
-            No new draft today
+            No demo draft today
           </h2>
           <p className="mt-3 max-w-xl text-sm leading-7 text-white/50">
-            Hələ bu gün üçün yeni draft yaranmayıb.
+            This demo surface does not currently have a fresh local draft fixture.
           </p>
 
           <div className="mt-5 flex flex-wrap gap-2">
@@ -244,10 +252,10 @@ function TodayDraftCard({ navigate }) {
             </button>
             <button
               type="button"
-              onClick={() => navigate("/agents")}
+              onClick={() => navigate("/setup/studio")}
               className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm text-white/72 transition hover:border-white/16 hover:bg-white/[0.08] hover:text-white"
             >
-              Generate concept
+              Open Setup Studio
             </button>
           </div>
         </div>
@@ -261,7 +269,7 @@ function TodayDraftCard({ navigate }) {
       <div className="relative">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="max-w-2xl">
-            <Eyebrow icon={Sparkles}>Featured today</Eyebrow>
+            <Eyebrow icon={Sparkles}>Featured demo fixture</Eyebrow>
             <h2 className="text-[30px] font-semibold tracking-[-0.05em] text-white md:text-[36px]">
               {TODAY_DRAFT.title}
             </h2>
@@ -330,20 +338,20 @@ function AgentTaskComposer({ navigate }) {
 
   function submitTask(e) {
     e.preventDefault();
-    console.log("assign agent task", { agent, title });
-    navigate("/agents");
+    console.log("assign demo agent task", { agent, title });
+    navigate("/executions");
   }
 
   return (
     <Surface className="border-rose-400/12 h-full">
-      <Eyebrow icon={UserCog}>Assign task to agent</Eyebrow>
+      <Eyebrow icon={UserCog}>Demo task console</Eyebrow>
 
       <h3 className="text-[24px] font-semibold tracking-[-0.04em] text-white">
-        Quick task console
+        Internal task composer
       </h3>
 
       <p className="mt-2 text-sm leading-7 text-white/48">
-        Agent seç və qısa task başlığı ilə işi başlat.
+        This panel is a local demo interaction, not a live agent assignment workflow.
       </p>
 
       <form onSubmit={submitTask} className="mt-5 space-y-3">
@@ -381,15 +389,15 @@ function AgentTaskComposer({ navigate }) {
             className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-4 py-2.5 text-sm text-white/82 transition hover:border-white/16 hover:bg-white/[0.1] hover:text-white"
           >
             <Send className="h-4 w-4" />
-            Assign task
+            Log demo task
           </button>
 
           <button
             type="button"
-            onClick={() => navigate("/agents")}
+            onClick={() => navigate("/executions")}
             className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm text-white/72 transition hover:border-white/16 hover:bg-white/[0.08] hover:text-white"
           >
-            Open agents
+            Open executions
           </button>
         </div>
       </form>
@@ -402,18 +410,18 @@ function LiveFeed({ navigate }) {
     <Surface>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <Eyebrow icon={Clock3}>Live activity</Eyebrow>
+          <Eyebrow icon={Clock3}>Demo live activity</Eyebrow>
           <h3 className="text-[24px] font-semibold tracking-[-0.04em] text-white">
-            Today’s motion
+            Fixture activity
           </h3>
         </div>
 
         <button
           type="button"
-          onClick={() => navigate("/operations/executions")}
+          onClick={() => navigate("/executions")}
           className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-white/74 transition hover:border-white/16 hover:bg-white/[0.08] hover:text-white"
         >
-          View all
+          View executions
           <ArrowRight className="h-4 w-4" />
         </button>
       </div>
@@ -437,13 +445,13 @@ function LiveFeed({ navigate }) {
       <div className="mt-4 flex flex-wrap gap-2">
         <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/16 bg-emerald-500/10 px-3 py-1.5 text-sm text-emerald-200">
           <CheckCircle2 className="h-4 w-4" />
-          Workflow active
+          Demo workflow active
         </div>
         <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-sm text-white/60">
-          {LEAD_RADAR.hotCount} hot leads
+          {LEAD_RADAR.hotCount} demo hot leads
         </div>
         <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-sm text-white/60">
-          {CONVERSATION_PULSE.activeThreads} active threads
+          {CONVERSATION_PULSE.activeThreads} demo active threads
         </div>
       </div>
     </Surface>
@@ -455,12 +463,12 @@ function LeadRadar({ navigate }) {
     <Surface className="border-emerald-400/12 h-full">
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
-          <Eyebrow icon={Target}>Lead radar</Eyebrow>
+          <Eyebrow icon={Target}>Demo lead radar</Eyebrow>
           <h3 className="text-[24px] font-semibold tracking-[-0.04em] text-white">
-            Today’s leads
+            Fixture leads
           </h3>
           <p className="mt-2 text-sm leading-7 text-white/48">
-            Bugünkü lead axını və ən isti siqnallar.
+            This summary is backed by local fixture data and is not a live sales signal.
           </p>
         </div>
 
@@ -523,17 +531,17 @@ function LeadRadar({ navigate }) {
 function ConversationPulse({ navigate }) {
   return (
     <Surface className="border-sky-400/12 h-full">
-      <Eyebrow icon={Inbox}>Conversation pulse</Eyebrow>
+      <Eyebrow icon={Inbox}>Demo conversation pulse</Eyebrow>
 
       <h3 className="text-[24px] font-semibold tracking-[-0.04em] text-white">
-        DM + comments
+        Demo DM + comments
       </h3>
 
       <p className="mt-2 text-sm leading-7 text-white/48">
-        Bu gün neçə nəfərlə əlaqə qurulub və neçə comment gözləyir.
+        This panel shows local fixture counts and should not be treated as live message state.
       </p>
 
-      <div className="mt-4 grid gap-3 grid-cols-2">
+      <div className="mt-4 grid grid-cols-2 gap-3">
         <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-4">
           <div className="text-[11px] uppercase tracking-[0.2em] text-white/30">DM touched</div>
           <div className="mt-2 text-[26px] font-semibold tracking-[-0.05em] text-white">
@@ -595,6 +603,7 @@ export default function CommandPage() {
       </div>
 
       <div className="relative mx-auto max-w-[1560px] px-5 py-6 md:px-8 md:py-8">
+        <InternalDemoBanner />
         <CompactHeader navigate={navigate} />
 
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1.18fr)_400px]">

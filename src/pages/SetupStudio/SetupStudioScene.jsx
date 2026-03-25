@@ -81,6 +81,49 @@ function hasVoiceDraftInput({ discoveryForm = {}, discoveryState = {} }) {
   );
 }
 
+function ReviewSyncBanner({ reviewSyncState = {}, onReloadReviewDraft }) {
+  const state = obj(reviewSyncState);
+  const level = s(state.level);
+  const message = s(state.message);
+
+  if (!message || level === "idle" || level === "ready") return null;
+
+  const showRecoveryAction =
+    typeof onReloadReviewDraft === "function" &&
+    (level === "conflict" || level === "stale" || level === "mismatch");
+
+  const tone =
+    level === "conflict" || level === "stale"
+      ? "border-amber-200 bg-amber-50/90 text-amber-900"
+      : "border-slate-200 bg-slate-50/90 text-slate-700";
+
+  return (
+    <div className={`rounded-[24px] border px-4 py-3 text-sm ${tone}`}>
+      <div className="font-medium">
+        {level === "conflict"
+          ? "Review conflict detected"
+          : level === "stale"
+            ? "Review is stale"
+            : level === "mismatch"
+              ? "Review/source mismatch"
+              : "Review protection is limited"}
+      </div>
+      <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
+        <div className="leading-6">{message}</div>
+        {showRecoveryAction ? (
+          <button
+            type="button"
+            onClick={onReloadReviewDraft}
+            className="inline-flex h-9 items-center justify-center rounded-full border border-current/20 bg-white/60 px-3 text-xs font-medium transition hover:bg-white/80"
+          >
+            Reload draft
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export default function SetupStudioScene({
   loading,
   refreshing,
@@ -107,6 +150,7 @@ export default function SetupStudioScene({
   services = [],
   reviewSources = [],
   reviewEvents = [],
+  reviewSyncState = {},
   hasVisibleResults,
   visibleKnowledgeCount = 0,
   visibleServiceCount = 0,
@@ -119,6 +163,7 @@ export default function SetupStudioScene({
   onRejectKnowledge,
   onCreateSuggestedService,
   onOpenWorkspace,
+  onReloadReviewDraft,
   onRefresh,
   onToggleRefine,
   onToggleKnowledge,
@@ -339,6 +384,12 @@ export default function SetupStudioScene({
               />
 
               <div className="relative z-10 w-full max-w-[1180px]">
+                <div className="mb-3">
+                  <ReviewSyncBanner
+                    reviewSyncState={reviewSyncState}
+                    onReloadReviewDraft={onReloadReviewDraft}
+                  />
+                </div>
                 <SetupStudioRefineModal
                   savingBusiness={savingBusiness}
                   businessForm={businessForm}
@@ -380,6 +431,13 @@ export default function SetupStudioScene({
               />
               Refresh
             </button>
+          </div>
+
+          <div className="mb-6">
+            <ReviewSyncBanner
+              reviewSyncState={reviewSyncState}
+              onReloadReviewDraft={onReloadReviewDraft}
+            />
           </div>
 
           <AnimatePresence mode="wait">
@@ -471,6 +529,12 @@ export default function SetupStudioScene({
             />
 
             <div className="relative z-10 w-full max-w-[1180px]">
+              <div className="mb-3">
+                <ReviewSyncBanner
+                  reviewSyncState={reviewSyncState}
+                  onReloadReviewDraft={onReloadReviewDraft}
+                />
+              </div>
               <SetupStudioRefineModal
                 savingBusiness={savingBusiness}
                 businessForm={businessForm}

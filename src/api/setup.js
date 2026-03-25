@@ -1,5 +1,5 @@
 // src/api/setup.js
-// FINAL v2.1 — setup studio API with session review flow + unified analyze
+// FINAL v2.1 - setup studio API with session review flow + unified analyze
 
 import { apiGet, apiPost, apiPut, apiPatch } from "./client.js";
 

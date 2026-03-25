@@ -135,16 +135,16 @@ export default function App() {
           }
         >
           <Route index element={<CommandPage />} />
-          <Route path="analytics" element={<Analytics />} />
           <Route path="proposals" element={<Proposals />} />
           <Route path="inbox" element={<Inbox />} />
           <Route path="leads" element={<Leads />} />
           <Route path="comments" element={<Comments />} />
           <Route path="voice" element={<Voice />} />
           <Route path="executions" element={<Executions />} />
+          <Route path="settings" element={<Settings />} />
+          <Route path="analytics" element={<Analytics />} />
           <Route path="agents" element={<Agents />} />
           <Route path="threads" element={<Threads />} />
-          <Route path="settings" element={<Settings />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />
