@@ -1,7 +1,7 @@
 // src/api/client.js
 // FINAL v1.2 - resilient API client for same-origin or explicit API base
 
-const RAW = (import.meta.env.VITE_API_BASE || "").trim();
+const RAW = String(import.meta.env?.VITE_API_BASE ?? "").trim();
 const API_BASE = RAW ? RAW.replace(/\/+$/, "") : "";
 
 function s(v, d = "") {
@@ -169,9 +169,13 @@ export async function apiRequest(path, options = {}) {
     : false;
 
   if ((!response.ok || payload?.ok === false) && !allowed) {
-    throw new Error(
+    const error = new Error(
       pickErr(payload, `${method} ${path} failed (${response.status})`)
     );
+    error.status = response.status;
+    error.payload = payload;
+    error.code = s(payload?.code || payload?.error);
+    throw error;
   }
 
   return payload;

@@ -3,6 +3,11 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
+  test: {
+    environment: "jsdom",
+    setupFiles: "./src/test/vitest.setup.js",
+    css: true,
+  },
   build: {
     rollupOptions: {
       output: {
@@ -12,6 +17,16 @@ export default defineConfig({
           if (id.includes("react-router")) return "router";
           if (id.includes("framer-motion")) return "motion";
           if (id.includes("lucide-react")) return "icons";
+          if (id.includes("recharts")) return "charts";
+          if (
+            id.includes("/three/") ||
+            id.includes("@react-three") ||
+            id.includes("@react-spring/three") ||
+            id.includes("maath") ||
+            id.includes("postprocessing")
+          ) {
+            return "three-stack";
+          }
           if (id.includes("@radix-ui")) return "radix";
           if (id.includes("node_modules")) return "vendor";
 

@@ -101,6 +101,7 @@ export function createSetupStudioFinalize(ctx, helpers) {
       });
 
       await patchCurrentSetupReview({
+        ...concurrencyPayload,
         patch: {
           businessProfile: businessProfilePatch,
           capabilities: capabilitiesPatch,
@@ -109,15 +110,14 @@ export function createSetupStudioFinalize(ctx, helpers) {
         },
         metadata: compactObject({
           requestId: s(discoveryState.requestId),
-          ...concurrencyPayload,
         }),
       });
 
       await finalizeCurrentSetupReview({
+        ...concurrencyPayload,
         reason: "setup_studio_finalize",
         metadata: compactObject({
           requestId: s(discoveryState.requestId),
-          ...concurrencyPayload,
         }),
       });
 

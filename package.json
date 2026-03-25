@@ -12,6 +12,10 @@
     "dev:host": "vite --host",
     "build": "vite build",
     "preview": "vite preview",
+    "test": "npm run test:contracts && npm run test:smoke",
+    "test:contracts": "node --test --test-isolation=none src/api/truth.test.js src/pages/Settings/hooks/useSourceIntelligence.test.js src/pages/SetupStudio/hooks/setupStudioActionShared.test.js src/pages/SetupStudio/state/shared.test.js",
+    "test:smoke": "vitest run --pool threads --maxWorkers 1 src/App.smoke.test.jsx src/pages/SetupStudio/SetupStudioScene.smoke.test.jsx src/pages/Truth/TruthViewerPage.smoke.test.jsx src/pages/Settings/SettingsController.smoke.test.jsx",
+    "test:browser:smoke": "playwright test",
     "lint": "eslint .",
     "clean": "rimraf dist node_modules/.vite"
   },
@@ -50,6 +54,9 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@playwright/test": "^1.58.2",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
@@ -58,10 +65,12 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
+    "jsdom": "^29.0.1",
     "postcss": "^8.5.6",
     "rimraf": "^6.0.1",
     "tailwindcss": "^3.4.4",
     "vite": "^7.3.1",
-    "vite-plugin-pwa": "^1.2.0"
+    "vite-plugin-pwa": "^1.2.0",
+    "vitest": "^4.1.1"
   }
 }

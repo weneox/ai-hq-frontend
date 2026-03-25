@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { NavLink, useLocation } from "react-router-dom";
 import {
@@ -17,7 +17,7 @@ import {
   PhoneCall,
   ScrollText,
 } from "lucide-react";
-import ExecutiveMark3D from "./ExecutiveMark3D.jsx";
+const ExecutiveMark3D = lazy(() => import("./ExecutiveMark3D.jsx"));
 
 const NAV_ITEMS = [
   { label: "Command Demo", icon: Command, to: "/" },
@@ -70,6 +70,18 @@ function CountBadge({ count, active = false }) {
     >
       {count > 99 ? "99+" : count}
     </span>
+  );
+}
+
+function BrandMarkFallback({ className = "" }) {
+  return (
+    <div
+      className={cn(
+        "rounded-full border border-white/18 bg-[radial-gradient(circle,rgba(255,255,255,0.22),rgba(255,255,255,0.05)_52%,transparent_74%)] shadow-[0_0_24px_rgba(125,211,252,0.12)]",
+        className
+      )}
+      aria-hidden="true"
+    />
   );
 }
 
@@ -244,7 +256,11 @@ function BrandDock({ expanded }) {
         >
           <div className="relative flex items-center justify-center">
             <div className="absolute h-[64px] w-[64px] rounded-full bg-[radial-gradient(circle,rgba(110,241,255,0.05),rgba(110,241,255,0.014)_46%,transparent_72%)] blur-[10px]" />
-            <ExecutiveMark3D className="relative h-[38px] w-[38px]" />
+            <Suspense
+              fallback={<BrandMarkFallback className="relative h-[38px] w-[38px]" />}
+            >
+              <ExecutiveMark3D className="relative h-[38px] w-[38px]" />
+            </Suspense>
           </div>
         </div>
 

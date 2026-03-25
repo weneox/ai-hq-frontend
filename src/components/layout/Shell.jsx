@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import Sidebar from "./Sidebar.jsx";
 import Header from "./Header.jsx";
 import { realtimeStore } from "../../lib/realtime/realtimeStore.js";
@@ -93,6 +93,7 @@ function isLiveVoiceStatus(v) {
 export default function Shell() {
   const [expanded, setExpanded] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const location = useLocation();
 
   const refreshTimerRef = useRef(0);
 
@@ -187,6 +188,11 @@ export default function Shell() {
   useEffect(() => {
     loadShellStats();
   }, []);
+
+  useEffect(() => {
+    setMobileOpen(false);
+    loadShellStats();
+  }, [location.pathname]);
 
   useEffect(() => {
     const unsubscribeStatus = realtimeStore.subscribeStatus((status) => {

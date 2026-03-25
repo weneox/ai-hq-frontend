@@ -18,37 +18,49 @@ function toFiniteNumber(value, fallback = 0) {
 }
 
 function describeSourceSyncOutcome(result = {}) {
+  const review =
+    result && typeof result.review === "object" && !Array.isArray(result.review)
+      ? result.review
+      : {};
   const run = result && typeof result.run === "object" && !Array.isArray(result.run) ? result.run : {};
   const source =
     result && typeof result.source === "object" && !Array.isArray(result.source)
       ? result.source
       : {};
-  const syncStatus = String(run?.status || source?.sync_status || "").trim().toLowerCase();
+  const syncStatus = String(result?.status || run?.status || source?.sync_status || "").trim().toLowerCase();
+  const reviewSessionId = String(review?.sessionId || "").trim();
   const pendingReviewCount = Math.max(
-    toFiniteNumber(run?.pendingReviewCount, 0),
-    toFiniteNumber(run?.reviewRequiredCount, 0),
-    toFiniteNumber(run?.candidateCount, 0),
-    toFiniteNumber(source?.pending_review_count, 0),
-    toFiniteNumber(source?.metadata_json?.pendingReviewCount, 0),
-    toFiniteNumber(source?.metadata_json?.candidateCount, 0)
+    toFiniteNumber(review?.candidateDraftCount, 0),
+    toFiniteNumber(review?.candidateCreatedCount, 0)
   );
+  const reviewRequired = !!review?.required;
 
-  if (syncStatus === "running" || syncStatus === "queued" || syncStatus === "pending") {
-    return "Source sync started. New evidence may still require review before approved truth changes.";
+  if (result?.accepted || syncStatus === "running" || syncStatus === "queued" || syncStatus === "pending") {
+    return reviewRequired || reviewSessionId
+      ? "Source sync was queued and opened review-backed follow-up work. Approved truth will not change until review is completed."
+      : "Source sync was queued. New evidence may still require review before approved truth changes.";
   }
 
   if (syncStatus === "failed" || syncStatus === "error") {
     return "Source sync did not complete cleanly. Approved truth remains unchanged.";
   }
 
-  if (pendingReviewCount > 0) {
+  if (reviewRequired && pendingReviewCount > 0) {
     return `Source sync refreshed evidence. ${pendingReviewCount} review item${
       pendingReviewCount === 1 ? "" : "s"
     } may affect approved truth next.`;
   }
 
+  if (reviewRequired) {
+    return "Source sync refreshed evidence and opened review-backed follow-up work before approved truth can change.";
+  }
+
   return "Source sync refreshed evidence. Review may still be required before approved truth changes.";
 }
+
+export const __test__ = {
+  describeSourceSyncOutcome,
+};
 
 export function useSourceIntelligence({
   tenantKey,

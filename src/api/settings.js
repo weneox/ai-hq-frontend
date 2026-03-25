@@ -258,7 +258,11 @@ export async function startSettingsSourceSync(id, payload = {}) {
   const j = await apiPost(`/api/settings/sources/${x}/sync`, payload);
   ensureOk(j, "Failed to start source sync");
   return {
+    accepted: !!j?.accepted,
     message: j?.message || "",
+    status: j?.status || "",
+    poll: j?.poll || null,
+    review: j?.review || null,
     source: j?.source || null,
     run: j?.run || null,
   };

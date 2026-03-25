@@ -79,6 +79,18 @@ import BrandSection from "./sections/BrandSection.jsx";
 import AiPolicySection from "./sections/AiPolicySection.jsx";
 import SourcesSection from "./sections/SourcesSection.jsx";
 import KnowledgeReviewSection from "./sections/KnowledgeReviewSection.jsx";
+import AutoContentSection from "./sections/AutoContentSection.jsx";
+import NotificationsSection from "./sections/NotificationsSection.jsx";
+import BusinessFactsSection from "./sections/BusinessFactsSection.jsx";
+import ChannelPoliciesSection from "./sections/ChannelPoliciesSection.jsx";
+import LocationsSection from "./sections/LocationsSection.jsx";
+import ContactsSection from "./sections/ContactsSection.jsx";
+import {
+  createNewBusinessFact,
+  createNewChannelPolicy,
+  createNewContact,
+  createNewLocation,
+} from "./settingsShared.js";
 
 function pad2(n) {
   return String(Number(n || 0)).padStart(2, "0");
@@ -122,8 +134,29 @@ function truthMaintenanceMeta(item = {}) {
     item && typeof item.settings_json === "object" && !Array.isArray(item.settings_json)
       ? item.settings_json
       : {};
+  const review =
+    item && typeof item.review === "object" && !Array.isArray(item.review)
+      ? item.review
+      : {};
   const syncStatus = String(item?.sync_status || "").trim().toLowerCase();
+  const projectionStatus = String(
+    review?.projectionStatus ||
+      item?.projection_status ||
+      metadata?.projection_status ||
+      settings?.projection_status
+  )
+    .trim()
+    .toLowerCase();
+  const reviewSessionId = String(
+    review?.sessionId ||
+      item?.review_session_id ||
+      item?.reviewSessionId ||
+      metadata?.review_session_id ||
+      metadata?.reviewSessionId
+  ).trim();
   const pendingReviewCount = Math.max(
+    toFiniteNumber(review?.candidateDraftCount, 0),
+    toFiniteNumber(review?.candidateCreatedCount, 0),
     toFiniteNumber(item?.pending_review_count, 0),
     toFiniteNumber(metadata?.pendingReviewCount, 0),
     toFiniteNumber(metadata?.reviewRequiredCount, 0),
@@ -131,7 +164,10 @@ function truthMaintenanceMeta(item = {}) {
     toFiniteNumber(settings?.pendingReviewCount, 0)
   );
   const reviewRequired =
+    !!review?.required ||
     pendingReviewCount > 0 ||
+    projectionStatus === "review_required" ||
+    !!reviewSessionId ||
     !!(
       item?.review_required ??
       metadata?.reviewRequired ??
@@ -194,33 +230,41 @@ function truthMaintenanceMeta(item = {}) {
 }
 
 function describeSourceSyncOutcome(result = {}) {
+  const review =
+    result && typeof result.review === "object" && !Array.isArray(result.review)
+      ? result.review
+      : {};
   const run = result && typeof result.run === "object" && !Array.isArray(result.run) ? result.run : {};
   const source =
     result && typeof result.source === "object" && !Array.isArray(result.source)
       ? result.source
       : {};
-  const syncStatus = String(run?.status || source?.sync_status || "").trim().toLowerCase();
+  const syncStatus = String(result?.status || run?.status || source?.sync_status || "").trim().toLowerCase();
+  const reviewSessionId = String(review?.sessionId || "").trim();
   const pendingReviewCount = Math.max(
-    toFiniteNumber(run?.pendingReviewCount, 0),
-    toFiniteNumber(run?.reviewRequiredCount, 0),
-    toFiniteNumber(run?.candidateCount, 0),
-    toFiniteNumber(source?.pending_review_count, 0),
-    toFiniteNumber(source?.metadata_json?.pendingReviewCount, 0),
-    toFiniteNumber(source?.metadata_json?.candidateCount, 0)
+    toFiniteNumber(review?.candidateDraftCount, 0),
+    toFiniteNumber(review?.candidateCreatedCount, 0)
   );
+  const reviewRequired = !!review?.required;
 
-  if (syncStatus === "running" || syncStatus === "queued" || syncStatus === "pending") {
-    return "Source sync started. New evidence may still require review before approved truth changes.";
+  if (result?.accepted || syncStatus === "running" || syncStatus === "queued" || syncStatus === "pending") {
+    return reviewRequired || reviewSessionId
+      ? "Source sync was queued and opened review-backed follow-up work. Approved truth will not change until review is completed."
+      : "Source sync was queued. New evidence may still require review before approved truth changes.";
   }
 
   if (syncStatus === "failed" || syncStatus === "error") {
     return "Source sync did not complete cleanly. Approved truth remains unchanged.";
   }
 
-  if (pendingReviewCount > 0) {
+  if (reviewRequired && pendingReviewCount > 0) {
     return `Source sync refreshed evidence. ${pendingReviewCount} review item${
       pendingReviewCount === 1 ? "" : "s"
     } may affect approved truth next.`;
+  }
+
+  if (reviewRequired) {
+    return "Source sync refreshed evidence and opened review-backed follow-up work before approved truth can change.";
   }
 
   return "Source sync refreshed evidence. Review may still be required before approved truth changes.";
@@ -1207,1629 +1251,6 @@ function KnowledgeCandidateCard({
   );
 }
 
-function AutoContentPanel({ aiPolicy, patchAi, canManage }) {
-  const publishPolicy =
-    aiPolicy && typeof aiPolicy.publish_policy === "object" && !Array.isArray(aiPolicy.publish_policy)
-      ? aiPolicy.publish_policy
-      : {};
-
-  const schedule =
-    publishPolicy && typeof publishPolicy.schedule === "object" && !Array.isArray(publishPolicy.schedule)
-      ? publishPolicy.schedule
-      : { enabled: false, time: "10:00", timezone: "Asia/Baku" };
-
-  const automation =
-    publishPolicy && typeof publishPolicy.automation === "object" && !Array.isArray(publishPolicy.automation)
-      ? publishPolicy.automation
-      : { enabled: false, mode: "manual" };
-
-  function patchPublishPolicy(next) {
-    if (!canManage) return;
-
-    patchAi("publish_policy", {
-      ...publishPolicy,
-      ...next,
-      schedule: {
-        ...(publishPolicy.schedule || {}),
-        ...(next.schedule || {}),
-      },
-      automation: {
-        ...(publishPolicy.automation || {}),
-        ...(next.automation || {}),
-      },
-    });
-  }
-
-  function onScheduleEnabledChange(checked) {
-    patchPublishPolicy({
-      schedule: {
-        ...schedule,
-        enabled: !!checked,
-      },
-    });
-  }
-
-  function onTimeChange(value) {
-    patchPublishPolicy({
-      schedule: {
-        ...schedule,
-        time: normalizeTimeString(value, "10:00"),
-      },
-    });
-  }
-
-  function onTimezoneChange(value) {
-    patchPublishPolicy({
-      schedule: {
-        ...schedule,
-        timezone: String(value || "Asia/Baku").trim() || "Asia/Baku",
-      },
-    });
-  }
-
-  function onAutomationEnabledChange(checked) {
-    const enabled = !!checked;
-    patchPublishPolicy({
-      automation: {
-        enabled,
-        mode: enabled ? "full_auto" : "manual",
-      },
-    });
-  }
-
-  function onModeChange(value) {
-    const mode = normalizeAutomationMode(value, "manual");
-    patchPublishPolicy({
-      automation: {
-        enabled: mode === "full_auto",
-        mode,
-      },
-    });
-  }
-
-  const fullAuto = !!automation.enabled || automation.mode === "full_auto";
-
-  return (
-    <SettingsSection
-      eyebrow="Automation"
-      title="Auto Content"
-      subtitle="Daily scheduled draft creation və istəyə görə tam avtomatik publish davranışı."
-      tone="default"
-    >
-      <div className="space-y-6">
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-          <Card variant="surface" padded="lg" className="rounded-[28px]">
-            <div className="space-y-5">
-              <div className="space-y-2">
-                <div className="inline-flex flex-wrap items-center gap-2">
-                  <Badge tone="info" variant="subtle" dot>
-                    Content Scheduler
-                  </Badge>
-                  <Badge
-                    tone={schedule.enabled ? "success" : "neutral"}
-                    variant="subtle"
-                    dot={schedule.enabled}
-                  >
-                    {schedule.enabled ? "Scheduled" : "Disabled"}
-                  </Badge>
-                </div>
-
-                <div className="text-lg font-semibold tracking-[-0.02em] text-slate-950 dark:text-white">
-                  Scheduled Draft Flow
-                </div>
-                <div className="text-sm leading-6 text-slate-500 dark:text-slate-400">
-                  Hər gün müəyyən vaxtda content flow başlasın və draft yaradılsın.
-                </div>
-              </div>
-
-              <FeatureToggleCard
-                title="Scheduled Content"
-                subtitle="Cron vaxtında content flow avtomatik başlasın."
-                checked={!!schedule.enabled}
-                onChange={onScheduleEnabledChange}
-                disabled={!canManage}
-              />
-
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                <Field label="Run Time" hint="HH:MM formatında gündəlik işə düşmə vaxtı.">
-                  <Input
-                    type="time"
-                    value={normalizeTimeString(schedule.time, "10:00")}
-                    disabled={!canManage}
-                    onChange={(e) => onTimeChange(e.target.value)}
-                  />
-                </Field>
-
-                <Field label="Timezone" hint="Execution üçün əsas timezone.">
-                  <Input
-                    type="text"
-                    value={schedule.timezone || "Asia/Baku"}
-                    disabled={!canManage}
-                    onChange={(e) => onTimezoneChange(e.target.value)}
-                    placeholder="Asia/Baku"
-                  />
-                </Field>
-
-                <StatTile
-                  label="Next Mode"
-                  value={schedule.enabled ? "Active" : "Idle"}
-                  hint="Scheduler runtime state"
-                  tone={schedule.enabled ? "success" : "neutral"}
-                />
-              </div>
-            </div>
-          </Card>
-
-          <Card variant="surface" padded="lg" className="rounded-[28px]">
-            <div className="space-y-5">
-              <div className="space-y-2">
-                <div className="inline-flex flex-wrap items-center gap-2">
-                  <Badge
-                    tone={fullAuto ? "warn" : "neutral"}
-                    variant="subtle"
-                    dot={fullAuto}
-                  >
-                    {fullAuto ? "Full Auto" : "Manual Gate"}
-                  </Badge>
-                </div>
-
-                <div className="text-lg font-semibold tracking-[-0.02em] text-slate-950 dark:text-white">
-                  Publish Automation
-                </div>
-                <div className="text-sm leading-6 text-slate-500 dark:text-slate-400">
-                  Draft approval olmadan asset və publish mərhələsinə keçid davranışı.
-                </div>
-              </div>
-
-              <FeatureToggleCard
-                title="Full Auto Publish"
-                subtitle="Risklidir. Manual təsdiq olmadan publish mərhələsinə keçə bilər."
-                checked={fullAuto}
-                onChange={onAutomationEnabledChange}
-                disabled={!canManage}
-              />
-
-              <Field label="Publish Mode" hint="Manual approval və ya tam avtomatik rejim.">
-                <Select
-                  value={normalizeAutomationMode(automation.mode, "manual")}
-                  disabled={!canManage}
-                  onChange={(e) => onModeChange(e.target.value)}
-                >
-                  <option value="manual">Manual approval</option>
-                  <option value="full_auto">Full auto publish</option>
-                </Select>
-              </Field>
-
-              <div className="rounded-[24px] border border-amber-200/80 bg-amber-50/90 px-4 py-4 text-sm text-amber-800 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-200">
-                Full auto publish aktiv olanda sistem cron vaxtında draft yarada,
-                asset/video generasiya edə və publish mərhələsinə manual təsdiq olmadan
-                keçə bilər.
-              </div>
-            </div>
-          </Card>
-        </div>
-      </div>
-    </SettingsSection>
-  );
-}
-
-function NotificationsPanel({
-  perm,
-  pushBusy,
-  pushMessage,
-  env,
-  enableNotifications,
-}) {
-  const permissionTone =
-    perm === "granted" ? "success" : perm === "denied" ? "danger" : "warn";
-
-  return (
-    <SettingsSection
-      eyebrow="Notifications"
-      title="Mobile Notifications"
-      subtitle="Push subscription status və browser notification icazələri."
-      tone="default"
-    >
-      <div className="space-y-6">
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-          <Card variant="surface" padded="lg" className="rounded-[28px]">
-            <div className="space-y-5">
-              <div className="space-y-2">
-                <div className="inline-flex flex-wrap items-center gap-2">
-                  <Badge tone="info" variant="subtle" dot>
-                    Push Delivery
-                  </Badge>
-                  <Badge tone={permissionTone} variant="subtle" dot>
-                    {perm}
-                  </Badge>
-                </div>
-
-                <div className="text-lg font-semibold tracking-[-0.02em] text-slate-950 dark:text-white">
-                  Browser Permission State
-                </div>
-                <div className="text-sm leading-6 text-slate-500 dark:text-slate-400">
-                  Real-time proposal və execution update-ləri üçün browser notification icazəsi.
-                </div>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-3">
-                <StatTile
-                  label="Permission"
-                  value={perm}
-                  hint="Browser notification state"
-                  tone={permissionTone}
-                />
-                <StatTile
-                  label="VAPID"
-                  value={env.VAPID ? "Configured" : "Missing"}
-                  hint={env.VAPID ? `len=${env.VAPID.length}` : "VITE_VAPID_PUBLIC_KEY"}
-                  tone={env.VAPID ? "success" : "danger"}
-                />
-                <StatTile
-                  label="API Base"
-                  value={env.API_BASE ? "Configured" : "Default"}
-                  hint={env.API_BASE || "Using default"}
-                  tone="info"
-                />
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <Button
-                  onClick={enableNotifications}
-                  disabled={pushBusy}
-                  leftIcon={<BellRing className="h-4 w-4" />}
-                >
-                  {pushBusy ? "Aktiv edilir..." : "Enable Notifications"}
-                </Button>
-              </div>
-            </div>
-          </Card>
-
-          <Card variant="subtle" padded="lg" className="rounded-[28px]">
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <div className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-400 dark:text-slate-500">
-                  Delivery Notes
-                </div>
-                <div className="text-lg font-semibold tracking-[-0.02em] text-slate-950 dark:text-white">
-                  Push Status
-                </div>
-                <div className="text-sm leading-6 text-slate-500 dark:text-slate-400">
-                  Subscription, permission və environment readiness burada görünür.
-                </div>
-              </div>
-
-              {pushMessage ? (
-                <div className="rounded-[24px] border border-slate-200/80 bg-white/80 px-4 py-4 text-sm text-slate-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300">
-                  {pushMessage}
-                </div>
-              ) : (
-                <div className="rounded-[24px] border border-dashed border-slate-200/80 bg-white/60 px-4 py-4 text-sm text-slate-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-400">
-                  Hələ push əməliyyatı yoxdur.
-                </div>
-              )}
-            </div>
-          </Card>
-        </div>
-      </div>
-    </SettingsSection>
-  );
-}
-
-function BusinessFactsPanel({
-  items,
-  canManage,
-  onCreate,
-  onSave,
-  onDelete,
-}) {
-  const [savingId, setSavingId] = useState("");
-  const [deletingId, setDeletingId] = useState("");
-
-  async function handleSave(item) {
-    setSavingId(String(item.id || item.fact_key || "new"));
-    try {
-      await onSave(item);
-    } finally {
-      setSavingId("");
-    }
-  }
-
-  async function handleDelete(item) {
-    if (!item?.id) return;
-    setDeletingId(String(item.id));
-    try {
-      await onDelete(item.id);
-    } finally {
-      setDeletingId("");
-    }
-  }
-
-  return (
-    <SettingsSection
-      eyebrow="Business Brain"
-      title="Business Facts"
-      subtitle="Şirkətə aid əsas faktlar, qaydalar, pricing qaydaları, satış məntiqi və xüsusi cavab konteksti."
-      tone="default"
-    >
-      <div className="space-y-4">
-        <div className="flex justify-end">
-          <Button onClick={onCreate} disabled={!canManage} leftIcon={<BrainCircuit className="h-4 w-4" />}>
-            Add Fact
-          </Button>
-        </div>
-
-        {!items.length ? (
-          <EmptyState
-            title="Hələ business fact yoxdur"
-            subtitle="Qiymət qaydaları, çatdırılma qaydaları, xüsusi cavab qaydaları və s. buraya əlavə olunmalıdır."
-            actionLabel="Create First Fact"
-            onAction={onCreate}
-            disabled={!canManage}
-          />
-        ) : (
-          <div className="space-y-4">
-            {items.map((item, idx) => (
-              <BusinessFactCard
-                key={item.id || `${item.fact_key || "fact"}-${idx}`}
-                item={item}
-                canManage={canManage}
-                saving={savingId === String(item.id || item.fact_key || "new")}
-                deleting={deletingId === String(item.id || "")}
-                onSave={handleSave}
-                onDelete={handleDelete}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-    </SettingsSection>
-  );
-}
-
-function BusinessFactCard({ item, canManage, onSave, onDelete, saving, deleting }) {
-  const [local, setLocal] = useState({
-    id: item?.id || "",
-    fact_key: item?.fact_key || "",
-    fact_group: item?.fact_group || "general",
-    title: item?.title || "",
-    value_text: item?.value_text || "",
-    language: item?.language || "az",
-    priority: item?.priority ?? 100,
-    enabled: typeof item?.enabled === "boolean" ? item.enabled : true,
-    source_type: item?.source_type || "manual",
-  });
-
-  useEffect(() => {
-    setLocal({
-      id: item?.id || "",
-      fact_key: item?.fact_key || "",
-      fact_group: item?.fact_group || "general",
-      title: item?.title || "",
-      value_text: item?.value_text || "",
-      language: item?.language || "az",
-      priority: item?.priority ?? 100,
-      enabled: typeof item?.enabled === "boolean" ? item.enabled : true,
-      source_type: item?.source_type || "manual",
-    });
-  }, [item]);
-
-  function patch(key, value) {
-    setLocal((prev) => ({ ...prev, [key]: value }));
-  }
-
-  return (
-    <Card variant="surface" padded="lg" className="rounded-[28px]">
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Field label="Fact Key" hint="Məs: pricing_policy, shipping_rule, service_scope">
-          <Input
-            value={local.fact_key}
-            disabled={!canManage}
-            onChange={(e) => patch("fact_key", e.target.value)}
-            placeholder="pricing_policy"
-          />
-        </Field>
-
-        <Field label="Group" hint="general, pricing, support, sales və s.">
-          <Input
-            value={local.fact_group}
-            disabled={!canManage}
-            onChange={(e) => patch("fact_group", e.target.value)}
-            placeholder="general"
-          />
-        </Field>
-
-        <Field label="Title" hint="UI və admin üçün qısa başlıq">
-          <Input
-            value={local.title}
-            disabled={!canManage}
-            onChange={(e) => patch("title", e.target.value)}
-            placeholder="Pricing Policy"
-          />
-        </Field>
-
-        <Field label="Language" hint="az / en / ru / tr">
-          <Input
-            value={local.language}
-            disabled={!canManage}
-            onChange={(e) => patch("language", e.target.value)}
-            placeholder="az"
-          />
-        </Field>
-
-        <Field label="Priority" hint="Kiçik rəqəm daha prioritetli olur">
-          <Input
-            type="number"
-            value={local.priority}
-            disabled={!canManage}
-            onChange={(e) => patch("priority", Number(e.target.value || 100))}
-            placeholder="100"
-          />
-        </Field>
-
-        <Field label="Source Type" hint="manual / imported / derived / system">
-          <Select
-            value={local.source_type}
-            disabled={!canManage}
-            onChange={(e) => patch("source_type", e.target.value)}
-          >
-            <option value="manual">manual</option>
-            <option value="imported">imported</option>
-            <option value="derived">derived</option>
-            <option value="system">system</option>
-          </Select>
-        </Field>
-
-        <div className="lg:col-span-2">
-          <Field label="Value Text" hint="AI burada əsas business konteksti kimi istifadə edəcək">
-            <textarea
-              value={local.value_text}
-              disabled={!canManage}
-              onChange={(e) => patch("value_text", e.target.value)}
-              placeholder="Qiymətlər avtomatik yazılmamalıdır. İstifadəçi qiymət soruşarsa əvvəl ehtiyacını dəqiqləşdir və sonra DM/contact capture et."
-              className="min-h-[140px] w-full rounded-[22px] border border-slate-200/80 bg-white/90 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-sky-300/90 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-100"
-            />
-          </Field>
-        </div>
-
-        <div className="lg:col-span-2 flex items-center justify-between gap-4 rounded-[22px] border border-slate-200/80 bg-slate-50/80 px-4 py-4 dark:border-white/10 dark:bg-white/[0.03]">
-          <div className="space-y-1">
-            <div className="text-sm font-semibold text-slate-900 dark:text-white">
-              Enabled
-            </div>
-            <div className="text-xs text-slate-500 dark:text-slate-400">
-              Bu fact AI tərəfindən istifadə olunsun.
-            </div>
-          </div>
-          <Toggle checked={!!local.enabled} onChange={(v) => patch("enabled", v)} disabled={!canManage} />
-        </div>
-
-        <div className="lg:col-span-2">
-          <RowActions
-            canManage={canManage}
-            saving={saving}
-            deleting={deleting}
-            onSave={() => onSave(local)}
-            onDelete={() => onDelete(local)}
-          />
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-function ChannelPoliciesPanel({
-  items,
-  canManage,
-  onCreate,
-  onSave,
-  onDelete,
-}) {
-  const [savingId, setSavingId] = useState("");
-  const [deletingId, setDeletingId] = useState("");
-
-  async function handleSave(item) {
-    setSavingId(String(item.id || `${item.channel}:${item.subchannel}`));
-    try {
-      await onSave(item);
-    } finally {
-      setSavingId("");
-    }
-  }
-
-  async function handleDelete(id) {
-    setDeletingId(String(id || ""));
-    try {
-      await onDelete(id);
-    } finally {
-      setDeletingId("");
-    }
-  }
-
-  return (
-    <SettingsSection
-      eyebrow="Business Brain"
-      title="Channel Policies"
-      subtitle="Instagram DM, comments, WhatsApp və digər kanallar üzrə davranış qaydaları."
-      tone="default"
-    >
-      <div className="space-y-4">
-        <div className="flex justify-end">
-          <Button onClick={onCreate} disabled={!canManage} leftIcon={<ListTree className="h-4 w-4" />}>
-            Add Policy
-          </Button>
-        </div>
-
-        {!items.length ? (
-          <EmptyState
-            title="Hələ channel policy yoxdur"
-            subtitle="Məsələn Instagram commentdə qiymət public yazılsın ya yox, DM-də auto-reply aktiv olsun ya yox kimi qaydalar."
-            actionLabel="Create First Policy"
-            onAction={onCreate}
-            disabled={!canManage}
-          />
-        ) : (
-          <div className="space-y-4">
-            {items.map((item, idx) => (
-              <ChannelPolicyCard
-                key={item.id || `${item.channel || "channel"}-${idx}`}
-                item={item}
-                canManage={canManage}
-                saving={savingId === String(item.id || `${item.channel}:${item.subchannel}`)}
-                deleting={deletingId === String(item.id || "")}
-                onSave={handleSave}
-                onDelete={handleDelete}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-    </SettingsSection>
-  );
-}
-
-function ChannelPolicyCard({ item, canManage, onSave, onDelete, saving, deleting }) {
-  const [local, setLocal] = useState({
-    id: item?.id || "",
-    channel: item?.channel || "instagram",
-    subchannel: item?.subchannel || "default",
-    enabled: typeof item?.enabled === "boolean" ? item.enabled : true,
-    auto_reply_enabled:
-      typeof item?.auto_reply_enabled === "boolean" ? item.auto_reply_enabled : true,
-    ai_reply_enabled:
-      typeof item?.ai_reply_enabled === "boolean" ? item.ai_reply_enabled : true,
-    human_handoff_enabled:
-      typeof item?.human_handoff_enabled === "boolean" ? item.human_handoff_enabled : true,
-    pricing_visibility: item?.pricing_visibility || "inherit",
-    public_reply_mode: item?.public_reply_mode || "inherit",
-    contact_capture_mode: item?.contact_capture_mode || "inherit",
-    escalation_mode: item?.escalation_mode || "inherit",
-    reply_style: item?.reply_style || "",
-    max_reply_sentences: item?.max_reply_sentences ?? 2,
-  });
-
-  useEffect(() => {
-    setLocal({
-      id: item?.id || "",
-      channel: item?.channel || "instagram",
-      subchannel: item?.subchannel || "default",
-      enabled: typeof item?.enabled === "boolean" ? item.enabled : true,
-      auto_reply_enabled:
-        typeof item?.auto_reply_enabled === "boolean" ? item.auto_reply_enabled : true,
-      ai_reply_enabled:
-        typeof item?.ai_reply_enabled === "boolean" ? item.ai_reply_enabled : true,
-      human_handoff_enabled:
-        typeof item?.human_handoff_enabled === "boolean" ? item.human_handoff_enabled : true,
-      pricing_visibility: item?.pricing_visibility || "inherit",
-      public_reply_mode: item?.public_reply_mode || "inherit",
-      contact_capture_mode: item?.contact_capture_mode || "inherit",
-      escalation_mode: item?.escalation_mode || "inherit",
-      reply_style: item?.reply_style || "",
-      max_reply_sentences: item?.max_reply_sentences ?? 2,
-    });
-  }, [item]);
-
-  function patch(key, value) {
-    setLocal((prev) => ({ ...prev, [key]: value }));
-  }
-
-  return (
-    <Card variant="surface" padded="lg" className="rounded-[28px]">
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Field label="Channel" hint="instagram / whatsapp / facebook / comments">
-          <Input
-            value={local.channel}
-            disabled={!canManage}
-            onChange={(e) => patch("channel", e.target.value)}
-            placeholder="instagram"
-          />
-        </Field>
-
-        <Field label="Subchannel" hint="default, dm, comments və s.">
-          <Input
-            value={local.subchannel}
-            disabled={!canManage}
-            onChange={(e) => patch("subchannel", e.target.value)}
-            placeholder="default"
-          />
-        </Field>
-
-        <Field label="Pricing Visibility">
-          <Select
-            value={local.pricing_visibility}
-            disabled={!canManage}
-            onChange={(e) => patch("pricing_visibility", e.target.value)}
-          >
-            <option value="inherit">inherit</option>
-            <option value="hidden">hidden</option>
-            <option value="allowed">allowed</option>
-            <option value="redirect_to_dm">redirect_to_dm</option>
-            <option value="quote_only">quote_only</option>
-          </Select>
-        </Field>
-
-        <Field label="Public Reply Mode">
-          <Select
-            value={local.public_reply_mode}
-            disabled={!canManage}
-            onChange={(e) => patch("public_reply_mode", e.target.value)}
-          >
-            <option value="inherit">inherit</option>
-            <option value="disabled">disabled</option>
-            <option value="short_public">short_public</option>
-            <option value="dm_redirect">dm_redirect</option>
-            <option value="operator_only">operator_only</option>
-          </Select>
-        </Field>
-
-        <Field label="Contact Capture Mode">
-          <Select
-            value={local.contact_capture_mode}
-            disabled={!canManage}
-            onChange={(e) => patch("contact_capture_mode", e.target.value)}
-          >
-            <option value="inherit">inherit</option>
-            <option value="never">never</option>
-            <option value="optional">optional</option>
-            <option value="required_before_quote">required_before_quote</option>
-            <option value="required_before_handoff">required_before_handoff</option>
-          </Select>
-        </Field>
-
-        <Field label="Escalation Mode">
-          <Select
-            value={local.escalation_mode}
-            disabled={!canManage}
-            onChange={(e) => patch("escalation_mode", e.target.value)}
-          >
-            <option value="inherit">inherit</option>
-            <option value="manual">manual</option>
-            <option value="automatic">automatic</option>
-            <option value="operator_only">operator_only</option>
-          </Select>
-        </Field>
-
-        <Field label="Reply Style">
-          <Input
-            value={local.reply_style}
-            disabled={!canManage}
-            onChange={(e) => patch("reply_style", e.target.value)}
-            placeholder="short, warm, premium"
-          />
-        </Field>
-
-        <Field label="Max Reply Sentences">
-          <Input
-            type="number"
-            value={local.max_reply_sentences}
-            disabled={!canManage}
-            onChange={(e) => patch("max_reply_sentences", Number(e.target.value || 2))}
-            placeholder="2"
-          />
-        </Field>
-
-        <div className="lg:col-span-2 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <FeatureToggleCard
-            title="Enabled"
-            subtitle="Bu policy aktiv olsun"
-            checked={!!local.enabled}
-            onChange={(v) => patch("enabled", v)}
-            disabled={!canManage}
-          />
-          <FeatureToggleCard
-            title="Auto Reply"
-            subtitle="Kanal üzrə auto reply aktiv"
-            checked={!!local.auto_reply_enabled}
-            onChange={(v) => patch("auto_reply_enabled", v)}
-            disabled={!canManage}
-          />
-          <FeatureToggleCard
-            title="AI Reply"
-            subtitle="AI reply istifadə edilsin"
-            checked={!!local.ai_reply_enabled}
-            onChange={(v) => patch("ai_reply_enabled", v)}
-            disabled={!canManage}
-          />
-          <FeatureToggleCard
-            title="Human Handoff"
-            subtitle="Human escalation icazəli olsun"
-            checked={!!local.human_handoff_enabled}
-            onChange={(v) => patch("human_handoff_enabled", v)}
-            disabled={!canManage}
-          />
-        </div>
-
-        <div className="lg:col-span-2">
-          <RowActions
-            canManage={canManage}
-            saving={saving}
-            deleting={deleting}
-            onSave={() => onSave(local)}
-            onDelete={() => onDelete(local.id)}
-          />
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-function LocationsPanel({
-  items,
-  canManage,
-  onCreate,
-  onSave,
-  onDelete,
-}) {
-  const [savingId, setSavingId] = useState("");
-  const [deletingId, setDeletingId] = useState("");
-
-  async function handleSave(item) {
-    setSavingId(String(item.id || item.location_key || "new"));
-    try {
-      await onSave(item);
-    } finally {
-      setSavingId("");
-    }
-  }
-
-  async function handleDelete(id) {
-    setDeletingId(String(id || ""));
-    try {
-      await onDelete(id);
-    } finally {
-      setDeletingId("");
-    }
-  }
-
-  return (
-    <SettingsSection
-      eyebrow="Business Brain"
-      title="Locations"
-      subtitle="Filiallar, address, working hours, map link və delivery area məlumatları."
-      tone="default"
-    >
-      <div className="space-y-4">
-        <div className="flex justify-end">
-          <Button onClick={onCreate} disabled={!canManage} leftIcon={<MapPin className="h-4 w-4" />}>
-            Add Location
-          </Button>
-        </div>
-
-        {!items.length ? (
-          <EmptyState
-            title="Hələ location yoxdur"
-            subtitle="Filial və ya ofis məlumatlarını əlavə et ki sistem branch/location əsaslı cavab verə bilsin."
-            actionLabel="Create First Location"
-            onAction={onCreate}
-            disabled={!canManage}
-          />
-        ) : (
-          <div className="space-y-4">
-            {items.map((item, idx) => (
-              <LocationCard
-                key={item.id || `${item.location_key || "location"}-${idx}`}
-                item={item}
-                canManage={canManage}
-                saving={savingId === String(item.id || item.location_key || "new")}
-                deleting={deletingId === String(item.id || "")}
-                onSave={handleSave}
-                onDelete={handleDelete}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-    </SettingsSection>
-  );
-}
-
-function LocationCard({ item, canManage, onSave, onDelete, saving, deleting }) {
-  const [local, setLocal] = useState({
-    id: item?.id || "",
-    location_key: item?.location_key || "",
-    title: item?.title || "",
-    country_code: item?.country_code || "AZ",
-    city: item?.city || "",
-    address_line: item?.address_line || "",
-    map_url: item?.map_url || "",
-    phone: item?.phone || "",
-    email: item?.email || "",
-    is_primary: typeof item?.is_primary === "boolean" ? item.is_primary : false,
-    enabled: typeof item?.enabled === "boolean" ? item.enabled : true,
-    sort_order: item?.sort_order ?? 0,
-  });
-
-  useEffect(() => {
-    setLocal({
-      id: item?.id || "",
-      location_key: item?.location_key || "",
-      title: item?.title || "",
-      country_code: item?.country_code || "AZ",
-      city: item?.city || "",
-      address_line: item?.address_line || "",
-      map_url: item?.map_url || "",
-      phone: item?.phone || "",
-      email: item?.email || "",
-      is_primary: typeof item?.is_primary === "boolean" ? item.is_primary : false,
-      enabled: typeof item?.enabled === "boolean" ? item.enabled : true,
-      sort_order: item?.sort_order ?? 0,
-    });
-  }, [item]);
-
-  function patch(key, value) {
-    setLocal((prev) => ({ ...prev, [key]: value }));
-  }
-
-  return (
-    <Card variant="surface" padded="lg" className="rounded-[28px]">
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Field label="Location Key">
-          <Input
-            value={local.location_key}
-            disabled={!canManage}
-            onChange={(e) => patch("location_key", e.target.value)}
-            placeholder="main_office"
-          />
-        </Field>
-
-        <Field label="Title">
-          <Input
-            value={local.title}
-            disabled={!canManage}
-            onChange={(e) => patch("title", e.target.value)}
-            placeholder="Main Office"
-          />
-        </Field>
-
-        <Field label="Country Code">
-          <Input
-            value={local.country_code}
-            disabled={!canManage}
-            onChange={(e) => patch("country_code", e.target.value)}
-            placeholder="AZ"
-          />
-        </Field>
-
-        <Field label="City">
-          <Input
-            value={local.city}
-            disabled={!canManage}
-            onChange={(e) => patch("city", e.target.value)}
-            placeholder="Baku"
-          />
-        </Field>
-
-        <Field label="Address">
-          <Input
-            value={local.address_line}
-            disabled={!canManage}
-            onChange={(e) => patch("address_line", e.target.value)}
-            placeholder="Street, building, floor"
-          />
-        </Field>
-
-        <Field label="Map URL">
-          <Input
-            value={local.map_url}
-            disabled={!canManage}
-            onChange={(e) => patch("map_url", e.target.value)}
-            placeholder="https://maps..."
-          />
-        </Field>
-
-        <Field label="Phone">
-          <Input
-            value={local.phone}
-            disabled={!canManage}
-            onChange={(e) => patch("phone", e.target.value)}
-            placeholder="+994..."
-          />
-        </Field>
-
-        <Field label="Email">
-          <Input
-            value={local.email}
-            disabled={!canManage}
-            onChange={(e) => patch("email", e.target.value)}
-            placeholder="info@company.com"
-          />
-        </Field>
-
-        <Field label="Sort Order">
-          <Input
-            type="number"
-            value={local.sort_order}
-            disabled={!canManage}
-            onChange={(e) => patch("sort_order", Number(e.target.value || 0))}
-            placeholder="0"
-          />
-        </Field>
-
-        <div className="grid gap-3 md:grid-cols-2">
-          <FeatureToggleCard
-            title="Primary"
-            subtitle="Əsas location"
-            checked={!!local.is_primary}
-            onChange={(v) => patch("is_primary", v)}
-            disabled={!canManage}
-          />
-          <FeatureToggleCard
-            title="Enabled"
-            subtitle="Bu location aktiv olsun"
-            checked={!!local.enabled}
-            onChange={(v) => patch("enabled", v)}
-            disabled={!canManage}
-          />
-        </div>
-
-        <div className="lg:col-span-2">
-          <RowActions
-            canManage={canManage}
-            saving={saving}
-            deleting={deleting}
-            onSave={() => onSave(local)}
-            onDelete={() => onDelete(local.id)}
-          />
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-function ContactsPanel({
-  items,
-  canManage,
-  onCreate,
-  onSave,
-  onDelete,
-}) {
-  const [savingId, setSavingId] = useState("");
-  const [deletingId, setDeletingId] = useState("");
-
-  async function handleSave(item) {
-    setSavingId(String(item.id || item.contact_key || "new"));
-    try {
-      await onSave(item);
-    } finally {
-      setSavingId("");
-    }
-  }
-
-  async function handleDelete(id) {
-    setDeletingId(String(id || ""));
-    try {
-      await onDelete(id);
-    } finally {
-      setDeletingId("");
-    }
-  }
-
-  return (
-    <SettingsSection
-      eyebrow="Business Brain"
-      title="Contacts"
-      subtitle="Telefon, email, WhatsApp, Instagram, support line və AI-visible əlaqə kanalları."
-      tone="default"
-    >
-      <div className="space-y-4">
-        <div className="flex justify-end">
-          <Button onClick={onCreate} disabled={!canManage} leftIcon={<Contact2 className="h-4 w-4" />}>
-            Add Contact
-          </Button>
-        </div>
-
-        {!items.length ? (
-          <EmptyState
-            title="Hələ contact yoxdur"
-            subtitle="AI düzgün əlaqə məlumatı verməsi üçün əsas contact record-lar buraya daxil edilməlidir."
-            actionLabel="Create First Contact"
-            onAction={onCreate}
-            disabled={!canManage}
-          />
-        ) : (
-          <div className="space-y-4">
-            {items.map((item, idx) => (
-              <ContactCard
-                key={item.id || `${item.contact_key || "contact"}-${idx}`}
-                item={item}
-                canManage={canManage}
-                saving={savingId === String(item.id || item.contact_key || "new")}
-                deleting={deletingId === String(item.id || "")}
-                onSave={handleSave}
-                onDelete={handleDelete}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-    </SettingsSection>
-  );
-}
-
-function ContactCard({ item, canManage, onSave, onDelete, saving, deleting }) {
-  const [local, setLocal] = useState({
-    id: item?.id || "",
-    contact_key: item?.contact_key || "",
-    channel: item?.channel || "phone",
-    label: item?.label || "",
-    value: item?.value || "",
-    is_primary: typeof item?.is_primary === "boolean" ? item.is_primary : false,
-    enabled: typeof item?.enabled === "boolean" ? item.enabled : true,
-    visible_public:
-      typeof item?.visible_public === "boolean" ? item.visible_public : true,
-    visible_in_ai:
-      typeof item?.visible_in_ai === "boolean" ? item.visible_in_ai : true,
-    sort_order: item?.sort_order ?? 0,
-  });
-
-  useEffect(() => {
-    setLocal({
-      id: item?.id || "",
-      contact_key: item?.contact_key || "",
-      channel: item?.channel || "phone",
-      label: item?.label || "",
-      value: item?.value || "",
-      is_primary: typeof item?.is_primary === "boolean" ? item.is_primary : false,
-      enabled: typeof item?.enabled === "boolean" ? item.enabled : true,
-      visible_public:
-        typeof item?.visible_public === "boolean" ? item.visible_public : true,
-      visible_in_ai:
-        typeof item?.visible_in_ai === "boolean" ? item.visible_in_ai : true,
-      sort_order: item?.sort_order ?? 0,
-    });
-  }, [item]);
-
-  function patch(key, value) {
-    setLocal((prev) => ({ ...prev, [key]: value }));
-  }
-
-  return (
-    <Card variant="surface" padded="lg" className="rounded-[28px]">
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Field label="Contact Key">
-          <Input
-            value={local.contact_key}
-            disabled={!canManage}
-            onChange={(e) => patch("contact_key", e.target.value)}
-            placeholder="main_phone"
-          />
-        </Field>
-
-        <Field label="Channel">
-          <Input
-            value={local.channel}
-            disabled={!canManage}
-            onChange={(e) => patch("channel", e.target.value)}
-            placeholder="phone"
-          />
-        </Field>
-
-        <Field label="Label">
-          <Input
-            value={local.label}
-            disabled={!canManage}
-            onChange={(e) => patch("label", e.target.value)}
-            placeholder="Main Sales Line"
-          />
-        </Field>
-
-        <Field label="Value">
-          <Input
-            value={local.value}
-            disabled={!canManage}
-            onChange={(e) => patch("value", e.target.value)}
-            placeholder="+994..."
-          />
-        </Field>
-
-        <Field label="Sort Order">
-          <Input
-            type="number"
-            value={local.sort_order}
-            disabled={!canManage}
-            onChange={(e) => patch("sort_order", Number(e.target.value || 0))}
-            placeholder="0"
-          />
-        </Field>
-
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 lg:col-span-2">
-          <FeatureToggleCard
-            title="Primary"
-            subtitle="Əsas contact"
-            checked={!!local.is_primary}
-            onChange={(v) => patch("is_primary", v)}
-            disabled={!canManage}
-          />
-          <FeatureToggleCard
-            title="Enabled"
-            subtitle="Record aktiv olsun"
-            checked={!!local.enabled}
-            onChange={(v) => patch("enabled", v)}
-            disabled={!canManage}
-          />
-          <FeatureToggleCard
-            title="Visible Public"
-            subtitle="Public UI üçün görünə bilər"
-            checked={!!local.visible_public}
-            onChange={(v) => patch("visible_public", v)}
-            disabled={!canManage}
-          />
-          <FeatureToggleCard
-            title="Visible In AI"
-            subtitle="AI cavablarında istifadə olunsun"
-            checked={!!local.visible_in_ai}
-            onChange={(v) => patch("visible_in_ai", v)}
-            disabled={!canManage}
-          />
-        </div>
-
-        <div className="lg:col-span-2">
-          <RowActions
-            canManage={canManage}
-            saving={saving}
-            deleting={deleting}
-            onSave={() => onSave(local)}
-            onDelete={() => onDelete(local.id)}
-          />
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-function normalizeWorkspace(raw) {
-  const tenant = raw?.tenant || {};
-  const profile = raw?.profile || {};
-  const ai = raw?.aiPolicy || {};
-  const publishPolicy =
-    ai && typeof ai.publish_policy === "object" && !Array.isArray(ai.publish_policy)
-      ? ai.publish_policy
-      : {};
-
-  const oldDraftSchedule =
-    publishPolicy &&
-    typeof publishPolicy.draftSchedule === "object" &&
-    !Array.isArray(publishPolicy.draftSchedule)
-      ? publishPolicy.draftSchedule
-      : {};
-
-  const schedule =
-    publishPolicy &&
-    typeof publishPolicy.schedule === "object" &&
-    !Array.isArray(publishPolicy.schedule)
-      ? publishPolicy.schedule
-      : {};
-
-  const automation =
-    publishPolicy &&
-    typeof publishPolicy.automation === "object" &&
-    !Array.isArray(publishPolicy.automation)
-      ? publishPolicy.automation
-      : {};
-
-  const scheduleTime =
-    typeof schedule.time === "string" && schedule.time.trim()
-      ? normalizeTimeString(schedule.time, "10:00")
-      : `${pad2(clampHour(oldDraftSchedule?.hour, 10))}:${pad2(
-          clampMinute(oldDraftSchedule?.minute, 0)
-        )}`;
-
-  const scheduleTimezone =
-    schedule.timezone || oldDraftSchedule?.timezone || tenant?.timezone || "Asia/Baku";
-
-  const automationEnabled =
-    typeof automation.enabled === "boolean"
-      ? automation.enabled
-      : normalizeAutomationMode(automation.mode, "manual") === "full_auto";
-
-  const automationMode = normalizeAutomationMode(
-    automation.mode,
-    automationEnabled ? "full_auto" : "manual"
-  );
-
-  return {
-    tenantKey: tenant?.tenant_key || raw?.tenantKey || "neox",
-    viewerRole: String(raw?.viewerRole || raw?.role || "owner").trim().toLowerCase(),
-
-    tenant: {
-      company_name: tenant?.company_name || "",
-      legal_name: tenant?.legal_name || "",
-      industry_key: tenant?.industry_key || "generic_business",
-      country_code: tenant?.country_code || "AZ",
-      timezone: tenant?.timezone || "Asia/Baku",
-      default_language: tenant?.default_language || "az",
-      enabled_languages: Array.isArray(tenant?.enabled_languages)
-        ? tenant.enabled_languages
-        : ["az"],
-      market_region: tenant?.market_region || "",
-      plan_key: tenant?.plan_key || "starter",
-      status: tenant?.status || "active",
-      active: typeof tenant?.active === "boolean" ? tenant.active : true,
-    },
-
-    profile: {
-      brand_name: profile?.brand_name || "",
-      website_url: profile?.website_url || "",
-      public_email: profile?.public_email || "",
-      public_phone: profile?.public_phone || "",
-      audience_summary: profile?.audience_summary || "",
-      services_summary: profile?.services_summary || "",
-      value_proposition: profile?.value_proposition || "",
-      brand_summary: profile?.brand_summary || "",
-      tone_of_voice: profile?.tone_of_voice || "professional",
-      preferred_cta: profile?.preferred_cta || "",
-      banned_phrases: Array.isArray(profile?.banned_phrases) ? profile.banned_phrases : [],
-      communication_rules:
-        profile &&
-        typeof profile.communication_rules === "object" &&
-        !Array.isArray(profile.communication_rules)
-          ? profile.communication_rules
-          : {},
-      visual_style:
-        profile &&
-        typeof profile.visual_style === "object" &&
-        !Array.isArray(profile.visual_style)
-          ? profile.visual_style
-          : {},
-      extra_context:
-        profile &&
-        typeof profile.extra_context === "object" &&
-        !Array.isArray(profile.extra_context)
-          ? profile.extra_context
-          : {},
-    },
-
-    aiPolicy: {
-      auto_reply_enabled:
-        typeof ai?.auto_reply_enabled === "boolean" ? ai.auto_reply_enabled : true,
-      suppress_ai_during_handoff:
-        typeof ai?.suppress_ai_during_handoff === "boolean"
-          ? ai.suppress_ai_during_handoff
-          : true,
-      mark_seen_enabled:
-        typeof ai?.mark_seen_enabled === "boolean" ? ai.mark_seen_enabled : true,
-      typing_indicator_enabled:
-        typeof ai?.typing_indicator_enabled === "boolean"
-          ? ai.typing_indicator_enabled
-          : true,
-      create_lead_enabled:
-        typeof ai?.create_lead_enabled === "boolean" ? ai.create_lead_enabled : true,
-      approval_required_content:
-        typeof ai?.approval_required_content === "boolean"
-          ? ai.approval_required_content
-          : true,
-      approval_required_publish:
-        typeof ai?.approval_required_publish === "boolean"
-          ? ai.approval_required_publish
-          : true,
-      quiet_hours_enabled:
-        typeof ai?.quiet_hours_enabled === "boolean" ? ai.quiet_hours_enabled : false,
-      quiet_hours:
-        ai && typeof ai.quiet_hours === "object" && !Array.isArray(ai.quiet_hours)
-          ? ai.quiet_hours
-          : { startHour: 0, endHour: 0 },
-      inbox_policy:
-        ai && typeof ai.inbox_policy === "object" && !Array.isArray(ai.inbox_policy)
-          ? ai.inbox_policy
-          : {},
-      comment_policy:
-        ai && typeof ai.comment_policy === "object" && !Array.isArray(ai.comment_policy)
-          ? ai.comment_policy
-          : {},
-      content_policy:
-        ai && typeof ai.content_policy === "object" && !Array.isArray(ai.content_policy)
-          ? ai.content_policy
-          : {},
-      escalation_rules:
-        ai && typeof ai.escalation_rules === "object" && !Array.isArray(ai.escalation_rules)
-          ? ai.escalation_rules
-          : {},
-      risk_rules:
-        ai && typeof ai.risk_rules === "object" && !Array.isArray(ai.risk_rules)
-          ? ai.risk_rules
-          : {},
-      lead_scoring_rules:
-        ai && typeof ai.lead_scoring_rules === "object" && !Array.isArray(ai.lead_scoring_rules)
-          ? ai.lead_scoring_rules
-          : {},
-      publish_policy: {
-        ...(publishPolicy || {}),
-        schedule: {
-          enabled:
-            typeof schedule?.enabled === "boolean"
-              ? schedule.enabled
-              : typeof oldDraftSchedule?.enabled === "boolean"
-              ? oldDraftSchedule.enabled
-              : false,
-          time: scheduleTime,
-          timezone: scheduleTimezone,
-        },
-        automation: {
-          enabled: automationEnabled,
-          mode: automationMode,
-        },
-        draftSchedule: {
-          enabled:
-            typeof schedule?.enabled === "boolean"
-              ? schedule.enabled
-              : typeof oldDraftSchedule?.enabled === "boolean"
-              ? oldDraftSchedule.enabled
-              : false,
-          hour: clampHour(oldDraftSchedule?.hour, Number(scheduleTime.split(":")[0])),
-          minute: clampMinute(oldDraftSchedule?.minute, Number(scheduleTime.split(":")[1])),
-          timezone: scheduleTimezone,
-          format: oldDraftSchedule?.format || "image",
-        },
-      },
-    },
-
-    agents: Array.isArray(raw?.agents) ? raw.agents : [],
-    businessFacts: Array.isArray(raw?.businessFacts) ? raw.businessFacts : [],
-    channelPolicies: Array.isArray(raw?.channelPolicies) ? raw.channelPolicies : [],
-    locations: Array.isArray(raw?.locations) ? raw.locations : [],
-    contacts: Array.isArray(raw?.contacts) ? raw.contacts : [],
-    sources: Array.isArray(raw?.sources) ? raw.sources : [],
-    knowledgeReview: Array.isArray(raw?.knowledgeReview) ? raw.knowledgeReview : [],
-  };
-}
-
-function buildSafeWorkspaceSavePayload(workspace) {
-  const publishPolicy =
-    workspace?.aiPolicy &&
-    typeof workspace.aiPolicy.publish_policy === "object" &&
-    !Array.isArray(workspace.aiPolicy.publish_policy)
-      ? workspace.aiPolicy.publish_policy
-      : {};
-
-  const schedule =
-    publishPolicy &&
-    typeof publishPolicy.schedule === "object" &&
-    !Array.isArray(publishPolicy.schedule)
-      ? publishPolicy.schedule
-      : {};
-
-  const automation =
-    publishPolicy &&
-    typeof publishPolicy.automation === "object" &&
-    !Array.isArray(publishPolicy.automation)
-      ? publishPolicy.automation
-      : {};
-
-  const safeTime = normalizeTimeString(schedule.time, "10:00");
-  const safeMode = normalizeAutomationMode(
-    automation.mode,
-    automation.enabled ? "full_auto" : "manual"
-  );
-  const safeAutomationEnabled =
-    typeof automation.enabled === "boolean" ? automation.enabled : safeMode === "full_auto";
-
-  return {
-    tenant: {
-      company_name: workspace?.tenant?.company_name || "",
-      legal_name: workspace?.tenant?.legal_name || "",
-      industry_key: workspace?.tenant?.industry_key || "generic_business",
-      country_code: workspace?.tenant?.country_code || "AZ",
-      timezone: workspace?.tenant?.timezone || "Asia/Baku",
-      default_language: workspace?.tenant?.default_language || "az",
-      enabled_languages: Array.isArray(workspace?.tenant?.enabled_languages)
-        ? workspace.tenant.enabled_languages
-        : ["az"],
-      market_region: workspace?.tenant?.market_region || "",
-    },
-
-    profile: {
-      brand_name: workspace?.profile?.brand_name || "",
-      website_url: workspace?.profile?.website_url || "",
-      public_email: workspace?.profile?.public_email || "",
-      public_phone: workspace?.profile?.public_phone || "",
-      audience_summary: workspace?.profile?.audience_summary || "",
-      services_summary: workspace?.profile?.services_summary || "",
-      value_proposition: workspace?.profile?.value_proposition || "",
-      brand_summary: workspace?.profile?.brand_summary || "",
-      tone_of_voice: workspace?.profile?.tone_of_voice || "professional",
-      preferred_cta: workspace?.profile?.preferred_cta || "",
-      banned_phrases: Array.isArray(workspace?.profile?.banned_phrases)
-        ? workspace.profile.banned_phrases
-        : [],
-      communication_rules:
-        workspace?.profile &&
-        typeof workspace.profile.communication_rules === "object" &&
-        !Array.isArray(workspace.profile.communication_rules)
-          ? workspace.profile.communication_rules
-          : {},
-      visual_style:
-        workspace?.profile &&
-        typeof workspace.profile.visual_style === "object" &&
-        !Array.isArray(workspace.profile.visual_style)
-          ? workspace.profile.visual_style
-          : {},
-      extra_context:
-        workspace?.profile &&
-        typeof workspace.profile.extra_context === "object" &&
-        !Array.isArray(workspace.profile.extra_context)
-          ? workspace.profile.extra_context
-          : {},
-    },
-
-    aiPolicy: {
-      auto_reply_enabled: !!workspace?.aiPolicy?.auto_reply_enabled,
-      suppress_ai_during_handoff: !!workspace?.aiPolicy?.suppress_ai_during_handoff,
-      mark_seen_enabled: !!workspace?.aiPolicy?.mark_seen_enabled,
-      typing_indicator_enabled: !!workspace?.aiPolicy?.typing_indicator_enabled,
-      create_lead_enabled: !!workspace?.aiPolicy?.create_lead_enabled,
-      approval_required_content: !!workspace?.aiPolicy?.approval_required_content,
-      approval_required_publish: !!workspace?.aiPolicy?.approval_required_publish,
-      quiet_hours_enabled: !!workspace?.aiPolicy?.quiet_hours_enabled,
-      quiet_hours:
-        workspace?.aiPolicy &&
-        typeof workspace.aiPolicy.quiet_hours === "object" &&
-        !Array.isArray(workspace.aiPolicy.quiet_hours)
-          ? workspace.aiPolicy.quiet_hours
-          : { startHour: 0, endHour: 0 },
-      inbox_policy:
-        workspace?.aiPolicy &&
-        typeof workspace.aiPolicy.inbox_policy === "object" &&
-        !Array.isArray(workspace.aiPolicy.inbox_policy)
-          ? workspace.aiPolicy.inbox_policy
-          : {},
-      comment_policy:
-        workspace?.aiPolicy &&
-        typeof workspace.aiPolicy.comment_policy === "object" &&
-        !Array.isArray(workspace.aiPolicy.comment_policy)
-          ? workspace.aiPolicy.comment_policy
-          : {},
-      content_policy:
-        workspace?.aiPolicy &&
-        typeof workspace.aiPolicy.content_policy === "object" &&
-        !Array.isArray(workspace.aiPolicy.content_policy)
-          ? workspace.aiPolicy.content_policy
-          : {},
-      escalation_rules:
-        workspace?.aiPolicy &&
-        typeof workspace.aiPolicy.escalation_rules === "object" &&
-        !Array.isArray(workspace.aiPolicy.escalation_rules)
-          ? workspace.aiPolicy.escalation_rules
-          : {},
-      risk_rules:
-        workspace?.aiPolicy &&
-        typeof workspace.aiPolicy.risk_rules === "object" &&
-        !Array.isArray(workspace.aiPolicy.risk_rules)
-          ? workspace.aiPolicy.risk_rules
-          : {},
-      lead_scoring_rules:
-        workspace?.aiPolicy &&
-        typeof workspace.aiPolicy.lead_scoring_rules === "object" &&
-        !Array.isArray(workspace.aiPolicy.lead_scoring_rules)
-          ? workspace.aiPolicy.lead_scoring_rules
-          : {},
-      publish_policy: {
-        ...publishPolicy,
-        schedule: {
-          enabled: !!schedule.enabled,
-          time: safeTime,
-          timezone:
-            String(schedule.timezone || workspace?.tenant?.timezone || "Asia/Baku").trim() ||
-            "Asia/Baku",
-        },
-        automation: {
-          enabled: !!safeAutomationEnabled,
-          mode: safeMode,
-        },
-        draftSchedule: {
-          enabled: !!schedule.enabled,
-          hour: Number(safeTime.split(":")[0]),
-          minute: Number(safeTime.split(":")[1]),
-          timezone:
-            String(schedule.timezone || workspace?.tenant?.timezone || "Asia/Baku").trim() ||
-            "Asia/Baku",
-          format:
-            publishPolicy &&
-            typeof publishPolicy.draftSchedule === "object" &&
-            !Array.isArray(publishPolicy.draftSchedule)
-              ? publishPolicy.draftSchedule.format || "image"
-              : "image",
-        },
-      },
-    },
-  };
-}
-
-function createNewBusinessFact() {
-  return {
-    fact_key: "",
-    fact_group: "general",
-    title: "",
-    value_text: "",
-    language: "az",
-    priority: 100,
-    enabled: true,
-    source_type: "manual",
-  };
-}
-
-function createNewChannelPolicy() {
-  return {
-    channel: "instagram",
-    subchannel: "default",
-    enabled: true,
-    auto_reply_enabled: true,
-    ai_reply_enabled: true,
-    human_handoff_enabled: true,
-    pricing_visibility: "inherit",
-    public_reply_mode: "inherit",
-    contact_capture_mode: "inherit",
-    escalation_mode: "inherit",
-    reply_style: "",
-    max_reply_sentences: 2,
-  };
-}
-
-function createNewLocation() {
-  return {
-    location_key: "",
-    title: "",
-    country_code: "AZ",
-    city: "",
-    address_line: "",
-    map_url: "",
-    phone: "",
-    email: "",
-    is_primary: false,
-    enabled: true,
-    sort_order: 0,
-  };
-}
-
-function createNewContact() {
-  return {
-    contact_key: "",
-    channel: "phone",
-    label: "",
-    value: "",
-    is_primary: false,
-    enabled: true,
-    visible_public: true,
-    visible_in_ai: true,
-    sort_order: 0,
-  };
-}
-
-function replaceWorkspaceSlice(prev, patch) {
-  return {
-    ...prev,
-    ...patch,
-  };
-}
-
-function syncWorkspaceAndInitial({
-  setWorkspace,
-  setInitialWorkspace,
-  patch,
-}) {
-  setWorkspace((prev) => replaceWorkspaceSlice(prev, patch));
-  setInitialWorkspace((prev) => replaceWorkspaceSlice(prev, patch));
-}
-
 export default function SettingsController() {
   const [activeSection, setActiveSection] = useState("general");
   const [perm, setPerm] = useState("default");
@@ -3032,15 +1453,76 @@ export default function SettingsController() {
       case "brand":
         return <BrandSection profile={workspace.profile} patchProfile={patchProfile} canManage={canManageSettings} />;
       case "ai_policy":
-        return <AiPolicySection aiPolicy={workspace.aiPolicy} patchAi={patchAi} canManage={canManageSettings} autoContent={<AutoContentPanel aiPolicy={workspace.aiPolicy} patchAi={patchAi} canManage={canManageSettings} />} />;
+        return (
+          <AiPolicySection
+            aiPolicy={workspace.aiPolicy}
+            patchAi={patchAi}
+            canManage={canManageSettings}
+            autoContent={
+              <AutoContentSection
+                aiPolicy={workspace.aiPolicy}
+                patchAi={patchAi}
+                canManage={canManageSettings}
+              />
+            }
+          />
+        );
       case "business_facts":
-        return <BusinessFactsPanel items={businessFacts} canManage={canManageSettings} onCreate={() => { const next = [createNewBusinessFact(), ...businessFacts]; setBusinessFacts(next); setWorkspace((prev) => ({ ...prev, businessFacts: next })); }} onSave={handleSaveBusinessFact} onDelete={handleDeleteBusinessFact} />;
+        return (
+          <BusinessFactsSection
+            items={businessFacts}
+            canManage={canManageSettings}
+            onCreate={() => {
+              const next = [createNewBusinessFact(), ...businessFacts];
+              setBusinessFacts(next);
+              setWorkspace((prev) => ({ ...prev, businessFacts: next }));
+            }}
+            onSave={handleSaveBusinessFact}
+            onDelete={handleDeleteBusinessFact}
+          />
+        );
       case "channel_policies":
-        return <ChannelPoliciesPanel items={channelPolicies} canManage={canManageSettings} onCreate={() => { const next = [createNewChannelPolicy(), ...channelPolicies]; setChannelPolicies(next); setWorkspace((prev) => ({ ...prev, channelPolicies: next })); }} onSave={handleSaveChannelPolicy} onDelete={handleDeleteChannelPolicy} />;
+        return (
+          <ChannelPoliciesSection
+            items={channelPolicies}
+            canManage={canManageSettings}
+            onCreate={() => {
+              const next = [createNewChannelPolicy(), ...channelPolicies];
+              setChannelPolicies(next);
+              setWorkspace((prev) => ({ ...prev, channelPolicies: next }));
+            }}
+            onSave={handleSaveChannelPolicy}
+            onDelete={handleDeleteChannelPolicy}
+          />
+        );
       case "locations":
-        return <LocationsPanel items={locations} canManage={canManageSettings} onCreate={() => { const next = [createNewLocation(), ...locations]; setLocations(next); setWorkspace((prev) => ({ ...prev, locations: next })); }} onSave={handleSaveLocation} onDelete={handleDeleteLocation} />;
+        return (
+          <LocationsSection
+            items={locations}
+            canManage={canManageSettings}
+            onCreate={() => {
+              const next = [createNewLocation(), ...locations];
+              setLocations(next);
+              setWorkspace((prev) => ({ ...prev, locations: next }));
+            }}
+            onSave={handleSaveLocation}
+            onDelete={handleDeleteLocation}
+          />
+        );
       case "contacts":
-        return <ContactsPanel items={contacts} canManage={canManageSettings} onCreate={() => { const next = [createNewContact(), ...contacts]; setContacts(next); setWorkspace((prev) => ({ ...prev, contacts: next })); }} onSave={handleSaveContact} onDelete={handleDeleteContact} />;
+        return (
+          <ContactsSection
+            items={contacts}
+            canManage={canManageSettings}
+            onCreate={() => {
+              const next = [createNewContact(), ...contacts];
+              setContacts(next);
+              setWorkspace((prev) => ({ ...prev, contacts: next }));
+            }}
+            onSave={handleSaveContact}
+            onDelete={handleDeleteContact}
+          />
+        );
       case "sources":
         return <SourcesSection><SourcesPanel items={sources} canManage={canManageSettings} onCreate={() => { const next = [createNewSource(), ...sources]; setSources(next); setWorkspace((prev) => ({ ...prev, sources: next })); }} onSave={handleSaveSource} onStartSync={handleStartSourceSync} onViewSyncRuns={handleViewSourceSyncRuns} /></SourcesSection>;
       case "knowledge_review":
@@ -3052,7 +1534,15 @@ export default function SettingsController() {
       case "team":
         return <TeamPanel canManage={canManageSettings} />;
       case "notifications":
-        return <NotificationsPanel perm={perm} pushBusy={pushBusy} pushMessage={pushMessage} env={env} enableNotifications={enableNotifications} />;
+        return (
+          <NotificationsSection
+            perm={perm}
+            pushBusy={pushBusy}
+            pushMessage={pushMessage}
+            env={env}
+            enableNotifications={enableNotifications}
+          />
+        );
       default:
         return null;
     }
@@ -3133,3 +1623,4 @@ export default function SettingsController() {
     </>
   );
 }
+

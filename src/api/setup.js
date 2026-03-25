@@ -11,6 +11,10 @@ export function getSetupOverview() {
   return apiGet("/api/setup/overview");
 }
 
+export function getSetupTruth() {
+  return apiGet("/api/setup/truth/current");
+}
+
 export function saveBusinessProfile(payload = {}) {
   return apiPut("/api/setup/business-profile", payload);
 }

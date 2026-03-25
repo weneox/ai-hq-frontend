@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
 
-import { getCanonicalTruthSnapshot } from "../../api/truth.js";
+import {
+  getCanonicalTruthSnapshot,
+  getTruthVersionDetail,
+} from "../../api/truth.js";
 import TruthHeader from "../../components/truth/TruthHeader.jsx";
 import TruthFieldTable from "../../components/truth/TruthFieldTable.jsx";
 import TruthProvenancePanel from "../../components/truth/TruthProvenancePanel.jsx";
 import TruthHistoryPanel from "../../components/truth/TruthHistoryPanel.jsx";
+import TruthVersionComparePanel from "../../components/truth/TruthVersionComparePanel.jsx";
 
 function initialState() {
   return {
@@ -22,6 +26,12 @@ function initialState() {
 
 export default function TruthViewerPage() {
   const [state, setState] = useState(initialState);
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [compareState, setCompareState] = useState({
+    loading: false,
+    error: "",
+    detail: null,
+  });
 
   useEffect(() => {
     let alive = true;
@@ -55,6 +65,57 @@ export default function TruthViewerPage() {
     };
   }, []);
 
+  async function handleOpenVersion(item = {}) {
+    const versionId = String(item?.id || item?.version || "").trim();
+    const compareTo = String(item?.previousVersionId || "").trim();
+    if (!versionId) return;
+
+    setCompareOpen(true);
+    setCompareState({
+      loading: true,
+      error: "",
+      detail: {
+        selectedVersion: {
+          id: versionId,
+          version: String(item?.version || "").trim(),
+          versionLabel: String(item?.versionLabel || "").trim(),
+          profileStatus: String(item?.profileStatus || "").trim(),
+          approvedAt: String(item?.approvedAt || "").trim(),
+          approvedBy: String(item?.approvedBy || "").trim(),
+          sourceSummary: String(item?.sourceSummary || "").trim(),
+        },
+        comparedVersion: {
+          id: compareTo,
+        },
+        changedFields: Array.isArray(item?.changedFields) ? item.changedFields : [],
+        fieldChanges: Array.isArray(item?.fieldChanges) ? item.fieldChanges : [],
+        sectionChanges: [],
+        diffSummary: String(item?.diffSummary || "").trim(),
+        hasStructuredDiff:
+          !!String(item?.diffSummary || "").trim() ||
+          (Array.isArray(item?.changedFields) && item.changedFields.length > 0) ||
+          (Array.isArray(item?.fieldChanges) && item.fieldChanges.length > 0),
+      },
+    });
+
+    try {
+      const detail = await getTruthVersionDetail(versionId, { compareTo });
+      setCompareState({
+        loading: false,
+        error: "",
+        detail,
+      });
+    } catch (error) {
+      setCompareState((prev) => ({
+        loading: false,
+        error: String(
+          error?.message || error || "Truth version detail could not be loaded."
+        ),
+        detail: prev.detail,
+      }));
+    }
+  }
+
   if (state.loading) {
     return (
       <div className="mx-auto max-w-[1120px] px-4 py-10 sm:px-6 lg:px-8">
@@ -84,8 +145,19 @@ export default function TruthViewerPage() {
 
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
         <TruthProvenancePanel hasProvenance={state.data.hasProvenance} />
-        <TruthHistoryPanel history={state.data.history} />
+        <TruthHistoryPanel
+          history={state.data.history}
+          onOpenVersion={handleOpenVersion}
+        />
       </div>
+
+      <TruthVersionComparePanel
+        open={compareOpen}
+        onClose={() => setCompareOpen(false)}
+        loading={compareState.loading}
+        error={compareState.error}
+        detail={compareState.detail}
+      />
     </div>
   );
 }

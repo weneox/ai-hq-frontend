@@ -60,6 +60,8 @@ function boolFrom(...values) {
 export function createEmptyReviewState() {
   return {
     session: null,
+    concurrency: {},
+    finalizeProtection: {},
     sessionMeta: {
       sessionId: "",
       sessionStatus: "",
@@ -798,33 +800,22 @@ function normalizeSessionId(session = {}, meta = {}, payload = {}, review = {}) 
 }
 
 function normalizeSessionRevision(
+  draft = {},
   session = {},
   meta = {},
   payload = {},
   review = {}
 ) {
+  const concurrency = obj(payload?.concurrency || review?.concurrency);
   return firstNonEmpty(
-    session.revision,
-    session.reviewRevision,
-    session.review_revision,
-    session.version,
-    session.revisionId,
-    session.revision_id,
-    session.etag,
-    session.eTag,
-    meta.reviewRevision,
-    meta.review_revision,
-    meta.revision,
-    meta.version,
-    meta.etag,
-    payload.reviewRevision,
-    payload.review_revision,
-    payload.revision,
-    payload.version,
-    review.reviewRevision,
-    review.review_revision,
-    review.revision,
-    review.version
+    draft.version,
+    concurrency.draftVersion,
+    concurrency.draft_version,
+    meta.draftVersion,
+    meta.draft_version,
+    payload.draftVersion,
+    payload.draft_version,
+    review?.draft?.version
   );
 }
 
@@ -832,7 +823,10 @@ export function extractReviewSessionMeta(payload = {}) {
   const root = obj(payload);
   const review = obj(root?.review || root);
   const session = firstObject(review?.session, root?.session);
+  const draft = firstObject(review?.draft, root?.draft);
+  const concurrency = firstObject(review?.concurrency, root?.concurrency);
   const meta = firstObject(
+    concurrency,
     review?.reviewMeta,
     review?.review_meta,
     review?.meta,
@@ -848,18 +842,15 @@ export function extractReviewSessionMeta(payload = {}) {
   );
 
   const sessionId = normalizeSessionId(session, meta, root, review);
-  const revision = normalizeSessionRevision(session, meta, root, review);
+  const revision = normalizeSessionRevision(draft, session, meta, root, review);
   const sessionStatus = firstNonEmpty(
     session.status,
-    session.reviewStatus,
-    session.review_status,
+    concurrency.sessionStatus,
+    concurrency.session_status,
     meta.reviewSessionStatus,
     meta.review_session_status,
     meta.status,
-    root.reviewSessionStatus,
-    root.review_session_status,
-    review.reviewSessionStatus,
-    review.review_session_status
+    root.reviewSessionStatus
   );
 
   const conflictMessage = firstNonEmpty(
@@ -870,10 +861,7 @@ export function extractReviewSessionMeta(payload = {}) {
     root.conflictMessage,
     root.conflict_message,
     review.conflictMessage,
-    review.conflict_message,
-    root.reason,
-    review.reason,
-    meta.reason
+    review.conflict_message
   );
 
   const sourceFingerprint = firstNonEmpty(
@@ -957,6 +945,11 @@ export function extractReviewSessionMeta(payload = {}) {
 
 export function normalizeReviewState(payload = {}) {
   const review = obj(payload?.review || payload);
+  const concurrency = firstObject(payload?.concurrency, review?.concurrency);
+  const finalizeProtection = firstObject(
+    payload?.finalizeProtection,
+    review?.finalizeProtection
+  );
   const sessionMeta = extractReviewSessionMeta(payload);
   const rawSession = firstObject(review?.session, payload?.session);
   const session =
@@ -973,14 +966,14 @@ export function normalizeReviewState(payload = {}) {
             rawSession.status,
             rawSession.reviewStatus,
             rawSession.review_status,
+            concurrency.sessionStatus,
+            concurrency.session_status,
             sessionMeta.sessionStatus
           ),
           revision: firstNonEmpty(
-            rawSession.revision,
-            rawSession.reviewRevision,
-            rawSession.review_revision,
             rawSession.version,
-            rawSession.etag,
+            concurrency.draftVersion,
+            concurrency.draft_version,
             sessionMeta.revision
           ),
           freshness: sessionMeta.freshness,
@@ -1001,6 +994,8 @@ export function normalizeReviewState(payload = {}) {
 
   return {
     session,
+    concurrency,
+    finalizeProtection,
     sessionMeta,
     draft: obj(review?.draft),
     sources: arr(review?.sources),

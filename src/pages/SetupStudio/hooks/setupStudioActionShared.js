@@ -119,26 +119,23 @@ export function resolveKnowledgeCandidateUuid({
 
 export function currentReviewConcurrencyMeta(review = {}, discoveryState = {}) {
   const session = obj(review?.session);
+  const draft = obj(review?.draft);
+  const concurrency = obj(review?.concurrency);
 
   return {
     sessionId: s(
       session.id ||
-        session.sessionId ||
-        session.session_id ||
+        concurrency.sessionId ||
         discoveryState?.reviewSessionId
     ),
     sessionStatus: s(
       session.status ||
-        session.reviewStatus ||
-        session.review_status ||
+        concurrency.sessionStatus ||
         discoveryState?.reviewSessionStatus
     ),
     revision: s(
-      session.revision ||
-        session.reviewRevision ||
-        session.review_revision ||
-        session.version ||
-        session.etag ||
+      draft.version ||
+        concurrency.draftVersion ||
         discoveryState?.reviewSessionRevision
     ),
     freshness: s(session.freshness || discoveryState?.reviewFreshness || "unknown"),
@@ -165,34 +162,38 @@ export function currentReviewConcurrencyMeta(review = {}, discoveryState = {}) {
 }
 
 export function buildReviewConcurrencyPayload(meta = {}) {
-  const sessionId = s(meta.sessionId);
-  const revision = s(meta.revision);
   const payload = {};
 
-  if (sessionId) {
-    payload.sessionId = sessionId;
-    payload.reviewSessionId = sessionId;
-  }
-
-  if (revision) {
-    payload.revision = revision;
-    payload.reviewRevision = revision;
-    payload.version = revision;
-  }
-
+  if (s(meta.sessionId)) payload.sessionId = s(meta.sessionId);
+  if (s(meta.revision)) payload.draftVersion = s(meta.revision);
   return payload;
 }
 
 export function parseReviewConcurrencyError(error, meta = {}) {
   const message = String(error?.message || error || "").trim();
+  const payload = obj(error?.payload);
+  const code = s(error?.code || payload?.code || payload?.error).toUpperCase();
   const lowered = lowerText(message);
+  const hasBaselineDriftPayload =
+    Object.keys(obj(payload?.baseline)).length > 0 ||
+    Object.keys(obj(payload?.current)).length > 0;
+  const staleByBackend =
+    code === "SETUP_REVIEW_BASELINE_DRIFT" || hasBaselineDriftPayload;
+  const mismatchByBackend =
+    code === "SETUP_REVIEW_SESSION_MISMATCH" ||
+    code === "SETUP_REVIEW_DRAFT_VERSION_MISMATCH";
   const conflicted =
-    /conflict|revision mismatch|version mismatch|precondition|409|412/.test(
-      lowered
-    );
+    mismatchByBackend ||
+    (!staleByBackend &&
+      /conflict|revision mismatch|version mismatch|precondition|409|412/.test(
+        lowered
+      ));
   const stale =
-    !conflicted &&
-    /stale|expired|out[_ -]?of[_ -]?date|outdated/.test(lowered);
+    staleByBackend ||
+    (!conflicted &&
+      /stale|expired|out[_ -]?of[_ -]?date|outdated|baseline drift/.test(
+        lowered
+      ));
 
   return {
     sessionId: s(meta.sessionId),
@@ -205,7 +206,7 @@ export function parseReviewConcurrencyError(error, meta = {}) {
         : s(meta.freshness || "unknown"),
     stale,
     conflicted,
-    message,
+    message: s(payload?.reason || message),
   };
 }
 
