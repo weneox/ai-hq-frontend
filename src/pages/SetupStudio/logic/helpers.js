@@ -154,11 +154,17 @@ export function humanizeStudioIssue(value = "") {
     services_incomplete: "Services are still incomplete.",
     weak_services: "Services are still incomplete.",
     missing_services: "Services are still incomplete.",
+    xidmetler_zeifdir: "Services are still incomplete.",
+    manual_yoxlama_teleb_olunur: "Manual review needed.",
+    website_blocked_backend_access_before_review:
+      "Website could not be fully processed.",
     address_weak: "Address needs review.",
     unvan_zeifdir: "Address needs review.",
     tesvir_zeifdir: "Summary needs improvement.",
     ad_zeifdir: "Missing or weak business name.",
     ad_yoxdur: "Missing or weak business name.",
+    phone_weak: "Phone needs review.",
+    email_weak: "Email needs review.",
   };
 
   if (exact[normalized]) return exact[normalized];

@@ -187,7 +187,7 @@ export default function SetupStudioScreen() {
     setBusinessForm((prev) => ({
       ...DEFAULT_BUSINESS_FORM,
       timezone: s(prev.timezone || "Asia/Baku"),
-      language: s(prev.language || "az"),
+      language: s(prev.language || "en"),
       websiteUrl: s(nextSourceUrl),
     }));
 
@@ -299,7 +299,7 @@ export default function SetupStudioScreen() {
         return {
           ...DEFAULT_BUSINESS_FORM,
           timezone: s(prev.timezone || "Asia/Baku"),
-          language: s(prev.language || "az"),
+          language: s(prev.language || "en"),
           websiteUrl: s(reviewInfo.sourceUrl),
         };
       }

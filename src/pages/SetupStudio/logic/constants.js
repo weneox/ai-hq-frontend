@@ -5,7 +5,7 @@ export const DEFAULT_BUSINESS_FORM = {
   companyName: "",
   description: "",
   timezone: "Asia/Baku",
-  language: "az",
+  language: "en",
   websiteUrl: "",
   primaryPhone: "",
   primaryEmail: "",

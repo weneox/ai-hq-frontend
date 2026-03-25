@@ -52,12 +52,32 @@ const GENERIC_SUMMARY_VALUES = new Set([
   "linkedin",
 ]);
 
+const GENERIC_CONTACT_VALUES = new Set([
+  "contact",
+  "email",
+  "mail",
+  "phone",
+  "telephone",
+  "mobile",
+  "address",
+  "location",
+  "website",
+  "google maps",
+  "instagram",
+  "facebook",
+  "linkedin",
+]);
+
 function normalizeToken(value = "") {
   return s(value)
     .toLowerCase()
     .replace(/\s+/g, " ")
     .replace(/[|/\\]+/g, " ")
     .trim();
+}
+
+function normalizeContactToken(value = "") {
+  return normalizeToken(value).replace(/[()]/g, "").trim();
 }
 
 function isLikelyUrl(value = "") {
@@ -69,13 +89,30 @@ function isGenericSourceLabel(value = "") {
   const normalized = normalizeToken(value);
   if (!normalized) return true;
   if (GENERIC_BUSINESS_NAME_VALUES.has(normalized)) return true;
-  if (/^(google|instagram|facebook|linkedin)(\s+(maps|page|profile|account))?$/i.test(normalized)) {
+  if (
+    /^(google|instagram|facebook|linkedin)(\s+(maps|page|profile|account))?$/i.test(
+      normalized
+    )
+  ) {
     return true;
   }
-  if (/^(website|source|business|company)(\s+(profile|page|details|info))?$/i.test(normalized)) {
+  if (
+    /^(website|source|business|company)(\s+(profile|page|details|info))?$/i.test(
+      normalized
+    )
+  ) {
     return true;
   }
   return false;
+}
+
+function looksLikeEmail(value = "") {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s(value));
+}
+
+function looksLikePhone(value = "") {
+  const digits = s(value).replace(/[^\d+]/g, "");
+  return digits.length >= 7;
 }
 
 export function sanitizeExtractedBusinessName(value = "") {
@@ -103,7 +140,40 @@ export function sanitizeExtractedBusinessSummary(value = "", companyName = "") {
   if (isLikelyUrl(text)) return "";
   if (GENERIC_SUMMARY_VALUES.has(normalized)) return "";
   if (safeCompanyName && normalized === safeCompanyName) return "";
-  if (/^(services?|products?|pricing|faq|contact|about|policy|policies)$/i.test(normalized)) {
+  if (
+    /^(services?|products?|pricing|faq|contact|about|policy|policies)$/i.test(
+      normalized
+    )
+  ) {
+    return "";
+  }
+
+  return text;
+}
+
+export function sanitizeExtractedContactValue(value = "", type = "generic") {
+  const text = s(value);
+  const normalized = normalizeContactToken(text);
+
+  if (!text) return "";
+  if (text.length <= 2) return "";
+  if (GENERIC_CONTACT_VALUES.has(normalized)) return "";
+  if (isGenericSourceLabel(normalized)) return "";
+  if (type === "email" && !looksLikeEmail(text)) return "";
+  if (type === "phone" && !looksLikePhone(text)) return "";
+
+  return text;
+}
+
+export function sanitizeExtractedAddress(value = "") {
+  const text = s(value);
+  const normalized = normalizeContactToken(text);
+
+  if (!text) return "";
+  if (text.length < 6) return "";
+  if (GENERIC_CONTACT_VALUES.has(normalized)) return "";
+  if (isGenericSourceLabel(normalized)) return "";
+  if (/^(home|contact|direction|location|map|maps)$/i.test(normalized)) {
     return "";
   }
 
@@ -189,7 +259,18 @@ export function formFromProfile(profile = {}, prev = {}) {
       x.language,
       x.sourceLanguage,
       x.source_language
-    ) || s(prev.language || "az");
+    ) || s(prev.language || "en");
+  const safePhone = sanitizeExtractedContactValue(
+    x.primaryPhone || x.primary_phone || x.phone,
+    "phone"
+  );
+  const safeEmail = sanitizeExtractedContactValue(
+    x.primaryEmail || x.primary_email || x.email,
+    "email"
+  );
+  const safeAddress = sanitizeExtractedAddress(
+    x.primaryAddress || x.primary_address || x.address
+  );
 
   return {
     ...prev,
@@ -206,11 +287,9 @@ export function formFromProfile(profile = {}, prev = {}) {
         x.site_url ||
         prev.websiteUrl
     ),
-    primaryPhone: s(x.primaryPhone || x.primary_phone || prev.primaryPhone),
-    primaryEmail: s(x.primaryEmail || x.primary_email || prev.primaryEmail),
-    primaryAddress: s(
-      x.primaryAddress || x.primary_address || prev.primaryAddress
-    ),
+    primaryPhone: s(safePhone || prev.primaryPhone),
+    primaryEmail: s(safeEmail || prev.primaryEmail),
+    primaryAddress: s(safeAddress || prev.primaryAddress),
   };
 }
 
@@ -222,9 +301,17 @@ export function hasExtractedIdentityProfile(profile = {}) {
   return !!(
     extractedName ||
     extractedSummary ||
-    s(x.primaryPhone || x.primary_phone || x.phone) ||
-    s(x.primaryEmail || x.primary_email || x.email) ||
-    s(x.primaryAddress || x.primary_address || x.address) ||
+    sanitizeExtractedContactValue(
+      x.primaryPhone || x.primary_phone || x.phone,
+      "phone"
+    ) ||
+    sanitizeExtractedContactValue(
+      x.primaryEmail || x.primary_email || x.email,
+      "email"
+    ) ||
+    sanitizeExtractedAddress(
+      x.primaryAddress || x.primary_address || x.address
+    ) ||
     arr(x.services).length > 0 ||
     arr(x.socialLinks || x.social_links).length > 0 ||
     arr(x.faqItems || x.faq_items).length > 0 ||
@@ -313,9 +400,9 @@ export function hasMeaningfulProfile(profile = {}) {
     extractProfileName(x) ||
     extractProfileSummary(x) ||
     s(x.websiteUrl || x.website_url) ||
-    s(x.primaryPhone || x.primary_phone) ||
-    s(x.primaryEmail || x.primary_email) ||
-    s(x.primaryAddress || x.primary_address)
+    sanitizeExtractedContactValue(x.primaryPhone || x.primary_phone, "phone") ||
+    sanitizeExtractedContactValue(x.primaryEmail || x.primary_email, "email") ||
+    sanitizeExtractedAddress(x.primaryAddress || x.primary_address)
   );
 }
 
@@ -378,7 +465,7 @@ export function hydrateBusinessFormFromProfile(
   }
 
   if (force || !s(next.language)) {
-    next.language = s(candidate.language || prev.language || "az");
+    next.language = s(candidate.language || prev.language || "en");
   }
 
   return next;
@@ -429,9 +516,15 @@ export function buildBusinessProfilePatch({
     websiteUrl: s(
       businessForm.websiteUrl || existing.websiteUrl || discoveryState?.lastUrl
     ),
-    primaryPhone: s(businessForm.primaryPhone),
-    primaryEmail: s(businessForm.primaryEmail),
-    primaryAddress: s(businessForm.primaryAddress),
+    primaryPhone: sanitizeExtractedContactValue(
+      businessForm.primaryPhone,
+      "phone"
+    ),
+    primaryEmail: sanitizeExtractedContactValue(
+      businessForm.primaryEmail,
+      "email"
+    ),
+    primaryAddress: sanitizeExtractedAddress(businessForm.primaryAddress),
     reviewRequired: !!(
       existing.reviewRequired ?? discoveryState.reviewRequired ?? false
     ),
@@ -468,5 +561,107 @@ export function buildCapabilitiesPatch({
     mainLanguage: language,
     supportedLanguages,
     supportsMultilanguage: supportedLanguages.length > 1,
+  };
+}
+
+export function buildSafeUiProfile({
+  rawProfile = {},
+  sourceType = "",
+  sourceUrl = "",
+  warnings = [],
+  mainLanguage = "",
+  primaryLanguage = "",
+  reviewRequired = false,
+  reviewFlags = [],
+  fieldConfidence = {},
+  barrierOnly = false,
+} = {}) {
+  const profile = obj(rawProfile);
+
+  const safeWebsiteUrl = s(
+    profile.websiteUrl ||
+      profile.website ||
+      (sourceType === "website" ? sourceUrl : "")
+  );
+  const safePhone = sanitizeExtractedContactValue(
+    profile.primaryPhone || profile.phone,
+    "phone"
+  );
+  const safeEmail = sanitizeExtractedContactValue(
+    profile.primaryEmail || profile.email,
+    "email"
+  );
+  const safeAddress = sanitizeExtractedAddress(
+    profile.primaryAddress || profile.address
+  );
+
+  const safeName = barrierOnly
+    ? ""
+    : sanitizeExtractedBusinessName(
+        profile.companyName ||
+          profile.displayName ||
+          profile.companyTitle ||
+          profile.name
+      );
+
+  const safeDisplayName = barrierOnly ? "" : s(profile.displayName || safeName);
+  const safeCompanyTitle = barrierOnly ? "" : s(profile.companyTitle || safeName);
+
+  const safeSummaryShort = sanitizeExtractedBusinessSummary(
+    profile.companySummaryShort ||
+      profile.summaryShort ||
+      profile.shortDescription,
+    safeName
+  );
+
+  const safeSummaryLong = sanitizeExtractedBusinessSummary(
+    profile.companySummaryLong ||
+      profile.summaryLong ||
+      profile.description ||
+      safeSummaryShort,
+    safeName
+  );
+
+  const safeMainLanguage =
+    s(
+      mainLanguage ||
+        profile.mainLanguage ||
+        profile.primaryLanguage ||
+        profile.language
+    ) || "";
+
+  const safePrimaryLanguage =
+    s(
+      primaryLanguage ||
+        profile.primaryLanguage ||
+        profile.mainLanguage ||
+        profile.language
+    ) || safeMainLanguage;
+
+  return {
+    ...profile,
+    companyName: safeName,
+    displayName: safeDisplayName,
+    companyTitle: safeCompanyTitle,
+    name: safeName,
+    companySummaryShort: safeSummaryShort,
+    summaryShort: safeSummaryShort,
+    companySummaryLong: safeSummaryLong,
+    summaryLong: safeSummaryLong,
+    description: safeSummaryLong || safeSummaryShort,
+    websiteUrl: safeWebsiteUrl,
+    website: safeWebsiteUrl,
+    primaryPhone: safePhone,
+    phone: safePhone,
+    primaryEmail: safeEmail,
+    email: safeEmail,
+    primaryAddress: safeAddress,
+    address: safeAddress,
+    mainLanguage: safeMainLanguage,
+    primaryLanguage: safePrimaryLanguage,
+    language: safeMainLanguage || s(profile.language || "en"),
+    reviewRequired: !!reviewRequired,
+    reviewFlags: arr(reviewFlags),
+    fieldConfidence: obj(fieldConfidence),
   };
 }

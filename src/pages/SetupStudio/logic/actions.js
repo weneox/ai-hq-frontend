@@ -403,7 +403,7 @@ export function createSetupStudioActions(ctx) {
           return {
             ...DEFAULT_BUSINESS_FORM,
             timezone: s(prev.timezone || "Asia/Baku"),
-            language: s(prev.language || "az"),
+            language: s(prev.language || "en"),
             websiteUrl: s(reviewInfo.sourceUrl),
           };
         }
@@ -419,7 +419,7 @@ export function createSetupStudioActions(ctx) {
                   baseProfile?.primaryLanguage,
                   baseProfile?.language,
                   firstLanguage(baseProfile)
-                ) || "az",
+                ) || "en",
             }),
             baseProfile,
             { force: true }

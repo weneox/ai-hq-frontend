@@ -1,5 +1,13 @@
 import { motion } from "framer-motion";
-import { FileAudio2, FileText, Globe2, Loader2, Mic } from "lucide-react";
+import { FileText, Globe2, Loader2, Mic } from "lucide-react";
+
+import SetupStudioStageShell from "../components/SetupStudioStageShell.jsx";
+import {
+  MetricCard,
+  StagePanel,
+  TinyChip,
+  TinyLabel,
+} from "../components/SetupStudioUi.jsx";
 import { truncateMiddle } from "../lib/setupStudioHelpers.js";
 
 function s(v, d = "") {
@@ -27,9 +35,8 @@ function sourceLabel(sourceType = "", lastUrl = "") {
   if (x === "linkedin") return "LinkedIn";
   if (x === "facebook") return "Facebook";
   if (x === "website") return "Website";
-
   if (s(lastUrl)) return "Source";
-  return "";
+  return "Draft";
 }
 
 function buildDefaultScanLines({
@@ -39,28 +46,23 @@ function buildDefaultScanLines({
   hasVoiceInput = false,
 }) {
   const sourceName = sourceLabel(sourceType);
-
   const lines = [];
 
   if (hasSourceInput) {
-    lines.push(
-      sourceName
-        ? `Reading ${sourceName} input`
-        : "Reading the primary source"
-    );
+    lines.push(sourceName ? `Reading ${sourceName}` : "Reading source");
   }
 
   if (hasManualInput) {
-    lines.push("Merging manual business details");
+    lines.push("Blending manual notes");
   }
 
   if (hasVoiceInput) {
     lines.push("Transcribing voice input");
   }
 
-  lines.push("Extracting business identity");
-  lines.push("Collecting knowledge signals");
-  lines.push("Preparing the first draft");
+  lines.push("Shaping identity");
+  lines.push("Collecting useful signals");
+  lines.push("Preparing review draft");
 
   const seen = new Set();
   return lines.filter((line) => {
@@ -69,15 +71,6 @@ function buildDefaultScanLines({
     seen.add(key);
     return true;
   });
-}
-
-function Pill({ icon: Icon, children }) {
-  return (
-    <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
-      {Icon ? <Icon className="h-4 w-4 shrink-0" /> : null}
-      <span className="truncate">{children}</span>
-    </div>
-  );
 }
 
 export default function SetupStudioScanningStage({
@@ -91,7 +84,6 @@ export default function SetupStudioScanningStage({
 }) {
   const resolvedHasSourceInput =
     typeof hasSourceInput === "boolean" ? hasSourceInput : !!s(lastUrl);
-
   const resolvedHasManualInput = bool(hasManualInput, false);
   const resolvedHasVoiceInput = bool(hasVoiceInput, false);
 
@@ -103,122 +95,111 @@ export default function SetupStudioScanningStage({
   });
 
   const safeLines = arr(scanLines).length ? arr(scanLines) : defaultLines;
-
   const activeIndex = Math.max(
     0,
     Math.min(Number(scanLineIndex || 0), safeLines.length - 1)
   );
 
-  const clippedUrl = s(lastUrl) ? truncateMiddle(lastUrl, 58, 28) : "";
   const sourceName = sourceLabel(sourceType, lastUrl);
-
-  const title = resolvedHasSourceInput && resolvedHasManualInput
-    ? "Analyzing source and manual input."
-    : resolvedHasSourceInput && resolvedHasVoiceInput
-      ? "Analyzing source and voice input."
-      : resolvedHasManualInput && resolvedHasVoiceInput
-        ? "Analyzing manual and voice input."
-        : resolvedHasSourceInput
-          ? "Building the first business draft."
-          : resolvedHasManualInput
-            ? "Building the draft from manual input."
-            : resolvedHasVoiceInput
-              ? "Building the draft from voice input."
-              : "Preparing the first business draft.";
-
-  const description = resolvedHasSourceInput && (resolvedHasManualInput || resolvedHasVoiceInput)
-    ? "The system is combining all available inputs, extracting business details, and preparing a review draft."
-    : resolvedHasSourceInput
-      ? "The system is reading the source, extracting business details, and preparing a draft you can review."
-      : resolvedHasManualInput
-        ? "The system is structuring the written business details and preparing the first review draft."
-        : resolvedHasVoiceInput
-          ? "The system is transcribing the voice description and shaping the first review draft."
-          : "The system is preparing the first business draft for review.";
+  const clippedUrl = s(lastUrl) ? truncateMiddle(lastUrl, 58, 28) : "";
 
   return (
-    <motion.section
-      key="setup-studio-scanning"
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
-      transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
-      className="mx-auto w-full max-w-[980px]"
+    <SetupStudioStageShell
+      eyebrow="scanning"
+      title="Building your review draft."
+      body="A temporary draft is being prepared from the current source and any notes you added."
     >
-      <div className="rounded-[32px] border border-slate-200 bg-white p-6 sm:p-8">
-        <div className="max-w-[760px]">
-          <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            Analyzing
-          </div>
-
-          <h2 className="mt-5 text-[30px] font-semibold leading-[1.02] tracking-[-0.05em] text-slate-950 sm:text-[40px]">
-            {title}
-          </h2>
-
-          <p className="mt-4 text-[15px] leading-7 text-slate-600">
-            {description}
-          </p>
-
-          <div className="mt-5 flex flex-wrap gap-2">
-            {clippedUrl ? (
-              <Pill icon={Globe2}>{clippedUrl}</Pill>
-            ) : null}
-
-            {!clippedUrl && sourceName ? (
-              <Pill icon={Globe2}>{sourceName}</Pill>
-            ) : null}
-
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+        <StagePanel className="space-y-6">
+          <div className="flex flex-wrap items-center gap-2">
+            <TinyLabel>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              In progress
+            </TinyLabel>
+            {clippedUrl ? <TinyChip>{clippedUrl}</TinyChip> : null}
+            {!clippedUrl ? <TinyChip>{sourceName}</TinyChip> : null}
             {resolvedHasManualInput ? (
-              <Pill icon={FileText}>Manual details</Pill>
+              <TinyChip>
+                <FileText className="mr-1 h-3.5 w-3.5" />
+                Notes
+              </TinyChip>
             ) : null}
-
             {resolvedHasVoiceInput ? (
-              <Pill icon={Mic}>Voice input</Pill>
+              <TinyChip>
+                <Mic className="mr-1 h-3.5 w-3.5" />
+                Voice
+              </TinyChip>
             ) : null}
           </div>
-        </div>
 
-        <div className="mt-8 space-y-3">
-          {safeLines.map((line, index) => {
-            const active = index === activeIndex;
-            const done = index < activeIndex;
+          <div className="space-y-3">
+            {safeLines.map((line, index) => {
+              const active = index === activeIndex;
+              const done = index < activeIndex;
 
-            return (
-              <div
-                key={`${line}-${index}`}
-                className={`flex items-center gap-4 rounded-2xl border px-4 py-4 ${
-                  active
-                    ? "border-slate-950 bg-slate-950 text-white"
-                    : done
-                      ? "border-emerald-200 bg-emerald-50 text-emerald-900"
-                      : "border-slate-200 bg-slate-50 text-slate-500"
-                }`}
-              >
-                <div
-                  className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+              return (
+                <motion.div
+                  key={`${line}-${index}`}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.03 }}
+                  className={`flex items-center gap-4 rounded-[24px] px-4 py-4 ${
                     active
-                      ? "bg-white text-slate-950"
+                      ? "bg-slate-950 text-white"
                       : done
-                        ? "bg-emerald-600 text-white"
-                        : "bg-white text-slate-500"
+                        ? "bg-emerald-50 text-emerald-900"
+                        : "bg-white/70 text-slate-500"
                   }`}
                 >
-                  {String(index + 1).padStart(2, "0")}
-                </div>
+                  <div
+                    className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                      active
+                        ? "bg-white text-slate-950"
+                        : done
+                          ? "bg-emerald-600 text-white"
+                          : "bg-slate-100 text-slate-500"
+                    }`}
+                  >
+                    {String(index + 1).padStart(2, "0")}
+                  </div>
 
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium">{line}</div>
-                </div>
+                  <div className="flex-1 text-sm font-medium">{line}</div>
 
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em]">
-                  {active ? "active" : done ? "done" : "queued"}
-                </div>
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] opacity-70">
+                    {active ? "live" : done ? "done" : "queued"}
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        </StagePanel>
+
+        <div className="grid gap-4">
+          <MetricCard
+            label="Source"
+            value={sourceName}
+            detail="The current input stays isolated in its own review session."
+          />
+          <MetricCard
+            label="Draft"
+            value="Temporary"
+            detail="Only the reviewed draft can become saved business truth."
+          />
+          <StagePanel tone="subtle" className="flex items-start gap-3">
+            <div className="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-slate-100 text-slate-500">
+              <Globe2 className="h-4 w-4" />
+            </div>
+            <div>
+              <div className="text-sm font-medium text-slate-950">
+                Calm review flow
               </div>
-            );
-          })}
+              <div className="mt-1 text-sm leading-6 text-slate-500">
+                Evidence stays separate. You will refine the editable draft next.
+              </div>
+            </div>
+          </StagePanel>
         </div>
       </div>
-    </motion.section>
+    </SetupStudioStageShell>
   );
 }

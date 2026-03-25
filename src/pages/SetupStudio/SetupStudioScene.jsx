@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import { RefreshCw } from "lucide-react";
 
+import { TinyChip, TinyLabel } from "./components/SetupStudioUi.jsx";
+
 import SetupStudioEntryStage from "./stages/SetupStudioEntryStage.jsx";
 import SetupStudioScanningStage from "./stages/SetupStudioScanningStage.jsx";
 import SetupStudioIdentityStage from "./stages/SetupStudioIdentityStage.jsx";
@@ -362,8 +364,9 @@ export default function SetupStudioScene({
       <div className="min-h-screen overflow-y-auto">
         <main className="mx-auto w-full max-w-[1200px] px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-            <div className="text-[12px] font-medium text-slate-400">
-              {sourceLabel ? sourceLabel : "Setup Studio"}
+            <div className="flex flex-wrap items-center gap-2">
+              <TinyLabel>Setup Studio</TinyLabel>
+              <TinyChip>{sourceLabel ? sourceLabel : "Draft flow"}</TinyChip>
             </div>
 
             <button

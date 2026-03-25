@@ -1,10 +1,13 @@
-import {
-  AlertTriangle,
-  ArrowRight,
-  FileSearch,
-  PencilLine,
-} from "lucide-react";
+import { ArrowRight, PencilLine } from "lucide-react";
+
 import SetupStudioStageShell from "../components/SetupStudioStageShell.jsx";
+import {
+  GhostButton,
+  SectionHeading,
+  StagePanel,
+  TinyChip,
+  TinyLabel,
+} from "../components/SetupStudioUi.jsx";
 import { humanizeStudioIssue } from "../logic/helpers.js";
 
 function arr(v) {
@@ -39,65 +42,29 @@ function normalizeRows(rows = []) {
     .filter((item) => item.label || item.value);
 }
 
-function isBarrierWarning(value = "") {
-  const x = s(value).toLowerCase();
-  return [
-    "http_403",
-    "http_429",
-    "fetch_failed",
-    "non_html_response",
-    "website_fetch_timeout",
-    "website_entry_timeout",
-  ].includes(x);
-}
-
-function ActionButton({ active = false, icon: Icon, children, onClick }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`inline-flex h-11 items-center justify-center gap-2 rounded-full px-4 text-sm font-medium transition ${
-        active
-          ? "bg-slate-950 text-white hover:bg-slate-800"
-          : "border border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:text-slate-950"
-      }`}
-    >
-      <Icon className="h-4 w-4" />
-      {children}
-    </button>
-  );
-}
-
-function SnapshotRow({ label, value, provenance = "" }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-        {label || "Field"}
-      </div>
-      <div className="mt-1.5 text-sm leading-6 text-slate-700">
-        {value || "-"}
-      </div>
-      {provenance ? (
-        <div className="mt-2 text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">
-          {provenance}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function sourceBadgeLabel(sourceLabel = "") {
-  const x = s(sourceLabel);
-  if (!x) return "";
-  if (x.toLowerCase() === "manual") return "Manual input";
-  return x;
-}
-
 function sourceRoleLabel(source = {}) {
   const role = s(source?.role).toLowerCase();
   if (source?.isPrimary || role === "primary") return "Primary";
   if (source?.isSupporting || role === "supporting") return "Supporting";
   return "";
+}
+
+function Row({ label, value, provenance = "" }) {
+  return (
+    <div className="grid gap-2 border-t border-slate-200/70 py-3 first:border-t-0 first:pt-0 md:grid-cols-[160px_minmax(0,1fr)]">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+        {label}
+      </div>
+      <div className="min-w-0">
+        <div className="break-words text-sm leading-6 text-slate-700">
+          {value || "Missing"}
+        </div>
+        {provenance ? (
+          <div className="mt-1 text-[11px] text-slate-400">{provenance}</div>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 export default function SetupStudioIdentityStage({
@@ -111,7 +78,10 @@ export default function SetupStudioIdentityStage({
   onToggleRefine,
 }) {
   const rows = normalizeRows(discoveryProfileRows).slice(0, 8);
-  const warnings = arr(discoveryWarnings).map((x) => s(x)).filter(Boolean);
+  const warnings = arr(discoveryWarnings)
+    .map((item) => humanizeStudioIssue(item))
+    .filter(Boolean)
+    .slice(0, 4);
   const sources = arr(reviewSources)
     .map((item) => ({
       label: s(item?.label || item?.sourceType || item?.url),
@@ -121,136 +91,125 @@ export default function SetupStudioIdentityStage({
     .filter((item) => item.label || item.url)
     .slice(0, 4);
 
-  const barrierWarning = warnings.find(isBarrierWarning) || "";
-  const barrierState = !!barrierWarning;
-  const sourceBadge = sourceBadgeLabel(sourceLabel);
-
-  const resolvedTitle =
-    !barrierState && s(currentTitle)
-      ? s(currentTitle)
-      : barrierState
-        ? "This source needs manual review."
-        : rows.length
-          ? "Your first business draft is ready."
-          : "Your business draft needs a quick review.";
-
-  const resolvedDescription =
-    !barrierState && s(currentDescription)
-      ? s(currentDescription)
-      : barrierState
-        ? humanizeStudioIssue(barrierWarning)
-        : rows.length
-          ? "Review the first structured draft, fix anything important, then continue."
-          : "The system did not produce many strong fields yet. Refine the draft manually and continue.";
+  const identityTitle = s(currentTitle) || "Business name needs review";
+  const identitySummary =
+    s(currentDescription) || "Add a short business summary before finalizing.";
 
   return (
     <SetupStudioStageShell
       eyebrow="identity"
-      title="Review the first business draft."
-      body="This is the first structured version of the business. Keep it clean, believable, and minimal."
+      title="Shape one clean business identity."
+      body="Review the draft first. Source evidence stays secondary."
     >
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="rounded-[30px] border border-slate-200 bg-white p-6 sm:p-7">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <StagePanel className="space-y-6">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
-              <FileSearch className="h-3.5 w-3.5" />
-              review draft
-            </span>
-
-            {sourceBadge ? (
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                {sourceBadge}
-              </span>
-            ) : null}
-
-            {rows.length ? (
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                {rows.length} fields
-              </span>
-            ) : null}
+            <TinyLabel>Editable draft</TinyLabel>
+            {sourceLabel ? <TinyChip>{sourceLabel}</TinyChip> : null}
+            {warnings.length ? (
+              <TinyChip tone="warn">
+                {warnings.length} review item{warnings.length === 1 ? "" : "s"}
+              </TinyChip>
+            ) : (
+              <TinyChip tone="success">Draft visible</TinyChip>
+            )}
           </div>
 
-          <div className="mt-6">
-            <h3 className="text-[28px] font-semibold leading-[1.02] tracking-[-0.04em] text-slate-950 sm:text-[36px]">
-              {resolvedTitle}
-            </h3>
-
-            <p className="mt-4 max-w-[760px] text-[15px] leading-7 text-slate-600">
-              {resolvedDescription}
-            </p>
+          <div>
+            <div className="text-[32px] font-semibold leading-[1.04] tracking-[-0.05em] text-slate-950 sm:text-[38px]">
+              {identityTitle}
+            </div>
+            <div className="mt-3 max-w-[760px] text-[15px] leading-7 text-slate-600">
+              {identitySummary}
+            </div>
           </div>
 
           {warnings.length ? (
-            <div className="mt-6 space-y-3">
-              {warnings.slice(0, 3).map((warning, index) => (
-                <div
-                  key={`${warning}-${index}`}
-                  className={`flex items-start gap-3 rounded-2xl border px-4 py-3.5 text-sm ${
-                    isBarrierWarning(warning)
-                      ? "border-amber-200 bg-amber-50 text-amber-800"
-                      : "border-slate-200 bg-slate-50 text-slate-700"
-                  }`}
-                >
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                  <span>{humanizeStudioIssue(warning)}</span>
-                </div>
+            <div className="flex flex-wrap gap-2">
+              {warnings.map((warning, index) => (
+                <TinyChip key={`${warning}-${index}`} tone="warn">
+                  {warning}
+                </TinyChip>
               ))}
             </div>
           ) : null}
 
-          {sources.length ? (
-            <div className="mt-6">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-[24px] bg-white/72 px-4 py-4">
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                Participating sources
+                Name
               </div>
-
-              <div className="mt-3 flex flex-wrap gap-2">
-                {sources.map((item, index) => (
-                  <span
-                    key={`${item.label}-${item.url}-${index}`}
-                    className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500"
-                  >
-                    {item.label}
-                    {item.role ? ` ${item.role}` : ""}
-                  </span>
-                ))}
+              <div className="mt-2 text-lg font-semibold text-slate-950">
+                {identityTitle}
               </div>
             </div>
-          ) : null}
 
-          <div className="mt-8 flex flex-wrap gap-3">
-            <ActionButton active icon={ArrowRight} onClick={onNext}>
-              {barrierState ? "Continue manually" : "Continue"}
-            </ActionButton>
-
-            <ActionButton icon={PencilLine} onClick={onToggleRefine}>
-              Refine draft
-            </ActionButton>
-          </div>
-        </div>
-
-        <div className="rounded-[30px] border border-slate-200 bg-white p-6">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">
-            Snapshot
-          </div>
-
-          <div className="mt-5 space-y-3">
-            {rows.length ? (
-              rows.map((item, index) => (
-                <SnapshotRow
-                  key={`${item.label}-${index}`}
-                  label={item.label}
-                  value={item.value}
-                  provenance={item.provenance}
-                />
-              ))
-            ) : (
-              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm leading-6 text-slate-500">
-                No structured fields are visible yet. Use refine to complete the
-                draft manually.
+            <div className="rounded-[24px] bg-white/72 px-4 py-4">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                Draft state
               </div>
-            )}
+              <div className="mt-2 text-lg font-semibold text-slate-950">
+                {rows.length ? `${rows.length} observed fields` : "Needs manual review"}
+              </div>
+            </div>
           </div>
+
+          <div className="flex flex-wrap gap-3">
+            <GhostButton active icon={ArrowRight} onClick={onNext}>
+              Continue
+            </GhostButton>
+            <GhostButton icon={PencilLine} onClick={onToggleRefine}>
+              Review draft
+            </GhostButton>
+          </div>
+        </StagePanel>
+
+        <div className="grid gap-4">
+          <StagePanel tone="subtle">
+            <SectionHeading
+              label="Observed"
+              title="Evidence snapshot"
+              body={
+                rows.length
+                  ? "Observed values are shown here for review."
+                  : "No strong observed fields yet."
+              }
+            />
+            <div className="mt-5 space-y-1">
+              {rows.length ? (
+                rows.map((item, index) => (
+                  <Row
+                    key={`${item.label}-${index}`}
+                    label={item.label}
+                    value={item.value}
+                    provenance={item.provenance}
+                  />
+                ))
+              ) : (
+                <div className="rounded-[22px] bg-white/70 px-4 py-4 text-sm leading-6 text-slate-500">
+                  Open the draft and fill the missing identity fields manually.
+                </div>
+              )}
+            </div>
+          </StagePanel>
+
+          {sources.length ? (
+            <StagePanel tone="subtle">
+              <SectionHeading
+                label="Sources"
+                title="Attached evidence"
+                body="These sources inform the draft but do not define saved truth."
+              />
+              <div className="mt-4 flex flex-wrap gap-2">
+                {sources.map((item, index) => (
+                  <TinyChip key={`${item.label}-${item.url}-${index}`}>
+                    {item.label}
+                    {item.role ? ` - ${item.role}` : ""}
+                  </TinyChip>
+                ))}
+              </div>
+            </StagePanel>
+          ) : null}
         </div>
       </div>
     </SetupStudioStageShell>
