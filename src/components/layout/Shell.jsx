@@ -3,69 +3,22 @@ import { Outlet, useLocation } from "react-router-dom";
 import Sidebar from "./Sidebar.jsx";
 import Header from "./Header.jsx";
 import { realtimeStore } from "../../lib/realtime/realtimeStore.js";
+import { apiGet } from "../../api/client.js";
 
 const SIDEBAR_RAIL_W = 84;
 
-function getApiBase() {
-  const raw = String(import.meta.env.VITE_API_BASE || "").trim();
-  return raw ? raw.replace(/\/+$/, "") : "";
-}
-
-async function readJsonSafe(r) {
-  const text = await r.text().catch(() => "");
-  if (!text) return {};
+async function fetchShellResource(path) {
   try {
-    return JSON.parse(text);
-  } catch {
-    return { raw: text };
-  }
-}
-
-async function apiGet(path) {
-  const base = getApiBase();
-  if (!base) throw new Error("VITE_API_BASE is not set");
-
-  const r = await fetch(`${base}${path}`, {
-    method: "GET",
-    credentials: "include",
-    headers: {
-      Accept: "application/json",
-    },
-  });
-
-  const j = await readJsonSafe(r);
-
-  if (r.status === 401) {
-    const err = new Error("Unauthorized");
-    err.status = 401;
-    err.payload = j;
-    throw err;
-  }
-
-  if (r.status === 403) {
-    const err = new Error("Forbidden");
-    err.status = 403;
-    err.payload = j;
-    throw err;
-  }
-
-  if (!r.ok || j?.ok === false) {
-    const err = new Error(j?.error || j?.details?.message || "Request failed");
-    err.status = r.status || 500;
-    err.payload = j;
-    throw err;
-  }
-
-  return j;
-}
-
-async function safeApiGet(path, fallback = {}) {
-  try {
-    return await apiGet(path);
+    return { ok: true, data: await apiGet(path) };
   } catch (e) {
-    const status = Number(e?.status || 0);
-    if (status === 401 || status === 403) return fallback;
-    return fallback;
+    return {
+      ok: false,
+      status: Number(e?.status || 0),
+      message:
+        typeof e?.message === "string" && e.message.trim()
+          ? e.message.trim()
+          : "Shared workspace stats are temporarily unavailable.",
+    };
   }
 }
 
@@ -98,28 +51,55 @@ export default function Shell() {
   const refreshTimerRef = useRef(0);
 
   const [shellStats, setShellStats] = useState({
-    inboxUnread: 0,
-    inboxOpen: 0,
-    leadsOpen: 0,
-    commentsCount: 0,
-    voiceLive: 0,
-    notificationsUnread: 0,
+    inboxUnread: null,
+    inboxOpen: null,
+    leadsOpen: null,
+    commentsCount: null,
+    voiceLive: null,
+    notificationsUnread: null,
     dbDisabled: false,
     wsState: "idle",
+    availability: "loading",
+    message: "",
   });
 
   async function loadShellStats() {
     const [inboxRes, leadsRes, commentsRes, voiceRes] = await Promise.all([
-      safeApiGet("/api/inbox/threads", { threads: [], dbDisabled: false }),
-      safeApiGet("/api/leads", { leads: [], dbDisabled: false }),
-      safeApiGet("/api/comments?limit=200", { comments: [], dbDisabled: false }),
-      safeApiGet("/api/voice/calls?limit=100", { calls: [], dbDisabled: false }),
+      fetchShellResource("/api/inbox/threads"),
+      fetchShellResource("/api/leads"),
+      fetchShellResource("/api/comments?limit=200"),
+      fetchShellResource("/api/voice/calls?limit=100"),
     ]);
 
-    const threads = Array.isArray(inboxRes?.threads) ? inboxRes.threads : [];
-    const leads = Array.isArray(leadsRes?.leads) ? leadsRes.leads : [];
-    const comments = Array.isArray(commentsRes?.comments) ? commentsRes.comments : [];
-    const voiceCalls = normalizeArray(voiceRes, "calls");
+    const responses = [inboxRes, leadsRes, commentsRes, voiceRes];
+    const failedResponse = responses.find((entry) => !entry?.ok);
+
+    if (failedResponse) {
+      setShellStats((prev) => ({
+        ...prev,
+        inboxUnread: null,
+        inboxOpen: null,
+        leadsOpen: null,
+        commentsCount: null,
+        voiceLive: null,
+        notificationsUnread: null,
+        dbDisabled: false,
+        availability: "unavailable",
+        message:
+          failedResponse.message || "Shared workspace stats are temporarily unavailable.",
+      }));
+      return;
+    }
+
+    const inboxData = inboxRes.data;
+    const leadsData = leadsRes.data;
+    const commentsData = commentsRes.data;
+    const voiceData = voiceRes.data;
+
+    const threads = Array.isArray(inboxData?.threads) ? inboxData.threads : [];
+    const leads = Array.isArray(leadsData?.leads) ? leadsData.leads : [];
+    const comments = Array.isArray(commentsData?.comments) ? commentsData.comments : [];
+    const voiceCalls = normalizeArray(voiceData, "calls");
 
     const inboxUnread = threads.reduce(
       (sum, t) => sum + Number(t?.unread_count || 0),
@@ -150,11 +130,13 @@ export default function Shell() {
       voiceLive,
       notificationsUnread: inboxUnread + leadsOpen + commentsCount + voiceLive,
       dbDisabled: Boolean(
-        inboxRes?.dbDisabled ||
-          leadsRes?.dbDisabled ||
-          commentsRes?.dbDisabled ||
-          voiceRes?.dbDisabled
+        inboxData?.dbDisabled ||
+          leadsData?.dbDisabled ||
+          commentsData?.dbDisabled ||
+          voiceData?.dbDisabled
       ),
+      availability: "ready",
+      message: "",
     }));
   }
 

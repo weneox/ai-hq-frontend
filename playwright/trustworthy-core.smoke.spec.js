@@ -363,6 +363,55 @@ async function mockApi(page) {
   });
 }
 
+async function mockViewerRole(page, role = "owner") {
+  await page.route("**/api/auth/me", async (route) => {
+    await route.fulfill(
+      ok({
+        ok: true,
+        authenticated: true,
+        user: {
+          id: "user-1",
+          full_name: "Operator",
+          user_email: "operator@aihq.test",
+          role,
+          tenant_key: "neox",
+        },
+      })
+    );
+  });
+
+  await page.route("**/api/app/bootstrap", async (route) => {
+    await route.fulfill(
+      ok({
+        ok: true,
+        viewerRole: role,
+        workspace: {
+          tenantKey: "neox",
+          tenant: { tenant_key: "neox", display_name: "NEOX" },
+          businessProfile: {
+            companyName: "North Clinic",
+            description: "Clinic in Baku",
+          },
+          progress: {
+            setupCompleted: true,
+            nextRoute: "/",
+            nextSetupRoute: "/setup/studio",
+            nextStudioStage: "ready",
+          },
+        },
+        setup: {
+          progress: {
+            setupCompleted: true,
+            nextRoute: "/",
+            nextSetupRoute: "/setup/studio",
+            nextStudioStage: "ready",
+          },
+        },
+      })
+    );
+  });
+}
+
 test.beforeEach(async ({ page }) => {
   const pageErrors = [];
   page.on("pageerror", (error) => {
@@ -394,6 +443,69 @@ test("/setup/studio opens on Entry first with explicit review/truth actions", as
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: /view approved truth/i })
+  ).toBeVisible();
+});
+
+test("unauthenticated users are sent into login flow from root", async ({ page }) => {
+  await page.route("**/api/auth/me", async (route) => {
+    await route.fulfill(
+      ok({
+        ok: true,
+        authenticated: false,
+      })
+    );
+  });
+
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByRole("heading", { name: /back inside/i })).toBeVisible();
+});
+
+test("authenticated users land on real setup flow instead of demo root when setup is incomplete", async ({
+  page,
+}) => {
+  await page.route("**/api/app/bootstrap", async (route) => {
+    await route.fulfill(
+      ok({
+        ok: true,
+        viewerRole: "owner",
+        workspace: {
+          tenantKey: "neox",
+          progress: {
+            setupCompleted: false,
+            nextRoute: "/",
+            nextSetupRoute: "/setup/studio",
+            nextStudioStage: "entry",
+          },
+        },
+        setup: {
+          progress: {
+            setupCompleted: false,
+            nextRoute: "/",
+            nextSetupRoute: "/setup/studio",
+            nextStudioStage: "entry",
+          },
+        },
+      })
+    );
+  });
+
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/setup\/studio$/);
+  await expect(
+    page.getByRole("heading", {
+      name: /build your business draft from real signals/i,
+    })
+  ).toBeVisible();
+});
+
+test("authenticated users land on approved truth when setup is already complete", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/truth$/);
+  await expect(
+    page.getByRole("heading", { name: /business truth/i })
   ).toBeVisible();
 });
 
@@ -437,7 +549,7 @@ test("/truth compare flow renders rich and sparse version detail safely", async 
   await expect(compareDialog).not.toBeVisible();
 
   await compareButtons.nth(1).click();
-  await expect(compareDialog.getByText(/version detail/i)).toBeVisible();
+  await expect(compareDialog.getByText("Version detail").first()).toBeVisible();
   await expect(
     compareDialog.getByText(/the backend did not return structured diff detail/i)
   ).toBeVisible();
@@ -456,6 +568,163 @@ test("/settings renders truth-maintenance sources and knowledge review", async (
   await expect(
     page.getByText(/this is source evidence under review, not approved truth yet/i)
   ).toBeVisible();
+});
+
+test("lead to inbox deep-link opens the intended thread when available", async ({ page }) => {
+  await page.route("**/api/leads*", async (route) => {
+    await route.fulfill(
+      ok({
+        ok: true,
+        leads: [
+          {
+            id: "lead-1",
+            full_name: "Aysel Mammadova",
+            stage: "qualified",
+            status: "open",
+            inbox_thread_id: "thread-1",
+            source: "instagram",
+            interest: "Consultation",
+            score: 87,
+            created_at: "2026-03-25T09:00:00.000Z",
+            updated_at: "2026-03-25T09:05:00.000Z",
+          },
+        ],
+      })
+    );
+  });
+
+  await page.route("**/api/inbox/threads", async (route) => {
+    await route.fulfill(
+      ok({
+        ok: true,
+        threads: [
+          {
+            id: "thread-1",
+            customer_name: "Aysel Mammadova",
+            channel: "instagram",
+            status: "open",
+            unread_count: 2,
+            last_message_at: "2026-03-25T09:05:00.000Z",
+          },
+          {
+            id: "thread-2",
+            customer_name: "Other Customer",
+            channel: "whatsapp",
+            status: "open",
+            unread_count: 0,
+            last_message_at: "2026-03-25T08:00:00.000Z",
+          },
+        ],
+      })
+    );
+  });
+
+  await page.route("**/api/inbox/threads/thread-1", async (route) => {
+    await route.fulfill(
+      ok({
+        ok: true,
+        thread: {
+          id: "thread-1",
+          customer_name: "Aysel Mammadova",
+          external_username: "aysel",
+          channel: "instagram",
+          status: "open",
+          unread_count: 2,
+          handoff_active: false,
+        },
+      })
+    );
+  });
+
+  await page.route("**/api/inbox/threads/thread-1/messages?limit=200", async (route) => {
+    await route.fulfill(
+      ok({
+        ok: true,
+        messages: [
+          {
+            id: "msg-1",
+            thread_id: "thread-1",
+            direction: "inbound",
+            text: "I want to book a consultation",
+            created_at: "2026-03-25T09:03:00.000Z",
+          },
+        ],
+      })
+    );
+  });
+
+  await page.goto("/inbox");
+  await page.getByRole("button", { name: /open in leads/i }).click();
+  await expect(page.getByText(/^Leads$/)).toBeVisible();
+  await page.getByRole("button", { name: /open inbox thread/i }).click();
+
+  await expect(page).toHaveURL(/\/inbox\?threadId=thread-1$/);
+  await expect(page.getByText(/aysel mammadova/i).first()).toBeVisible();
+  await expect(page.getByText(/i want to book a consultation/i)).toBeVisible();
+});
+
+test("lead to inbox deep-link degrades safely when the thread is unavailable", async ({ page }) => {
+  await page.route("**/api/inbox/threads", async (route) => {
+    await route.fulfill(ok({ ok: true, threads: [] }));
+  });
+
+  await page.route("**/api/inbox/threads/thread-missing", async (route) => {
+    await route.fulfill({
+      status: 404,
+      contentType: "application/json",
+      body: JSON.stringify({ ok: false, error: "Thread not found" }),
+    });
+  });
+
+  await page.route("**/api/inbox/threads/thread-missing/messages?limit=200", async (route) => {
+    await route.fulfill(ok({ ok: true, messages: [] }));
+  });
+
+  await page.goto("/inbox?threadId=thread-missing");
+
+  await expect(
+    page.getByText(/requested inbox thread is no longer available/i)
+  ).toBeVisible();
+  await expect(page.getByText(/no threads yet/i)).toBeVisible();
+});
+
+test("operator-only routes show a clean access-denied state for non-operator users", async ({
+  page,
+}) => {
+  await mockViewerRole(page, "member");
+  await page.goto("/leads");
+
+  await expect(page.getByText(/restricted surface/i)).toBeVisible();
+  await expect(page.getByRole("heading", { name: /operator access required/i })).toBeVisible();
+  await expect(page.getByRole("link", { name: /go to business truth/i })).toBeVisible();
+  await expect(page.getByText(/lead pipeline/i)).toHaveCount(0);
+});
+
+test("operator roles can still open operator surfaces directly", async ({ page }) => {
+  await mockViewerRole(page, "operator");
+  await page.route("**/api/leads*", async (route) => {
+    await route.fulfill(ok({ ok: true, leads: [] }));
+  });
+
+  await page.goto("/leads");
+  await expect(page.getByText(/^Leads$/)).toBeVisible();
+  await expect(page.getByText(/lead pipeline/i)).toBeVisible();
+});
+
+test("primary navigation stays focused on the launch slice", async ({ page }) => {
+  await page.goto("/truth");
+  await expect(page.locator('a[href="/setup/studio"]')).toHaveCount(1);
+  await expect(page.locator('a[href="/inbox"]')).toHaveCount(1);
+  await expect(page.locator('a[href="/truth"]')).toHaveCount(1);
+  await expect(page.locator('a[href="/settings"]')).toHaveCount(1);
+  await expect(page.getByText("Command Demo")).toHaveCount(0);
+  await expect(page.getByText("Analytics")).toHaveCount(0);
+  await expect(page.getByText("Agents")).toHaveCount(0);
+  await expect(page.locator('a[href="/proposals"]')).toHaveCount(0);
+  await expect(page.locator('a[href="/leads"]')).toHaveCount(0);
+  await expect(page.locator('a[href="/comments"]')).toHaveCount(0);
+  await expect(page.locator('a[href="/voice"]')).toHaveCount(0);
+  await expect(page.locator('a[href="/executions"]')).toHaveCount(0);
 });
 
 test("critical routes do not blank-screen", async ({ page }) => {

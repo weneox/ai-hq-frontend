@@ -1,4 +1,4 @@
-import { apiGet, apiPost, getApiBase } from "./client.js";
+import { apiDelete, apiGet, apiPost } from "./client.js";
 
 export async function getAdminSecrets(provider = "") {
   const p = String(provider || "").trim().toLowerCase();
@@ -23,26 +23,7 @@ export async function saveAdminSecret(provider, secretKey, value) {
 export async function deleteAdminSecret(provider, secretKey) {
   const p = encodeURIComponent(String(provider || "").trim().toLowerCase());
   const k = encodeURIComponent(String(secretKey || "").trim().toLowerCase());
-
-  const base = getApiBase();
-  if (!base) {
-    throw new Error("VITE_API_BASE is not set");
-  }
-
-  const r = await fetch(`${base}/api/settings/secrets/${p}/${k}`, {
-    method: "DELETE",
-    headers: {
-      Accept: "application/json",
-    },
-  });
-
-  const text = await r.text().catch(() => "");
-  let j = {};
-  try {
-    j = text ? JSON.parse(text) : {};
-  } catch {
-    j = { raw: text };
-  }
+  const j = await apiDelete(`/api/settings/secrets/${p}/${k}`);
 
   if (!j?.ok) throw new Error(j?.error || "Failed to delete secret");
   return j;

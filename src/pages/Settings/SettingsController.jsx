@@ -125,6 +125,21 @@ function toFiniteNumber(value, fallback = 0) {
   return Number.isFinite(x) ? x : fallback;
 }
 
+function formatTimestampLabel(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "Unavailable";
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return raw;
+  return date.toLocaleString();
+}
+
+function titleizeTrustAction(value = "") {
+  return String(value || "")
+    .trim()
+    .replace(/[._]+/g, " ")
+    .replace(/\b\w/g, (x) => x.toUpperCase());
+}
+
 function truthMaintenanceMeta(item = {}) {
   const metadata =
     item && typeof item.metadata_json === "object" && !Array.isArray(item.metadata_json)
@@ -554,6 +569,9 @@ function SourcesPanel({
   onSave,
   onStartSync,
   onViewSyncRuns,
+  trustSummary,
+  trustRecentRuns,
+  trustStatus,
 }) {
   const [savingId, setSavingId] = useState("");
   const [syncingId, setSyncingId] = useState("");
@@ -581,6 +599,11 @@ function SourcesPanel({
     (x) => String(x.status).toLowerCase() === "connected"
   ).length;
   const enabledCount = items.filter((x) => !!x.is_enabled).length;
+  const sourceHealth = trustSummary?.sources || {};
+  const runtimeHealth = trustSummary?.runtimeProjection || {};
+  const truthHealth = trustSummary?.truth || {};
+  const reviewHealth = trustSummary?.reviewQueue || {};
+  const trustUnavailable = trustStatus === "unavailable";
 
   return (
     <SettingsSection
@@ -593,27 +616,111 @@ function SourcesPanel({
         <div className="grid gap-4 md:grid-cols-3">
           <StatTile
             label="Total Sources"
-            value={items.length}
+            value={sourceHealth.total ?? items.length}
             hint="Tenant üçün qeydiyyatlı source sayı"
             tone="info"
           />
           <StatTile
             label="Connected"
-            value={connectedCount}
+            value={sourceHealth.connected ?? connectedCount}
             hint="Aktiv qoşulmuş source-lar"
             tone="success"
           />
           <StatTile
             label="Enabled"
-            value={enabledCount}
+            value={sourceHealth.enabled ?? enabledCount}
             hint="Enabled for evidence refresh and future review work"
             tone="neutral"
           />
         </div>
 
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Card variant="surface" padded="md" className="rounded-[24px]">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-sm font-semibold text-slate-950 dark:text-white">
+                  Source Health
+                </div>
+                <Badge
+                  tone={
+                    trustUnavailable
+                      ? "warn"
+                      : (sourceHealth.failed || 0) > 0
+                        ? "warn"
+                        : "success"
+                  }
+                  variant="subtle"
+                  dot
+                >
+                  {trustUnavailable
+                    ? "Unavailable"
+                    : (sourceHealth.failed || 0) > 0
+                      ? "Needs attention"
+                      : "Healthy"}
+                </Badge>
+              </div>
+              <div className="text-sm leading-6 text-slate-500 dark:text-slate-400">
+                Running: {sourceHealth.running ?? 0} · Failed: {sourceHealth.failed ?? 0} · Review
+                required: {sourceHealth.reviewRequired ?? 0}
+              </div>
+              <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
+                Last run {formatTimestampLabel(sourceHealth.lastRunAt)}
+              </div>
+            </div>
+          </Card>
+
+          <Card variant="surface" padded="md" className="rounded-[24px]">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-sm font-semibold text-slate-950 dark:text-white">
+                  Runtime Projection
+                </div>
+                <Badge
+                  tone={trustUnavailable ? "warn" : runtimeHealth.stale ? "warn" : "success"}
+                  variant="subtle"
+                  dot
+                >
+                  {trustUnavailable ? "Unavailable" : runtimeHealth.stale ? "Stale" : "Current"}
+                </Badge>
+              </div>
+              <div className="text-sm leading-6 text-slate-500 dark:text-slate-400">
+                Status: {runtimeHealth.status || "unknown"}
+              </div>
+              <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
+                Updated {formatTimestampLabel(runtimeHealth.updatedAt)}
+              </div>
+            </div>
+          </Card>
+
+          <Card variant="surface" padded="md" className="rounded-[24px]">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-sm font-semibold text-slate-950 dark:text-white">
+                  Approved Truth
+                </div>
+                <Badge tone={trustUnavailable ? "warn" : "success"} variant="subtle" dot>
+                  {truthHealth.latestVersionId ? "Versioned" : trustUnavailable ? "Unavailable" : "Pending"}
+                </Badge>
+              </div>
+              <div className="text-sm leading-6 text-slate-500 dark:text-slate-400">
+                Review queue: {reviewHealth.pending ?? 0} pending · Conflicts: {reviewHealth.conflicts ?? 0}
+              </div>
+              <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
+                Last approved {formatTimestampLabel(truthHealth.approvedAt)}
+              </div>
+            </div>
+          </Card>
+        </div>
+
         <div className="rounded-[22px] border border-slate-200/80 bg-slate-50/90 px-4 py-4 text-sm leading-6 text-slate-700 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300">
           Sync refreshes source evidence only. If something may change the approved business twin, it should appear in Knowledge Review before truth is updated.
         </div>
+
+        {trustUnavailable ? (
+          <div className="rounded-[22px] border border-amber-200/80 bg-amber-50/90 px-4 py-4 text-sm leading-6 text-amber-800 dark:border-amber-300/20 dark:bg-amber-300/10 dark:text-amber-100">
+            Operator trust summary is temporarily unavailable. Source cards below still reflect the last loaded settings state, but health and audit signals could not be loaded.
+          </div>
+        ) : null}
 
         <div className="flex justify-end">
           <Button
@@ -649,6 +756,54 @@ function SourcesPanel({
             ))}
           </div>
         )}
+
+        <Card variant="surface" padded="md" className="rounded-[24px]">
+          <div className="space-y-4">
+            <div>
+              <div className="text-sm font-semibold text-slate-950 dark:text-white">
+                Recent Sync Health
+              </div>
+              <div className="text-sm text-slate-500 dark:text-slate-400">
+                Latest source sync outcomes that may affect review and approved truth.
+              </div>
+            </div>
+
+            {!trustRecentRuns?.length ? (
+              <EmptyState
+                title="No recent sync runs"
+                subtitle="New source sync activity will appear here once operators refresh evidence."
+              />
+            ) : (
+              <div className="space-y-3">
+                {trustRecentRuns.slice(0, 5).map((run) => (
+                  <div
+                    key={run.id || `${run.sourceId || "source"}-${run.startedAt || run.createdAt || ""}`}
+                    className="flex flex-col gap-2 rounded-[18px] border border-slate-200/80 px-4 py-3 dark:border-white/10"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge tone="info" variant="subtle" dot>
+                        {run.sourceDisplayName || run.sourceType || "Source"}
+                      </Badge>
+                      <SyncStatusBadge status={run.status} />
+                      {run.reviewRequired ? (
+                        <Badge tone="warn" variant="subtle" dot>
+                          Review required
+                        </Badge>
+                      ) : null}
+                    </div>
+                    <div className="text-sm text-slate-500 dark:text-slate-400">
+                      Started {formatTimestampLabel(run.startedAt || run.createdAt)} · Finished{" "}
+                      {formatTimestampLabel(run.finishedAt)}
+                    </div>
+                    {run.errorMessage ? (
+                      <div className="text-sm text-rose-600 dark:text-rose-300">{run.errorMessage}</div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </Card>
       </div>
     </SettingsSection>
   );
@@ -1065,6 +1220,8 @@ function KnowledgeReviewPanel({
   canManage,
   onApprove,
   onReject,
+  trustAudit,
+  trustStatus,
 }) {
   const [busyId, setBusyId] = useState("");
   const [busyAction, setBusyAction] = useState("");
@@ -1094,6 +1251,7 @@ function KnowledgeReviewPanel({
   const conflictCount = items.filter(
     (x) => String(x.status).toLowerCase() === "conflict"
   ).length;
+  const trustUnavailable = trustStatus === "unavailable";
 
   return (
     <SettingsSection
@@ -1127,6 +1285,58 @@ function KnowledgeReviewPanel({
         <div className="rounded-[22px] border border-slate-200/80 bg-slate-50/90 px-4 py-4 text-sm leading-6 text-slate-700 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300">
           Approve a candidate only when the source evidence is strong enough to move it forward in the truth-maintenance workflow. Rejecting leaves approved truth unchanged.
         </div>
+
+        <Card variant="surface" padded="md" className="rounded-[24px]">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-slate-950 dark:text-white">
+                  Recent Trust Activity
+                </div>
+                <div className="text-sm text-slate-500 dark:text-slate-400">
+                  Minimal audit trail for source, review, and truth-governance actions.
+                </div>
+              </div>
+              {trustUnavailable ? (
+                <Badge tone="warn" variant="subtle" dot>
+                  Unavailable
+                </Badge>
+              ) : null}
+            </div>
+
+            {!trustAudit?.length ? (
+              <EmptyState
+                title="No recent trust activity"
+                subtitle={
+                  trustUnavailable
+                    ? "Audit signals are temporarily unavailable."
+                    : "Recent source, review, and truth actions will appear here."
+                }
+              />
+            ) : (
+              <div className="space-y-3">
+                {trustAudit.slice(0, 6).map((entry) => (
+                  <div
+                    key={entry.id || `${entry.action || "action"}-${entry.createdAt || ""}`}
+                    className="flex flex-col gap-2 rounded-[18px] border border-slate-200/80 px-4 py-3 dark:border-white/10"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge tone="info" variant="subtle" dot>
+                        {titleizeTrustAction(entry.action)}
+                      </Badge>
+                      <Badge tone="neutral" variant="subtle" dot>
+                        {entry.actor || "system"}
+                      </Badge>
+                    </div>
+                    <div className="text-sm text-slate-500 dark:text-slate-400">
+                      {formatTimestampLabel(entry.createdAt)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </Card>
 
         {!items.length ? (
           <EmptyState
@@ -1334,6 +1544,10 @@ export default function SettingsController() {
     setSyncRunsOpen,
     syncRunsSource,
     syncRunsItems,
+    trustSummary,
+    trustRecentRuns,
+    trustAudit,
+    trustStatus,
     refreshSourceIntelligence,
     handleSaveSource,
     handleStartSourceSync,
@@ -1524,9 +1738,38 @@ export default function SettingsController() {
           />
         );
       case "sources":
-        return <SourcesSection><SourcesPanel items={sources} canManage={canManageSettings} onCreate={() => { const next = [createNewSource(), ...sources]; setSources(next); setWorkspace((prev) => ({ ...prev, sources: next })); }} onSave={handleSaveSource} onStartSync={handleStartSourceSync} onViewSyncRuns={handleViewSourceSyncRuns} /></SourcesSection>;
+        return (
+          <SourcesSection>
+            <SourcesPanel
+              items={sources}
+              canManage={canManageSettings}
+              onCreate={() => {
+                const next = [createNewSource(), ...sources];
+                setSources(next);
+                setWorkspace((prev) => ({ ...prev, sources: next }));
+              }}
+              onSave={handleSaveSource}
+              onStartSync={handleStartSourceSync}
+              onViewSyncRuns={handleViewSourceSyncRuns}
+              trustSummary={trustSummary}
+              trustRecentRuns={trustRecentRuns}
+              trustStatus={trustStatus}
+            />
+          </SourcesSection>
+        );
       case "knowledge_review":
-        return <KnowledgeReviewSection><KnowledgeReviewPanel items={knowledgeReview} canManage={canManageSettings} onApprove={handleApproveKnowledge} onReject={handleRejectKnowledge} /></KnowledgeReviewSection>;
+        return (
+          <KnowledgeReviewSection>
+            <KnowledgeReviewPanel
+              items={knowledgeReview}
+              canManage={canManageSettings}
+              onApprove={handleApproveKnowledge}
+              onReject={handleRejectKnowledge}
+              trustAudit={trustAudit}
+              trustStatus={trustStatus}
+            />
+          </KnowledgeReviewSection>
+        );
       case "channels":
         return <ChannelsPanel canManage={canManageSettings} />;
       case "agents":

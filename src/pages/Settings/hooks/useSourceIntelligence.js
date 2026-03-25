@@ -6,6 +6,7 @@ import {
   updateSettingsSource,
   getSettingsSourceSyncRuns,
   startSettingsSourceSync,
+  getSettingsTrustSummary,
   listKnowledgeReviewQueue,
   approveKnowledgeCandidate,
   rejectKnowledgeCandidate,
@@ -75,18 +76,33 @@ export function useSourceIntelligence({
   const [syncRunsOpen, setSyncRunsOpen] = useState(false);
   const [syncRunsSource, setSyncRunsSource] = useState(null);
   const [syncRunsItems, setSyncRunsItems] = useState([]);
+  const [trustSummary, setTrustSummary] = useState({});
+  const [trustRecentRuns, setTrustRecentRuns] = useState([]);
+  const [trustAudit, setTrustAudit] = useState([]);
+  const [trustStatus, setTrustStatus] = useState("idle");
 
   async function refreshSourceIntelligence(overrideTenantKey = tenantKey) {
-    const [srcs, review] = await Promise.all([
+    const [srcs, review, trust] = await Promise.all([
       listSettingsSources({ tenantKey: overrideTenantKey }).then((x) => x.items).catch(() => []),
       listKnowledgeReviewQueue({ tenantKey: overrideTenantKey }).then((x) => x.items).catch(() => []),
+      getSettingsTrustSummary({ tenantKey: overrideTenantKey, limit: 8 }).catch(() => null),
     ]);
 
     const nextSources = Array.isArray(srcs) ? srcs : [];
     const nextReview = Array.isArray(review) ? review : [];
+    const nextTrustSummary =
+      trust?.summary && typeof trust.summary === "object" && !Array.isArray(trust.summary)
+        ? trust.summary
+        : {};
+    const nextTrustRuns = Array.isArray(trust?.recentRuns) ? trust.recentRuns : [];
+    const nextTrustAudit = Array.isArray(trust?.audit) ? trust.audit : [];
 
     setSources(nextSources);
     setKnowledgeReview(nextReview);
+    setTrustSummary(nextTrustSummary);
+    setTrustRecentRuns(nextTrustRuns);
+    setTrustAudit(nextTrustAudit);
+    setTrustStatus(trust ? "ready" : "unavailable");
 
     syncWorkspaceAndInitial({
       setWorkspace,
@@ -94,10 +110,17 @@ export function useSourceIntelligence({
       patch: {
         sources: nextSources,
         knowledgeReview: nextReview,
+        trustSummary: nextTrustSummary,
       },
     });
 
-    return { sources: nextSources, knowledgeReview: nextReview };
+    return {
+      sources: nextSources,
+      knowledgeReview: nextReview,
+      trustSummary: nextTrustSummary,
+      trustRecentRuns: nextTrustRuns,
+      trustAudit: nextTrustAudit,
+    };
   }
 
   async function handleSaveSource(payload) {
@@ -213,6 +236,10 @@ export function useSourceIntelligence({
     setSyncRunsOpen,
     syncRunsSource,
     syncRunsItems,
+    trustSummary,
+    trustRecentRuns,
+    trustAudit,
+    trustStatus,
     refreshSourceIntelligence,
     handleSaveSource,
     handleStartSourceSync,

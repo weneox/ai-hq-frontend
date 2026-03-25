@@ -371,9 +371,10 @@ export function useLeadsData({ requestedLeadId = "", navigate }) {
 
   function openInboxThread() {
     if (!selectedLead?.inbox_thread_id) return;
-    navigate("/inbox", {
+    const threadId = String(selectedLead.inbox_thread_id).trim();
+    navigate(`/inbox?threadId=${encodeURIComponent(threadId)}`, {
       state: {
-        selectedThreadId: selectedLead.inbox_thread_id,
+        selectedThreadId: threadId,
       },
     });
   }

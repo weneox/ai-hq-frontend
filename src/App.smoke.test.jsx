@@ -34,10 +34,20 @@ vi.mock("./components/auth/UserRouteGuard.jsx", () => ({
   },
 }));
 
+vi.mock("./components/auth/OperatorRouteGuard.jsx", () => ({
+  default: function OperatorRouteGuardMock({ children }) {
+    return children;
+  },
+}));
+
 vi.mock("./components/guards/GuestRouteGuard.jsx", () => ({
   default: function GuestRouteGuardMock({ children }) {
     return children;
   },
+}));
+
+vi.mock("./components/auth/AppEntryRedirect.jsx", () => ({
+  default: () => <div>App Entry Redirect</div>,
 }));
 
 vi.mock("./pages/CommandPage.jsx", () => ({
@@ -103,6 +113,7 @@ afterEach(() => {
 
 describe("App critical route smoke", () => {
   it.each([
+    ["/", "App Entry Redirect"],
     ["/setup/studio", "Setup Studio Route"],
     ["/truth", "Truth Page"],
     ["/settings", "Settings Page"],

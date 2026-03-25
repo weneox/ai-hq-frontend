@@ -13,7 +13,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "npm run test:contracts && npm run test:smoke",
-    "test:contracts": "node --test --test-isolation=none src/api/truth.test.js src/pages/Settings/hooks/useSourceIntelligence.test.js src/pages/SetupStudio/hooks/setupStudioActionShared.test.js src/pages/SetupStudio/state/shared.test.js",
+    "test:contracts": "node --test --test-isolation=none src/api/truth.test.js src/lib/appEntry.test.js src/pages/Settings/hooks/useSourceIntelligence.test.js src/pages/SetupStudio/hooks/setupStudioActionShared.test.js src/pages/SetupStudio/state/shared.test.js",
     "test:smoke": "vitest run --pool threads --maxWorkers 1 src/App.smoke.test.jsx src/pages/SetupStudio/SetupStudioScene.smoke.test.jsx src/pages/Truth/TruthViewerPage.smoke.test.jsx src/pages/Settings/SettingsController.smoke.test.jsx",
     "test:browser:smoke": "playwright test",
     "lint": "eslint .",

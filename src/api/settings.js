@@ -268,6 +268,27 @@ export async function startSettingsSourceSync(id, payload = {}) {
   };
 }
 
+export async function getSettingsTrustSummary(params = {}) {
+  const suffix = qsFrom({
+    tenantId: params.tenantId,
+    tenantKey: params.tenantKey,
+    limit: params.limit,
+  });
+
+  const j = await apiGet(`/api/settings/trust${suffix}`);
+  ensureOk(j, "Failed to load settings trust summary");
+  return {
+    tenantId: j?.tenantId || "",
+    tenantKey: j?.tenantKey || "",
+    summary:
+      j?.summary && typeof j.summary === "object" && !Array.isArray(j.summary)
+        ? j.summary
+        : {},
+    recentRuns: Array.isArray(j?.recentRuns) ? j.recentRuns : [],
+    audit: Array.isArray(j?.audit) ? j.audit : [],
+  };
+}
+
 // ---------------------------------------------------------
 // knowledge review
 // ---------------------------------------------------------

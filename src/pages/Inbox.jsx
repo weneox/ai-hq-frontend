@@ -20,16 +20,25 @@ import InboxComposer from "../components/inbox/InboxComposer.jsx";
 import RetryQueuePanel from "../components/inbox/RetryQueuePanel.jsx";
 import ThreadOutboundAttemptsPanel from "../components/inbox/ThreadOutboundAttemptsPanel.jsx";
 
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { getAppSessionContext } from "../lib/appSession.js";
+import { areInternalRoutesEnabled } from "../lib/appEntry.js";
 
 export default function Inbox() {
+  const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const showInternalDebug = areInternalRoutesEnabled();
   const [filter, setFilter] = useState("all");
   const [wsState, setWsState] = useState("idle");
   const [tenantKey, setTenantKey] = useState("");
   const [operatorName, setOperatorName] = useState("");
   const [replyText, setReplyText] = useState("");
+  const [deepLinkNotice, setDeepLinkNotice] = useState("");
+  const requestedThreadId = String(
+    location.state?.selectedThreadId || searchParams.get("threadId") || ""
+  ).trim();
+  const [pendingThreadId, setPendingThreadId] = useState(requestedThreadId);
 
   useEffect(() => {
     let alive = true;
@@ -91,8 +100,89 @@ export default function Inbox() {
   });
 
   useEffect(() => {
-    loadThreads();
-  }, [loadThreads]);
+    setPendingThreadId(requestedThreadId);
+    if (!requestedThreadId) {
+      setDeepLinkNotice("");
+    }
+  }, [requestedThreadId]);
+
+  useEffect(() => {
+    loadThreads(pendingThreadId || requestedThreadId);
+  }, [loadThreads, pendingThreadId, requestedThreadId]);
+
+  useEffect(() => {
+    if (!pendingThreadId || loadingThreads) {
+      return;
+    }
+
+    const matchingThread = threads.find(
+      (thread) => String(thread?.id || "") === pendingThreadId
+    );
+
+    if (matchingThread) {
+      if (selectedThread?.id !== matchingThread.id) {
+        setSelectedThread(matchingThread);
+      }
+      setDeepLinkNotice("");
+      setPendingThreadId("");
+      return;
+    }
+
+    let cancelled = false;
+
+    async function hydrateRequestedThread() {
+      try {
+        await Promise.all([
+          loadThreadDetail(pendingThreadId),
+          loadMessages(pendingThreadId),
+          loadRelatedLead(pendingThreadId),
+        ]);
+
+        if (cancelled) return;
+
+        setSelectedThread((current) => {
+          if (String(current?.id || "") === pendingThreadId) {
+            setDeepLinkNotice("");
+            setPendingThreadId("");
+            return current;
+          }
+          setDeepLinkNotice("The requested inbox thread is no longer available.");
+          setPendingThreadId("");
+          return current;
+        });
+      } catch {
+        if (!cancelled) {
+          setDeepLinkNotice("The requested inbox thread could not be opened.");
+          setPendingThreadId("");
+        }
+      }
+    }
+
+    hydrateRequestedThread();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    pendingThreadId,
+    loadingThreads,
+    threads,
+    selectedThread?.id,
+    loadThreadDetail,
+    loadMessages,
+    loadRelatedLead,
+    setSelectedThread,
+  ]);
+
+  useEffect(() => {
+    if (!requestedThreadId) return;
+    setSearchParams((prev) => {
+      if (prev.get("threadId") === requestedThreadId) return prev;
+      const next = new URLSearchParams(prev);
+      next.set("threadId", requestedThreadId);
+      return next;
+    }, { replace: true });
+  }, [requestedThreadId, setSearchParams]);
 
   useEffect(() => {
     if (selectedThread?.id) {
@@ -150,6 +240,12 @@ export default function Inbox() {
       {error ? (
         <div className="mb-6 rounded-[22px] border border-rose-400/20 bg-rose-400/[0.06] px-4 py-3 text-sm text-rose-100">
           {error}
+        </div>
+      ) : null}
+
+      {deepLinkNotice ? (
+        <div className="mb-6 rounded-[22px] border border-amber-300/20 bg-amber-300/[0.08] px-4 py-3 text-sm text-amber-100">
+          {deepLinkNotice}
         </div>
       ) : null}
 
@@ -257,7 +353,8 @@ export default function Inbox() {
             actor={operatorName || "operator"}
           />
 
-          <div className="rounded-[30px] border border-white/10 bg-white/[0.03] p-5 shadow-[0_22px_60px_rgba(0,0,0,0.22)] backdrop-blur-xl">
+          {showInternalDebug ? (
+            <div className="rounded-[30px] border border-white/10 bg-white/[0.03] p-5 shadow-[0_22px_60px_rgba(0,0,0,0.22)] backdrop-blur-xl">
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04]">
                 <UserRound className="h-4 w-4 text-white/72" />
@@ -281,7 +378,8 @@ export default function Inbox() {
                 <div className="text-sm text-white/46">No thread selected.</div>
               )}
             </div>
-          </div>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

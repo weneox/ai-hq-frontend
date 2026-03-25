@@ -20,7 +20,16 @@ function cn(...classes) {
   return classes.filter(Boolean).join(" ");
 }
 
-function StatusPill({ live = true, pending = 0, scheduled = 0 }) {
+function formatStatValue(value, suffix) {
+  return value == null ? `${suffix} unavailable` : `${value} ${suffix}`;
+}
+
+function StatusPill({
+  live = true,
+  pending = null,
+  scheduled = null,
+  unavailable = false,
+}) {
   return (
     <div
       className={cn(
@@ -45,42 +54,50 @@ function StatusPill({ live = true, pending = 0, scheduled = 0 }) {
         />
       </div>
 
-      <div className="min-w-0">
-        <div className="flex items-center gap-2 text-[12px] text-white/86">
-          <span className="font-medium">
-            {live ? "Workflow pulse active" : "Workflow pulse paused"}
-          </span>
-          <span className="h-1 w-1 rounded-full bg-white/20" />
-          <span className="text-white/42">
-            {live ? "review lane synced" : "awaiting reconnect"}
-          </span>
-        </div>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-[12px] text-white/86">
+            <span className="font-medium">
+              {unavailable
+                ? "Shared stats unavailable"
+                : live
+                  ? "Workflow pulse active"
+                  : "Workflow pulse paused"}
+            </span>
+            <span className="h-1 w-1 rounded-full bg-white/20" />
+            <span className="text-white/42">
+              {unavailable
+                ? "retry on refresh or navigation"
+                : live
+                  ? "review lane synced"
+                  : "awaiting reconnect"}
+            </span>
+          </div>
 
-        <div className="mt-1 flex items-center gap-2 text-[11px] text-white/40">
-          <span className="inline-flex items-center gap-1.5">
-            <Clock3 className="h-3 w-3" strokeWidth={1.9} />
-            {pending} open leads
-          </span>
+          <div className="mt-1 flex items-center gap-2 text-[11px] text-white/40">
+            <span className="inline-flex items-center gap-1.5">
+              <Clock3 className="h-3 w-3" strokeWidth={1.9} />
+              {formatStatValue(pending, "open leads")}
+            </span>
 
           <span className="h-1 w-1 rounded-full bg-white/15" />
 
-          <span className="inline-flex items-center gap-1.5">
-            <CheckCircle2 className="h-3 w-3" strokeWidth={1.9} />
-            {scheduled} open threads
-          </span>
+            <span className="inline-flex items-center gap-1.5">
+              <CheckCircle2 className="h-3 w-3" strokeWidth={1.9} />
+              {formatStatValue(scheduled, "open threads")}
+            </span>
+          </div>
         </div>
-      </div>
     </div>
   );
 }
 
-function NotificationButton({ unread = 0 }) {
-  const hasUnread = unread > 0;
+function NotificationButton({ unread = null, unavailable = false }) {
+  const hasUnread = typeof unread === "number" && unread > 0;
 
   return (
     <button
       type="button"
-      aria-label="Open notifications"
+      aria-label={unavailable ? "Notifications unavailable" : "Open notifications"}
       className={cn(
         "group relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full",
         "border border-white/[0.09] bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))]",
@@ -97,6 +114,10 @@ function NotificationButton({ unread = 0 }) {
         className="relative z-10 h-[18px] w-[18px] text-white/78 transition duration-300 group-hover:scale-[1.05] group-hover:text-white"
         strokeWidth={1.9}
       />
+
+      {unavailable ? (
+        <span className="absolute right-[8px] top-[8px] z-20 h-[9px] w-[9px] rounded-full border border-amber-200/20 bg-amber-300/80 shadow-[0_0_12px_rgba(252,211,77,0.45)]" />
+      ) : null}
 
       {hasUnread ? (
         <>
@@ -169,10 +190,16 @@ function LogoutButton() {
 }
 
 export default function Header({ shellStats = {} }) {
-  const live = true;
-  const pending = Number(shellStats?.leadsOpen || 0);
-  const scheduled = Number(shellStats?.inboxOpen || 0);
-  const unread = Number(shellStats?.notificationsUnread || 0);
+  const unavailable = shellStats?.availability === "unavailable";
+  const live = !unavailable;
+  const pending =
+    typeof shellStats?.leadsOpen === "number" ? shellStats.leadsOpen : null;
+  const scheduled =
+    typeof shellStats?.inboxOpen === "number" ? shellStats.inboxOpen : null;
+  const unread =
+    typeof shellStats?.notificationsUnread === "number"
+      ? shellStats.notificationsUnread
+      : null;
 
   return (
     <header className="sticky top-0 z-40 px-3 pt-3 md:px-5 md:pt-4">
@@ -205,8 +232,13 @@ export default function Header({ shellStats = {} }) {
           </div>
 
           <div className="flex items-center gap-2 md:gap-3">
-            <StatusPill live={live} pending={pending} scheduled={scheduled} />
-            <NotificationButton unread={unread} />
+            <StatusPill
+              live={live}
+              pending={pending}
+              scheduled={scheduled}
+              unavailable={unavailable}
+            />
+            <NotificationButton unread={unread} unavailable={unavailable} />
             <LogoutButton />
           </div>
         </div>

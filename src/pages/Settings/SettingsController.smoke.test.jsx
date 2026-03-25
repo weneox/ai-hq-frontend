@@ -102,6 +102,49 @@ vi.mock("./hooks/useSourceIntelligence.js", () => ({
     setSyncRunsOpen: vi.fn(),
     syncRunsSource: null,
     syncRunsItems: [],
+    trustSummary: {
+      sources: {
+        total: 1,
+        connected: 1,
+        enabled: 1,
+        running: 0,
+        failed: 0,
+        reviewRequired: 1,
+        lastRunAt: "2026-03-25T10:00:00.000Z",
+      },
+      runtimeProjection: {
+        status: "ready",
+        stale: false,
+        updatedAt: "2026-03-25T10:05:00.000Z",
+      },
+      truth: {
+        latestVersionId: "truth-v1",
+        approvedAt: "2026-03-25T10:06:00.000Z",
+      },
+      reviewQueue: {
+        pending: 1,
+        conflicts: 0,
+      },
+    },
+    trustRecentRuns: [
+      {
+        id: "run-1",
+        sourceDisplayName: "Main Website",
+        status: "completed",
+        startedAt: "2026-03-25T10:00:00.000Z",
+        finishedAt: "2026-03-25T10:02:00.000Z",
+        reviewRequired: true,
+      },
+    ],
+    trustAudit: [
+      {
+        id: "audit-1",
+        action: "settings.source.sync.requested",
+        actor: "owner@example.com",
+        createdAt: "2026-03-25T10:01:00.000Z",
+      },
+    ],
+    trustStatus: "ready",
     refreshSourceIntelligence: vi.fn().mockResolvedValue({}),
     handleSaveSource: vi.fn(),
     handleStartSourceSync: vi.fn(),
@@ -145,6 +188,8 @@ describe("Settings truth-maintenance smoke", () => {
     expect(
       screen.getByText(/new source evidence created candidate changes/i)
     ).toBeInTheDocument();
+    expect(screen.getByText(/recent sync health/i)).toBeInTheDocument();
+    expect(screen.getByText(/runtime projection/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /knowledge review/i }));
     expect(
@@ -153,5 +198,6 @@ describe("Settings truth-maintenance smoke", () => {
     expect(
       screen.getByText(/this is source evidence under review, not approved truth yet/i)
     ).toBeInTheDocument();
+    expect(screen.getByText(/recent trust activity/i)).toBeInTheDocument();
   });
 });

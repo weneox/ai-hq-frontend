@@ -50,10 +50,12 @@ import {
   LeadSelect,
   LeadTextArea,
 } from "../components/leads/LeadFormControls.jsx";
+import { areInternalRoutesEnabled } from "../lib/appEntry.js";
 
 export default function Leads() {
   const location = useLocation();
   const navigate = useNavigate();
+  const showInternalDebug = areInternalRoutesEnabled();
 
   const requestedLeadId = String(location?.state?.selectedLeadId || "").trim();
 
@@ -529,11 +531,11 @@ export default function Leads() {
                     </div>
                   </div>
 
-                  {selExtra && Object.keys(selExtra).length > 0 ? (
+                  {showInternalDebug && selExtra && Object.keys(selExtra).length > 0 ? (
                     <div className="mt-4 rounded-2xl border border-white/8 bg-white/[0.02] p-3">
                       <div className="mb-2 flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-white/32">
                         <ShieldCheck className="h-3.5 w-3.5" />
-                        Extra
+                        Internal Payload
                       </div>
                       <pre className="overflow-auto text-xs leading-6 text-white/58">
                         {JSON.stringify(selExtra, null, 2)}
@@ -593,7 +595,7 @@ export default function Leads() {
                       </div>
                     </div>
 
-                    {ev?.payload ? (
+                    {showInternalDebug && ev?.payload ? (
                       <pre className="mt-3 overflow-auto rounded-2xl border border-white/6 bg-white/[0.02] p-3 text-xs leading-6 text-white/54">
                         {JSON.stringify(ev.payload, null, 2)}
                       </pre>
